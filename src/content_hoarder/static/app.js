@@ -98,7 +98,9 @@
     if (document.getElementById("fuzzy").checked) p.set("fuzzy", "1");
     const status = document.getElementById("status-filter").value;
     if (status) p.set("status", status);
-    p.set("sort", document.getElementById("sort").value);
+    const sv = document.getElementById("sort").value.split(":");
+    p.set("sort", sv[0]);
+    p.set("order", sv[1] || "desc");
     if (activeSource) p.set("source", activeSource);
     p.set("limit", "50");
     p.set("offset", String(offset));
