@@ -44,7 +44,7 @@ def cmd_enrich(args) -> int:
             res = archival.recover(conn, limit=args.limit, retry=args.all,
                                    progress=lambda m: print(m, file=sys.stderr))
         elif args.source:
-            res = enrich_mod.enrich_source(conn, args.source, all_rows=args.all)
+            res = enrich_mod.enrich_source(conn, args.source, all_rows=args.all, limit=args.limit)
         else:
             res = enrich_mod.enrich_all(conn, all_rows=args.all)
     print(json.dumps(res, indent=2))
