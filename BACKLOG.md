@@ -28,10 +28,10 @@ area. Goal: tag videos so they can be filtered into dedicated "processing areas"
 *Motivation: `--flat-playlist` captures duration/channel but NOT category/tags/description, which
 the categorizer (Epic 1) wants for accuracy.*
 
-- [ ] **P2 — Per-video enrich pass.** `enrich --source youtube` runs
-  `yt-dlp --dump-single-json <id>` to fill `category`, `tags`, `description`, exact `duration`,
-  `view_count`. Make it **incremental/resumable** (only items missing the fields) — ~5k videos is
-  slow, so batch + checkpoint. Lazy-import yt-dlp; degrade gracefully.
+- [x] ~~**Per-video enrich pass.**~~ Shipped: `YouTubeConnector.enrich()` runs
+  `yt-dlp --dump-single-json` per video to fill exact `duration`/`view_count`/`yt_categories`/`tags`/
+  `description`/`channel`; `enrich --source youtube [--limit N]`, resumable via `hydrated_at`, lazy
+  yt-dlp, unavailable videos stamped. (Full ~5k run deferred — slow; chunk with `--limit`.)
 
 ## Epic 3 — Recover deleted / private YouTube titles  (`enhancement`, `area:recovery`)
 *Motivation: many WL items show as `[Private video]` / `[Deleted video]` with no title.*

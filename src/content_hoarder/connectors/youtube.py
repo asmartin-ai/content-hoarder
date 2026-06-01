@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
+import time
 from pathlib import Path
 
 from content_hoarder.connectors.base import BaseConnector
@@ -92,3 +95,59 @@ class YouTubeConnector(BaseConnector):
                 "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
             },
         )
+
+    # -- enrich (per-video yt-dlp metadata) ----------------------------------
+    def enrich(self, items: list[dict]) -> list[dict]:
+        """Fill exact duration / categories / tags / description / view_count per video
+        via ``yt-dlp --dump-single-json``. Marks ``hydrated_at`` so re-runs resume; no-ops
+        if yt-dlp is missing. Unavailable (private/deleted) videos are stamped so they
+        aren't retried — title recovery for those is a separate step."""
+        exe = shutil.which("yt-dlp")
+        if not exe:
+            return items  # don't drop the rows; just can't enrich without yt-dlp
+        now = int(time.time())
+        out = []
+        for it in items:
+            info = self._ytdlp_info(exe, it.get("source_id") or "")
+            upd = {"fullname": it["fullname"], "hydrated_at": now}
+            if info:
+                md = {
+                    "duration": info.get("duration"),
+                    "view_count": info.get("view_count"),
+                    "like_count": info.get("like_count"),
+                    "yt_categories": info.get("categories"),   # NOT 'category' (that's the heuristic tag)
+                    "tags": (info.get("tags") or [])[:25],
+                    "description": (info.get("description") or "")[:2000],
+                    "channel": info.get("channel") or info.get("uploader"),
+                    "channel_id": info.get("channel_id") or info.get("uploader_id"),
+                    "availability": info.get("availability"),
+                    "upload_date": info.get("upload_date"),
+                }
+                upd["metadata"] = {k: v for k, v in md.items() if v not in (None, "", [], {})}
+                if info.get("title"):
+                    upd["title"] = info["title"]
+                ts = info.get("timestamp")
+                if isinstance(ts, (int, float)):
+                    upd["created_utc"] = int(ts)
+            else:
+                upd["metadata"] = {"availability": "unavailable"}
+            out.append(upd)
+        return out
+
+    def _ytdlp_info(self, exe: str, vid: str):
+        if not vid:
+            return None
+        try:
+            proc = subprocess.run(
+                [exe, "--dump-single-json", "--skip-download", "--no-warnings",
+                 f"https://youtu.be/{vid}"],
+                capture_output=True, text=True, timeout=60,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+        if proc.returncode != 0 or not (proc.stdout or "").strip():
+            return None
+        try:
+            return json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            return None
