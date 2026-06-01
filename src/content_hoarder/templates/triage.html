@@ -13,9 +13,25 @@
   <header class="topbar triage-bar">
     <a class="btn ghost" href="/">&larr;&nbsp;Browse</a>
     <span id="progress" class="progress"></span>
-    <select id="source-filter" class="src-filter" title="Limit to source">
-      <option value="">all sources</option>
-    </select>
+    <div class="bar-right">
+      <button id="undo-btn" class="btn ghost" type="button" disabled>&#8630;&nbsp;Undo</button>
+      <select id="source-filter" class="src-filter" title="Limit to source">
+        <option value="">all sources</option>
+      </select>
+      <div class="menu">
+        <button id="menu-btn" class="icon-btn" type="button" aria-label="Settings"
+                aria-haspopup="true" aria-expanded="false">&#8943;</button>
+        <div id="menu-pop" class="menu-pop" hidden role="menu">
+          <span class="menu-label">Items per batch</span>
+          <div class="chip-row" id="batch-chips">
+            <button class="chip" data-batch="10" type="button">10</button>
+            <button class="chip" data-batch="20" type="button">20</button>
+            <button class="chip" data-batch="30" type="button">30</button>
+            <button class="chip" data-batch="50" type="button">50</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </header>
 
   <main id="triage-main" class="triage-main">
