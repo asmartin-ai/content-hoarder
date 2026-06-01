@@ -104,6 +104,14 @@ def cmd_promote(args) -> int:
     return 0
 
 
+def cmd_export_obsidian(args) -> int:
+    from content_hoarder import export
+    with _connect() as conn:
+        res = export.obsidian_export(conn, args.vault, status=args.status)
+    print(f"exported {res['exported']} note(s) to {res['vault']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="content_hoarder", description="Local triage-first content manager.")
     sub = p.add_subparsers(dest="command", required=True)
@@ -144,6 +152,11 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--limit", type=int)
     pp.add_argument("--dry-run", action="store_true")
     pp.set_defaults(func=cmd_promote)
+
+    px = sub.add_parser("export-obsidian", help="Write items to an Obsidian vault as Markdown.")
+    px.add_argument("--vault", required=True)
+    px.add_argument("--status", default="keep", help="Which status to export (default: keep).")
+    px.set_defaults(func=cmd_export_obsidian)
 
     return p
 
