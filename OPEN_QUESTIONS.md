@@ -29,3 +29,33 @@ I worked around them and built the connectors so they're ready once you provide 
 ## Notes
 - Everything is local + offline; no API keys needed for any v1 source.
 - The DB lives at `data/app.db` (gitignored). Personal data is never committed.
+
+---
+
+## What I built overnight (2026-06-01)
+**Phase 1 (complete, committed):** schema + FTS5 (exact + fuzzy) search; all 5 connectors
+(Reddit/YouTube/HN/Obsidian/Keep) + Firefox stub; non-destructive idempotent import pipeline;
+Flask web app + CLI; responsive **PWA** with a swipe **triage** card mode (Pixel-6 edge-gesture-safe)
+and a browse/list mode with bulk actions; reversible **bankruptcy**. Browser-verified end-to-end.
+
+**Phase 2 (complete, committed):**
+- **Obsidian export** — `content_hoarder export-obsidian --vault PATH` writes kept items as Markdown
+  (round-trips back through the importer).
+- **Local-LLM assist** — optional keep/skip + auto-tag suggestions via your LM Studio endpoint;
+  "Ask AI" button on the triage card. **Verified working live against your Devstral model.** Never
+  changes status on its own.
+- **Offline service worker** + **reversible dedup** (`content_hoarder dedup --dry-run`).
+
+**45 tests passing**, all offline. 7 commits on `main`.
+
+**Reddit import is validated and ready:** I did a read-only schema check of
+`F:\reddit-saved-manager\data\app.db` — 64,615 rows, all with fullname/permalink/subreddit/score, so
+the connector will import them cleanly (with metadata) once you say go. **I did NOT import anything.**
+
+## Quick decisions for you (no rush)
+1. **Reddit import:** OK to run `content_hoarder import "F:\reddit-saved-manager\data\app.db"` against a
+   **copy** (I'll copy first)? It will load all ~64.6k items into the inbox.
+2. **Theme / triage batch size:** kept defaults (dark theme, 20-item batches) — change if you like.
+3. **Dedup aggressiveness:** current dedup only matches *identical normalized URLs* and is reversible.
+   Want it looser (e.g., near-duplicate titles) or is exact-URL right?
+4. Anything you want reprioritized for the next session.
