@@ -43,6 +43,10 @@ def cmd_enrich(args) -> int:
             print(f"{n} reddit item(s) need recovery; querying archives...", file=sys.stderr)
             res = archival.recover(conn, limit=args.limit, retry=args.all,
                                    progress=lambda m: print(m, file=sys.stderr))
+        elif getattr(args, "titles", False):
+            from content_hoarder import youtube_recover
+            res = youtube_recover.recover_titles(conn, limit=args.limit, retry=args.all,
+                                                 progress=lambda m: print(m, file=sys.stderr))
         elif args.source:
             res = enrich_mod.enrich_source(conn, args.source, all_rows=args.all, limit=args.limit)
         else:
@@ -148,6 +152,8 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--archives", action="store_true",
                     help="Recover [removed]/[deleted] + unhydrated reddit items from web "
                          "archives (PullPush + Arctic-Shift). Network; resumable via --limit.")
+    pe.add_argument("--titles", action="store_true",
+                    help="Recover [Private/Deleted video] YouTube titles from the Wayback Machine.")
     pe.add_argument("--limit", type=int, default=None,
                     help="Max items to attempt this run (chunked/resumable recovery).")
     pe.set_defaults(func=cmd_enrich)
