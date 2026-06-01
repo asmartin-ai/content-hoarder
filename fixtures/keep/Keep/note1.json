@@ -1,0 +1,24 @@
+{
+  "title": "Grocery",
+  "textContent": "Need milk",
+  "listContent": [
+    {
+      "text": "eggs",
+      "isChecked": false
+    },
+    {
+      "text": "bread",
+      "isChecked": true
+    }
+  ],
+  "labels": [
+    {
+      "name": "home"
+    }
+  ],
+  "color": "RED",
+  "isArchived": false,
+  "isTrashed": false,
+  "createdTimestampMs": 1700000000000,
+  "userEditedTimestampMs": 1700000005000
+}

@@ -1,0 +1,19 @@
+{
+  "_type": "playlist",
+  "title": "WL2",
+  "id": "PL1",
+  "entries": [
+    {
+      "id": "vid000001",
+      "title": "First Video",
+      "channel": "Chan A",
+      "duration": 120,
+      "url": "https://youtu.be/vid000001"
+    },
+    {
+      "id": "vid000002",
+      "title": "Second Video",
+      "uploader": "Chan B"
+    }
+  ]
+}

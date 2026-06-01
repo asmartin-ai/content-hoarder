@@ -1,0 +1,21 @@
+{
+  "kind": "Listing",
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "name": "t3_zzz",
+          "title": "A Post",
+          "subreddit": "news",
+          "permalink": "/r/news/comments/zzz/a_post/",
+          "url": "https://example.com",
+          "author": "bob",
+          "score": 99,
+          "over_18": false,
+          "created_utc": 1700000000
+        }
+      }
+    ]
+  }
+}
