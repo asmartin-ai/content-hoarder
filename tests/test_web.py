@@ -1,3 +1,6 @@
+import io
+import json
+
 from content_hoarder import db, models
 from content_hoarder.web import create_app
 
@@ -66,3 +69,43 @@ def test_import_upload(tmp_db, fixtures):
         r = cl.post("/import", data={"file": (fh, "note1.json")},
                     content_type="multipart/form-data").get_json()
     assert r["imported"] >= 1
+
+
+def _yt_playlist(*ids):
+    return {"_type": "playlist", "title": "WL", "id": "PL",
+            "entries": [{"id": i, "title": i.upper()} for i in ids]}
+
+
+def test_import_prepare_counts_without_writing_then_commit(tmp_db):
+    cl = _client(tmp_db)  # seeds 2 items
+    blob = json.dumps(_yt_playlist("abc123", "def456")).encode()
+    data = {"file": (io.BytesIO(blob), "wl.json")}
+    pr = cl.post("/import/prepare", data=data, content_type="multipart/form-data").get_json()
+    assert pr["count"] == 2 and pr["new"] == 2 and pr["source"] == "youtube"
+    assert cl.get("/stats").get_json()["total"] == 2  # prepare must NOT write
+    res = cl.post("/import/commit", json={"token": pr["token"]}).get_json()
+    assert res["imported"] == 2
+    assert cl.get("/stats").get_json()["total"] == 4  # commit wrote
+
+
+def test_import_prepare_url_via_ytdlp(tmp_db, monkeypatch):
+    import content_hoarder.web as web
+
+    class FakeProc:
+        returncode = 0
+        stdout = json.dumps(_yt_playlist("zzz999"))
+        stderr = ""
+
+    monkeypatch.setattr(web.shutil, "which", lambda name: "yt-dlp")
+    monkeypatch.setattr(web.subprocess, "run", lambda *a, **k: FakeProc())
+    cl = _client(tmp_db)
+    pr = cl.post("/import/prepare", json={"url": "https://www.youtube.com/playlist?list=PL"}).get_json()
+    assert pr["count"] == 1 and pr["source"] == "youtube"
+
+
+def test_import_prepare_rejects_non_youtube_url(tmp_db):
+    assert _client(tmp_db).post("/import/prepare", json={"url": "https://example.com/x"}).status_code == 400
+
+
+def test_import_commit_expired_token(tmp_db):
+    assert _client(tmp_db).post("/import/commit", json={"token": "nope"}).status_code == 400
