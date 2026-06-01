@@ -3,12 +3,27 @@
 Questions and decisions raised while working autonomously — for asmartin-ai to review later.
 Each feature was implemented, committed, and run through `/code-review` (real findings fixed inline).
 
-## Open questions
-- _(none yet)_
+## ✅ Shipped this run (10 features — each committed + `/code-review`'d, fixes applied)
+1. **Heuristic categorizer** (listenable/watch/wotagei) — `categorize` CLI + `#category` "processing
+   areas" dropdown with counts + a category tag on cards + manual re-tag chips on the triage card.
+2. **YouTube per-video enrich** — `enrich --source youtube` (exact duration/views/categories/tags).
+3. **YouTube title recovery** — `enrich --source youtube --titles` (Wayback for [Private/Deleted video]).
+4. **On-demand Reddit "Recover"** button on [removed]/[deleted] cards (+ `POST /items/<fn>/recover`).
+5. **Firefox tabs connector** (Export Tabs URLs) — imported 326 as a sample.
+6. **Duplicates v2** — `dedup` CLI (placeholder-excluded, query-safe, non-destructive + reversible).
+7. **.gitattributes** — LF normalization (stops the CRLF warnings).
 
-## Notes / decisions made autonomously
-- Categorizer uses the agreed defaults (listenable ≥30min OR allowlisted channel; watch ≤5min;
-  wotagei title keyword); see `categorize.py` for the channel allowlist — tell me who to add/remove.
+## Open questions for you
+- **Wotagei detection is conservative** — only 3 of 4998 WL2 videos matched (titles with ヲタ芸/wotagei/
+  wota). If your wotagei videos use other terms (idol-event names, performers, サイリウム/cyalume, specific
+  channels), tell me which and I'll widen the rules in `categorize.py` (kept tight to avoid false positives).
+- **Categorizer tunables** — listenable ≥30 min OR allowlisted channel (Isaac Arthur, Perun, LEMMiNO,
+  music/podcast/" - Topic"); watch ≤5 min. Re-tune thresholds/allowlist in `categorize.py` anytime.
+- **Deliberately deferred (need your call, not built to avoid undo-work):** drag-and-drop to buckets
+  (conflicts with the swipe pointer handlers + redundant with swipe), consolidating the triage swipe onto
+  swipe.js (risky refactor, no visible gain), and a **Duplicates review UI** (you removed the last one as
+  confusing — wants your design input; the CLI does the work now). LLM auto-classify stays deferred per
+  your "validate heuristics first".
 
 ## Duplicates v2 (CLI; UI deferred)
 - `python -m content_hoarder dedup --by url` flags possible dups (non-destructive); review, then
