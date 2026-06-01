@@ -309,6 +309,7 @@ def search_items(
     source: str | None = None,
     kind: str | None = None,
     status: str | None = None,
+    category: str | None = None,
     is_saved: int | None = None,
     fuzzy: bool = False,
     sort: str = "last_seen_utc",
@@ -331,6 +332,9 @@ def search_items(
         if status:
             filters.append(f"{a}status = ?")
             params.append(status)
+        if category:
+            filters.append(f"json_extract({a}metadata, '$.category') = ?")
+            params.append(category)
         if is_saved is not None:
             filters.append(f"{a}is_saved = ?")
             params.append(int(is_saved))

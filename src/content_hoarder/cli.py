@@ -51,6 +51,15 @@ def cmd_enrich(args) -> int:
     return 0
 
 
+def cmd_categorize(args) -> int:
+    from content_hoarder import categorize as cat_mod
+    with _connect() as conn:
+        res = cat_mod.categorize_source(conn, args.source or "youtube",
+                                        limit=args.limit, retry=args.all)
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def cmd_serve(args) -> int:
     from content_hoarder.web import create_app
     app = create_app()
@@ -142,6 +151,12 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--limit", type=int, default=None,
                     help="Max items to attempt this run (chunked/resumable recovery).")
     pe.set_defaults(func=cmd_enrich)
+
+    pc = sub.add_parser("categorize", help="Tag items listenable/watch/wotagei (heuristics).")
+    pc.add_argument("--source", default="youtube", help="Source to categorize (default: youtube).")
+    pc.add_argument("--all", action="store_true", help="Re-categorize items that already have one.")
+    pc.add_argument("--limit", type=int, default=None, help="Max items to categorize.")
+    pc.set_defaults(func=cmd_categorize)
 
     ps = sub.add_parser("serve", help="Run the web app.")
     ps.add_argument("--host", help="Bind host (default 127.0.0.1; set to your Tailscale IP for mobile).")

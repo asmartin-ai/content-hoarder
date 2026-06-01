@@ -63,6 +63,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 source=a.get("source") or None,
                 kind=a.get("kind") or None,
                 status=a.get("status") or None,
+                category=a.get("category") or None,
                 is_saved=_int(is_saved) if is_saved not in (None, "") else None,
                 fuzzy=a.get("fuzzy") == "1",
                 sort=a.get("sort", "last_seen_utc"),

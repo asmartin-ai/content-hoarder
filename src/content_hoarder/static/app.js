@@ -158,6 +158,8 @@
     const sv = document.getElementById("sort").value.split(":");
     p.set("sort", sv[0]);
     p.set("order", sv[1] || "desc");
+    const cat = document.getElementById("category").value;
+    if (cat) p.set("category", cat);
     if (activeSource) p.set("source", activeSource);
     p.set("limit", "50");
     p.set("offset", String(offset));
@@ -465,6 +467,7 @@
   document.getElementById("q").addEventListener("input", debounce(() => load(true), 250));
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
+  document.getElementById("category").addEventListener("change", () => load(true));
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)
