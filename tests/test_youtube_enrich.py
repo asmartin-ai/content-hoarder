@@ -46,4 +46,4 @@ def test_youtube_enrich_unavailable(tmp_db, monkeypatch):
 def test_youtube_enrich_no_ytdlp_noop(monkeypatch):
     monkeypatch.setattr(yt.shutil, "which", lambda n: None)
     items = [{"fullname": "youtube:x", "source_id": "x"}]
-    assert YouTubeConnector().enrich(items) == items
+    assert YouTubeConnector().enrich(items) == []  # nothing written; rows stay eligible
