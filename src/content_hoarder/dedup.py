@@ -46,16 +46,27 @@ def _key(item: dict, by: str) -> str:
 
 
 def _richness(it: dict) -> tuple:
-    md = it["metadata"] if isinstance(it["metadata"], dict) else parse_metadata(it["metadata"])
-    return (1 if it.get("title") else 0, len(md), -(it.get("first_seen_utc") or 0))
+    # Works on a full item dict OR the light find_groups row (which carries md_len).
+    md_size = it.get("md_len")
+    if md_size is None:
+        md = it["metadata"] if isinstance(it.get("metadata"), dict) else parse_metadata(it.get("metadata"))
+        md_size = len(md)
+    return (1 if it.get("title") else 0, md_size, -(it.get("first_seen_utc") or 0))
 
 
 def find_groups(conn, by: str = "url", *, status: str = "inbox") -> list[dict]:
-    """Return duplicate groups (>1 item sharing a key). Each: key, count, suggested_keep, items."""
-    rows = [db._row_to_public(r) for r in conn.execute(
-        "SELECT * FROM items WHERE status=?", (status,))]
+    """Return duplicate groups (>1 item sharing a key): key, count, suggested_keep, items.
+
+    Selects only the columns grouping needs (no SELECT * / per-row metadata JSON parse),
+    so it stays cheap on a large inbox.
+    """
+    rows = conn.execute(
+        "SELECT fullname, source, url, title, first_seen_utc, length(metadata) AS md_len "
+        "FROM items WHERE status=?", (status,)
+    ).fetchall()
     groups: dict[str, list[dict]] = {}
-    for it in rows:
+    for row in rows:
+        it = dict(row)
         k = _key(it, by)
         if k:
             groups.setdefault(k, []).append(it)

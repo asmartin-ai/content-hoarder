@@ -92,6 +92,29 @@ def test_invalid_status_raises(conn):
         pass
 
 
+def test_fts_operator_keywords_dont_crash(conn):
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="cats and dogs OR birds"))
+    for q in ("OR", "AND", "NOT", "cats OR dogs", "cats AND"):
+        db.search_items(conn, q)  # bare FTS5 operators must not raise
+    assert db.search_items(conn, "cats")
+
+
+def test_status_prev_preserved_on_double_apply(conn):
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
+    db.set_status(conn, "r:1", "keep")
+    db.set_status(conn, "r:1", "keep")   # re-apply same status (no-op)
+    db.undo_status(conn, "r:1")
+    assert db.get_item(conn, "r:1")["status"] == "inbox"  # not stuck at 'keep'
+
+
+def test_bulk_status_prev_preserved_on_double_apply(conn):
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
+    assert db.bulk_set_status(conn, ["r:1"], "archived") == 1
+    assert db.bulk_set_status(conn, ["r:1"], "archived") == 0  # no-op skipped
+    db.undo_status(conn, "r:1")
+    assert db.get_item(conn, "r:1")["status"] == "inbox"
+
+
 def test_init_db_idempotent(conn):
     db.init_db(conn)
     db.init_db(conn)

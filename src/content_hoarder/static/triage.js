@@ -30,6 +30,7 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+  function safeUrl(u) { return /^(https?:\/\/|\/)/i.test(u || "") ? u : ""; }
   function ago(ts) {
     if (!ts) return "";
     var d = Math.floor(Date.now() / 1000) - ts;
@@ -72,7 +73,7 @@
   }
   function cardHtml(item) {
     var title = item.title || (item.url || item.fullname);
-    var titleHtml = item.url
+    var titleHtml = safeUrl(item.url)
       ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(title) + "</a>"
       : esc(title);
     var snippet = (item.body || "").slice(0, 400);

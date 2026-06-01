@@ -128,7 +128,8 @@ def create_app(db_path: str | None = None) -> Flask:
         by = request.args.get("by", "url")
         with conn() as c:
             groups = dedup.find_groups(c, by=by)
-        return jsonify({"groups": groups, "by": by})
+        # Biggest groups first; cap the payload so the review modal stays responsive.
+        return jsonify({"groups": groups[:200], "total_groups": len(groups), "by": by})
 
     @app.post("/duplicates/resolve")
     def duplicates_resolve():
