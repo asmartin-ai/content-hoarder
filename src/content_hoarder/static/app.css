@@ -556,6 +556,8 @@ select {
 }
 
 .tcard {
+    position: relative;
+    overflow: hidden;
     background-color: var(--panel);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -637,6 +639,51 @@ select {
 .tcard.swipe-arch {
     border-color: var(--danger);
 }
+
+/* triage card: Tinder-style swipe stamps (parity with the list's reveal icons) */
+.tcard-stamp {
+    position: absolute;
+    top: 1rem;
+    padding: 0.25rem 0.7rem;
+    border: 3px solid;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.1s var(--ease);
+    pointer-events: none;
+    z-index: 3;
+}
+.stamp-keep { left: 1rem; color: var(--keep); border-color: var(--keep); transform: rotate(-10deg); }
+.stamp-arch { right: 1rem; color: var(--danger); border-color: var(--danger); transform: rotate(10deg); }
+.tcard.swipe-keep .stamp-keep { opacity: 1; }
+.tcard.swipe-arch .stamp-arch { opacity: 1; }
+
+/* triage card: inline click-to-load Reddit embed */
+.tcard-embed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    margin: 0.5rem 0;
+    background-color: var(--panel2);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+}
+.rd-preview-lg {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.7rem 1.4rem;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+}
+.rd-preview-lg:hover { border-color: var(--accent); }
+.tcard-embed .reddit-embed-bq, .tcard-embed iframe { width: 100% !important; max-width: 100%; border: 0; }
 
 .triage-empty {
     text-align: center;
