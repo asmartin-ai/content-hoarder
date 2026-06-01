@@ -16,6 +16,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from html import unescape
 
 from content_hoarder import db
 
@@ -23,9 +24,11 @@ DEFAULT_USER_AGENT = "content-hoarder/0.1 (youtube title recovery)"
 _WAYBACK_AVAILABLE = "https://archive.org/wayback/available?url="
 _PLACEHOLDER_TITLES = {"", "[private video]", "[deleted video]", "[unavailable video]"}
 
-_OG_TITLE = re.compile(
-    r'<meta[^>]+(?:property|name)=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']', re.I)
-_TITLE_TAG = re.compile(r"<title>(.*?)</title>", re.I | re.S)
+# Find the og:title <meta> tag (attribute order agnostic), then pull its content value
+# with a back-referenced quote so apostrophes inside a double-quoted value don't truncate it.
+_META_OG = re.compile(r"<meta\b[^>]*og:title[^>]*>", re.I)
+_META_CONTENT = re.compile(r"""content\s*=\s*(["'])(.*?)\1""", re.I | re.S)
+_TITLE_TAG = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _YT_SUFFIX = re.compile(r"\s*-\s*YouTube\s*$", re.I)
 # WHERE for items still needing a title.
 _NEEDS_TITLE = (
@@ -41,9 +44,17 @@ def _http_get(url: str, ua: str = DEFAULT_USER_AGENT, timeout: float = 20.0) -> 
 
 
 def _extract_title(html: str) -> str:
-    m = _OG_TITLE.search(html or "")
-    title = m.group(1) if m else ((_TITLE_TAG.search(html or "") or [None, ""])[1])
-    return _YT_SUFFIX.sub("", (title or "").strip()).strip()
+    html = html or ""
+    title = ""
+    tag = _META_OG.search(html)
+    if tag:
+        content = _META_CONTENT.search(tag.group(0))
+        if content:
+            title = content.group(2)
+    if not title:
+        t = _TITLE_TAG.search(html)
+        title = t.group(1) if t else ""
+    return _YT_SUFFIX.sub("", unescape(title).strip()).strip()
 
 
 def recover_title(vid: str, *, get=_http_get) -> str:

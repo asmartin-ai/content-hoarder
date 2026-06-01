@@ -19,6 +19,12 @@ def _fake_get(avail=_AVAIL, html=_HTML):
 def test_extract_title():
     assert _extract_title('<meta property="og:title" content="Foo Bar">') == "Foo Bar"
     assert _extract_title("<title>Baz - YouTube</title>") == "Baz"
+    # apostrophes inside the double-quoted content must not truncate (code-review)
+    assert _extract_title('<meta property="og:title" content="It\'s a Don\'t Test">') == "It's a Don't Test"
+    # reversed attribute order (content before property)
+    assert _extract_title('<meta content="Reversed Attrs" property="og:title">') == "Reversed Attrs"
+    # HTML entities are unescaped
+    assert _extract_title('<meta property="og:title" content="Rock &amp; Roll">') == "Rock & Roll"
 
 
 def test_recover_title_via_wayback():
