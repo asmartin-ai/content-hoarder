@@ -64,26 +64,19 @@
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
   };
 
-  // Reddit's official embed — loaded only when the user taps Play/Preview (online; the
-  // permalink link is the offline/blocked fallback). Re-injecting the script makes it
-  // re-scan and render the freshly-added blockquote.
-  const loadRedditPlatform = () => {
-    const prev = document.getElementById("reddit-embed-js");
-    if (prev) prev.remove();
-    const s = document.createElement("script");
-    s.id = "reddit-embed-js";
-    s.async = true;
-    s.charSet = "UTF-8";
-    s.src = "https://embed.reddit.com/widgets/platform.js";
-    document.body.appendChild(s);
+  // Reddit's blockquote + platform.js embed was retired (the script now 404s), so embed the
+  // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
+  const redditEmbedUrl = (permalink) => {
+    const base = (permalink || "").split("#")[0].split("?")[0]
+      .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
+    return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   };
   const openMedia = (permalink) => {
     if (!safeUrl(permalink)) return;
     document.getElementById("media-body").innerHTML =
-      '<blockquote class="reddit-embed-bq" data-embed-height="500">' +
-      '<a href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a></blockquote>';
+      '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) + '" loading="lazy"></iframe>' +
+      '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
     document.getElementById("media-modal").hidden = false;
-    loadRedditPlatform();
   };
   const closeMedia = () => {
     document.getElementById("media-modal").hidden = true;
