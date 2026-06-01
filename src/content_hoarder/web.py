@@ -125,6 +125,20 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "not a recoverable reddit item"}), 400
         return jsonify(res)
 
+    @app.post("/items/<path:fullname>/category")
+    def set_category(fullname):
+        from content_hoarder.categorize import VALID_CATEGORIES
+        body = request.get_json(silent=True) or {}
+        cat = (body.get("category") or "").strip().lower()
+        if cat not in VALID_CATEGORIES:
+            return jsonify({"error": "invalid category"}), 400
+        with conn() as c:
+            if db.get_item(c, fullname) is None:
+                return jsonify({"error": "not found"}), 404
+            db.merge_upsert(c, {"fullname": fullname, "metadata": {"category": cat}})
+            c.commit()
+        return jsonify({"fullname": fullname, "category": cat})
+
     @app.post("/bulk/status")
     def bulk_status():
         data = request.get_json(silent=True) or {}

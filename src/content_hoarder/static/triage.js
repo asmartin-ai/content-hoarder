@@ -69,6 +69,18 @@
     if (typeof m.score === "number") bits.push(m.score + " pts");
     return bits.join(" · ");
   }
+
+  var CATEGORIES = ["listenable", "watch", "wotagei", "unknown"];
+  function catHtml(item) {
+    if (item.source !== "youtube") return "";  // category is a YouTube concept for now
+    var cur = (item.metadata || {}).category || "";
+    var chips = CATEGORIES.map(function (c) {
+      return '<button class="chip cat-chip' + (c === cur ? " active" : "") +
+        '" type="button" data-cat="' + c + '">' + c + "</button>";
+    }).join("");
+    return '<div class="tcard-cat"><span class="tcard-cat-label">category</span>' +
+      '<div class="chip-row">' + chips + "</div></div>";
+  }
   function mediaHtml(item) {
     var m = item.metadata || {};
     var thumb = m.thumbnail || "";
@@ -107,6 +119,7 @@
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
+      catHtml(item) +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
       '<div class="tcard-ai">' + ai + "</div>" +
       "</article>";
@@ -233,6 +246,23 @@
           '<a href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a></blockquote>';
         loadRedditPlatform();
       }
+      return;
+    }
+    var chip = e.target.closest(".cat-chip");
+    if (chip && queue.length) {
+      var cat = chip.getAttribute("data-cat");
+      var fn = queue[0].fullname;
+      fetchJSON("/items/" + encodeURIComponent(fn) + "/category", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: cat })
+      }).then(function () {
+        if (queue[0]) { queue[0].metadata = queue[0].metadata || {}; queue[0].metadata.category = cat; }
+        var rowEl = chip.closest(".chip-row");
+        if (rowEl) Array.prototype.forEach.call(rowEl.querySelectorAll(".cat-chip"), function (c) {
+          c.classList.toggle("active", c === chip);
+        });
+        toast("Category: " + cat, false);
+      }).catch(function () { toast("Failed — check connection", false); });
       return;
     }
     var aiBtn = e.target.closest(".ai-btn");

@@ -685,6 +685,11 @@ select {
 .rd-preview-lg:hover { border-color: var(--accent); }
 .tcard-embed .reddit-embed-bq, .tcard-embed iframe { width: 100% !important; max-width: 100%; border: 0; }
 
+/* triage card: manual category re-tag */
+.tcard-cat { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.tcard-cat-label { font-size: var(--fs-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.tcard-cat .chip-row { margin-top: 0; }
+
 .triage-empty {
     text-align: center;
     color: var(--muted);

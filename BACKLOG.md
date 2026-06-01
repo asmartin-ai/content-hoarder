@@ -22,7 +22,9 @@ area. Goal: tag videos so they can be filtered into dedicated "processing areas"
   + `/items?category=` + the `#category` selector in the browse topbar.
 - [ ] **P2 — Local-LLM auto-classify (`assist/llm.py`).** Classify from title + channel
   (listenable/watch/wotagei) with a manual override per item. Only after heuristics are validated.
-- [ ] **P3 — Manual re-tagging UI.** A quick category picker on the triage card / list row.
+- [x] ~~**Manual re-tagging UI.**~~ Shipped: a category chip-row on the triage card (youtube items)
+  + `POST /items/<fn>/category` (validated, non-destructive). List-row picker left out to avoid
+  clutter — triage is the focused single-item view.
 
 ## Epic 2 — YouTube metadata enrich  (`enhancement`, `area:youtube`)
 *Motivation: `--flat-playlist` captures duration/channel but NOT category/tags/description, which
