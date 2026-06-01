@@ -55,20 +55,30 @@ the categorizer (Epic 1) wants for accuracy.*
   `enrich --source reddit --archives`. Refs: [pullpush.io](https://pullpush.io),
   [ArthurHeitmann/arctic_shift](https://github.com/ArthurHeitmann/arctic_shift). (reveddit/removeddit
   are dead / moderator-only.)
+- [ ] **P3 — Refine media metadata from the same fetch.** The local data has no `reddit_video`/
+  `preview`, so media is currently inferred by URL heuristics (`media_type` = `reddit_video` for
+  `v.redd.it`, else `reddit_media` for media posts with no captured URL). When the archival fetch runs,
+  populate real `thumbnail`/`reddit_video` URLs and split `reddit_media` into precise image/video.
 
 ## Epic 5 — Inbox redesign follow-ups  (`enhancement`, `area:ui`)
-*The incremental redesign shipped bigger cards + list swipe + undo snackbar. Remaining Gmail/Inbox
-patterns (ref [team-inbox/inbox-reborn](https://github.com/team-inbox/inbox-reborn)):*
+*Shipped: bigger cards + list swipe + undo snackbar; **sources as top tabs**; **status as a left
+sidebar** (with counts) + mobile hamburger drawer; **Gmail-style swipe-reveal icons** (trash/keep);
+import modal; Keep/Archive/Done legend. Remaining patterns (ref
+[team-inbox/inbox-reborn](https://github.com/team-inbox/inbox-reborn)):*
 
-- [ ] **P2 — Sources as top tabs.** Move the source sidebar to Gmail-style category tabs across the
-  top. Plain CSS/JS or [cferdinandi/tabby](https://github.com/cferdinandi/tabby) (~2 KB).
-- [ ] **P2 — Status as a left sidebar.** Replace the `#status-filter` dropdown with a collapsible
-  Gmail-style label sidebar (inbox/keep/archived/done with counts).
+- [x] ~~**Sources as top tabs.**~~ Shipped (`#source-tabs`).
+- [x] ~~**Status as a left sidebar.**~~ Shipped (`#status-nav` + mobile drawer).
+- [ ] **P2 — Triage card parity.** Bring the two features that currently live only on the inbox list
+  into the triage card: (a) the Gmail-style swipe-reveal icons, and (b) the Reddit click-to-load
+  preview embed for `media_type` `reddit_video`/`reddit_media`. The list uses a `#media-modal` +
+  `openMedia()`; triage can embed inline in the big card.
 - [ ] **P3 — Smooth drag-and-drop to buckets.** Drag cards onto category/status buckets.
   [SortableJS](https://github.com/SortableJS/Sortable) (~20 KB, touch-capable) or
   [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).
 - [ ] **P3 — Consolidate triage swipe onto `swipe.js`.** Refactor `triage.js` to use the shared
-  `window.attachSwipe` helper (currently duplicated). Keep the verified behavior.
+  `window.attachSwipe` helper (now also drives the list's icon reveal). Keep the verified behavior.
+- [ ] **P3 — Cross-filtered counts.** Sidebar status counts + tab source counts are currently global
+  (from `/stats` + `/sources`); make them reflect the other axis' active selection.
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created

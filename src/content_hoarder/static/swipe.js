@@ -1,6 +1,8 @@
 /* Shared horizontal-swipe helper (pointer events).
    - Android-edge-safe: ignores a pointerdown within `edge` px of a screen edge.
    - Distinguishes horizontal swipe from vertical scroll (so lists still scroll).
+   - Slides an inner `.item-fg` (falls back to the element itself) so a fixed
+     `.item-bg` with keep/archive icons is revealed underneath, Gmail-style.
    - Calls opts.onRight / opts.onLeft when dragged past `commit` px.
    Usage: window.attachSwipe(el, { onRight: fn, onLeft: fn }). */
 (function () {
@@ -8,11 +10,11 @@
   window.attachSwipe = function (el, opts) {
     opts = opts || {};
     var EDGE = opts.edge || 30, COMMIT = opts.commit || 80;
+    var fg = el.querySelector(".item-fg") || el;
     var startX = 0, startY = 0, dragging = false, decided = false, horizontal = false;
 
     function reset() {
-      el.style.transform = "";
-      el.style.opacity = "";
+      fg.style.transform = "";
       el.classList.remove("swipe-keep", "swipe-arch");
     }
 
@@ -22,7 +24,7 @@
       if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return;  // back-gesture zone
       dragging = true; decided = false; horizontal = false;
       startX = e.clientX; startY = e.clientY;
-      el.style.transition = "none";
+      fg.style.transition = "none";
     });
 
     el.addEventListener("pointermove", function (e) {
@@ -35,21 +37,19 @@
         if (horizontal) { try { el.setPointerCapture(e.pointerId); } catch (_e) {} }
       }
       if (!horizontal) return;                 // vertical → let the list scroll
-      el.style.transform = "translateX(" + dx + "px)";
-      el.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 300));
-      el.classList.toggle("swipe-keep", dx > 40);
-      el.classList.toggle("swipe-arch", dx < -40);
+      fg.style.transform = "translateX(" + dx + "px)";
+      el.classList.toggle("swipe-keep", dx > 40);   // reveals the left (keep) icon
+      el.classList.toggle("swipe-arch", dx < -40);  // reveals the right (archive) icon
     });
 
     function end(e) {
       if (!dragging) return;
       dragging = false;
       var dx = e.clientX - startX;
-      el.style.transition = "transform .2s ease-out, opacity .2s ease-out";
+      fg.style.transition = "transform .2s ease-out";
       if (horizontal && Math.abs(dx) >= COMMIT) {
         var dir = dx > 0 ? 1 : -1;
-        el.style.transform = "translateX(" + (dir * 130) + "%)";
-        el.style.opacity = "0";
+        fg.style.transform = "translateX(" + (dir * 130) + "%)";
         var cb = dir > 0 ? opts.onRight : opts.onLeft;
         setTimeout(function () { if (cb) cb(); }, 160);
       } else {
