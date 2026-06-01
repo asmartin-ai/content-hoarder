@@ -580,3 +580,14 @@ select {
         flex-direction: row;
     }
 }
+
+.tcard-ai { margin-top: 0.85rem; font-size: 0.8rem; line-height: 1.6; }
+.ai-btn { background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem; }
+.ai-btn:hover { border-color: var(--accent); }
+.ai-verdict { font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px; }
+.ai-keep { background: var(--keep); color: #04231a; }
+.ai-skip { background: var(--danger); color: #2a0a0a; }
+.ai-reason { color: var(--muted); }
+.ai-tag { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0 0.45rem; margin-left: 0.25rem; color: var(--muted); }

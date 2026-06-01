@@ -112,6 +112,14 @@ def cmd_export_obsidian(args) -> int:
     return 0
 
 
+def cmd_suggest(args) -> int:
+    from content_hoarder.assist import llm
+    with _connect() as conn:
+        res = llm.suggest_inbox(conn, source=args.source, limit=args.limit)
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="content_hoarder", description="Local triage-first content manager.")
     sub = p.add_subparsers(dest="command", required=True)
@@ -157,6 +165,11 @@ def build_parser() -> argparse.ArgumentParser:
     px.add_argument("--vault", required=True)
     px.add_argument("--status", default="keep", help="Which status to export (default: keep).")
     px.set_defaults(func=cmd_export_obsidian)
+
+    pg = sub.add_parser("suggest", help="Annotate inbox items with local-LLM keep/skip suggestions.")
+    pg.add_argument("--source")
+    pg.add_argument("--limit", type=int, default=20)
+    pg.set_defaults(func=cmd_suggest)
 
     return p
 
