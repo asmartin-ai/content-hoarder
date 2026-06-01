@@ -109,3 +109,15 @@ def test_import_prepare_rejects_non_youtube_url(tmp_db):
 
 def test_import_commit_expired_token(tmp_db):
     assert _client(tmp_db).post("/import/commit", json={"token": "nope"}).status_code == 400
+
+
+def test_cross_filtered_counts(tmp_db):
+    cl = _client(tmp_db)  # seeds reddit:t3_a + youtube:v1, both inbox
+    cl.post("/items/reddit:t3_a/status", json={"status": "keep"})
+    # status counts cross-filtered by source
+    s = cl.get("/stats?source=reddit").get_json()
+    assert s["total"] == 1
+    assert s["by_status"].get("keep") == 1 and s["by_status"].get("inbox", 0) == 0
+    # source counts cross-filtered by status; reddit still listed even at 0
+    src = {x["id"]: x["count"] for x in cl.get("/sources?status=inbox").get_json()["sources"]}
+    assert src.get("youtube") == 1 and src.get("reddit") == 0 and "reddit" in src

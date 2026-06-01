@@ -494,37 +494,53 @@ def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
 # Stats
 # ---------------------------------------------------------------------------
 
-def _group_counts(conn: sqlite3.Connection, column: str) -> dict:
+def _group_counts(conn: sqlite3.Connection, column: str, source: str | None = None) -> dict:
+    where = " WHERE source = ?" if source else ""
+    params = (source,) if source else ()
     rows = conn.execute(
-        f"SELECT {column} AS k, COUNT(*) AS c FROM items GROUP BY {column} ORDER BY c DESC"
+        f"SELECT {column} AS k, COUNT(*) AS c FROM items{where} GROUP BY {column} ORDER BY c DESC",
+        params,
     ).fetchall()
     return {(r["k"] or ""): r["c"] for r in rows}
 
 
-def source_counts(conn: sqlite3.Connection) -> list[dict]:
-    rows = conn.execute(
-        "SELECT source, COUNT(*) AS c FROM items GROUP BY source ORDER BY c DESC"
-    ).fetchall()
+def source_counts(conn: sqlite3.Connection, status: str | None = None) -> list[dict]:
+    """Per-source counts. With ``status``, ``count`` is that source's items in that
+    status (sources present globally still appear, possibly with 0); ordered by global
+    size so the tab order stays stable as the status filter changes."""
+    if status:
+        rows = conn.execute(
+            "SELECT source, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS c "
+            "FROM items GROUP BY source ORDER BY COUNT(*) DESC",
+            (status,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT source, COUNT(*) AS c FROM items GROUP BY source ORDER BY c DESC"
+        ).fetchall()
     return [{"source": r["source"], "count": r["c"]} for r in rows]
 
 
-def get_counts(conn: sqlite3.Connection) -> dict:
-    total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
-    by_status = _group_counts(conn, "status")
-    by_source = _group_counts(conn, "source")
+def get_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
+    where = " WHERE source = ?" if source else ""
+    sp = (source,) if source else ()
+    extra = " AND source = ?" if source else ""
+    total = conn.execute(f"SELECT COUNT(*) FROM items{where}", sp).fetchone()[0]
+    by_status = _group_counts(conn, "status", source)
+    by_source = _group_counts(conn, "source")  # global — drives the Stats modal chart
     week_ago = int(time.time()) - 7 * 86400
     processed_week = conn.execute(
-        "SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL AND processed_utc >= ?",
-        (week_ago,),
+        f"SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL AND processed_utc >= ?{extra}",
+        (week_ago, *sp),
     ).fetchone()[0]
     with_url = conn.execute(
-        "SELECT COUNT(*) FROM items WHERE url <> ''"
+        f"SELECT COUNT(*) FROM items WHERE url <> ''{extra}", sp
     ).fetchone()[0]
     return {
         "total": total,
         "inbox": by_status.get("inbox", 0),
         "by_source": by_source,
-        "by_kind": _group_counts(conn, "kind"),
+        "by_kind": _group_counts(conn, "kind", source),
         "by_status": by_status,
         "processed_this_week": processed_week,
         "with_url": with_url,

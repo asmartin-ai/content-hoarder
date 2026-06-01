@@ -77,8 +77,8 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).
 - [ ] **P3 — Consolidate triage swipe onto `swipe.js`.** Refactor `triage.js` to use the shared
   `window.attachSwipe` helper (now also drives the list's icon reveal). Keep the verified behavior.
-- [ ] **P3 — Cross-filtered counts.** Sidebar status counts + tab source counts are currently global
-  (from `/stats` + `/sources`); make them reflect the other axis' active selection.
+- [x] ~~**Cross-filtered counts.**~~ Shipped: `/stats?source=` + `/sources?status=` cross-filter the
+  sidebar status counts and the source-tab counts (the tab list stays stable at 0).
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created

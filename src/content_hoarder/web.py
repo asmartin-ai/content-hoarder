@@ -129,23 +129,27 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.get("/sources")
     def sources():
+        # Optional ?status= cross-filters the per-source counts (tabs by active status).
+        status = request.args.get("status") or None
         with conn() as c:
-            counts = {r["source"]: r["count"] for r in db.source_counts(c)}
-        out = [
-            {"id": x.id, "label": x.label, "badge_color": x.badge_color,
-             "count": counts.get(x.id, 0)}
-            for x in connectors.all_connectors()
-        ]
-        # Surface any DB sources not in the registry, too.
-        for src, cnt in counts.items():
-            if src not in connectors.REGISTRY:
-                out.append({"id": src, "label": src, "badge_color": "#888888", "count": cnt})
+            rows = db.source_counts(c, status=status)
+        out = []
+        for r in rows:  # source_counts only returns sources actually present in the DB
+            x = connectors.REGISTRY.get(r["source"])
+            out.append({
+                "id": r["source"],
+                "label": x.label if x else r["source"],
+                "badge_color": x.badge_color if x else "#888888",
+                "count": r["count"],
+            })
         return jsonify({"sources": out})
 
     @app.get("/stats")
     def stats():
+        # Optional ?source= cross-filters the status counts (sidebar by active source).
+        source = request.args.get("source") or None
         with conn() as c:
-            return jsonify(db.get_counts(c))
+            return jsonify(db.get_counts(c, source=source))
 
     @app.post("/import")
     def do_import():
