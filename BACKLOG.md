@@ -51,9 +51,9 @@ the categorizer (Epic 1) wants for accuracy.*
   `enrich --source reddit --archives [--limit N] [--all]`. Targets `[removed]`/`[deleted]` items and
   un-hydrated comment bodies. Refs: [pullpush.io](https://pullpush.io),
   [ArthurHeitmann/arctic_shift](https://github.com/ArthurHeitmann/arctic_shift).
-- [ ] **P3 — On-demand single-item recovery in the UI.** A "Recover" button on a `[removed]` card
-  that calls the providers (throttle off) for just that item and patches it in place — like RSM's
-  `hydrate_fullnames`. Reuses `archival.providers`; add a `POST /items/<fn>/recover` route.
+- [x] ~~**On-demand single-item recovery in the UI.**~~ Shipped: `archival.recover_one()` +
+  `POST /items/<fn>/recover` + a "↻ Recover" button on `[removed]`/`[deleted]` reddit cards that
+  patches the title/body in place (throttle off).
 - [ ] **P3 — Refine media metadata from the same fetch.** The local data has no `reddit_video`/
   `preview`, so media is currently inferred by URL heuristics (`media_type` = `reddit_video` for
   `v.redd.it`, else `reddit_media` for media posts with no captured URL). When the archival fetch runs,

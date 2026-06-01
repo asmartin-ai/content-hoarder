@@ -8,10 +8,11 @@ from content_hoarder.archival.providers import (
     PullPushProvider,
     default_providers,
 )
-from content_hoarder.archival.service import count_targets, recover
+from content_hoarder.archival.service import count_targets, recover, recover_one
 
 __all__ = [
     "recover",
+    "recover_one",
     "count_targets",
     "default_providers",
     "PullPushProvider",

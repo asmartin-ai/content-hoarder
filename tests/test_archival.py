@@ -78,6 +78,19 @@ def test_recover_marks_attempted_so_rerun_skips(tmp_db):
     assert archival.recover(conn, providers=[none_prov])["selected"] == 0  # all hydrated now
 
 
+def test_recover_one(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_zz", kind="post",
+                    title="[removed]", body="[removed]", metadata={"permalink": "/r/x/comments/zz/t/"}))
+    conn.commit()
+    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(
+        post_recs=[{"id": "zz", "title": "Got it back", "selftext": "Recovered body"}]))
+    res = archival.recover_one(conn, "reddit:t3_zz", providers=[prov])
+    assert res["recovered"] is True and res["title"] == "Got it back"
+    assert db.get_item(conn, "reddit:t3_zz")["body"] == "Recovered body"
+    assert archival.recover_one(conn, "reddit:t3_missing") is None  # not in DB
+
+
 def test_provider_url_construction():
     pp = PullPushProvider("ua")
     assert pp._ids_url("posts", ["abc"]) == "https://api.pullpush.io/reddit/search/submission/?ids=abc"

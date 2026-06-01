@@ -116,6 +116,15 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "no suggestion"}), 502
         return jsonify(s)
 
+    @app.post("/items/<path:fullname>/recover")
+    def recover_item(fullname):
+        from content_hoarder.archival import service as archival
+        with conn() as c:
+            res = archival.recover_one(c, fullname)
+        if res is None:
+            return jsonify({"error": "not a recoverable reddit item"}), 400
+        return jsonify(res)
+
     @app.post("/bulk/status")
     def bulk_status():
         data = request.get_json(silent=True) or {}

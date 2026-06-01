@@ -111,6 +111,19 @@ def test_import_commit_expired_token(tmp_db):
     assert _client(tmp_db).post("/import/commit", json={"token": "nope"}).status_code == 400
 
 
+def test_recover_route(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+    monkeypatch.setattr(svc, "recover_one",
+                        lambda c, fn, **k: {"recovered": True, "title": "X", "body": "Y", "url": "Z"})
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover")
+    assert r.status_code == 200 and r.get_json()["recovered"] is True
+
+
+def test_recover_route_non_reddit_400(tmp_db):
+    # real recover_one short-circuits for a non-reddit item (no network)
+    assert _client(tmp_db).post("/items/youtube:v1/recover").status_code == 400
+
+
 def test_cross_filtered_counts(tmp_db):
     cl = _client(tmp_db)  # seeds reddit:t3_a + youtube:v1, both inbox
     cl.post("/items/reddit:t3_a/status", json={"status": "keep"})
