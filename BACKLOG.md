@@ -90,8 +90,9 @@ false positives.*
   Later via a browser-extension export (the connector already accepts a flat array).
 - [ ] **P2 — Google Keep import.** Per-account Takeout → `import path/to/Keep` (connector exists;
   just needs the export).
-- [ ] **P3 — Firefox tabs connector.** Build the deferred stub: OneTab / Tab Session Manager exports
-  + `recovery.jsonlz4`. Inputs already in `K:\Users\asmartin-ai\Downloads\TabExports`.
+- [x] ~~**Firefox tabs connector.**~~ Shipped: parses "Export Tabs URLs (Rich format)" .txt
+  (title / url / favicon / window / pinned) → `firefox:<url-hash>` items, de-duped across the
+  overlapping daily exports. Imported one sample (326 tabs). OneTab / `recovery.jsonlz4` remain future.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 

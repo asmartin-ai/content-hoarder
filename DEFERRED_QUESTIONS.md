@@ -10,6 +10,11 @@ Each feature was implemented, committed, and run through `/code-review` (real fi
 - Categorizer uses the agreed defaults (listenable ≥30min OR allowlisted channel; watch ≤5min;
   wotagei title keyword); see `categorize.py` for the channel allowlist — tell me who to add/remove.
 
+## Partial imports (sampled, finish when you want)
+- Firefox tabs: connector built + imported **1 of ~17** TabExports (326 tabs). Import the rest with
+  `python -m content_hoarder import "K:\Users\asmartin-ai\Downloads\TabExports\<file>.txt" --source firefox`
+  (the daily exports overlap heavily, so they de-dup by URL).
+
 ## Data jobs NOT run (per "build + small sample")
 - Full Reddit archival recovery (~9.5k items) — run `enrich --source reddit --archives` when ready.
 - Full YouTube per-video enrich (~5k) — run `enrich --source youtube` when ready.
