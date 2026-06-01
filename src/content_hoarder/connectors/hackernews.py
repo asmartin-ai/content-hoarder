@@ -1,7 +1,11 @@
 """Hacker News connector (Materialistic app DB / id list / favorites HTML).
 
-Imports produce sparse stubs keyed ``hackernews:<id>``; ``enrich()`` fills
-title/url/author/score from the free, no-auth HN Firebase API.
+The Materialistic Android app stores saved stories in a ``favorite`` table inside
+``Materialistic.db`` (columns include itemid/url/title/time). On a non-rooted phone
+you get this file via ``adb backup`` (see docs/IMPORTING.md), NOT ``adb pull``.
+
+DB rows usually carry title + url already; ``enrich()`` can still fill score/etc.
+from the free, no-auth HN Firebase API.
 """
 
 from __future__ import annotations
@@ -20,18 +24,24 @@ _ITEM_ID = re.compile(r"item\?id=(\d+)")
 _ATHING = re.compile(r"class=['\"]athing[^'\"]*['\"][^>]*id=['\"](\d+)['\"]")
 _BARE_ID = re.compile(r"\b(\d{4,})\b")
 _FIREBASE = "https://hacker-news.firebaseio.com/v0/item/{}.json"
+_FAVORITE_TABLES = ("favorite", "favorites", "saved")
 
 
-def _has_saved_table(path: Path) -> bool:
+def _favorites_table(path: Path):
+    """Return the name of the favorites/saved table in a Materialistic DB, or None."""
     try:
         con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
     except sqlite3.Error:
-        return False
+        return None
     try:
-        names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        return "saved" in names
+        names = {r[0].lower(): r[0] for r in
+                 con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        for cand in _FAVORITE_TABLES:
+            if cand in names:
+                return names[cand]
+        return None
     except sqlite3.Error:
-        return False
+        return None
     finally:
         con.close()
 
@@ -51,7 +61,7 @@ class HNConnector(BaseConnector):
             return False
         suf = p.suffix.lower()
         if suf in (".db", ".sqlite", ".sqlite3"):
-            return _has_saved_table(p)
+            return _favorites_table(p) is not None
         if suf in (".html", ".htm"):
             try:
                 return "news.ycombinator.com" in p.read_text("utf-8", errors="ignore")[:16384]
@@ -70,10 +80,12 @@ class HNConnector(BaseConnector):
     def import_file(self, path: Path):
         p = Path(path)
         suf = p.suffix.lower()
-        ids: list[str] = []
         if suf in (".db", ".sqlite", ".sqlite3"):
-            ids = self._db_ids(p)
-        elif suf in (".html", ".htm"):
+            yield from self._from_db(p)
+            return
+
+        ids: list[str] = []
+        if suf in (".html", ".htm"):
             text = p.read_text("utf-8", errors="ignore")
             ids = _ITEM_ID.findall(text) or _ATHING.findall(text)
         elif suf == ".json":
@@ -91,31 +103,45 @@ class HNConnector(BaseConnector):
             if not sid or sid in seen:
                 continue
             seen.add(sid)
-            yield new_item(
-                source="hackernews",
-                source_id=sid,
-                kind="story",
-                title="",
-                url=_hn_url(sid),
-                metadata={"hn_url": _hn_url(sid)},
-            )
+            yield new_item(source="hackernews", source_id=sid, kind="story",
+                           title="", url=_hn_url(sid), metadata={"hn_url": _hn_url(sid)})
 
-    def _db_ids(self, p: Path) -> list[str]:
+    def _from_db(self, p: Path):
+        table = _favorites_table(p)
+        if not table:
+            return
         try:
             con = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
         except sqlite3.Error:
-            return []
+            return
+        con.row_factory = sqlite3.Row
         try:
-            cols = [r[1] for r in con.execute("PRAGMA table_info(saved)")]
-            if not cols:
-                return []
-            idcol = next(
-                (c for c in cols if c.lower() in ("itemid", "id", "_id", "item_id", "story_id")),
-                cols[0],
-            )
-            return [str(r[0]) for r in con.execute(f"SELECT {idcol} FROM saved") if r[0] is not None]
+            cols = {r[1].lower(): r[1] for r in con.execute(f"PRAGMA table_info({table})")}
+            id_c = next((cols[c] for c in ("itemid", "item_id", "story_id", "id") if c in cols),
+                        cols.get("_id"))
+            title_c, url_c = cols.get("title"), cols.get("url")
+            time_c = cols.get("time") or cols.get("timestamp") or cols.get("created")
+            seen = set()
+            for row in con.execute(f"SELECT * FROM {table}"):
+                d = dict(row)
+                sid = str(d.get(id_c)) if id_c and d.get(id_c) is not None else ""
+                url = (d.get(url_c) or "") if url_c else ""
+                if not sid.isdigit() and url:
+                    m = _ITEM_ID.search(url)
+                    if m:
+                        sid = m.group(1)
+                if not sid or sid in seen:
+                    continue
+                seen.add(sid)
+                yield new_item(
+                    source="hackernews", source_id=sid, kind="story",
+                    title=(d.get(title_c) or "") if title_c else "",
+                    url=url or _hn_url(sid),
+                    created_utc=int(d.get(time_c) or 0) if time_c else 0,
+                    metadata={"hn_url": _hn_url(sid)},
+                )
         except sqlite3.Error:
-            return []
+            return
         finally:
             con.close()
 
@@ -137,17 +163,15 @@ class HNConnector(BaseConnector):
                 meta["descendants"] = data["descendants"]
             out.append(
                 new_item(
-                    source="hackernews",
-                    source_id=str(sid),
+                    source="hackernews", source_id=str(sid),
                     kind=data.get("type") or "story",
                     title=data.get("title") or it.get("title") or "",
                     body=data.get("text") or "",
-                    url=data.get("url") or _hn_url(sid),
+                    url=data.get("url") or it.get("url") or _hn_url(sid),
                     author=data.get("by") or "",
                     created_utc=int(data.get("time") or 0),
                     hydrated_at=int(time.time()),
-                    metadata=meta,
-                    raw=data,
+                    metadata=meta, raw=data,
                 )
             )
         return out

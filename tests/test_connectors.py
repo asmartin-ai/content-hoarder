@@ -88,6 +88,26 @@ def test_hackernews_import_and_enrich(fixtures, monkeypatch):
     assert md(e)["score"] == 5
 
 
+def test_hackernews_favorite_db(tmp_path):
+    import sqlite3
+    dbp = tmp_path / "Materialistic.db"
+    con = sqlite3.connect(dbp)
+    con.execute("CREATE TABLE favorite (_id INTEGER PRIMARY KEY, itemid TEXT, url TEXT, title TEXT, time INTEGER)")
+    con.executemany(
+        "INSERT INTO favorite (itemid,url,title,time) VALUES (?,?,?,?)",
+        [("8863", "https://example.com/a", "Story A", 1700000000),
+         ("121003", "https://example.com/b", "Story B", 1700000001)])
+    con.commit()
+    con.close()
+    c = HNConnector()
+    assert c.can_import(dbp)
+    its = items(c, dbp)
+    assert {i["source_id"] for i in its} == {"8863", "121003"}
+    by_id = {i["source_id"]: i for i in its}
+    assert by_id["8863"]["title"] == "Story A"     # title pulled straight from the favorite table
+    assert by_id["8863"]["url"] == "https://example.com/a"
+
+
 def test_dispatch_routes(fixtures):
     cases = {
         fixtures / "reddit" / "saved.csv": "reddit",

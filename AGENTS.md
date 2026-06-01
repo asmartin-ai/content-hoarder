@@ -70,8 +70,9 @@ inbox; `status_prev` enables one-step undo.
 - **youtube**: `yt-dlp --flat-playlist --dump-single-json <PLAYLIST_URL>` JSON (top-level
   `_type=playlist`, `entries[]`); also a WL array/NDJSON fallback. `url=https://youtu.be/<id>`,
   thumb `https://i.ytimg.com/vi/<id>/hqdefault.jpg`.
-- **hackernews**: Materialistic sqlite (a `.db` with a `saved` table) / id list / `favorites?id=` HTML
-  → sparse `hackernews:<id>` stubs; `enrich` via `https://hacker-news.firebaseio.com/v0/item/<id>.json`.
+- **hackernews**: Materialistic `Materialistic.db` (a `favorite` table with itemid/url/title/time —
+  obtained via `adb backup`, NOT `adb pull`; see docs/IMPORTING.md) / id list / `favorites?id=` HTML.
+  DB rows carry title+url directly; `enrich` fills score via `hacker-news.firebaseio.com/v0/item/<id>.json`.
 - **obsidian**: vault folder walk (skip `.obsidian/`, `.trash/`); YAML frontmatter + md body;
   `source_id` = vault-relative path.
 - **keep**: Google Takeout `Keep/` per-note JSON (`title`, `textContent`, `listContent[]`, `labels`,
