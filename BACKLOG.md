@@ -68,10 +68,8 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 
 - [x] ~~**Sources as top tabs.**~~ Shipped (`#source-tabs`).
 - [x] ~~**Status as a left sidebar.**~~ Shipped (`#status-nav` + mobile drawer).
-- [ ] **P2 — Triage card parity.** Bring the two features that currently live only on the inbox list
-  into the triage card: (a) the Gmail-style swipe-reveal icons, and (b) the Reddit click-to-load
-  preview embed for `media_type` `reddit_video`/`reddit_media`. The list uses a `#media-modal` +
-  `openMedia()`; triage can embed inline in the big card.
+- [x] ~~**Triage card parity.**~~ Shipped: Tinder-style swipe stamps + an inline Reddit click-to-load
+  embed on the triage card.
 - [ ] **P3 — Smooth drag-and-drop to buckets.** Drag cards onto category/status buckets.
   [SortableJS](https://github.com/SortableJS/Sortable) (~20 KB, touch-capable) or
   [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).
