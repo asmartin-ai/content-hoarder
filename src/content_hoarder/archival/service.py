@@ -167,3 +167,36 @@ def recover(conn, *, limit=None, retry: bool = False, providers=None,
     if errors:
         result["errors"] = errors
     return result
+
+
+def recover_one(conn, fullname: str, *, providers=None,
+                user_agent: str = DEFAULT_USER_AGENT) -> dict | None:
+    """On-demand recovery of a single reddit item (throttle off, for a UI button).
+
+    Returns ``{recovered, title, body, url}`` (post-recovery values), or None if it
+    isn't a recoverable reddit item.
+    """
+    item = db.get_item(conn, fullname)
+    if not item or item.get("source") != "reddit":
+        return None
+    sid = item.get("source_id") or ""
+    if not sid.startswith(("t1_", "t3_")):
+        return None
+    providers = providers or default_providers(user_agent, throttle=False)
+    by_sid = {sid: item}
+    recovered: dict = {}
+    bare = sid[3:]
+    for prov in providers:
+        try:
+            found = prov.fetch_posts([bare]) if sid.startswith("t3_") else prov.fetch_comments([bare])
+        except ArchiveError:
+            continue
+        if _collect(found, sid[:3], by_sid, recovered):
+            break
+    update = {"fullname": fullname, "hydrated_at": int(time.time())}
+    update.update(recovered.get(sid, {}))
+    db.merge_upsert(conn, update)
+    conn.commit()
+    fresh = db.get_item(conn, fullname) or {}
+    return {"recovered": bool(recovered), "title": fresh.get("title"),
+            "body": fresh.get("body"), "url": fresh.get("url")}

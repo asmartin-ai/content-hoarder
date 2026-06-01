@@ -10,6 +10,10 @@
   // Only allow http(s) or root-relative URLs in href (blocks javascript:/data: sinks).
   const safeUrl = (u) => (/^(https?:\/\/|\/)/i.test(u || "") ? u : "");
 
+  const REMOVED_RE = /^\[(removed|deleted)\]$/i;
+  const isRemoved = (item) => item.source === "reddit" &&
+    (REMOVED_RE.test(item.body || "") || REMOVED_RE.test(item.title || ""));
+
   const ago = (ts) => {
     if (!ts) return "";
     const s = Math.floor(Date.now() / 1000 - ts);
@@ -126,6 +130,8 @@
     const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
+    const recoverBtn = isRemoved(item)
+      ? '<button class="recover-btn" data-recover type="button">↻ Recover</button>' : "";
     return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
       '<div class="item-bg" aria-hidden="true">' +
         '<span class="ic ic-keep">✓ Keep</span>' +
@@ -142,6 +148,7 @@
         "</div>" +
         mediaSlotHtml(item) +
         '<div class="item-actions">' +
+          recoverBtn +
           '<button data-act="keep">Keep</button>' +
           '<button data-act="archived">Archive</button>' +
           '<button data-act="done">Done</button>' +
@@ -286,6 +293,33 @@
     }).catch(() => snackbar("Failed", null));
   };
 
+  // On-demand recovery of a [removed]/[deleted] reddit item from web archives.
+  const recoverItem = (fullname, row, btn) => {
+    btn.disabled = true;
+    btn.textContent = "…";
+    getJSON("/items/" + encodeURIComponent(fullname) + "/recover", { method: "POST" })
+      .then((d) => {
+        if (d && d.recovered) {
+          const ttl = row.querySelector(".item-title");
+          if (ttl && d.title) ttl.textContent = d.title;
+          if (d.body && !REMOVED_RE.test(d.body)) {
+            let snip = row.querySelector(".item-snippet");
+            if (!snip) {
+              snip = document.createElement("div");
+              snip.className = "item-snippet";
+              row.querySelector(".item-main").appendChild(snip);
+            }
+            snip.textContent = d.body.slice(0, 240);
+          }
+          btn.textContent = "✓ recovered";
+          toast("Recovered from archives");
+        } else {
+          btn.textContent = "not archived";
+        }
+      })
+      .catch(() => { btn.disabled = false; btn.textContent = "↻ Recover"; });
+  };
+
   // -- event wiring (script is at end of <body>, DOM is ready) --
   document.getElementById("items").addEventListener("click", (e) => {
     const row = e.target.closest(".item");
@@ -293,6 +327,8 @@
     const fullname = row.dataset.fullname;
     const actBtn = e.target.closest("[data-act]");
     if (actBtn) { actOnItem(fullname, actBtn.dataset.act, row); return; }
+    const recBtn = e.target.closest("[data-recover]");
+    if (recBtn) { recoverItem(fullname, row, recBtn); return; }
     const pv = e.target.closest(".rd-preview");
     if (pv) { openMedia(pv.dataset.permalink); return; }
     if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
