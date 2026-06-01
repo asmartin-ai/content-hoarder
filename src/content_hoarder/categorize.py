@@ -14,12 +14,12 @@ from content_hoarder import db
 # Title keywords that mark a wotagei (ヲタ芸) idol-event performance.
 _WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b", re.IGNORECASE)
 
-# Channels whose content is reliably "listenable" (audio-first: long-form talk, music,
-# podcasts). Case-insensitive substring match on the channel name. " - Topic" is the
-# YouTube auto-generated music-channel suffix.
-_LISTENABLE_CHANNELS = (
-    "isaac arthur", "perun", "lemmino", "lofi", "lo-fi", " - topic",
-    "podcast", "audiobook", "full album", "soundtrack",
+# Channels that are reliably "listenable" (audio-first: long-form talk, music, podcasts).
+# Word-boundaried so short tokens (e.g. "lofi") don't match unrelated names like
+# "LoFire Productions". "<Artist> - Topic" is YouTube's auto music-channel suffix.
+_LISTENABLE_CHANNEL_RE = re.compile(
+    r"isaac arthur|perun|lemmino|\blo-?fi\b|\s-\stopic|\bpodcast|\baudiobook|full album|soundtrack",
+    re.IGNORECASE,
 )
 
 LISTENABLE_MIN_SECONDS = 30 * 60   # >= 30 min  => likely listenable
@@ -35,8 +35,7 @@ def categorize(title: str, channel: str, duration) -> str:
     """
     if _WOTAGEI_RE.search(title or ""):
         return "wotagei"
-    ch = (channel or "").lower()
-    if any(name in ch for name in _LISTENABLE_CHANNELS):
+    if _LISTENABLE_CHANNEL_RE.search(channel or ""):
         return "listenable"
     try:
         secs = int(duration)
