@@ -129,6 +129,7 @@ def test_set_category(tmp_db):
     r = cl.post("/items/youtube:v1/category", json={"category": "listenable"})
     assert r.status_code == 200 and r.get_json()["category"] == "listenable"
     assert cl.get("/items?category=listenable").get_json()["items"][0]["fullname"] == "youtube:v1"
+    assert cl.get("/stats").get_json()["by_category"]["listenable"] == 1
     assert cl.post("/items/youtube:v1/category", json={"category": "bogus"}).status_code == 400
     assert cl.post("/items/youtube:nope/category", json={"category": "watch"}).status_code == 404
 

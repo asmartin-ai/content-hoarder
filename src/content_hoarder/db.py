@@ -508,6 +508,16 @@ def _group_counts(conn: sqlite3.Connection, column: str, source: str | None = No
     return {(r["k"] or ""): r["c"] for r in rows}
 
 
+def _category_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
+    where = " WHERE source = ?" if source else ""
+    params = (source,) if source else ()
+    rows = conn.execute(
+        f"SELECT json_extract(metadata, '$.category') AS k, COUNT(*) AS c "
+        f"FROM items{where} GROUP BY k", params,
+    ).fetchall()
+    return {r["k"]: r["c"] for r in rows if r["k"]}
+
+
 def source_counts(conn: sqlite3.Connection, status: str | None = None) -> list[dict]:
     """Per-source counts. With ``status``, ``count`` is that source's items in that
     status (sources present globally still appear, possibly with 0); ordered by global
@@ -545,6 +555,7 @@ def get_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
         "inbox": by_status.get("inbox", 0),
         "by_source": by_source,
         "by_kind": _group_counts(conn, "kind", source),
+        "by_category": _category_counts(conn, source),
         "by_status": by_status,
         "processed_this_week": processed_week,
         "with_url": with_url,
