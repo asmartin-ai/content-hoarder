@@ -1,0 +1,37 @@
+# Environment / secrets
+.env
+
+# Local data — NEVER commit (years of personal content from many accounts)
+data/
+exports/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Source exports / dumps
+takeout*/
+*Takeout*.zip
+*.ndjson
+saved*.json
+saved*.csv
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Allow only the tiny curated synthetic test fixtures
+!fixtures/
+!fixtures/**
