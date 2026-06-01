@@ -122,8 +122,10 @@ _UPDATE_SQL = (
 _SORT_COLUMNS = {
     "last_seen_utc": "last_seen_utc",
     "first_seen_utc": "first_seen_utc",
-    "created_utc": "created_utc",
-    "saved_utc": "saved_utc",
+    # NULLIF(...,0): undated items (created_utc/saved_utc == 0, common for sparse Reddit
+    # imports) are treated as unknown and sorted LAST in either direction.
+    "created_utc": "NULLIF(created_utc, 0)",
+    "saved_utc": "NULLIF(saved_utc, 0)",
     "title": "title",
     "status": "status",
     "source": "source",
