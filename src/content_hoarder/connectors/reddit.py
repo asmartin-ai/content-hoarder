@@ -45,6 +45,28 @@ def _sid_from_permalink(permalink: str) -> str:
     return ("t3_" + mp.group(1)) if mp else ""
 
 
+def _clean_url(url: str, permalink: str) -> str:
+    """Build a usable URL without double-prefixing. The RSM DB stores `permalink` as a
+    full (sometimes colon-broken `https//`) URL with an empty `url`, so we must NOT blindly
+    prepend the reddit domain — only do so for genuinely relative ('/r/...') permalinks."""
+    if url:
+        return url
+    p = (permalink or "").strip()
+    if not p:
+        return ""
+    if p.startswith(("http://", "https://")):
+        return p
+    if p.startswith("https//"):            # missing colon
+        return "https://" + p[len("https//"):]
+    if p.startswith("http//"):
+        return "http://" + p[len("http//"):]
+    if p.startswith("/"):
+        return "https://www.reddit.com" + p
+    if p.startswith("www."):
+        return "https://" + p
+    return "https://www.reddit.com/" + p.lstrip("/")
+
+
 def _is_rsm_db(path: Path) -> bool:
     try:
         con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
@@ -129,7 +151,7 @@ class RedditConnector(BaseConnector):
             kind=kind,
             title=d.get("title") or _title_from_permalink(permalink),
             body=d.get("body") or d.get("selftext") or "",
-            url=d.get("url") or (f"https://www.reddit.com{permalink}" if permalink else ""),
+            url=_clean_url(d.get("url"), permalink),
             author=d.get("author") or "",
             created_utc=int(d.get("created_utc") or 0),
             saved_utc=int(d.get("saved_utc") or 0),
@@ -165,7 +187,7 @@ class RedditConnector(BaseConnector):
                     kind="comment" if str(sid).startswith("t1_") else "post",
                     title=row.get("title") or _title_from_permalink(permalink),
                     body=row.get("body") or row.get("selftext") or "",
-                    url=row.get("url") or (f"https://www.reddit.com{permalink}" if permalink else ""),
+                    url=_clean_url(row.get("url"), permalink),
                     author=row.get("author") or "",
                     metadata=meta,
                 )
@@ -206,7 +228,7 @@ class RedditConnector(BaseConnector):
                 kind="comment" if str(sid).startswith("t1_") else "post",
                 title=d.get("title") or _title_from_permalink(permalink),
                 body=d.get("selftext") or d.get("body") or "",
-                url=d.get("url") or (f"https://www.reddit.com{permalink}" if permalink else ""),
+                url=_clean_url(d.get("url"), permalink),
                 author=d.get("author") or "",
                 created_utc=int(d.get("created_utc") or 0),
                 metadata=meta,

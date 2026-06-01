@@ -2,6 +2,12 @@
     box-sizing: border-box;
 }
 
+/* The `hidden` attribute must always win, even over a component's display rule
+   (e.g. .bulkbar/.btn set display, which would otherwise keep them visible). */
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --bg: #0f1115;
     --panel: #171a21;
@@ -574,7 +580,8 @@ select {
 .triage-hint {
     text-align: center;
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: 1rem;
+    line-height: 1.5;
     margin-top: 1rem;
 }
 
@@ -665,10 +672,3 @@ select {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
 }
-
-/* duplicates review */
-.dup-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: var(--sp-3); }
-.dup-group { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
-.dup-item { display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; cursor: pointer; }
-.dup-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dup-resolve { margin-top: var(--sp-2); }

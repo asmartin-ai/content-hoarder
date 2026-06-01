@@ -34,6 +34,15 @@ def test_reddit_listing(fixtures):
     assert md(it)["score"] == 99 and md(it)["subreddit"] == "news"
 
 
+def test_reddit_clean_url():
+    from content_hoarder.connectors.reddit import _clean_url
+    assert _clean_url("", "/r/x/comments/abc/t/") == "https://www.reddit.com/r/x/comments/abc/t/"
+    assert _clean_url("", "https://www.reddit.com/r/x/") == "https://www.reddit.com/r/x/"
+    assert _clean_url("", "https//www.reddit.com/r/x/") == "https://www.reddit.com/r/x/"  # broken colon
+    assert _clean_url("https://ex.com/a", "/r/x/") == "https://ex.com/a"  # explicit url wins
+    assert _clean_url("", "") == ""
+
+
 def test_youtube_playlist(fixtures):
     its = items(YouTubeConnector(), fixtures / "youtube" / "playlist.json")
     assert len(its) == 2
