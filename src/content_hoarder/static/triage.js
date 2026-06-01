@@ -43,6 +43,17 @@
     return fetch(url, opts).then(function (r) { return r.ok ? r.json() : Promise.reject(r); });
   }
 
+  // Reddit's official embed — loaded only when the user taps Play/Preview (online;
+  // the permalink link is the offline/blocked fallback).
+  function loadRedditPlatform() {
+    var prev = document.getElementById("reddit-embed-js");
+    if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+    var s = document.createElement("script");
+    s.id = "reddit-embed-js"; s.async = true; s.charSet = "UTF-8";
+    s.src = "https://embed.reddit.com/widgets/platform.js";
+    document.body.appendChild(s);
+  }
+
   function badge(item) {
     var s = sources[item.source] || { label: item.source, badge_color: "#888" };
     return '<span class="badge" style="--c:' + esc(s.badge_color) + '">' + esc(s.label) + "</span>";
@@ -66,10 +77,19 @@
       var yt = (item.url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/) || [])[1];
       if (yt) thumb = "https://i.ytimg.com/vi/" + yt + "/hqdefault.jpg";
     }
-    if (!thumb) return "";
-    var nsfw = m.over_18 ? " nsfw" : "";
-    return '<div class="tcard-media' + nsfw + '"><img loading="lazy" src="' + esc(thumb) +
-      '" alt="">' + (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") + "</div>";
+    if (thumb) {
+      var nsfw = m.over_18 ? " nsfw" : "";
+      return '<div class="tcard-media' + nsfw + '"><img loading="lazy" src="' + esc(thumb) +
+        '" alt="">' + (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") + "</div>";
+    }
+    // Reddit media posts with no thumbnail → click-to-load inline Reddit embed.
+    if (item.source === "reddit" && (m.media_type === "reddit_video" || m.media_type === "reddit_media")) {
+      var permalink = m.permalink || item.url || "";
+      var label = m.media_type === "reddit_video" ? "▶ Play" : "▶ Preview";
+      return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) + '">' +
+        '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
+    }
+    return "";
   }
   function cardHtml(item) {
     var title = item.title || (item.url || item.fullname);
@@ -80,6 +100,8 @@
     var m = item.metadata || {};
     var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
+      '<span class="tcard-stamp stamp-keep">✓ Keep</span>' +
+      '<span class="tcard-stamp stamp-arch">🗑 Archive</span>' +
       '<div class="tcard-head">' + badge(item) +
       '<span class="tcard-age">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span></div>" +
       mediaHtml(item) +
@@ -202,6 +224,17 @@
   stack.addEventListener("click", function (e) {
     var media = e.target.closest(".tcard-media.nsfw");
     if (media) { media.classList.remove("nsfw"); return; }
+    var pv = e.target.closest(".rd-preview-lg");
+    if (pv) {
+      var holder = e.target.closest(".tcard-embed");
+      var permalink = holder ? holder.getAttribute("data-permalink") : "";
+      if (/^https?:\/\//i.test(permalink)) {
+        holder.innerHTML = '<blockquote class="reddit-embed-bq" data-embed-height="480">' +
+          '<a href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a></blockquote>';
+        loadRedditPlatform();
+      }
+      return;
+    }
     var aiBtn = e.target.closest(".ai-btn");
     if (aiBtn && queue.length) {
       aiBtn.textContent = "…thinking";
