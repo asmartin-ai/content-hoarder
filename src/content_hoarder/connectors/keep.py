@@ -72,10 +72,15 @@ class KeepConnector(BaseConnector):
             ]
             m = re.search(r"https?://\S+", text_content)
             url = m.group(0) if m else ""
+            # createdTimestampMs is unique per note and stable across re-imports; prefer it
+            # over the filename stem (two notes titled the same in different account/label
+            # folders would otherwise collapse to one fullname).
+            created_ms = note.get("createdTimestampMs")
+            source_id = str(created_ms) if created_ms else file_path.stem
 
             yield new_item(
                 source="keep",
-                source_id=file_path.stem,
+                source_id=source_id,
                 kind="note",
                 title=title,
                 body=body,

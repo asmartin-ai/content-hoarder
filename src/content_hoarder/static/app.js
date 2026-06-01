@@ -7,6 +7,9 @@
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+  // Only allow http(s) or root-relative URLs in href (blocks javascript:/data: sinks).
+  const safeUrl = (u) => (/^(https?:\/\/|\/)/i.test(u || "") ? u : "");
+
   const ago = (ts) => {
     if (!ts) return "";
     const s = Math.floor(Date.now() / 1000 - ts);
@@ -68,7 +71,7 @@
 
   const itemHtml = (item) => {
     const t = thumb(item);
-    const titleHtml = item.url
+    const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
@@ -231,11 +234,14 @@
   });
 
   // -- duplicates review --
-  let dupGroups = [];
+  let dupGroups = [], dupTotal = 0;
   const renderDupes = () => {
     const body = document.getElementById("dup-body");
     if (!dupGroups.length) { body.innerHTML = '<p class="empty">No duplicate groups 🎉</p>'; return; }
-    body.innerHTML = dupGroups.map((g, gi) =>
+    const note = (dupTotal > dupGroups.length)
+      ? '<p class="menu-label">Showing ' + dupGroups.length + " of " + dupTotal + " groups (biggest first).</p>"
+      : '<p class="menu-label">' + dupTotal + " duplicate group(s).</p>";
+    body.innerHTML = note + dupGroups.map((g, gi) =>
       '<div class="dup-group">' +
         g.items.map((it) =>
           '<label class="dup-item"><input type="radio" name="dg' + gi + '" value="' + esc(it.fullname) + '"' +
@@ -248,7 +254,11 @@
   };
   const loadDupes = () => {
     getJSON("/duplicates?by=" + document.getElementById("dup-by").value)
-      .then((data) => { dupGroups = data.groups || []; renderDupes(); })
+      .then((data) => {
+        dupGroups = data.groups || [];
+        dupTotal = data.total_groups != null ? data.total_groups : dupGroups.length;
+        renderDupes();
+      })
       .catch(() => {});
   };
   document.getElementById("btn-dupes").addEventListener("click", () => {

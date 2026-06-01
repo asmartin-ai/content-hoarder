@@ -265,9 +265,11 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def _fts_query(q: str) -> str:
-    """Build a safe FTS5 MATCH expression (implicit AND of alnum tokens)."""
+    """Build a safe FTS5 MATCH expression. Each token is quoted so FTS5 operator
+    keywords (OR/AND/NOT/NEAR) are treated as string literals, not syntax — an
+    unquoted bare 'OR' would raise an fts5 syntax error and 500 the request."""
     toks = [t for t in re.split(r"\W+", q or "", flags=re.UNICODE) if t]
-    return " ".join(toks)
+    return " ".join('"' + t + '"' for t in toks)
 
 
 def _trigram_match(q: str) -> str:
@@ -385,6 +387,8 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
     if row is None:
         return None
     old = row[0]
+    if status == old:
+        return _public_by_fullname(conn, fullname)  # idempotent; don't clobber status_prev
     now = int(time.time())
     processed = None if status == "inbox" else now
     conn.execute(
@@ -423,10 +427,12 @@ def bulk_set_status(
     processed = None if status == "inbox" else now
     count = 0
     for fn in fullnames:
+        # `AND status<>?` skips no-op updates so status_prev (single-step undo) is
+        # never clobbered by re-applying the same status.
         cur = conn.execute(
             "UPDATE items SET status_prev=status, status=?, processed_utc=? "
-            "WHERE fullname=?",
-            (status, processed, fn),
+            "WHERE fullname=? AND status<>?",
+            (status, processed, fn, status),
         )
         count += cur.rowcount
     conn.commit()
@@ -491,6 +497,7 @@ def source_counts(conn: sqlite3.Connection) -> list[dict]:
 def get_counts(conn: sqlite3.Connection) -> dict:
     total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     by_status = _group_counts(conn, "status")
+    by_source = _group_counts(conn, "source")
     week_ago = int(time.time()) - 7 * 86400
     processed_week = conn.execute(
         "SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL AND processed_utc >= ?",
@@ -502,10 +509,10 @@ def get_counts(conn: sqlite3.Connection) -> dict:
     return {
         "total": total,
         "inbox": by_status.get("inbox", 0),
-        "by_source": _group_counts(conn, "source"),
+        "by_source": by_source,
         "by_kind": _group_counts(conn, "kind"),
         "by_status": by_status,
         "processed_this_week": processed_week,
         "with_url": with_url,
-        "distinct_sources": len(_group_counts(conn, "source")),
+        "distinct_sources": len(by_source),
     }

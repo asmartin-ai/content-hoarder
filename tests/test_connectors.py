@@ -108,6 +108,14 @@ def test_hackernews_favorite_db(tmp_path):
     assert by_id["8863"]["url"] == "https://example.com/a"
 
 
+def test_youtube_rejects_generic_list(tmp_path):
+    p = tmp_path / "bookmarks.json"
+    p.write_text(json.dumps([{"name": "x", "foo": 1}, {"name": "y"}]))
+    assert YouTubeConnector().can_import(p) is False  # no video ids -> not claimed
+    with pytest.raises(ValueError):
+        connectors.dispatch(p)  # falls through to a helpful "pass --source" error
+
+
 def test_dispatch_routes(fixtures):
     cases = {
         fixtures / "reddit" / "saved.csv": "reddit",

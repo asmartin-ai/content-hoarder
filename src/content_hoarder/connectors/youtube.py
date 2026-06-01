@@ -33,7 +33,12 @@ class YouTubeConnector(BaseConnector):
         if isinstance(data, dict):
             return data.get("_type") == "playlist" and isinstance(data.get("entries"), list)
         if isinstance(data, list):
-            return bool(data) and isinstance(data[0], dict)
+            e0 = data[0] if data else None
+            # Only claim a flat array if the first entry actually looks like a video
+            # (a bare list-of-dicts must NOT be greedily claimed — it masks the right
+            # connector and silently imports nothing).
+            return isinstance(e0, dict) and bool(
+                e0.get("id") or e0.get("videoId") or _video_id_from_url(e0.get("url") or ""))
         return False
 
     def import_file(self, path: Path):
