@@ -235,6 +235,13 @@
     set("archived", bs.archived);
     set("done", bs.done);
     set("all", d.total);
+    // category dropdown = "processing areas" with volume, e.g. "listenable (626)"
+    const bc = d.by_category || {};
+    document.querySelectorAll("#category option").forEach((o) => {
+      if (!o.value) return;
+      if (o.dataset.label == null) o.dataset.label = o.textContent;
+      o.textContent = bc[o.value] != null ? o.dataset.label + " (" + bc[o.value] + ")" : o.dataset.label;
+    });
   }).catch(() => {});
   // An item changing status moves both axes (status counts by source, tab counts by
   // status), so refresh them together.
