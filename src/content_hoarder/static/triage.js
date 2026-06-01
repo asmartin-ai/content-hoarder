@@ -249,14 +249,21 @@
       return;
     }
     var chip = e.target.closest(".cat-chip");
-    if (chip && queue.length) {
+    if (chip) {
       var cat = chip.getAttribute("data-cat");
-      var fn = queue[0].fullname;
+      // bind to the chip's own card, NOT queue[0] — during a swipe's animate-out the
+      // outgoing card's chips are still in the DOM while queue[0] is already the next item.
+      var cardEl = chip.closest(".tcard");
+      var fn = cardEl ? cardEl.getAttribute("data-fullname") : "";
+      if (!fn) return;
       fetchJSON("/items/" + encodeURIComponent(fn) + "/category", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: cat })
       }).then(function () {
-        if (queue[0]) { queue[0].metadata = queue[0].metadata || {}; queue[0].metadata.category = cat; }
+        if (queue[0] && queue[0].fullname === fn) {
+          queue[0].metadata = queue[0].metadata || {};
+          queue[0].metadata.category = cat;
+        }
         var rowEl = chip.closest(".chip-row");
         if (rowEl) Array.prototype.forEach.call(rowEl.querySelectorAll(".cat-chip"), function (c) {
           c.classList.toggle("active", c === chip);
