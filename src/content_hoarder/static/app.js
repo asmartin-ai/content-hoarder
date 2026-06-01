@@ -184,11 +184,16 @@
     }).catch(() => {}).finally(() => { loading = false; });
   };
 
+  // Source tabs. Counts are cross-filtered by the active status; the tab list stays
+  // stable (every source present in the DB shows, even at 0 for the active status).
   const loadSources = () => {
-    getJSON("/sources").then((data) => {
+    const qs = activeStatus ? "?status=" + encodeURIComponent(activeStatus) : "";
+    getJSON("/sources" + qs).then((data) => {
       const nav = document.getElementById("source-tabs");
       nav.innerHTML = "";
       Object.keys(sources).forEach((k) => delete sources[k]);
+      const list = data.sources || [];
+      const total = list.reduce((n, s) => n + (s.count || 0), 0);
       const mkTab = (id, label, color, count) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -200,16 +205,16 @@
         b.classList.toggle("active", activeSource === id);
         nav.appendChild(b);
       };
-      mkTab("", "All", "", null);
-      (data.sources || []).filter((s) => s.count > 0).forEach((s) => {
+      mkTab("", "All", "", total);
+      list.forEach((s) => {
         sources[s.id] = { label: s.label, badge_color: s.badge_color };
         mkTab(s.id, s.label, s.badge_color, s.count);
       });
     }).catch(() => {});
   };
 
-  // Status counts in the sidebar come from /stats (by_status + total).
-  const loadCounts = () => getJSON("/stats").then((d) => {
+  // Sidebar status counts come from /stats, cross-filtered by the active source.
+  const loadCounts = () => getJSON("/stats" + (activeSource ? "?source=" + encodeURIComponent(activeSource) : "")).then((d) => {
     const bs = d.by_status || {};
     const set = (k, v) => {
       const el = document.querySelector('[data-cnt="' + k + '"]');
@@ -221,7 +226,10 @@
     set("done", bs.done);
     set("all", d.total);
   }).catch(() => {});
-  const loadCountsDebounced = debounce(loadCounts, 600);
+  // An item changing status moves both axes (status counts by source, tab counts by
+  // status), so refresh them together.
+  const refreshNav = () => { loadCounts(); loadSources(); };
+  const refreshNavDebounced = debounce(refreshNav, 600);
 
   const renderStats = (data) => {
     const body = document.getElementById("stats-body");
@@ -272,7 +280,7 @@
       selected.delete(fullname);
       if (row && activeStatus && activeStatus !== status) row.remove();
       snackbar(cap(status), () => undoItem(fullname));
-      loadCountsDebounced();
+      refreshNavDebounced();
     }).catch(() => snackbar("Failed", null));
   };
 
@@ -302,7 +310,7 @@
         selected.clear();
         document.getElementById("bulkbar").hidden = true;
         load(true);
-        loadCounts();
+        refreshNav();
       }).catch(() => {});
     });
   });
@@ -320,6 +328,7 @@
     document.querySelectorAll("#source-tabs .tab").forEach((x) => x.classList.remove("active"));
     tab.classList.add("active");
     load(true);
+    loadCounts();   // status counts reflect the newly active source
   });
 
   // status sidebar nav + mobile drawer
@@ -348,6 +357,7 @@
     li.classList.add("active");
     closeDrawer();
     load(true);
+    loadSources();  // tab counts reflect the newly active status
   });
 
   document.getElementById("btn-stats").addEventListener("click", () => {
