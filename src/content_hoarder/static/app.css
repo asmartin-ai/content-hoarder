@@ -904,3 +904,5 @@ select {
 .media-box { max-width: 680px; }
 #media-body { min-height: 220px; }
 #media-body iframe, #media-body .reddit-embed-bq { width: 100% !important; max-width: 100%; border: 0; }
+.reddit-embed-frame { height: 72vh; max-height: 680px; border-radius: 8px; background: #0b0c0f; }
+.media-fallback { display: block; margin-top: 0.6rem; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }

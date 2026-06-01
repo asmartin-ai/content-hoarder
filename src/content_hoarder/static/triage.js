@@ -43,15 +43,12 @@
     return fetch(url, opts).then(function (r) { return r.ok ? r.json() : Promise.reject(r); });
   }
 
-  // Reddit's official embed — loaded only when the user taps Play/Preview (online;
-  // the permalink link is the offline/blocked fallback).
-  function loadRedditPlatform() {
-    var prev = document.getElementById("reddit-embed-js");
-    if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
-    var s = document.createElement("script");
-    s.id = "reddit-embed-js"; s.async = true; s.charSet = "UTF-8";
-    s.src = "https://embed.reddit.com/widgets/platform.js";
-    document.body.appendChild(s);
+  // Reddit retired its blockquote + platform.js embed (the script now 404s), so embed the
+  // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
+  function redditEmbedUrl(permalink) {
+    var base = (permalink || "").split("#")[0].split("?")[0]
+      .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
+    return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   }
 
   function badge(item) {
@@ -242,9 +239,9 @@
       var holder = e.target.closest(".tcard-embed");
       var permalink = holder ? holder.getAttribute("data-permalink") : "";
       if (/^https?:\/\//i.test(permalink)) {
-        holder.innerHTML = '<blockquote class="reddit-embed-bq" data-embed-height="480">' +
-          '<a href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a></blockquote>';
-        loadRedditPlatform();
+        holder.innerHTML = '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) +
+          '" loading="lazy"></iframe>' +
+          '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
       }
       return;
     }
