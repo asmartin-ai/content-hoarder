@@ -117,7 +117,8 @@ _UPDATE_SQL = (
     + " WHERE fullname=:fullname"
 )
 
-# Sort columns allowed for search/browse (whitelist; rowid tiebreaker added).
+# Sort keys allowed for search/browse (whitelist; rowid tiebreaker added). Values may
+# be a bare column or a SQL expression (e.g. json_extract for a metadata field).
 _SORT_COLUMNS = {
     "last_seen_utc": "last_seen_utc",
     "first_seen_utc": "first_seen_utc",
@@ -126,6 +127,7 @@ _SORT_COLUMNS = {
     "title": "title",
     "status": "status",
     "source": "source",
+    "duration": "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
 }
 
 
@@ -154,6 +156,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     """Create tables, FTS indexes, and triggers (idempotent)."""
     conn.executescript(_SCHEMA)
     conn.executescript(_FTS_SCHEMA)
+    # Functional index so sorting by video length (metadata.duration) stays cheap at scale.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_items_duration "
+        "ON items(CAST(json_extract(metadata, '$.duration') AS INTEGER))"
+    )
     _ensure_fts_built(conn)
     conn.commit()
 
@@ -285,7 +292,12 @@ def _order_clause(sort: str, order: str, alias: str = "") -> str:
     col = _SORT_COLUMNS.get(sort or "", "last_seen_utc")
     direction = "ASC" if (order or "desc").lower() == "asc" else "DESC"
     a = (alias + ".") if alias else ""
-    return f"ORDER BY {a}{col} {direction}, {a}rowid {direction}"
+    # Expression sort keys (json_extract/CAST) must not be table-alias-prefixed, and
+    # NULLs (e.g. videos with no duration) should sort last in either direction.
+    is_expr = "(" in col
+    col_sql = col if is_expr else f"{a}{col}"
+    nulls = " NULLS LAST" if is_expr else ""
+    return f"ORDER BY {col_sql} {direction}{nulls}, {a}rowid {direction}"
 
 
 def search_items(

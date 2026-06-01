@@ -25,9 +25,12 @@
         <option value="done">done</option>
       </select>
       <select id="sort" title="Sort">
-        <option value="last_seen_utc">recently added</option>
-        <option value="created_utc">date created</option>
-        <option value="title">title</option>
+        <option value="first_seen_utc:desc">recently added</option>
+        <option value="created_utc:asc">oldest first</option>
+        <option value="created_utc:desc">newest first</option>
+        <option value="title:asc">title (A&ndash;Z)</option>
+        <option value="duration:asc">shortest first</option>
+        <option value="duration:desc">longest first</option>
       </select>
       <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
     </nav>

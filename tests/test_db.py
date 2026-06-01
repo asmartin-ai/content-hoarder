@@ -115,6 +115,16 @@ def test_bulk_status_prev_preserved_on_double_apply(conn):
     assert db.get_item(conn, "r:1")["status"] == "inbox"
 
 
+def test_sort_oldest_first_and_by_duration(conn):
+    db.merge_upsert(conn, mk(source="y", source_id="1", title="old short",
+                             created_utc=100, metadata={"duration": 60}))
+    db.merge_upsert(conn, mk(source="y", source_id="2", title="new long",
+                             created_utc=200, metadata={"duration": 3600}))
+    assert [i["source_id"] for i in db.search_items(conn, "", sort="created_utc", order="asc")] == ["1", "2"]
+    assert db.search_items(conn, "", sort="duration", order="asc")[0]["source_id"] == "1"   # 60s first
+    assert db.search_items(conn, "", sort="duration", order="desc")[0]["source_id"] == "2"  # 3600s first
+
+
 def test_init_db_idempotent(conn):
     db.init_db(conn)
     db.init_db(conn)
