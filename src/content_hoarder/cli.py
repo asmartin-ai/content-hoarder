@@ -64,6 +64,23 @@ def cmd_categorize(args) -> int:
     return 0
 
 
+def cmd_dedup(args) -> int:
+    from content_hoarder import dedup as dd
+    with _connect() as conn:
+        if args.clear:
+            res = dd.clear_flags(conn)
+        elif args.resolve:
+            res = dd.auto_resolve(conn, by=args.by)
+        else:
+            res = dd.flag_duplicates(conn, by=args.by)
+    print(json.dumps(res, indent=2))
+    if not args.clear and not args.resolve and res.get("groups"):
+        print(f"(flagged {res['flagged']} items in {res['groups']} possible-duplicate groups — "
+              f"`dedup --resolve` to auto-archive all-but-richest, or `dedup --clear`)",
+              file=sys.stderr)
+    return 0
+
+
 def cmd_serve(args) -> int:
     from content_hoarder.web import create_app
     app = create_app()
@@ -163,6 +180,14 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--all", action="store_true", help="Re-categorize items that already have one.")
     pc.add_argument("--limit", type=int, default=None, help="Max items to categorize.")
     pc.set_defaults(func=cmd_categorize)
+
+    pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
+    pd.add_argument("--by", choices=("url", "title"), default="url",
+                    help="Group by identical URL (safe) or title (looser).")
+    pd.add_argument("--resolve", action="store_true",
+                    help="Auto-archive all-but-richest per group (reversible).")
+    pd.add_argument("--clear", action="store_true", help="Remove the dup flags.")
+    pd.set_defaults(func=cmd_dedup)
 
     ps = sub.add_parser("serve", help="Run the web app.")
     ps.add_argument("--host", help="Bind host (default 127.0.0.1; set to your Tailscale IP for mobile).")

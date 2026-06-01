@@ -81,9 +81,13 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
 false positives.*
 
-- [ ] **P3 — Redesign de-duplication.** Clearer language ("possible duplicates"), **exclude
-  placeholder titles** (`[deleted]`/`[removed]`/`[Private video]`/`[Deleted video]`) from grouping,
-  better review UX. Reuse the prior `find_groups`/`resolve` logic from git history (commit `a724f91`).
+- [x] ~~**Redesign de-duplication (v2).**~~ Shipped: `dedup.py` non-destructive flag + reversible
+  resolve via CLI `dedup [--by url|title] [--resolve] [--clear]`. **Excludes placeholder titles**
+  (`[removed]`/`[deleted]`/`[Private video]`/`[Deleted video]`); URL grouping **keeps the query string**
+  (a real-data scan caught the old code collapsing every `youtube.com/watch?v=…` into one group).
+- [ ] **P3 — Duplicates review UI.** A clear "possible duplicates" surface (group cards → keep one,
+  archive the rest) built on `dedup.find_groups`. The prior modal was removed for confusing UX —
+  rebuild minimally; the CLI already does the work non-destructively.
 
 ## Epic 7 — More sources & live sync  (`enhancement`, `area:connectors`)
 - [ ] **P2 — Import WL3 + Watch Later.** WL3 via the same `yt-dlp --flat-playlist` flow; main Watch
