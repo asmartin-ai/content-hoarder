@@ -10,6 +10,11 @@ Each feature was implemented, committed, and run through `/code-review` (real fi
 - Categorizer uses the agreed defaults (listenable ≥30min OR allowlisted channel; watch ≤5min;
   wotagei title keyword); see `categorize.py` for the channel allowlist — tell me who to add/remove.
 
+## Duplicates v2 (CLI; UI deferred)
+- `python -m content_hoarder dedup --by url` flags possible dups (non-destructive); review, then
+  `dedup --resolve` archives all-but-richest (reversible), or `dedup --clear`. A read-only scan of
+  your inbox found only a handful of genuine URL-dup pairs. A clear review UI is a follow-up.
+
 ## Partial imports (sampled, finish when you want)
 - Firefox tabs: connector built + imported **1 of ~17** TabExports (326 tabs). Import the rest with
   `python -m content_hoarder import "K:\Users\asmartin-ai\Downloads\TabExports\<file>.txt" --source firefox`
