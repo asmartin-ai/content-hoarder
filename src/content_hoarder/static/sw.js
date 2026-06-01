@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v1";
+const CACHE = "ch-shell-v2";
 const SHELL = [
   "/", "/triage",
   "/static/app.css", "/static/app.js", "/static/triage.js",
