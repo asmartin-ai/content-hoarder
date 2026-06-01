@@ -23,6 +23,16 @@ def _domain(url: str) -> str:
     return m.group(1).lower() if m else ""
 
 
+def _norm_url(url: str) -> str:
+    """Normalize for stable de-dup across overlapping exports: lowercase scheme+host,
+    drop a trailing slash and any #fragment (the query is kept — it's significant)."""
+    u = (url or "").strip()
+    m = re.match(r"(https?://[^/]+)(/[^#]*)?", u, re.I)
+    if not m:
+        return u.lower()
+    return m.group(1).lower() + (m.group(2) or "").rstrip("/")
+
+
 class FirefoxConnector(BaseConnector):
     id = "firefox"
     label = "Firefox Tabs"
@@ -56,9 +66,12 @@ class FirefoxConnector(BaseConnector):
                 continue
             # a tab block: title, url, [favicon], [flag]
             if len(lines) >= 2 and _URL_RE.match(lines[1]):
-                favicon = lines[2] if len(lines) >= 3 and _URL_RE.match(lines[2]) else ""
-                pinned = len(lines) >= 4 and lines[3].lower() == "true"
-                yield self._make(lines[1], lines[0], favicon, window, pinned)
+                favicon, flag = "", ""
+                if len(lines) >= 4:        # title, url, favicon, flag
+                    favicon, flag = lines[2], lines[3]
+                elif len(lines) == 3:      # title, url, flag (favicon omitted)
+                    flag = lines[2]
+                yield self._make(lines[1], lines[0], favicon, window, flag.lower() == "true")
             elif _URL_RE.match(lines[0]):  # title-less tab (bare URL)
                 yield self._make(lines[0], "", "", window, False)
 
@@ -72,7 +85,7 @@ class FirefoxConnector(BaseConnector):
             meta["pinned"] = 1
         return new_item(
             source="firefox",
-            source_id=hashlib.sha1(url.encode("utf-8", "ignore")).hexdigest()[:16],
+            source_id=hashlib.sha1(_norm_url(url).encode("utf-8", "ignore")).hexdigest()[:16],
             kind="tab",
             title=title,
             url=url,

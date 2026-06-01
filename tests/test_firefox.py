@@ -39,7 +39,18 @@ def test_firefox_import(tmp_path):
     assert its[0]["title"] == "The Vanilla Experience | TVE"
     md0 = json.loads(its[0]["metadata"])
     assert md0["domain"] == "modrinth.com" and md0["window"] == "17"
+    assert md0["favicon"] == "https://modrinth.com/favicon.ico"
     assert json.loads(its[1]["metadata"]).get("pinned") == 1
     # stable url-hash id → re-importing the overlapping daily exports de-dups
     again = list(FirefoxConnector().import_file(_write(tmp_path, "again.txt", _SAMPLE)))
     assert again[0]["fullname"] == its[0]["fullname"]
+
+
+def test_firefox_url_normalization_dedups(tmp_path):
+    base = ("Export Tabs URLs\n\nWindow::: id: 1  tabs count: 1\n\nT\n{url}\n"
+            "https://x/favicon.ico\nfalse\n")
+    a = list(FirefoxConnector().import_file(_write(tmp_path, "a.txt",
+        base.format(url="https://Example.com/Path"))))
+    b = list(FirefoxConnector().import_file(_write(tmp_path, "b.txt",
+        base.format(url="https://example.com/Path/#frag"))))
+    assert a[0]["fullname"] == b[0]["fullname"]  # host-case + trailing slash + fragment ignored
