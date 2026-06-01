@@ -672,3 +672,18 @@ select {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* inbox list — bigger, selectable, swipeable rows */
+.item {
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    touch-action: pan-y;
+    user-select: none;
+    will-change: transform;
+}
+.item.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.item.swipe-keep { border-color: var(--keep); }
+.item.swipe-arch { border-color: var(--danger); }
+.item .sel { width: 20px; height: 20px; cursor: pointer; }
+.item-title { font-size: var(--fs-md); }
+.item-actions button { font-size: var(--fs-sm); padding: 0.45rem 0.7rem; min-width: 70px; }

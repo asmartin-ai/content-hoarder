@@ -47,6 +47,18 @@
     t.hidden = false;
     toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
   };
+  // Gmail-style snackbar with an Undo affordance.
+  const snackbar = (msg, undoFn) => {
+    const t = document.getElementById("toast");
+    clearTimeout(toastTimer);
+    t.innerHTML = esc(msg) + (undoFn ? ' <button class="toast-undo" type="button">Undo</button>' : "");
+    t.hidden = false;
+    if (undoFn) t.querySelector(".toast-undo").addEventListener("click", () => {
+      t.hidden = true;
+      undoFn();
+    });
+    toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+  };
 
   let offset = 0, activeSource = "", loading = false;
   const sources = {};
@@ -114,6 +126,13 @@
     if (reset) { offset = 0; box.innerHTML = ""; }
     getJSON("/items?" + buildQuery()).then((data) => {
       (data.items || []).forEach((it) => box.insertAdjacentHTML("beforeend", itemHtml(it)));
+      box.querySelectorAll(".item:not([data-sw])").forEach((row) => {
+        row.setAttribute("data-sw", "1");
+        if (window.attachSwipe) window.attachSwipe(row, {
+          onRight: () => actOnItem(row.dataset.fullname, "keep", row),
+          onLeft: () => actOnItem(row.dataset.fullname, "archived", row),
+        });
+      });
       document.getElementById("empty").hidden = box.querySelector(".item") !== null;
       document.getElementById("loadmore").hidden = !data.has_more;
       offset += (data.items || []).length;
@@ -168,30 +187,44 @@
     section("By status", data.by_status);
   };
 
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const toggleSel = (fullname, checked, row) => {
+    if (checked) selected.add(fullname); else selected.delete(fullname);
+    if (row) row.classList.toggle("selected", checked);
+    document.getElementById("bulkbar").hidden = selected.size === 0;
+    document.getElementById("sel-count").textContent = selected.size + " selected";
+  };
+
+  const undoItem = (fullname) => {
+    getJSON("/items/" + encodeURIComponent(fullname) + "/undo", { method: "POST" })
+      .then(() => { load(true); loadSources(); })
+      .catch(() => {});
+  };
+
+  const actOnItem = (fullname, status, row) => {
+    getJSON("/items/" + encodeURIComponent(fullname) + "/status", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: status }),
+    }).then(() => {
+      selected.delete(fullname);
+      const sf = document.getElementById("status-filter").value;
+      if (row && sf && sf !== status) row.remove();
+      snackbar(cap(status), () => undoItem(fullname));
+    }).catch(() => snackbar("Failed", null));
+  };
+
   // -- event wiring (script is at end of <body>, DOM is ready) --
   document.getElementById("items").addEventListener("click", (e) => {
     const row = e.target.closest(".item");
     if (!row) return;
     const fullname = row.dataset.fullname;
     const actBtn = e.target.closest("[data-act]");
-    if (actBtn) {
-      const status = actBtn.dataset.act;
-      getJSON("/items/" + encodeURIComponent(fullname) + "/status", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: status }),
-      }).then(() => {
-        const sf = document.getElementById("status-filter").value;
-        if (sf && sf !== status) row.remove();
-        toast("Marked " + status);
-      }).catch(() => toast("Failed"));
-      return;
-    }
-    if (e.target.classList.contains("sel")) {
-      if (e.target.checked) selected.add(fullname);
-      else selected.delete(fullname);
-      document.getElementById("bulkbar").hidden = selected.size === 0;
-      document.getElementById("sel-count").textContent = selected.size + " selected";
-    }
+    if (actBtn) { actOnItem(fullname, actBtn.dataset.act, row); return; }
+    if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
+    if (e.target.closest("a")) return;                  // let title links open
+    const cb = row.querySelector(".sel");               // whole-card click toggles selection
+    if (cb) { cb.checked = !cb.checked; toggleSel(fullname, cb.checked, row); }
   });
 
   document.querySelectorAll("[data-bulk]").forEach((btn) => {
