@@ -72,6 +72,8 @@
       ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(title) + "</a>"
       : esc(title);
     var snippet = (item.body || "").slice(0, 400);
+    var m = item.metadata || {};
+    var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
       '<div class="tcard-head">' + badge(item) +
       '<span class="tcard-age">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span></div>" +
@@ -79,7 +81,16 @@
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
+      '<div class="tcard-ai">' + ai + "</div>" +
       "</article>";
+  }
+
+  function aiHtml(llm) {
+    var tags = (llm.tags || []).map(function (t) {
+      return '<span class="ai-tag">' + esc(t) + "</span>";
+    }).join("");
+    return '<span class="ai-verdict ai-' + esc(llm.verdict) + '">AI: ' + esc(llm.verdict) + "</span> " +
+      '<span class="ai-reason">' + esc(llm.reason || "") + "</span> " + tags;
   }
 
   // ---- rendering / flow ----
@@ -150,7 +161,7 @@
     card.addEventListener("pointerdown", function (e) {
       // Android back-gesture safety: ignore drags starting near a screen edge.
       if (e.clientX < EDGE_DEADZONE || e.clientX > window.innerWidth - EDGE_DEADZONE) return;
-      if (e.target.closest("a")) return;             // let links work
+      if (e.target.closest("a,button")) return;      // let links/buttons work
       dragging = true; startX = e.clientX;
       card.setPointerCapture(e.pointerId);
       card.style.transition = "none";
@@ -180,10 +191,25 @@
     card.addEventListener("pointercancel", function () { dragging = false; renderCurrent(); });
   }
 
-  // NSFW reveal
+  // NSFW reveal + Ask AI
   stack.addEventListener("click", function (e) {
     var media = e.target.closest(".tcard-media.nsfw");
-    if (media) media.classList.remove("nsfw");
+    if (media) { media.classList.remove("nsfw"); return; }
+    var aiBtn = e.target.closest(".ai-btn");
+    if (aiBtn && queue.length) {
+      aiBtn.textContent = "…thinking";
+      var fn = queue[0].fullname;
+      fetchJSON("/items/" + encodeURIComponent(fn) + "/suggest", { method: "POST" })
+        .then(function (s) {
+          if (queue[0]) {
+            queue[0].metadata = queue[0].metadata || {};
+            queue[0].metadata.llm = s;
+          }
+          var holder = aiBtn.parentNode;
+          if (holder) holder.innerHTML = aiHtml(s);
+        })
+        .catch(function () { aiBtn.textContent = "AI unavailable"; });
+    }
   });
 
   // ---- toast ----

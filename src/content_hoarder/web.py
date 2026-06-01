@@ -92,6 +92,17 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "not found"}), 404
         return jsonify(item)
 
+    @app.post("/items/<path:fullname>/suggest")
+    def suggest(fullname):
+        from content_hoarder.assist import llm
+        if not llm.is_available():
+            return jsonify({"error": "LLM not configured"}), 503
+        with conn() as c:
+            s = llm.suggest_and_store(c, fullname)
+        if s is None:
+            return jsonify({"error": "no suggestion"}), 502
+        return jsonify(s)
+
     @app.post("/bulk/status")
     def bulk_status():
         data = request.get_json(silent=True) or {}
