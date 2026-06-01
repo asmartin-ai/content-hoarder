@@ -85,22 +85,6 @@ def cmd_bankruptcy(args) -> int:
     return 0
 
 
-def cmd_dedup(args) -> int:
-    from content_hoarder import dedup as dd
-    with _connect() as conn:
-        if args.clear:
-            res = dd.clear_flags(conn)
-        elif args.resolve:
-            res = dd.auto_resolve(conn, by=args.by)
-        else:
-            res = dd.flag_duplicates(conn, by=args.by)
-    print(json.dumps(res, indent=2))
-    if not args.clear and not args.resolve and res.get("groups"):
-        print(f"(flagged {res['flagged']} items in {res['groups']} groups — review them in the web "
-              f"UI, or `dedup --resolve` to auto-archive all-but-richest, or `dedup --clear`)")
-    return 0
-
-
 def cmd_promote(args) -> int:
     from content_hoarder.bridge import karakeep
     with _connect() as conn:
@@ -161,12 +145,6 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--source", help="Only this source.")
     pb.add_argument("--dry-run", action="store_true")
     pb.set_defaults(func=cmd_bankruptcy)
-
-    pd = sub.add_parser("dedup", help="Flag duplicate items for review (or auto-resolve).")
-    pd.add_argument("--by", choices=["url", "title"], default="url", help="Grouping strategy.")
-    pd.add_argument("--resolve", action="store_true", help="Auto-archive all-but-richest per group.")
-    pd.add_argument("--clear", action="store_true", help="Remove duplicate flags.")
-    pd.set_defaults(func=cmd_dedup)
 
     pp = sub.add_parser("promote", help="Push 'keep' items to a stock Karakeep (opt-in).")
     pp.add_argument("--status", default="keep")

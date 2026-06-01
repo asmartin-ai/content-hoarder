@@ -49,20 +49,6 @@ def test_invalid_status(tmp_db):
     assert _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "bogus"}).status_code == 400
 
 
-def test_duplicates_review_and_resolve(tmp_db):
-    conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="a", title="A", url="https://x.com/p"))
-    db.merge_upsert(conn, models.new_item(source="youtube", source_id="b", title="B", url="https://x.com/p"))
-    conn.commit()
-    conn.close()
-    cl = create_app(tmp_db).test_client()
-    groups = cl.get("/duplicates").get_json()["groups"]
-    assert len(groups) == 1 and groups[0]["count"] == 2
-    keep = groups[0]["suggested_keep"]
-    others = [i["fullname"] for i in groups[0]["items"] if i["fullname"] != keep]
-    assert cl.post("/duplicates/resolve", json={"keep": keep, "archive": others}).get_json()["archived"] == 1
-
-
 def test_malformed_params_dont_500(tmp_db):
     cl = _client(tmp_db)
     assert cl.get("/items?limit=abc&offset=-9&is_saved=x").status_code == 200

@@ -233,66 +233,6 @@
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
-  // -- duplicates review --
-  let dupGroups = [], dupTotal = 0;
-  const renderDupes = () => {
-    const body = document.getElementById("dup-body");
-    if (!dupGroups.length) { body.innerHTML = '<p class="empty">No duplicate groups 🎉</p>'; return; }
-    const note = (dupTotal > dupGroups.length)
-      ? '<p class="menu-label">Showing ' + dupGroups.length + " of " + dupTotal + " groups (biggest first).</p>"
-      : '<p class="menu-label">' + dupTotal + " duplicate group(s).</p>";
-    body.innerHTML = note + dupGroups.map((g, gi) =>
-      '<div class="dup-group">' +
-        g.items.map((it) =>
-          '<label class="dup-item"><input type="radio" name="dg' + gi + '" value="' + esc(it.fullname) + '"' +
-          (it.fullname === g.suggested_keep ? " checked" : "") + "> " + badgeHtml(it) +
-          ' <span class="dup-title">' + esc(it.title || it.url || it.fullname) + "</span></label>"
-        ).join("") +
-        '<button class="btn primary dup-resolve" data-gi="' + gi + '">Keep selected · archive ' +
-        (g.count - 1) + " other(s)</button></div>"
-    ).join("");
-  };
-  const loadDupes = () => {
-    getJSON("/duplicates?by=" + document.getElementById("dup-by").value)
-      .then((data) => {
-        dupGroups = data.groups || [];
-        dupTotal = data.total_groups != null ? data.total_groups : dupGroups.length;
-        renderDupes();
-      })
-      .catch(() => {});
-  };
-  document.getElementById("btn-dupes").addEventListener("click", () => {
-    document.getElementById("dup-modal").hidden = false;
-    loadDupes();
-  });
-  document.getElementById("dup-close").addEventListener("click", () => {
-    document.getElementById("dup-modal").hidden = true;
-  });
-  document.getElementById("dup-modal").addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
-  });
-  document.getElementById("dup-by").addEventListener("change", loadDupes);
-  document.getElementById("dup-body").addEventListener("click", (e) => {
-    const btn = e.target.closest(".dup-resolve");
-    if (!btn) return;
-    const gi = +btn.dataset.gi;
-    const g = dupGroups[gi];
-    if (!g) return;
-    const sel = document.querySelector('input[name="dg' + gi + '"]:checked');
-    const keep = sel ? sel.value : g.suggested_keep;
-    const archive = g.items.map((it) => it.fullname).filter((fn) => fn !== keep);
-    getJSON("/duplicates/resolve", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keep: keep, archive: archive }),
-    }).then(() => {
-      toast("Archived " + archive.length + " duplicate(s)");
-      dupGroups.splice(gi, 1);
-      renderDupes();
-      load(true);
-      loadSources();
-    }).catch(() => toast("Failed"));
-  });
-
   document.getElementById("btn-import").addEventListener("click", () =>
     document.getElementById("import-file").click());
   document.getElementById("import-file").addEventListener("change", (e) => {
