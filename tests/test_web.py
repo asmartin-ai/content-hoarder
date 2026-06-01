@@ -49,6 +49,17 @@ def test_invalid_status(tmp_db):
     assert _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "bogus"}).status_code == 400
 
 
+def test_malformed_params_dont_500(tmp_db):
+    cl = _client(tmp_db)
+    assert cl.get("/items?limit=abc&offset=-9&is_saved=x").status_code == 200
+    assert cl.get("/random?n=notanumber").status_code == 200
+
+
+def test_suggest_unconfigured_503(tmp_db, monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "")
+    assert _client(tmp_db).post("/items/reddit:t3_a/suggest").status_code == 503
+
+
 def test_import_upload(tmp_db, fixtures):
     cl = _client(tmp_db)
     with open(fixtures / "keep" / "Keep" / "note1.json", "rb") as fh:

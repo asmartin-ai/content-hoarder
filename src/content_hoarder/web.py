@@ -11,6 +11,13 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from content_hoarder import config, connectors, db, pipeline
 
 
+def _int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def create_app(db_path: str | None = None) -> Flask:
     config.load_env()
     app = Flask(__name__)
@@ -42,8 +49,8 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/items")
     def items():
         a = request.args
-        limit = min(int(a.get("limit") or 50), 500)
-        offset = int(a.get("offset") or 0)
+        limit = min(max(_int(a.get("limit"), 50), 1), 500)
+        offset = max(_int(a.get("offset"), 0), 0)
         is_saved = a.get("is_saved")
         with conn() as c:
             rows = db.search_items(
@@ -51,7 +58,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 source=a.get("source") or None,
                 kind=a.get("kind") or None,
                 status=a.get("status") or None,
-                is_saved=int(is_saved) if is_saved not in (None, "") else None,
+                is_saved=_int(is_saved) if is_saved not in (None, "") else None,
                 fuzzy=a.get("fuzzy") == "1",
                 sort=a.get("sort", "last_seen_utc"),
                 order=a.get("order", "desc"),
@@ -63,7 +70,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/random")
     def random_batch():
         a = request.args
-        n = min(int(a.get("n") or 20), 100)
+        n = min(max(_int(a.get("n"), 20), 1), 100)
         with conn() as c:
             rows = db.get_random_batch(
                 c, n, source=a.get("source") or None,
