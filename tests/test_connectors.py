@@ -43,6 +43,29 @@ def test_reddit_clean_url():
     assert _clean_url("", "") == ""
 
 
+def test_reddit_media_classifier():
+    from content_hoarder.connectors.reddit import _classify_media
+    perma = "https://www.reddit.com/r/x/comments/abc/title/"
+
+    def run(raw_url, body="", kind="post"):
+        meta = {}
+        url = _classify_media(meta, raw_url, perma, body, kind)
+        return url, meta.get("media_type"), meta.get("media_url")
+
+    # bare v.redd.it: click URL becomes the permalink (the bare link renders nothing),
+    # original media URL is stashed, and it's flagged as a video.
+    url, mt, mu = run("https://v.redd.it/abc123")
+    assert url == perma and mt == "reddit_video" and mu == "https://v.redd.it/abc123"
+    # media post with no captured URL (e.g. the tonppk example) → previewable
+    assert run("")[1] == "reddit_media"
+    # direct images stay as the click URL
+    assert run("https://i.redd.it/x.jpg")[:2] == ("https://i.redd.it/x.jpg", "image")
+    # text posts (have a body) and comments are plain links, no preview affordance
+    assert run("", body="some text")[1] == "link"
+    assert run("", kind="comment")[1] == "link"
+    assert run("https://youtu.be/x")[1] == "youtube"
+
+
 def test_youtube_playlist(fixtures):
     its = items(YouTubeConnector(), fixtures / "youtube" / "playlist.json")
     assert len(its) == 2
