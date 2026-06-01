@@ -124,6 +124,15 @@ def test_recover_route_non_reddit_400(tmp_db):
     assert _client(tmp_db).post("/items/youtube:v1/recover").status_code == 400
 
 
+def test_set_category(tmp_db):
+    cl = _client(tmp_db)
+    r = cl.post("/items/youtube:v1/category", json={"category": "listenable"})
+    assert r.status_code == 200 and r.get_json()["category"] == "listenable"
+    assert cl.get("/items?category=listenable").get_json()["items"][0]["fullname"] == "youtube:v1"
+    assert cl.post("/items/youtube:v1/category", json={"category": "bogus"}).status_code == 400
+    assert cl.post("/items/youtube:nope/category", json={"category": "watch"}).status_code == 404
+
+
 def test_cross_filtered_counts(tmp_db):
     cl = _client(tmp_db)  # seeds reddit:t3_a + youtube:v1, both inbox
     cl.post("/items/reddit:t3_a/status", json={"status": "keep"})
