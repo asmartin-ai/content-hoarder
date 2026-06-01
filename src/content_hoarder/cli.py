@@ -86,7 +86,12 @@ def cmd_bankruptcy(args) -> int:
 
 
 def cmd_dedup(args) -> int:
-    print("dedup is a Phase 2 feature (not yet implemented).")
+    from content_hoarder import dedup as dedup_mod
+    with _connect() as conn:
+        res = dedup_mod.dedup(conn, dry_run=args.dry_run)
+    print(json.dumps(res, indent=2))
+    if res["dry_run"] and res["duplicates"]:
+        print("(dry run — re-run without --dry-run to archive duplicates, reversibly)")
     return 0
 
 
