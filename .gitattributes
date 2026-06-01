@@ -1,0 +1,15 @@
+# Normalize line endings: store and check out LF everywhere (stops the CRLF warnings).
+* text=auto eol=lf
+
+# Binary types — never normalize or text-diff.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.svg  text
+*.db   binary
+*.sqlite binary
+*.woff binary
+*.woff2 binary
