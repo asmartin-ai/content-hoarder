@@ -302,18 +302,20 @@
         if (d && d.recovered) {
           const ttl = row.querySelector(".item-title");
           if (ttl && d.title) ttl.textContent = d.title;
-          if (d.body && !REMOVED_RE.test(d.body)) {
+          const main = row.querySelector(".item-main");
+          if (d.body && !REMOVED_RE.test(d.body) && main) {
             let snip = row.querySelector(".item-snippet");
             if (!snip) {
               snip = document.createElement("div");
               snip.className = "item-snippet";
-              row.querySelector(".item-main").appendChild(snip);
+              main.appendChild(snip);
             }
             snip.textContent = d.body.slice(0, 240);
           }
           btn.textContent = "✓ recovered";
           toast("Recovered from archives");
         } else {
+          btn.disabled = false;   // not in archives — let the user try again later
           btn.textContent = "not archived";
         }
       })
