@@ -161,13 +161,11 @@ def test_dispatch_routes(fixtures):
         assert connectors.dispatch(path).id == sid, (path, sid)
 
 
-def test_registry_and_firefox_stub():
+def test_registry():
     assert set(connectors.REGISTRY) == {
         "reddit", "youtube", "hackernews", "obsidian", "keep", "firefox"}
-    ff = connectors.get("firefox")
-    assert ff.can_import(Path("x")) is False
-    with pytest.raises(NotImplementedError):
-        list(ff.import_file(Path("x")))
+    # firefox now imports "Export Tabs URLs" .txt (see test_firefox.py); a bogus path is ignored.
+    assert connectors.get("firefox").can_import(Path("x")) is False
 
 
 def test_dispatch_unknown(tmp_path):
