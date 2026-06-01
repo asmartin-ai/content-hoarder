@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
+import secrets
+import shutil
+import subprocess
 import tempfile
+import time
 from contextlib import closing
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -164,5 +169,129 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": str(exc)}), 400
         finally:
             os.unlink(tmp.name)
+
+    # -- import modal: /prepare counts a file/URL WITHOUT writing; /commit writes --
+
+    _prepared: dict[str, dict] = {}
+    _YT_RE = re.compile(r"^https?://([\w.-]*\.)?(youtube\.com|youtu\.be)/", re.I)
+
+    def _cleanup_prepared():
+        now = time.time()
+        for tok in list(_prepared):
+            if now - _prepared[tok].get("ts", now) > 3600:
+                try:
+                    os.unlink(_prepared[tok]["path"])
+                except OSError:
+                    pass
+                _prepared.pop(tok, None)
+
+    def _count_existing(c, fullnames):
+        existing = 0
+        for i in range(0, len(fullnames), 500):  # chunk to stay under SQLite's var limit
+            chunk = fullnames[i:i + 500]
+            qmarks = ",".join("?" * len(chunk))
+            existing += c.execute(
+                f"SELECT COUNT(*) FROM items WHERE fullname IN ({qmarks})", chunk
+            ).fetchone()[0]
+        return existing
+
+    def _ytdlp_to_temp(url):
+        exe = shutil.which("yt-dlp")
+        if not exe:
+            raise ValueError("yt-dlp is not installed (needed to fetch YouTube URLs)")
+        out = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        out.close()
+        try:
+            proc = subprocess.run(
+                [exe, "--flat-playlist", "--dump-single-json", url],
+                capture_output=True, text=True, timeout=600,
+            )
+        except subprocess.TimeoutExpired:
+            os.unlink(out.name)
+            raise ValueError("yt-dlp timed out fetching that playlist")
+        except OSError as exc:
+            os.unlink(out.name)
+            raise ValueError(f"could not run yt-dlp: {exc}")
+        if proc.returncode != 0 or not (proc.stdout or "").strip():
+            os.unlink(out.name)
+            tail = (proc.stderr or "").strip().splitlines()
+            raise ValueError("yt-dlp error: " + (tail[-1] if tail else "no output"))
+        with open(out.name, "w", encoding="utf-8") as fh:
+            fh.write(proc.stdout)
+        return out.name
+
+    @app.post("/import/prepare")
+    def import_prepare():
+        _cleanup_prepared()
+        f = request.files.get("file")
+        body = request.get_json(silent=True) or {}
+        url = (body.get("url") or request.form.get("url") or "").strip()
+        forced = request.form.get("source") or body.get("source")
+        try:
+            if f and f.filename:
+                suffix = os.path.splitext(f.filename)[1] or ".dat"
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                f.save(tmp.name)
+                tmp.close()
+                path = tmp.name
+            elif url:
+                if not _YT_RE.match(url):
+                    return jsonify({"error": "Only YouTube playlist or video URLs are supported here."}), 400
+                path = _ytdlp_to_temp(url)
+                forced = "youtube"
+            else:
+                return jsonify({"error": "Provide a file or a YouTube URL."}), 400
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        try:
+            connector = connectors.get(forced) if forced else connectors.dispatch(path)
+            items = list(connector.import_file(path))
+        except KeyError:
+            os.unlink(path)
+            return jsonify({"error": f"unknown source '{forced}'"}), 400
+        except ValueError as exc:
+            os.unlink(path)
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001 - surface any parse failure to the user
+            os.unlink(path)
+            return jsonify({"error": f"could not parse input: {exc}"}), 400
+
+        if not items:
+            os.unlink(path)
+            return jsonify({"error": "No importable items found in that input."}), 400
+
+        # de-dup within the file so "N items / X new" reflects distinct items, not raw rows
+        fullnames = list(dict.fromkeys(it["fullname"] for it in items if it.get("fullname")))
+        total = len(fullnames)
+        with conn() as c:
+            existing = _count_existing(c, fullnames)
+        token = secrets.token_urlsafe(16)
+        _prepared[token] = {"path": path, "source": connector.id,
+                            "count": total, "ts": time.time()}
+        sample = [{"title": (it.get("title") or it.get("url") or it.get("fullname") or "")[:120],
+                "source": it.get("source")} for it in items[:5]]
+        return jsonify({"token": token, "count": total,
+                        "new": max(total - existing, 0),
+                        "source": connector.id, "label": connector.label, "sample": sample})
+
+    @app.post("/import/commit")
+    def import_commit():
+        data = request.get_json(silent=True) or {}
+        prep = _prepared.pop((data.get("token") or "").strip(), None)
+        if not prep:
+            return jsonify({"error": "this import preview expired — please preview again"}), 400
+        try:
+            with conn() as c:
+                res = pipeline.import_path(c, prep["path"], source=prep.get("source"))
+            return jsonify({"imported": res.imported, "skipped": res.skipped,
+                            "errors": res.errors[:20]})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        finally:
+            try:
+                os.unlink(prep["path"])
+            except OSError:
+                pass
 
     return app
