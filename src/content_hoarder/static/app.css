@@ -665,3 +665,10 @@ select {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* duplicates review */
+.dup-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: var(--sp-3); }
+.dup-group { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+.dup-item { display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; cursor: pointer; }
+.dup-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dup-resolve { margin-top: var(--sp-2); }

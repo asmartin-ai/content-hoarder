@@ -37,6 +37,7 @@
     <aside id="sidebar">
       <div class="side-actions">
         <button id="btn-stats" class="btn">Stats</button>
+        <button id="btn-dupes" class="btn">Duplicates</button>
         <button id="btn-import" class="btn">Import…</button>
         <input type="file" id="import-file" hidden>
       </div>
@@ -66,6 +67,21 @@
       <button class="modal-close" id="stats-close">&times;</button>
       <h2>Stats</h2>
       <div id="stats-body"></div>
+    </div>
+  </div>
+
+  <div id="dup-modal" class="modal" hidden>
+    <div class="modal-box">
+      <button class="modal-close" id="dup-close">&times;</button>
+      <h2>Review duplicates</h2>
+      <div class="dup-controls">
+        <label class="menu-label" for="dup-by">Match by</label>
+        <select id="dup-by">
+          <option value="url">identical link</option>
+          <option value="title">identical title</option>
+        </select>
+      </div>
+      <div id="dup-body"></div>
     </div>
   </div>
 
