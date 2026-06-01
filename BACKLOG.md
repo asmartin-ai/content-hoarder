@@ -96,6 +96,6 @@ false positives.*
   using the existing `auth_tokens` table.
 
 ## Epic 8 — Polish & infra  (`chore`)
-- [ ] **P3 — `.gitattributes`** (`* text=auto eol=lf`) to stop CRLF warnings.
+- [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
