@@ -104,7 +104,7 @@ class YouTubeConnector(BaseConnector):
         aren't retried — title recovery for those is a separate step."""
         exe = shutil.which("yt-dlp")
         if not exe:
-            return items  # don't drop the rows; just can't enrich without yt-dlp
+            return []  # yt-dlp missing: write nothing, leave rows eligible for a later run
         now = int(time.time())
         out = []
         for it in items:
