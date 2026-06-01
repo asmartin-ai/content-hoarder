@@ -5,7 +5,7 @@
 
   var EDGE_DEADZONE = 30;     // ignore pointerdown within 30px of a screen edge
   var COMMIT_PX = 80;         // horizontal distance to commit a swipe
-  var BATCH = 20;
+  var BATCH = parseInt(localStorage.getItem("ch_batch"), 10) || 20;
 
   var stack = document.getElementById("card-stack");
   var progressEl = document.getElementById("progress");
@@ -13,6 +13,10 @@
   var actionsEl = document.getElementById("actions");
   var srcFilter = document.getElementById("source-filter");
   var toastEl = document.getElementById("toast");
+  var undoBtn = document.getElementById("undo-btn");
+  var menuBtn = document.getElementById("menu-btn");
+  var menuPop = document.getElementById("menu-pop");
+  var batchChips = document.getElementById("batch-chips");
 
   var queue = [];
   var reviewed = 0;
@@ -129,6 +133,7 @@
       body: JSON.stringify({ status: status })
     }).then(function () {
       lastAction = { fullname: item.fullname, status: status };
+      updateUndoBtn();
       toast(status.charAt(0).toUpperCase() + status.slice(1), true);
     }).catch(function () { toast("Failed — check connection", false); });
     queue.shift();
@@ -144,6 +149,7 @@
         queue.unshift(item);
         reviewed = Math.max(0, reviewed - 1);
         lastAction = null;
+        updateUndoBtn();
         renderCurrent();
       });
   }
@@ -237,6 +243,40 @@
   var nb = document.getElementById("next-batch");
   if (nb) nb.addEventListener("click", loadBatch);
   if (srcFilter) srcFilter.addEventListener("change", loadBatch);
+
+  function updateUndoBtn() { if (undoBtn) undoBtn.disabled = !lastAction; }
+  if (undoBtn) undoBtn.addEventListener("click", undo);
+
+  function setActiveChip() {
+    if (!batchChips) return;
+    Array.prototype.forEach.call(batchChips.children, function (c) {
+      c.classList.toggle("active", parseInt(c.getAttribute("data-batch"), 10) === BATCH);
+    });
+  }
+  if (menuBtn) menuBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var willOpen = menuPop.hidden;
+    menuPop.hidden = !willOpen;
+    menuBtn.setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) setActiveChip();
+  });
+  if (batchChips) batchChips.addEventListener("click", function (e) {
+    var c = e.target.closest(".chip");
+    if (!c) return;
+    BATCH = parseInt(c.getAttribute("data-batch"), 10) || 20;
+    localStorage.setItem("ch_batch", String(BATCH));
+    setActiveChip();
+    menuPop.hidden = true;
+    menuBtn.setAttribute("aria-expanded", "false");
+    loadBatch();
+  });
+  document.addEventListener("click", function (e) {
+    if (menuPop && !menuPop.hidden && !e.target.closest(".menu")) {
+      menuPop.hidden = true;
+      menuBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  updateUndoBtn();
 
   // ---- boot ----
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js").catch(function () {});
