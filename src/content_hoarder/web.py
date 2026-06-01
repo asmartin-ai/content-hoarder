@@ -122,6 +122,25 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"updated": n})
 
+    @app.get("/duplicates")
+    def duplicates():
+        from content_hoarder import dedup
+        by = request.args.get("by", "url")
+        with conn() as c:
+            groups = dedup.find_groups(c, by=by)
+        return jsonify({"groups": groups, "by": by})
+
+    @app.post("/duplicates/resolve")
+    def duplicates_resolve():
+        from content_hoarder import dedup
+        data = request.get_json(silent=True) or {}
+        keep = data.get("keep")
+        if not keep:
+            return jsonify({"error": "keep required"}), 400
+        with conn() as c:
+            res = dedup.resolve_group(c, keep, data.get("archive") or [])
+        return jsonify(res)
+
     @app.get("/sources")
     def sources():
         with conn() as c:
