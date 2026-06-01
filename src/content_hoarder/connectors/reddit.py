@@ -67,6 +67,53 @@ def _clean_url(url: str, permalink: str) -> str:
     return "https://www.reddit.com/" + p.lstrip("/")
 
 
+_IMG_RE = re.compile(r"\.(png|jpe?g|gif|gifv|webp|bmp)(?:\?|$)", re.I)
+
+
+def _media_type_from_url(url: str) -> str:
+    u = (url or "").lower()
+    if not u:
+        return ""
+    if "v.redd.it" in u:
+        return "reddit_video"
+    if "i.redd.it" in u or _IMG_RE.search(u):
+        return "image"
+    if "youtube.com" in u or "youtu.be" in u:
+        return "youtube"
+    return "link"
+
+
+def _classify_media(meta: dict, raw_url, permalink: str, body: str, kind: str) -> str:
+    """Annotate ``meta['media_type']`` (+ ``media_url``) and return the canonical click URL.
+
+    Bare ``v.redd.it`` URLs don't render a page, so v.redd.it posts are pointed at their
+    permalink (which plays in Reddit's embed/player) while the original media URL is kept
+    in metadata. Reddit posts with no captured URL and no text body are most likely
+    image/video posts (``reddit_media``) and get an inline preview affordance.
+    """
+    link_url = _clean_url(raw_url, permalink)
+    perma_url = _clean_url("", permalink)
+    mt = _media_type_from_url(link_url)
+    if mt == "reddit_video":
+        meta["media_type"] = "reddit_video"
+        if link_url:
+            meta["media_url"] = link_url
+        return perma_url or link_url
+    if mt in ("image", "youtube"):
+        meta["media_type"] = mt
+        return link_url
+    if mt == "link":
+        if "reddit.com" in link_url.lower() and kind == "post" and not (body or "").strip():
+            meta["media_type"] = "reddit_media"  # media post whose URL wasn't captured
+        else:
+            meta["media_type"] = "link"
+        return link_url
+    # no URL at all → only the permalink to fall back on
+    if kind == "post" and not (body or "").strip():
+        meta["media_type"] = "reddit_media"
+    return perma_url
+
+
 def _is_rsm_db(path: Path) -> bool:
     try:
         con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
@@ -145,13 +192,15 @@ class RedditConnector(BaseConnector):
             meta["subreddit"] = _sub_from_permalink(permalink)
         if permalink and "permalink" not in meta:
             meta["permalink"] = permalink
+        body = d.get("body") or d.get("selftext") or ""
+        url = _classify_media(meta, d.get("url"), permalink, body, kind)
         return new_item(
             source="reddit",
             source_id=sid,
             kind=kind,
             title=d.get("title") or _title_from_permalink(permalink),
-            body=d.get("body") or d.get("selftext") or "",
-            url=_clean_url(d.get("url"), permalink),
+            body=body,
+            url=url,
             author=d.get("author") or "",
             created_utc=int(d.get("created_utc") or 0),
             saved_utc=int(d.get("saved_utc") or 0),
@@ -181,13 +230,16 @@ class RedditConnector(BaseConnector):
                     meta["permalink"] = permalink
                 if row.get("score"):
                     meta["score"] = row["score"]
+                kind = "comment" if str(sid).startswith("t1_") else "post"
+                body = row.get("body") or row.get("selftext") or ""
+                url = _classify_media(meta, row.get("url"), permalink, body, kind)
                 yield new_item(
                     source="reddit",
                     source_id=sid,
-                    kind="comment" if str(sid).startswith("t1_") else "post",
+                    kind=kind,
                     title=row.get("title") or _title_from_permalink(permalink),
-                    body=row.get("body") or row.get("selftext") or "",
-                    url=_clean_url(row.get("url"), permalink),
+                    body=body,
+                    url=url,
                     author=row.get("author") or "",
                     metadata=meta,
                 )
@@ -222,13 +274,16 @@ class RedditConnector(BaseConnector):
                 meta["score"] = d["score"]
             if d.get("over_18") is not None:
                 meta["over_18"] = 1 if d["over_18"] else 0
+            kind = "comment" if str(sid).startswith("t1_") else "post"
+            body = d.get("selftext") or d.get("body") or ""
+            url = _classify_media(meta, d.get("url"), permalink, body, kind)
             yield new_item(
                 source="reddit",
                 source_id=sid,
-                kind="comment" if str(sid).startswith("t1_") else "post",
+                kind=kind,
                 title=d.get("title") or _title_from_permalink(permalink),
-                body=d.get("selftext") or d.get("body") or "",
-                url=_clean_url(d.get("url"), permalink),
+                body=body,
+                url=url,
                 author=d.get("author") or "",
                 created_utc=int(d.get("created_utc") or 0),
                 metadata=meta,
