@@ -59,7 +59,9 @@ def _key(item: dict, by: str) -> str:
 
 def _richness(it: dict) -> tuple:
     md = it["metadata"] if isinstance(it["metadata"], dict) else parse_metadata(it["metadata"])
-    return (1 if it.get("title") else 0, len(md), -(it.get("first_seen_utc") or 0))
+    # final `fullname` term makes the "keep" pick deterministic when richness ties
+    # (the SELECT has no ORDER BY, so row order can't be relied on).
+    return (1 if it.get("title") else 0, len(md), -(it.get("first_seen_utc") or 0), it.get("fullname") or "")
 
 
 def find_groups(conn, by: str = "url", *, status: str = "inbox") -> list[dict]:
