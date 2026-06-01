@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>content-hoarder</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-page="browse">
+  <header class="topbar">
+    <h1 class="brand">content&#8209;hoarder</h1>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search everything…" autocomplete="off">
+      <label class="chk"><input type="checkbox" id="fuzzy"> fuzzy</label>
+    </div>
+    <nav class="topnav">
+      <select id="status-filter" title="Status">
+        <option value="">all</option>
+        <option value="inbox" selected>inbox</option>
+        <option value="keep">keep</option>
+        <option value="archived">archived</option>
+        <option value="done">done</option>
+      </select>
+      <select id="sort" title="Sort">
+        <option value="last_seen_utc">recently added</option>
+        <option value="created_utc">date created</option>
+        <option value="title">title</option>
+      </select>
+      <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <aside id="sidebar">
+      <div class="side-actions">
+        <button id="btn-stats" class="btn">Stats</button>
+        <button id="btn-import" class="btn">Import…</button>
+        <input type="file" id="import-file" hidden>
+      </div>
+      <div id="install-hint" class="install-hint" hidden>
+        Add to your phone: <b>Firefox menu → Install</b>
+      </div>
+      <h2 class="side-title">Sources</h2>
+      <ul id="source-list" class="source-list"></ul>
+    </aside>
+
+    <section id="content">
+      <div id="bulkbar" class="bulkbar" hidden>
+        <span id="sel-count">0 selected</span>
+        <button class="btn" data-bulk="keep">Keep</button>
+        <button class="btn" data-bulk="archived">Archive</button>
+        <button class="btn" data-bulk="done">Done</button>
+        <button class="btn ghost" id="sel-clear">Clear</button>
+      </div>
+      <div id="items" class="items"></div>
+      <p id="empty" class="empty" hidden>Nothing here yet — import a source to begin.</p>
+      <div class="loadmore-wrap"><button id="loadmore" class="btn" hidden>Load more</button></div>
+    </section>
+  </main>
+
+  <div id="stats-modal" class="modal" hidden>
+    <div class="modal-box">
+      <button class="modal-close" id="stats-close">&times;</button>
+      <h2>Stats</h2>
+      <div id="stats-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Triage · content-hoarder</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-page="triage">
+  <header class="topbar triage-bar">
+    <a class="btn ghost" href="/">&larr;&nbsp;Browse</a>
+    <span id="progress" class="progress"></span>
+    <select id="source-filter" class="src-filter" title="Limit to source">
+      <option value="">all sources</option>
+    </select>
+  </header>
+
+  <main id="triage-main" class="triage-main">
+    <div id="card-stack" class="card-stack"><!-- current card injected here --></div>
+    <div id="triage-empty" class="triage-empty" hidden>
+      <p>Inbox clear for this batch 🎉</p>
+      <button id="next-batch" class="btn primary">Get another batch</button>
+    </div>
+    <div id="actions" class="triage-actions">
+      <button class="act archive" data-action="archived" title="Archive (←)">Archive</button>
+      <button class="act done" data-action="done" title="Done (D)">Done</button>
+      <button class="act keep" data-action="keep" title="Keep (→)">Keep</button>
+    </div>
+    <div class="triage-hint">Swipe ← archive · → keep · or use the buttons / A&nbsp;D&nbsp;K keys</div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/triage.js"></script>
+</body>
+</html>
