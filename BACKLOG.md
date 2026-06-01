@@ -48,13 +48,14 @@ the categorizer (Epic 1) wants for accuracy.*
 ## Epic 4 — Recover deleted Reddit content  (`enhancement`, `area:recovery`)
 *Motivation: many saved posts/comments are now `[removed]`/`[deleted]`.*
 
-- [ ] **P2 — Port the RSM `archival/` package.** Copy
-  `F:\reddit-saved-manager\src\reddit_saved_manager\archival\` (PullPush.io + Arctic-Shift providers,
-  non-destructive overlay, on-demand + bulk modes) into `content_hoarder/archival/`; run it as an
-  enrich step for reddit items whose body is `[removed]`/`[deleted]`. CLI
-  `enrich --source reddit --archives`. Refs: [pullpush.io](https://pullpush.io),
-  [ArthurHeitmann/arctic_shift](https://github.com/ArthurHeitmann/arctic_shift). (reveddit/removeddit
-  are dead / moderator-only.)
+- [x] ~~**Port the RSM `archival/` package.**~~ Shipped: `content_hoarder/archival/` (PullPush.io +
+  Arctic-Shift, stdlib-only, non-destructive overlay, resumable via `hydrated_at`) behind
+  `enrich --source reddit --archives [--limit N] [--all]`. Targets `[removed]`/`[deleted]` items and
+  un-hydrated comment bodies. Refs: [pullpush.io](https://pullpush.io),
+  [ArthurHeitmann/arctic_shift](https://github.com/ArthurHeitmann/arctic_shift).
+- [ ] **P3 — On-demand single-item recovery in the UI.** A "Recover" button on a `[removed]` card
+  that calls the providers (throttle off) for just that item and patches it in place — like RSM's
+  `hydrate_fullnames`. Reuses `archival.providers`; add a `POST /items/<fn>/recover` route.
 - [ ] **P3 — Refine media metadata from the same fetch.** The local data has no `reddit_video`/
   `preview`, so media is currently inferred by URL heuristics (`media_type` = `reddit_video` for
   `v.redd.it`, else `reddit_media` for media posts with no captured URL). When the archival fetch runs,

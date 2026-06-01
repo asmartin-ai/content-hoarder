@@ -17,6 +17,20 @@ To re-sync later (after the Reddit tool pulls new saves):
 python -m content_hoarder import "F:\reddit-saved-manager\data\app.db"
 ```
 
+### Recovering removed / un-hydrated Reddit content
+Saved posts/comments that are now `[removed]`/`[deleted]`, plus saved **comments whose body was
+never captured**, can be refilled from public web archives (PullPush.io → Arctic-Shift fallback).
+It's **non-destructive** (triage state is never touched) and **resumable** (every attempt is stamped,
+so re-runs continue where they left off).
+```bash
+python -m content_hoarder enrich --source reddit --archives             # recover everything eligible
+python -m content_hoarder enrich --source reddit --archives --limit 200 # one chunk at a time
+python -m content_hoarder enrich --source reddit --archives --all       # re-attempt already-tried items
+```
+It first prints how many items are eligible (your data: ~9.5k, mostly un-hydrated comment bodies).
+Bulk runs are throttled to be polite to the archives (~4 s between PullPush requests), so a full pass
+takes a while — use `--limit` to do it in sessions. Network-only; offline just no-ops gracefully.
+
 ---
 
 ## YouTube playlists (WL2 / WL3)

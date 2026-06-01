@@ -1,0 +1,165 @@
+"""Archive providers: PullPush.io (primary) and Arctic-Shift (fallback).
+
+Optional, removable feature (network-only). Ported from reddit-saved-manager.
+
+Each provider fetches reddit posts/comments by base36 id (no t3_/t1_ prefix) and
+returns dicts keyed by id with a normalized field shape ready to overlay onto an
+items row. Both archives use a ``{"data": [ ... ]}`` envelope.
+
+Field availability (verified against the live APIs):
+  posts    : id, title, selftext, author, subreddit, permalink, url, created_utc
+  comments : id, body, author, subreddit, created_utc, (permalink/link_id vary)
+PullPush comments omit ``permalink``; Arctic-Shift includes it — hence two providers.
+"""
+import re
+import time
+
+from content_hoarder.archival import _http
+
+# Reddit base36 ids are ASCII alphanumerics. Validate before putting ids in a URL so
+# a malformed imported fullname can't corrupt the request or inject query params.
+_VALID_ID = re.compile(r"^[A-Za-z0-9]+$")
+
+PULLPUSH_BASE = "https://api.pullpush.io"
+ARCTIC_BASE = "https://arctic-shift.photon-reddit.com"
+
+_PLACEHOLDERS = {"[removed]", "[deleted]"}
+
+
+def _bare_id(fullname: str) -> str:
+    """Strip a t3_/t1_ prefix → bare base36 id. Both archives' comment-search
+    endpoints expect the bare link id (PullPush returns HTTP 400 with the prefix)."""
+    if fullname.startswith(("t1_", "t3_")):
+        return fullname[3:]
+    return fullname
+
+
+def _norm_permalink(p: str) -> str:
+    if not p:
+        return ""
+    return ("https://www.reddit.com" + p) if p.startswith("/") else p
+
+
+def _norm_post(rec: dict) -> dict:
+    return {
+        "title": rec.get("title") or "",
+        "body": rec.get("selftext") or "",
+        "author": rec.get("author") or "",
+        "subreddit": rec.get("subreddit") or "",
+        "permalink": _norm_permalink(rec.get("permalink") or ""),
+        "url": rec.get("url") or "",
+        "created_utc": rec.get("created_utc"),
+        "score": rec.get("score") or 0,
+        "over_18": 1 if rec.get("over_18") else 0,
+    }
+
+
+def _norm_comment(rec: dict) -> dict:
+    return {
+        "body": rec.get("body") or "",
+        "author": rec.get("author") or "",
+        "subreddit": rec.get("subreddit") or "",
+        "permalink": _norm_permalink(rec.get("permalink") or ""),
+        "score": rec.get("score") or 0,
+        "depth": 0,  # archives don't give a reliable tree; render flat
+        "created_utc": rec.get("created_utc"),
+    }
+
+
+class ArchiveProvider:
+    """Base provider: batching, throttling, and 429 backoff. Subclasses supply URLs."""
+
+    name = "base"
+    max_batch = 100
+
+    def __init__(self, user_agent, *, min_interval: float = 0.0,
+                 sleep=time.sleep, get_json=None, max_retries: int = 3):
+        self.user_agent = user_agent
+        self.min_interval = min_interval
+        self._sleep = sleep
+        self._get_json = get_json or _http.get_json
+        self.max_retries = max_retries
+        self._made_request = False
+
+    # -- URL builders (overridden per provider) ------------------------------
+    def _ids_url(self, kind: str, ids: list) -> str:
+        raise NotImplementedError
+
+    def _search_comments_url(self, link_fullname: str, limit: int) -> str:
+        raise NotImplementedError
+
+    # -- HTTP with throttle + backoff ----------------------------------------
+    def _request(self, url: str) -> dict:
+        if self._made_request and self.min_interval > 0:
+            self._sleep(self.min_interval)
+        delay = 2.0
+        for attempt in range(self.max_retries + 1):
+            try:
+                self._made_request = True
+                _status, _headers, data = self._get_json(url, self.user_agent)
+                return data if isinstance(data, dict) else {"data": data}
+            except _http.ArchiveError as e:
+                if e.status == 429 and attempt < self.max_retries:
+                    wait = float(e.retry_after) if e.retry_after else delay
+                    self._sleep(wait)
+                    delay *= 2
+                    continue
+                raise
+        return {}
+
+    # -- Public fetches ------------------------------------------------------
+    def _fetch(self, kind: str, ids: list, normalizer) -> dict:
+        out = {}
+        ids = [i for i in ids if _VALID_ID.match(i or "")]
+        for i in range(0, len(ids), self.max_batch):
+            batch = ids[i:i + self.max_batch]
+            data = self._request(self._ids_url(kind, batch))
+            for rec in (data.get("data") or []):
+                rid = rec.get("id")
+                if rid:
+                    out[rid] = normalizer(rec)
+        return out
+
+    def fetch_posts(self, ids: list) -> dict:
+        return self._fetch("posts", ids, _norm_post)
+
+    def fetch_comments(self, ids: list) -> dict:
+        return self._fetch("comments", ids, _norm_comment)
+
+    def search_comments(self, link_fullname: str, limit: int = 200) -> list:
+        data = self._request(self._search_comments_url(link_fullname, limit))
+        return [_norm_comment(rec) for rec in (data.get("data") or [])]
+
+
+class PullPushProvider(ArchiveProvider):
+    name = "pullpush"
+    max_batch = 100  # PullPush caps `size`/ids at 100
+
+    def _ids_url(self, kind, ids):
+        path = "submission" if kind == "posts" else "comment"
+        return f"{PULLPUSH_BASE}/reddit/search/{path}/?ids={','.join(ids)}"
+
+    def _search_comments_url(self, link_fullname, limit):
+        return f"{PULLPUSH_BASE}/reddit/search/comment/?link_id={_bare_id(link_fullname)}&size={min(limit, 100)}"
+
+
+class ArcticShiftProvider(ArchiveProvider):
+    name = "arctic"
+    max_batch = 500  # Arctic-Shift allows up to 500 ids/request
+
+    def _ids_url(self, kind, ids):
+        path = "posts" if kind == "posts" else "comments"
+        return f"{ARCTIC_BASE}/api/{path}/ids?ids={','.join(ids)}"
+
+    def _search_comments_url(self, link_fullname, limit):
+        return f"{ARCTIC_BASE}/api/comments/search?link_id={_bare_id(link_fullname)}&limit={limit}"
+
+
+def default_providers(user_agent, *, throttle: bool = True, order=("pullpush", "arctic")):
+    """Build providers in priority order. ``throttle`` enables rate-limit spacing for
+    bulk hydration; pass throttle=False for snappy single on-demand fetches."""
+    factories = {
+        "pullpush": lambda: PullPushProvider(user_agent, min_interval=4.0 if throttle else 0.0),
+        "arctic": lambda: ArcticShiftProvider(user_agent, min_interval=0.4 if throttle else 0.0),
+    }
+    return [factories[name]() for name in order if name in factories]

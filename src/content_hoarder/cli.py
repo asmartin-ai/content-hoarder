@@ -37,7 +37,13 @@ def cmd_import(args) -> int:
 def cmd_enrich(args) -> int:
     from content_hoarder import enrich as enrich_mod
     with _connect() as conn:
-        if args.source:
+        if getattr(args, "archives", False):
+            from content_hoarder.archival import service as archival
+            n = archival.count_targets(conn, retry=args.all)
+            print(f"{n} reddit item(s) need recovery; querying archives...", file=sys.stderr)
+            res = archival.recover(conn, limit=args.limit, retry=args.all,
+                                   progress=lambda m: print(m, file=sys.stderr))
+        elif args.source:
             res = enrich_mod.enrich_source(conn, args.source, all_rows=args.all)
         else:
             res = enrich_mod.enrich_all(conn, all_rows=args.all)
@@ -130,6 +136,11 @@ def build_parser() -> argparse.ArgumentParser:
     pe = sub.add_parser("enrich", help="Fill sparse rows via source APIs.")
     pe.add_argument("--source", help="Only this source (else all that support it).")
     pe.add_argument("--all", action="store_true", help="Re-enrich every row, not just sparse ones.")
+    pe.add_argument("--archives", action="store_true",
+                    help="Recover [removed]/[deleted] + unhydrated reddit items from web "
+                         "archives (PullPush + Arctic-Shift). Network; resumable via --limit.")
+    pe.add_argument("--limit", type=int, default=None,
+                    help="Max items to attempt this run (chunked/resumable recovery).")
     pe.set_defaults(func=cmd_enrich)
 
     ps = sub.add_parser("serve", help="Run the web app.")
