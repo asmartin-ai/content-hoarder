@@ -107,6 +107,7 @@
     if (m.channel) parts.push(esc(m.channel));
     if (m.playlist) parts.push(esc(m.playlist));
     if (item.kind) parts.push(esc(item.kind));
+    if (m.category && m.category !== "unknown") parts.push("🏷 " + esc(m.category));
     if (Number.isFinite(m.score)) parts.push(Math.round(m.score) + " pts");
     return parts.join(" · ");
   };
