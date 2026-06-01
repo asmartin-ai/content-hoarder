@@ -1,0 +1,19 @@
+# Deferred questions / notes (autonomous run 2026-06-01)
+
+Questions and decisions raised while working autonomously — for asmartin-ai to review later.
+Each feature was implemented, committed, and run through `/code-review` (real findings fixed inline).
+
+## Open questions
+- _(none yet)_
+
+## Notes / decisions made autonomously
+- Categorizer uses the agreed defaults (listenable ≥30min OR allowlisted channel; watch ≤5min;
+  wotagei title keyword); see `categorize.py` for the channel allowlist — tell me who to add/remove.
+
+## Data jobs NOT run (per "build + small sample")
+- Full Reddit archival recovery (~9.5k items) — run `enrich --source reddit --archives` when ready.
+- Full YouTube per-video enrich (~5k) — run `enrich --source youtube` when ready.
+
+## Needs your input / data (couldn't do while away)
+- WL3 + Watch Later import — need the `list=PL…` playlist URL(s).
+- Google Keep import — need the Takeout export.

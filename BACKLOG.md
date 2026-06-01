@@ -14,15 +14,12 @@ issue (title = the bold line; body = the notes under it). Priorities: **P1** soo
 Isaac Arthur / Perun) and can be processed passively; wotagei (ヲタ芸) should be handled in its own
 area. Goal: tag videos so they can be filtered into dedicated "processing areas".*
 
-- [ ] **P1 — Heuristic categorizer (no LLM first).** Add a `category` field/tag
-  (`listenable` / `watch` / `wotagei` / `unknown`) derived from rules: duration thresholds
-  (`>~30 min` ⇒ listenable, `<~5 min` ⇒ watch), a **channel allowlist** (music/podcast/long-form
-  channels), and a **wotagei title-keyword** match (`ヲタ芸`, `wotagei`, `wota`, idol-event terms).
-  CLI `categorize` + store on `metadata.category`. *(asmartin-ai wants to test heuristic accuracy before
-  adding the LLM.)*
-- [ ] **P1 — "Processing areas" = category filters.** Filter the inbox/triage by `category`
-  (e.g. a Listenable view, a separate Wotagei area). Reuses the existing filter/sort layer
-  (`db.search_items`, the `#status-filter`/sort UI) — add a category facet.
+- [x] ~~**Heuristic categorizer (no LLM first).**~~ Shipped: `categorize.py` + CLI `categorize`
+  (`listenable`/`watch`/`wotagei`/`unknown` from duration ≥30min, a channel allowlist, and a wotagei
+  title-keyword), stored on `metadata.category`. First run on WL2: listenable 626 / watch 1315 /
+  wotagei 3 / unknown 3054 — re-tune the allowlist + thresholds in `categorize.py`.
+- [x] ~~**"Processing areas" = category filters.**~~ Shipped: a category facet on `db.search_items`
+  + `/items?category=` + the `#category` selector in the browse topbar.
 - [ ] **P2 — Local-LLM auto-classify (`assist/llm.py`).** Classify from title + channel
   (listenable/watch/wotagei) with a manual override per item. Only after heuristics are validated.
 - [ ] **P3 — Manual re-tagging UI.** A quick category picker on the triage card / list row.
