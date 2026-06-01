@@ -8,11 +8,17 @@ a dedicated workspace to sift through your backlog and actually deal with what y
 Status: **Phase 1 (in development)**
 
 ## Features
-- Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, and Google Keep into
-  one local SQLite database (Firefox tabs planned).
+- Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep, and
+  **Firefox tabs** into one local SQLite database.
 - Full-text **and** fuzzy (typo-tolerant) search across everything.
 - A triage UI with two modes: a one-at-a-time **swipe/keyboard card** mode and a **list** view with
-  bulk keep/archive actions.
+  bulk keep/archive actions, Gmail-style swipe icons, source tabs + a status sidebar, and an undo snackbar.
+- **Processing areas:** heuristic categorization of videos into *listenable* / *watch* / *wotagei*
+  (no LLM), filterable in the inbox; correct a tag from the triage card.
+- **Content recovery (non-destructive):** restore `[removed]`/`[deleted]` Reddit posts/comments (and
+  un-hydrated saved comments) from PullPush/Arctic-Shift, and `[Private/Deleted video]` YouTube titles
+  from the Wayback Machine.
+- **Duplicate detection:** flag possible duplicates (by URL or title) and reversibly resolve them.
 - Per-item status: `inbox` → `keep` / `archived` / `done`, with one-step undo and a reversible
   "content bankruptcy" bulk-archive.
 - Responsive, installable **PWA** so you can triage on desktop or phone.
@@ -34,8 +40,10 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | Command | Description |
 |---------|-------------|
 | `init-db` | Create the local SQLite database + FTS5 search tables. |
-| `import <path> [--source ID]` | Import from a file or directory; auto-detects the source, or force one with `--source`. |
-| `enrich [--source ID] [--all]` | Fetch missing metadata for sparse items (e.g. HN via its API, YouTube via yt-dlp). |
+| `import <path> [--source ID]` | Import a file/dir; auto-detects the source (Reddit DB/CSV/JSON, YouTube yt-dlp JSON, HN DB/txt, Obsidian/Keep folders, Firefox "Export Tabs URLs" .txt), or force with `--source`. |
+| `categorize [--source youtube] [--all] [--limit N]` | Tag items *listenable* / *watch* / *wotagei* by heuristics (duration, channel allowlist, title keyword); stored on `metadata.category`. |
+| `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
+| `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |
@@ -56,6 +64,8 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
   import a plain item-ID list or your `favorites?id=USER` HTML.
 - **Google Keep** is imported from an official **Google Takeout** export (one per account). The
   unofficial `gkeepapi` is intentionally **not** used (ToS / account-lockout risk).
+- **Firefox tabs** are imported from the "Export Tabs URLs" extension's `.txt` (Rich format);
+  re-importing the overlapping daily exports de-dups by URL.
 
 ## Privacy & data safety
 The SQLite database (`data/app.db`), all exports, and `.env` are gitignored. Personal data and API
