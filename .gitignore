@@ -32,6 +32,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Local preview-server config (machine-specific absolute paths)
+.claude/launch.json
+
 # Allow only the tiny curated synthetic test fixtures
 !fixtures/
 !fixtures/**
