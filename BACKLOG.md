@@ -101,6 +101,11 @@ false positives.*
   overlapping daily exports. Imported one sample (326 tabs). OneTab / `recovery.jsonlz4` remain future.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
+- [ ] **P3 — Needs the API (keyless not possible):** (a) render **Reddit gallery images** inline — the
+  archives keep `is_gallery` but drop `media_metadata`, and reddit `.json` is 403 without OAuth; (b) the
+  true **"date added to Watch Later"** for YouTube (`playlistItems.publishedAt`). Keyless stopgaps already
+  shipped: galleries relabel to "🖼 Gallery"; sort by **playlist position**; score/upvote hydration via
+  the archives (`enrich --source reddit --scores`).
 
 ## Epic 8 — Polish & infra  (`chore`)
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
