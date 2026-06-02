@@ -22,6 +22,7 @@ DEFAULT_USER_AGENT = "content-hoarder/0.1 (reddit archival recovery)"
 _TARGET_WHERE = (
     "source='reddit' AND ("
     "body IN ('[removed]','[deleted]') OR title IN ('[removed]','[deleted]') "
+    "OR body LIKE '[ removed by%' OR title LIKE '[ removed by%' OR title LIKE 'deleted by user%' "
     "OR (kind='comment' AND (body IS NULL OR body=''))"
     ")"
 )

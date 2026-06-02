@@ -10,9 +10,13 @@
   // Only allow http(s) or root-relative URLs in href (blocks javascript:/data: sinks).
   const safeUrl = (u) => (/^(https?:\/\/|\/)/i.test(u || "") ? u : "");
 
-  const REMOVED_RE = /^\[(removed|deleted)\]$/i;
+  // Removed/deleted Reddit posts — incl. admin/mod removals ("[ Removed by reddit … ]")
+  // and "Deleted by user", not just the bare "[removed]"/"[deleted]" placeholders.
+  const _rmStart = /^\s*\[\s*(removed|deleted)/i;
+  const _rmPhrase = /\b(removed by (reddit|a moderator|the moderators|moderator)|deleted by user)\b/i;
+  const isRemovedText = (s) => _rmStart.test(s || "") || _rmPhrase.test(s || "");
   const isRemoved = (item) => item.source === "reddit" &&
-    (REMOVED_RE.test(item.body || "") || REMOVED_RE.test(item.title || ""));
+    (isRemovedText(item.body) || isRemovedText(item.title));
 
   const ago = (ts) => {
     if (!ts) return "";
@@ -78,6 +82,14 @@
       '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
     document.getElementById("media-modal").hidden = false;
   };
+  // Image posts open a simple lightbox (reliable; no Reddit dependency).
+  const openImage = (url) => {
+    if (!safeUrl(url)) return;
+    document.getElementById("media-body").innerHTML =
+      '<img class="media-img" src="' + esc(url) + '" alt="">' +
+      '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>';
+    document.getElementById("media-modal").hidden = false;
+  };
   const closeMedia = () => {
     document.getElementById("media-modal").hidden = true;
     document.getElementById("media-body").innerHTML = "";  // stop playback
@@ -92,6 +104,22 @@
     return '<span class="badge" style="--c:' + esc(s.badge_color) + '">' + esc(s.label) + "</span>";
   };
 
+  // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
+  const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
+  const imageUrl = (item) => {
+    const u = item.url || "";
+    if (IMG_EXT.test(u) || /i\.redd\.it\//i.test(u)) return u;
+    return (item.metadata || {}).media_type === "image" ? u : "";
+  };
+  // YouTube upload date as YYYY-MM-DD (from enrich's upload_date, else created_utc).
+  const uploadDate = (item) => {
+    const m = item.metadata || {};
+    if (typeof m.upload_date === "string" && /^\d{8}$/.test(m.upload_date))
+      return m.upload_date.slice(0, 4) + "-" + m.upload_date.slice(4, 6) + "-" + m.upload_date.slice(6, 8);
+    if (item.created_utc) return new Date(item.created_utc * 1000).toISOString().slice(0, 10);
+    return "";
+  };
+
   const metaLine = (item) => {
     const m = item.metadata || {};
     const parts = [];
@@ -99,6 +127,7 @@
     if (m.subreddit) parts.push("r/" + esc(m.subreddit));
     if (m.channel) parts.push(esc(m.channel));
     if (m.playlist) parts.push(esc(m.playlist));
+    if (item.source === "youtube") { const ud = uploadDate(item); if (ud) parts.push("📅 " + ud); }
     if (item.kind) parts.push(esc(item.kind));
     if (m.category && m.category !== "unknown") parts.push("🏷 " + esc(m.category));
     if (Number.isFinite(m.score)) parts.push(Math.round(m.score) + " pts");
@@ -110,7 +139,11 @@
   // Reddit preview button for media posts whose media URL wasn't captured.
   const mediaSlotHtml = (item) => {
     const t = thumb(item);
-    if (t) return '<img class="item-thumb" loading="lazy" src="' + esc(t) + '" alt="">';
+    if (t) {
+      const full = imageUrl(item);
+      return '<img class="item-thumb' + (full ? ' img-open' : '') + '" loading="lazy" src="' + esc(t) + '"' +
+        (full ? ' data-img="' + esc(full) + '"' : '') + ' alt="">';
+    }
     const mt = (item.metadata || {}).media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
       const permalink = (item.metadata && item.metadata.permalink) || item.url || "";
@@ -334,6 +367,8 @@
     if (recBtn) { recoverItem(fullname, row, recBtn); return; }
     const pv = e.target.closest(".rd-preview");
     if (pv) { openMedia(pv.dataset.permalink); return; }
+    const imgEl = e.target.closest(".item-thumb.img-open");
+    if (imgEl) { openImage(imgEl.dataset.img); return; }
     if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
     if (e.target.closest("a")) return;                  // let title links open
     const cb = row.querySelector(".sel");               // whole-card click toggles selection
