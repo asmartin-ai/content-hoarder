@@ -37,11 +37,13 @@ def cmd_import(args) -> int:
 def cmd_enrich(args) -> int:
     from content_hoarder import enrich as enrich_mod
     with _connect() as conn:
-        if getattr(args, "archives", False):
+        if getattr(args, "archives", False) or getattr(args, "scores", False):
             from content_hoarder.archival import service as archival
-            n = archival.count_targets(conn, retry=args.all)
-            print(f"{n} reddit item(s) need recovery; querying archives...", file=sys.stderr)
-            res = archival.recover(conn, limit=args.limit, retry=args.all,
+            scope = "all" if getattr(args, "scores", False) else "removed"
+            n = archival.count_targets(conn, retry=args.all, scope=scope)
+            what = "to hydrate (score/content)" if scope == "all" else "need recovery"
+            print(f"{n} reddit item(s) {what}; querying archives...", file=sys.stderr)
+            res = archival.recover(conn, limit=args.limit, retry=args.all, scope=scope,
                                    progress=lambda m: print(m, file=sys.stderr))
         elif getattr(args, "titles", False):
             from content_hoarder import youtube_recover
@@ -171,6 +173,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "archives (PullPush + Arctic-Shift). Network; resumable via --limit.")
     pe.add_argument("--titles", action="store_true",
                     help="Recover [Private/Deleted video] YouTube titles from the Wayback Machine.")
+    pe.add_argument("--scores", action="store_true",
+                    help="Hydrate upvotes/score (+ current title/body) for ALL reddit items via the archives.")
     pe.add_argument("--limit", type=int, default=None,
                     help="Max items to attempt this run (chunked/resumable recovery).")
     pe.set_defaults(func=cmd_enrich)

@@ -130,6 +130,7 @@ _SORT_COLUMNS = {
     "status": "status",
     "source": "source",
     "duration": "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
+    "position": "CAST(json_extract(metadata, '$.position') AS INTEGER)",  # YouTube playlist order
 }
 
 
