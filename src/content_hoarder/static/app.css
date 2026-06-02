@@ -901,8 +901,10 @@ select {
 .rd-preview:hover { border-color: var(--accent); }
 .recover-btn { border-color: var(--accent); color: var(--accent); }
 .recover-btn:disabled { opacity: 0.6; cursor: default; }
-.media-box { max-width: 680px; }
-#media-body { min-height: 220px; }
-#media-body iframe, #media-body .reddit-embed-bq { width: 100% !important; max-width: 100%; border: 0; }
-.reddit-embed-frame { height: 72vh; max-height: 680px; border-radius: 8px; background: #0b0c0f; }
+.media-box { max-width: 680px; width: 92%; overflow: hidden; }  /* no outer scroll; the iframe scrolls itself */
+#media-body { min-height: 0; }
+#media-body iframe { width: 100% !important; max-width: 100%; border: 0; }
+.reddit-embed-frame { height: 70vh; max-height: 600px; border-radius: 8px; background: #0b0c0f; display: block; }
+.media-img { width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; display: block; }
+.item-thumb.img-open { cursor: zoom-in; }
 .media-fallback { display: block; margin-top: 0.6rem; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }

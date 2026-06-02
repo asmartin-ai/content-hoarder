@@ -61,6 +61,16 @@ def test_placeholder_falls_through_to_next_provider(tmp_db):
     assert res["by_provider"].get("arctic", 0) >= 1
 
 
+def test_targets_include_admin_removed(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_adm", kind="post",
+                    title="Some title", body="[ Removed by reddit on account of violating the content policy ]"))
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_du", kind="post",
+                    title="Deleted by user", body=""))
+    conn.commit()
+    assert archival.count_targets(conn) == 2
+
+
 def test_recover_no_targets(tmp_db):
     conn = db.connect(tmp_db)
     db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_ok", kind="post",
