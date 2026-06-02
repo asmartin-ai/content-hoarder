@@ -94,11 +94,24 @@
     // Reddit media posts with no thumbnail → click-to-load inline Reddit embed.
     if (item.source === "reddit" && (m.media_type === "reddit_video" || m.media_type === "reddit_media")) {
       var permalink = m.permalink || item.url || "";
-      var label = m.media_type === "reddit_video" ? "▶ Play" : "▶ Preview";
+      var label = m.media_type === "reddit_video" ? "▶ Play"
+        : (/\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : "▶ Preview");
       return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) + '">' +
         '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
     }
     return "";
+  }
+  var _rmStart = /^\s*\[\s*(removed|deleted)/i;
+  var _rmPhrase = /\b(removed by (reddit|a moderator|the moderators|moderator)|deleted by user)\b/i;
+  function isRemoved(item) {
+    if (item.source !== "reddit") return false;
+    return _rmStart.test(item.body || "") || _rmPhrase.test(item.body || "") ||
+      _rmStart.test(item.title || "") || _rmPhrase.test(item.title || "");
+  }
+  function recoverHtml(item) {
+    return isRemoved(item)
+      ? '<div class="tcard-recover"><button class="recover-btn" data-recover type="button">↻ Recover from archives</button></div>'
+      : "";
   }
   function cardHtml(item) {
     var title = item.title || (item.url || item.fullname);
@@ -117,6 +130,7 @@
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
       catHtml(item) +
+      recoverHtml(item) +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
       '<div class="tcard-ai">' + ai + "</div>" +
       "</article>";
@@ -243,6 +257,33 @@
           '" loading="lazy"></iframe>' +
           '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
       }
+      return;
+    }
+    var rb = e.target.closest("[data-recover]");
+    if (rb) {
+      var rcard = rb.closest(".tcard");
+      var rfn = rcard ? rcard.getAttribute("data-fullname") : "";
+      if (!rfn) return;
+      rb.disabled = true; rb.textContent = "…";
+      fetchJSON("/items/" + encodeURIComponent(rfn) + "/recover", { method: "POST" })
+        .then(function (d) {
+          if (d && d.recovered) {
+            var ttl = rcard.querySelector(".tcard-title");
+            if (ttl && d.title) ttl.textContent = d.title;
+            if (d.body) {
+              var meta = rcard.querySelector(".tcard-meta");
+              var snip = rcard.querySelector(".tcard-snippet");
+              if (!snip && meta) {
+                snip = document.createElement("p"); snip.className = "tcard-snippet";
+                meta.parentNode.insertBefore(snip, meta.nextSibling);
+              }
+              if (snip) snip.textContent = d.body.slice(0, 400);
+            }
+            rb.textContent = "✓ recovered";
+            toast("Recovered from archives", false);
+          } else { rb.disabled = false; rb.textContent = "not archived"; }
+        })
+        .catch(function () { rb.disabled = false; rb.textContent = "↻ Recover from archives"; });
       return;
     }
     var chip = e.target.closest(".cat-chip");

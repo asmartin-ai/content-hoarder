@@ -901,6 +901,8 @@ select {
 .rd-preview:hover { border-color: var(--accent); }
 .recover-btn { border-color: var(--accent); color: var(--accent); }
 .recover-btn:disabled { opacity: 0.6; cursor: default; }
+.tcard-recover { margin-top: 0.6rem; }
+.tcard-recover .recover-btn { padding: 0.45rem 0.9rem; border-radius: var(--r-sm); background: var(--panel2); cursor: pointer; }
 .media-box { max-width: 680px; width: 92%; overflow: hidden; }  /* no outer scroll; the iframe scrolls itself */
 #media-body { min-height: 0; }
 #media-body iframe { width: 100% !important; max-width: 100%; border: 0; }
