@@ -71,6 +71,15 @@ def test_targets_include_admin_removed(tmp_db):
     assert archival.count_targets(conn) == 2
 
 
+def test_scope_all_targets_every_reddit_item(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_norm", kind="post",
+                    title="Normal post", body="has content"))
+    conn.commit()
+    assert archival.count_targets(conn, scope="removed") == 0   # has content, not a target
+    assert archival.count_targets(conn, scope="all") == 1       # --scores hydrates it anyway
+
+
 def test_recover_no_targets(tmp_db):
     conn = db.connect(tmp_db)
     db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_ok", kind="post",

@@ -28,15 +28,20 @@ _TARGET_WHERE = (
 )
 
 
-def count_targets(conn, *, retry: bool = False) -> int:
-    sql = "SELECT COUNT(*) FROM items WHERE " + _TARGET_WHERE
+def _scope_where(scope: str) -> str:
+    # "all" hydrates score/content for every reddit item; "removed" only the placeholders.
+    return "source='reddit'" if scope == "all" else _TARGET_WHERE
+
+
+def count_targets(conn, *, retry: bool = False, scope: str = "removed") -> int:
+    sql = "SELECT COUNT(*) FROM items WHERE " + _scope_where(scope)
     if not retry:
         sql += " AND hydrated_at IS NULL"
     return conn.execute(sql).fetchone()[0]
 
 
-def _select_targets(conn, *, retry: bool, limit) -> list:
-    sql = "SELECT * FROM items WHERE " + _TARGET_WHERE
+def _select_targets(conn, *, retry: bool, limit, scope: str = "removed") -> list:
+    sql = "SELECT * FROM items WHERE " + _scope_where(scope)
     if not retry:
         sql += " AND hydrated_at IS NULL"
     sql += " ORDER BY last_seen_utc DESC"
@@ -106,16 +111,17 @@ def _collect(found: dict, prefix: str, by_sid: dict, recovered: dict) -> set:
     return done
 
 
-def recover(conn, *, limit=None, retry: bool = False, providers=None,
+def recover(conn, *, limit=None, retry: bool = False, scope: str = "removed", providers=None,
             user_agent: str = DEFAULT_USER_AGENT, progress=None) -> dict:
-    """Recover removed/unhydrated reddit items from web archives (bulk).
+    """Recover reddit items from web archives (bulk). ``scope='removed'`` (default)
+    targets only the ``[removed]``/``[deleted]``/un-hydrated placeholders; ``scope='all'``
+    hydrates score + current title/body for every reddit item.
 
     Tries each provider in order (PullPush → Arctic-Shift); ids not found, or only
     returning ``[removed]``, fall through to the next. Every attempted item is
-    stamped ``hydrated_at`` so re-runs resume where this one stopped. Returns
-    counts + per-provider tallies + any per-provider errors.
+    stamped ``hydrated_at`` so re-runs resume where this one stopped.
     """
-    targets = _select_targets(conn, retry=retry, limit=limit)
+    targets = _select_targets(conn, retry=retry, limit=limit, scope=scope)
     if not targets:
         return {"selected": 0, "recovered": 0, "missed": 0, "by_provider": {}}
 
