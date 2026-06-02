@@ -147,8 +147,9 @@
     const mt = (item.metadata || {}).media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
       const permalink = (item.metadata && item.metadata.permalink) || item.url || "";
+      const label = /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : PREVIEW_TYPES[mt];
       return '<button class="item-thumb rd-preview" type="button" data-permalink="' +
-        esc(permalink) + '">' + PREVIEW_TYPES[mt] + "</button>";
+        esc(permalink) + '">' + label + "</button>";
     }
     return "";
   };
