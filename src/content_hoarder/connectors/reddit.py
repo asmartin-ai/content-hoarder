@@ -11,6 +11,7 @@ import csv
 import json
 import re
 import sqlite3
+from html import unescape
 from pathlib import Path
 
 from content_hoarder.connectors.base import BaseConnector
@@ -132,6 +133,10 @@ def _is_rsm_db(path: Path) -> bool:
         con.close()
 
 
+_HREF_A = re.compile(r"<a\s+[^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", re.S | re.I)
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
 class RedditConnector(BaseConnector):
     id = "reddit"
     label = "Reddit"
@@ -148,6 +153,8 @@ class RedditConnector(BaseConnector):
             return True
         if suf == ".json":
             return self._looks_reddit(p)
+        if suf in (".html", ".htm"):
+            return self._looks_reddit_html(p)
         return False
 
     def _looks_reddit(self, p: Path) -> bool:
@@ -157,6 +164,13 @@ class RedditConnector(BaseConnector):
         except OSError:
             return False
         return any(s in head for s in ('"permalink"', '"subreddit"', '"kind": "t3', '"kind":"t3'))
+
+    def _looks_reddit_html(self, p: Path) -> bool:
+        try:
+            head = Path(p).read_text(encoding="utf-8", errors="ignore")[:16384]
+        except OSError:
+            return False
+        return "reddit.com" in head and "/comments/" in head
 
     # -- sources -----------------------------------------------------------
 
@@ -169,6 +183,47 @@ class RedditConnector(BaseConnector):
             yield from self._from_csv(p)
         elif suf == ".json":
             yield from self._from_json(p)
+        elif suf in (".html", ".htm"):
+            yield from self._from_html(p)
+
+    def _from_html(self, p: Path):
+        """saveddit-style export: one <li> per saved item — a content link (url +
+        title) plus the thread permalink. Route the content URL through the media
+        classifier so galleries/videos are detected; merges with existing items."""
+        try:
+            text = Path(p).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return
+        seen: set = set()
+        for block in re.split(r"</li>", text, flags=re.I):
+            links = _HREF_A.findall(block)
+            if not links:
+                continue
+            permalink = ""
+            for href, _txt in links:
+                if "/comments/" in href and "reddit.com" in href.lower():
+                    permalink = href
+                    break
+            if not permalink and "/comments/" in links[0][0]:
+                permalink = links[0][0]
+            sid = _sid_from_permalink(permalink)
+            if not sid or sid in seen:
+                continue
+            seen.add(sid)
+            content_url, title_html = links[0]
+            title = re.sub(r"\s+", " ", unescape(_HTML_TAG.sub("", title_html))).strip()
+            raw_url = "" if content_url == permalink else content_url
+            kind = "comment" if str(sid).startswith("t1_") else "post"
+            meta = {"permalink": permalink}
+            sub = _sub_from_permalink(permalink)
+            if sub:
+                meta["subreddit"] = sub
+            url = _classify_media(meta, raw_url, permalink, "", kind)
+            yield new_item(
+                source="reddit", source_id=sid, kind=kind,
+                title=title or _title_from_permalink(permalink),
+                url=url, metadata=meta,
+            )
 
     def _from_db(self, p: Path):
         con = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
