@@ -157,6 +157,7 @@ class HNConnector(BaseConnector):
                     yield new_item(
                         source="hackernews", source_id=sid, kind="story",
                         title="", url=_hn_url(sid),
+                        status="archived",  # read-but-not-saved is history, not inbox triage
                         metadata={"hn_url": _hn_url(sid), "hn_list": "read"},
                     )
         except sqlite3.Error:
