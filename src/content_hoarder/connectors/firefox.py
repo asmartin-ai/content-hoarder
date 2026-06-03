@@ -51,7 +51,9 @@ def youtube_id(url: str) -> str:
     if not _is_youtube_host(_domain(url)):
         return ""
     vid = _video_id_from_url(url)
-    return "" if vid in _YT_NON_IDS else vid   # /embed/videoseries etc. aren't videos
+    # YouTube video IDs are exactly 11 chars; shorter/longer captures (e.g. "playlist"
+    # from /embed/playlist?list=...) are embed-path sentinels, not real IDs.
+    return "" if (not vid or len(vid) != 11 or vid in _YT_NON_IDS) else vid
 
 
 def _clean_yt_tab_title(title: str) -> str:
@@ -63,14 +65,13 @@ def _clean_yt_tab_title(title: str) -> str:
 def yt_item(vid: str, title: str = "", window: str = "", pinned: bool = False) -> dict:
     """Build the ``youtube:<vid>`` item a Firefox YouTube tab promotes to.
 
-    Markers (``open_in_firefox``/``via_firefox``/``firefox_*``) are *additive* — keys a
-    Watch-Later row never carries — so a ``merge_upsert`` onto an existing save adds the
-    "open in a tab" signal without clobbering its playlist/position. (``title`` is still an
-    overlay field; for the rare open-and-saved case the cleanup pass / a later enrich wins.)"""
+    Markers (``open_in_firefox`` / ``firefox_*``) are *additive* — keys a Watch-Later
+    row never carries — so a ``merge_upsert`` onto an existing save adds the "open in a
+    tab" signal without clobbering its playlist/position. (``title`` is still an overlay
+    field; for the rare open-and-saved case the cleanup pass / a later enrich wins.)"""
     meta = {
         "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         "open_in_firefox": True,
-        "via_firefox": True,
     }
     if window:
         meta["firefox_window"] = window

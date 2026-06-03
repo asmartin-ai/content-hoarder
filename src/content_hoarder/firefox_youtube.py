@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from content_hoarder import db, dedup
 from content_hoarder.connectors.firefox import youtube_id, yt_item
-from content_hoarder.models import parse_metadata
+from content_hoarder.models import VALID_STATUSES, parse_metadata
 
 
 def plan(conn) -> dict:
@@ -28,15 +28,19 @@ def plan(conn) -> dict:
     yt_ids = {r[0] for r in conn.execute("SELECT source_id FROM items WHERE source='youtube'")}
     dupes: list[dict] = []
     orphans: list[dict] = []
-    for fullname, url, title, status, metadata in conn.execute(
-        "SELECT fullname, url, title, status, metadata FROM items WHERE source='firefox'"
+    for fullname, url, title, status, processed_utc, metadata in conn.execute(
+        "SELECT fullname, url, title, status, processed_utc, metadata"
+        " FROM items WHERE source='firefox' ORDER BY fullname"
     ):
         vid = youtube_id(url or "")
         if not vid:
             continue
         rec = {
             "fullname": fullname, "vid": vid, "title": title or "",
-            "status": status or "inbox", "metadata": parse_metadata(metadata),
+            # validate status so corrupted/legacy values don't slip through
+            "status": status if status in VALID_STATUSES else "inbox",
+            "processed_utc": processed_utc,  # preserve so 'done' tabs count in weekly stats
+            "metadata": parse_metadata(metadata),
         }
         (dupes if vid in yt_ids else orphans).append(rec)
     return {"dupes": dupes, "orphans": orphans}
@@ -46,7 +50,6 @@ def _firefox_marker_mutator(ff_meta: dict):
     """Return a mutator that copies the open-in-firefox signal onto a youtube row's metadata."""
     def mut(md: dict) -> None:
         md["open_in_firefox"] = True
-        md["via_firefox"] = True
         if ff_meta.get("window"):
             md["firefox_window"] = ff_meta["window"]
         if ff_meta.get("pinned"):
@@ -74,7 +77,8 @@ def migrate(conn, *, apply: bool = False) -> dict:
     for rec in orphans:  # open but never saved — becomes a real, enrichable youtube item
         md = rec["metadata"]
         item = yt_item(rec["vid"], rec["title"], md.get("window") or "", bool(md.get("pinned")))
-        item["status"] = rec["status"]  # preserve triage state (don't un-do a 'done' tab)
+        item["status"] = rec["status"]          # preserve triage state (don't un-do a 'done' tab)
+        item["processed_utc"] = rec["processed_utc"]  # preserve so 'done' counts in weekly stats
         db.merge_upsert(conn, item)
         conn.execute("DELETE FROM items WHERE fullname=?", (rec["fullname"],))
         removed += 1
