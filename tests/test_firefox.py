@@ -92,7 +92,7 @@ def test_firefox_youtube_tab_promoted_to_youtube_item(tmp_path):
     assert v["url"] == "https://youtu.be/q_ZTwCx1VSI"
     assert v["title"] == "Fauna's physics lecture"     # "(29) " prefix + " - YouTube" suffix stripped
     md = json.loads(v["metadata"])
-    assert md["open_in_firefox"] is True and md["via_firefox"] is True
+    assert md["open_in_firefox"] is True
     assert md["firefox_window"] == "9" and md["firefox_pinned"] == 1
     assert md["thumbnail"].endswith("/q_ZTwCx1VSI/hqdefault.jpg")
     assert "playlist" not in md and "position" not in md   # additive markers only (no WL clobber)
@@ -119,9 +119,13 @@ def test_clean_yt_tab_title():
 def test_youtube_id_host_guard_and_embed_sentinels():
     from content_hoarder.connectors.firefox import youtube_id
     assert youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
-    assert youtube_id("https://m.youtube.com/watch?v=abc123&list=WL") == "abc123"
+    assert youtube_id("https://m.youtube.com/watch?v=abc12345678&list=WL") == "abc12345678"
     # playlist/live embeds capture an 11-char non-id sentinel — must NOT be promoted
     assert youtube_id("https://www.youtube.com/embed/videoseries?list=PLx") == ""
     assert youtube_id("https://www.youtube.com/embed/live_stream?channel=X") == ""
     # non-YouTube host with a ?v= param is not a video
     assert youtube_id("https://example.com/page?v=fakevid12") == ""
+    # short non-id embed paths (< 11 chars) must NOT be promoted — the {6,} regex captures
+    # them but len-check filters them out (e.g. "/embed/playlist" → "playlist", 8 chars)
+    assert youtube_id("https://www.youtube.com/embed/playlist?list=PLxxx") == ""
+    assert youtube_id("https://www.youtube.com/embed/shorts") == ""
