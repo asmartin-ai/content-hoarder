@@ -204,7 +204,7 @@ class RedditConnector(BaseConnector):
                 if "/comments/" in href and "reddit.com" in href.lower():
                     permalink = href
                     break
-            if not permalink and "/comments/" in links[0][0]:
+            if not permalink and "reddit.com" in links[0][0].lower() and "/comments/" in links[0][0]:
                 permalink = links[0][0]
             sid = _sid_from_permalink(permalink)
             if not sid or sid in seen:
