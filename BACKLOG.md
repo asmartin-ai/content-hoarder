@@ -99,6 +99,12 @@ false positives.*
 - [x] ~~**Firefox tabs connector.**~~ Shipped: parses "Export Tabs URLs (Rich format)" .txt
   (title / url / favicon / window / pinned) → `firefox:<url-hash>` items, de-duped across the
   overlapping daily exports. Imported one sample (326 tabs). OneTab / `recovery.jsonlz4` remain future.
+- [x] ~~**Firefox YouTube tabs → YouTube items.**~~ Shipped: a tab whose URL is a YouTube video is
+  promoted at import to a real `youtube:<vid>` item (host-guarded id extraction, cleaned title,
+  thumbnail, `open_in_firefox` marker) so it merges with Watch Later and is enrichable. One-time
+  `migrate-firefox-tabs [--apply]` (dry-run default) re-keys rows imported before this and collapses
+  duplicates. Of the 326-tab sample, **219 were YouTube** (2 already saved, 217 orphans); browse them
+  via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 - [ ] **P3 — Needs the API (keyless not possible):** (a) render **Reddit gallery images** inline — the

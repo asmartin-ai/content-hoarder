@@ -312,6 +312,7 @@ def search_items(
     status: str | None = None,
     category: str | None = None,
     is_saved: int | None = None,
+    open_in_firefox: bool = False,
     fuzzy: bool = False,
     sort: str = "last_seen_utc",
     order: str = "desc",
@@ -339,6 +340,8 @@ def search_items(
         if is_saved is not None:
             filters.append(f"{a}is_saved = ?")
             params.append(int(is_saved))
+        if open_in_firefox:  # the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
+            filters.append(f"json_extract({a}metadata, '$.open_in_firefox') = 1")
 
     q = (q or "").strip()
     match_expr = ""

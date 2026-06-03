@@ -195,7 +195,11 @@
     p.set("order", sv[1] || "desc");
     const cat = document.getElementById("category").value;
     if (cat) p.set("category", cat);
-    if (activeSource) p.set("source", activeSource);
+    // "Firefox tabs" batch is all youtube-source; let it override the active source tab so the
+    // batch still shows when you toggle it from e.g. the Reddit tab (instead of an empty list).
+    const ffOnly = document.getElementById("ff-tabs").classList.contains("active");
+    if (ffOnly) p.set("open_in_firefox", "1");
+    if (activeSource && !ffOnly) p.set("source", activeSource);
     p.set("limit", "50");
     p.set("offset", String(offset));
     return p.toString();
@@ -543,6 +547,11 @@
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
   document.getElementById("category").addEventListener("change", () => load(true));
+  document.getElementById("ff-tabs").addEventListener("click", (e) => {
+    const on = e.currentTarget.classList.toggle("active");
+    e.currentTarget.setAttribute("aria-pressed", on ? "true" : "false");
+    load(true);
+  });
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)

@@ -83,6 +83,18 @@ def cmd_dedup(args) -> int:
     return 0
 
 
+def cmd_migrate_firefox_tabs(args) -> int:
+    from content_hoarder import firefox_youtube as fy
+    with _connect() as conn:
+        res = fy.migrate(conn, apply=args.apply)
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(f"(dry run — {res['dupes']} dupes + {res['orphans']} orphans would become youtube "
+              f"items and {res['dupes'] + res['orphans']} firefox rows removed; re-run with "
+              f"--apply to commit. Run against a COPY of the DB first.)", file=sys.stderr)
+    return 0
+
+
 def cmd_serve(args) -> int:
     from content_hoarder.web import create_app
     app = create_app()
@@ -192,6 +204,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Auto-archive all-but-richest per group (reversible).")
     pd.add_argument("--clear", action="store_true", help="Remove the dup flags.")
     pd.set_defaults(func=cmd_dedup)
+
+    pm = sub.add_parser("migrate-firefox-tabs",
+                        help="Promote Firefox YouTube tabs into youtube items (the connector now "
+                             "does this at import; this fixes rows imported before that).")
+    pm.add_argument("--apply", action="store_true",
+                    help="Commit changes (default: dry run). Run against a DB copy first.")
+    pm.set_defaults(func=cmd_migrate_firefox_tabs)
 
     ps = sub.add_parser("serve", help="Run the web app.")
     ps.add_argument("--host", help="Bind host (default 127.0.0.1; set to your Tailscale IP for mobile).")
