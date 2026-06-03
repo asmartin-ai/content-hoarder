@@ -95,6 +95,30 @@ python -m content_hoarder enrich --source hackernews
 
 ---
 
+## Firefox tabs (Export Tabs URLs)  ✅ done
+Install the **"Export Tabs URLs"** add-on, export in **Rich format** to a `.txt`, then:
+```bash
+python -m content_hoarder import "path\to\tabs.txt"
+```
+Each tab → a `firefox:<url-hash>` item (de-duped across overlapping daily exports).
+
+**YouTube tabs are promoted automatically.** A tab whose URL is a YouTube video (`watch?v=` /
+`youtu.be` / `/shorts/`) becomes a real `youtube:<vid>` item instead — cleaned title, thumbnail, and an
+`open_in_firefox` marker — so it merges with anything already in Watch Later and is enrichable. Browse
+the batch with the **"📑 Firefox tabs"** filter on the home page.
+
+To migrate tabs imported *before* this behavior existed (one-time reconciliation):
+```bash
+# dry run first — and always against a COPY of the DB
+python -m content_hoarder migrate-firefox-tabs
+python -m content_hoarder migrate-firefox-tabs --apply
+```
+This re-keys YouTube `firefox:` rows to `youtube:<vid>` (collapsing any Watch-Later duplicates) and
+removes the superseded tab rows. Afterwards run `enrich --source youtube` to fill real
+titles/durations. (OneTab / `recovery.jsonlz4` remain future inputs.)
+
+---
+
 ## Google Keep  ⏳ (deferred — do later)
 When ready: <https://takeout.google.com> → deselect all → select **Keep** → export → unzip, then:
 ```bash

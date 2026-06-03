@@ -12,10 +12,15 @@ import re
 from pathlib import Path
 
 from content_hoarder.connectors.base import BaseConnector
+from content_hoarder.connectors.youtube import _video_id_from_url
 from content_hoarder.models import new_item
 
 _URL_RE = re.compile(r"^https?://", re.I)
 _HEADER = "Export Tabs URLs"
+_YT_BADGE = re.compile(r"^\(\d+\)\s*")            # browser unread-count prefix: "(29) "
+_YT_SUFFIX = re.compile(r"\s*-\s*YouTube\s*$", re.I)
+# /embed/ path sentinels the shared regex captures that are NOT real video ids.
+_YT_NON_IDS = {"videoseries", "live_stream"}
 
 
 def _domain(url: str) -> str:
@@ -31,6 +36,54 @@ def _norm_url(url: str) -> str:
     if not m:
         return u.lower()
     return m.group(1).lower() + (m.group(2) or "").rstrip("/")
+
+
+def _is_youtube_host(host: str) -> bool:
+    return (host == "youtube.com" or host.endswith(".youtube.com")
+            or host == "youtu.be" or host.endswith(".youtu.be"))
+
+
+def youtube_id(url: str) -> str:
+    """Video id iff ``url`` is actually a YouTube watch/short/embed link.
+
+    Host-guards the shared ``_video_id_from_url`` regex so a coincidental ``?v=`` on a
+    non-YouTube host (e.g. ``example.com/p?v=123456``) is NOT mis-promoted to a video."""
+    if not _is_youtube_host(_domain(url)):
+        return ""
+    vid = _video_id_from_url(url)
+    return "" if vid in _YT_NON_IDS else vid   # /embed/videoseries etc. aren't videos
+
+
+def _clean_yt_tab_title(title: str) -> str:
+    """Strip the browser's unread-count ``(29) `` prefix and the `` - YouTube`` suffix."""
+    t = _YT_BADGE.sub("", (title or "").strip())
+    return _YT_SUFFIX.sub("", t).strip()
+
+
+def yt_item(vid: str, title: str = "", window: str = "", pinned: bool = False) -> dict:
+    """Build the ``youtube:<vid>`` item a Firefox YouTube tab promotes to.
+
+    Markers (``open_in_firefox``/``via_firefox``/``firefox_*``) are *additive* — keys a
+    Watch-Later row never carries — so a ``merge_upsert`` onto an existing save adds the
+    "open in a tab" signal without clobbering its playlist/position. (``title`` is still an
+    overlay field; for the rare open-and-saved case the cleanup pass / a later enrich wins.)"""
+    meta = {
+        "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+        "open_in_firefox": True,
+        "via_firefox": True,
+    }
+    if window:
+        meta["firefox_window"] = window
+    if pinned:
+        meta["firefox_pinned"] = 1
+    return new_item(
+        source="youtube",
+        source_id=vid,
+        kind="video",
+        title=_clean_yt_tab_title(title),
+        url=f"https://youtu.be/{vid}",
+        metadata=meta,
+    )
 
 
 class FirefoxConnector(BaseConnector):
@@ -76,6 +129,9 @@ class FirefoxConnector(BaseConnector):
                 yield self._make(lines[0], "", "", window, False)
 
     def _make(self, url, title, favicon, window, pinned):
+        vid = youtube_id(url)
+        if vid:  # a YouTube tab becomes a real youtube:<vid> item (merges with Watch Later)
+            return yt_item(vid, title, window, pinned)
         meta = {"domain": _domain(url)}
         if favicon:
             meta["favicon"] = favicon
