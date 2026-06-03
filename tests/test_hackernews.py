@@ -24,10 +24,11 @@ def test_hn_saved_and_read(tmp_path):
     assert set(items) == {"29387761", "111"}  # the read row that dups a saved id is skipped
 
     saved = items["29387761"]
-    assert saved["title"] == "A Title"
+    assert saved["title"] == "A Title" and saved["status"] == "inbox"
     assert saved["created_utc"] == 1638269381 and saved["saved_utc"] == 1638269381  # ms -> seconds
     assert json.loads(saved["metadata"])["hn_list"] == "saved"
 
     read = items["111"]
     assert read["title"] == "" and read["kind"] == "story"
+    assert read["status"] == "archived"  # read-but-not-saved is archived, not inbox
     assert json.loads(read["metadata"])["hn_list"] == "read"
