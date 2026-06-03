@@ -342,7 +342,7 @@
           const ttl = row.querySelector(".item-title");
           if (ttl && d.title) ttl.textContent = d.title;
           const main = row.querySelector(".item-main");
-          if (d.body && !REMOVED_RE.test(d.body) && main) {
+          if (d.body && !isRemovedText(d.body) && main) {
             let snip = row.querySelector(".item-snippet");
             if (!snip) {
               snip = document.createElement("div");
