@@ -107,9 +107,10 @@
   // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
   const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
   const imageUrl = (item) => {
+    const m = item.metadata || {};
     const u = item.url || "";
     if (IMG_EXT.test(u) || /i\.redd\.it\//i.test(u)) return u;
-    return (item.metadata || {}).media_type === "image" ? u : "";
+    return m.media_type === "image" ? (m.media_url || "") : "";
   };
   // YouTube upload date as YYYY-MM-DD (from enrich's upload_date, else created_utc).
   const uploadDate = (item) => {
@@ -134,19 +135,28 @@
     return parts.join(" · ");
   };
 
-  const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview" };
+  const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
   // Right-hand media slot: a thumbnail when we have one, else a click-to-load
   // Reddit preview button for media posts whose media URL wasn't captured.
   const mediaSlotHtml = (item) => {
+    const m = item.metadata || {};
     const t = thumb(item);
     if (t) {
       const full = imageUrl(item);
-      return '<img class="item-thumb' + (full ? ' img-open' : '') + '" loading="lazy" src="' + esc(t) + '"' +
-        (full ? ' data-img="' + esc(full) + '"' : '') + ' alt="">';
+      if (full) {                                         // direct image → open in lightbox
+        return '<img class="item-thumb img-open" loading="lazy" src="' + esc(t) +
+          '" data-img="' + esc(full) + '" alt="">';
+      }
+      if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
+        const permalink = m.permalink || item.url || "";
+        return '<img class="item-thumb rd-preview" loading="lazy" src="' + esc(t) +
+          '" data-permalink="' + esc(permalink) + '" alt="">';
+      }
+      return '<img class="item-thumb" loading="lazy" src="' + esc(t) + '" alt="">';
     }
-    const mt = (item.metadata || {}).media_type;
+    const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
-      const permalink = (item.metadata && item.metadata.permalink) || item.url || "";
+      const permalink = m.permalink || item.url || "";
       const label = /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : PREVIEW_TYPES[mt];
       return '<button class="item-thumb rd-preview" type="button" data-permalink="' +
         esc(permalink) + '">' + label + "</button>";
