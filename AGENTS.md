@@ -95,6 +95,21 @@ After any delegated code: grep for un-awaited async calls and `python -m py_comp
 the Devstral model for pure codegen. Most of this codebase is **synchronous**, so prefer plain
 functions over async.
 
+## Reddit unsave-on-Done (`reddit_unsave.py`)
+Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Design:
+- **Decoupled queue, drained on demand.** `db.set_status`/`bulk_set_status` enqueue a row into the
+  `reddit_unsave` table (gated on the `settings` flag `reddit_unsave_on_done`, **off by default**);
+  `undo_status` dequeues a still-`pending` row. The local Done stays instant and never blocks on Reddit.
+- **Transport: session cookie + modhash** (no OAuth). Cookie/modhash/username live in the `auth_tokens`
+  row `service='reddit_web'` (access_token=cookie, refresh_token=modhash). Stdlib `urllib` only.
+- **`drain()`** (CLI `reddit-unsave --drain`, the "Sync now" button, or a scheduled task) refreshes the
+  modhash once, then POSTs `/api/unsave` ~1/sec with 429 backoff. All network is injectable
+  (`post=`/`getf=`/`sleep=`) → tests are offline. A dead cookie → `auth_error` (loud), nothing sent.
+- **`is_saved` now means "still in the user's Reddit Saved list"** — flipped `1→0` only after a confirmed
+  unsave. **Never gate the unsave on it** (the DB may be stale; unsaving an already-unsaved item is a
+  Reddit no-op). `merge_upsert` already preserves `is_saved` across re-imports (gotcha #2).
+- Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it mutates real Reddit state).
+
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.
 - Never expose the web app to the public internet (Tailscale/LAN only).
