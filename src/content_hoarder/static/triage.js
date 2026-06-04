@@ -17,6 +17,9 @@
   var menuBtn = document.getElementById("menu-btn");
   var menuPop = document.getElementById("menu-pop");
   var batchChips = document.getElementById("batch-chips");
+  var ruPop = document.getElementById("ru-pop");
+  var ruPopStatus = document.getElementById("ru-pop-status");
+  var ruSyncBtn = document.getElementById("ru-sync-triage");
 
   var queue = [];
   var reviewed = 0;
@@ -369,7 +372,30 @@
     var willOpen = menuPop.hidden;
     menuPop.hidden = !willOpen;
     menuBtn.setAttribute("aria-expanded", String(willOpen));
-    if (willOpen) setActiveChip();
+    if (willOpen) { setActiveChip(); ruRefreshPop(); }
+  });
+
+  // Reddit unsave: show a "Sync now (N)" control only when a cookie is configured.
+  function ruRefreshPop() {
+    if (!ruPop) return;
+    fetchJSON("/reddit/unsave/status").then(function (s) {
+      if (!s.configured) { ruPop.hidden = true; return; }
+      ruPop.hidden = false;
+      ruPopStatus.textContent = s.pending ? (s.pending + " queued to unsave") : "all synced";
+      ruSyncBtn.textContent = s.pending ? ("Sync now (" + s.pending + ")") : "Sync now";
+      ruSyncBtn.disabled = !s.pending;
+    }).catch(function () {});
+  }
+  if (ruSyncBtn) ruSyncBtn.addEventListener("click", function () {
+    ruSyncBtn.disabled = true;
+    ruPopStatus.textContent = "Syncing…";
+    fetchJSON("/reddit/unsave/drain", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+    }).then(function (res) {
+      if (res.auth_error) toast("Reddit session expired — re-paste your cookie on Browse", false);
+      else toast("Unsaved " + res.unsaved + (res.failed ? " · " + res.failed + " failed" : ""), false);
+      ruRefreshPop();
+    }).catch(function () { toast("Sync failed", false); ruRefreshPop(); });
   });
   if (batchChips) batchChips.addEventListener("click", function (e) {
     var c = e.target.closest(".chip");

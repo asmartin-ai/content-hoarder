@@ -56,6 +56,7 @@
       <div class="side-actions">
         <button id="btn-import" class="btn">Import…</button>
         <button id="btn-stats" class="btn">Stats</button>
+        <button id="btn-reddit" class="btn">Reddit&nbsp;sync</button>
       </div>
       <div class="legend">
         <h2 class="side-title">What they mean</h2>
@@ -90,6 +91,32 @@
       <button class="modal-close" id="stats-close">&times;</button>
       <h2>Stats</h2>
       <div id="stats-body"></div>
+    </div>
+  </div>
+
+  <div id="reddit-modal" class="modal" hidden>
+    <div class="modal-box">
+      <button class="modal-close" id="reddit-close">&times;</button>
+      <h2>Reddit sync</h2>
+      <p class="ru-help">When you mark a Reddit item <b>Done</b>, it's queued to be unsaved from
+        your Reddit <b>Saved</b> list. A scheduled job (or the button below) does the unsaving, so
+        triage stays instant and nothing is lost if your cookie expires.</p>
+      <div id="ru-banner" class="ru-banner" hidden></div>
+      <p id="ru-status" class="ru-status">Checking…</p>
+      <label class="chk ru-toggle"><input type="checkbox" id="ru-enable">
+        Unsave items when I mark them Done</label>
+      <label class="import-field">
+        <span>reddit_session cookie</span>
+        <input type="password" id="ru-cookie" autocomplete="off"
+               placeholder="paste your reddit_session cookie value">
+      </label>
+      <p class="ru-hint">Get it in your browser: DevTools → Application → Cookies →
+        <code>reddit.com</code> → <code>reddit_session</code>. It expires every few days — re-paste
+        it when sync reports the session expired.</p>
+      <div class="import-actions">
+        <button class="btn" id="ru-save-cookie">Save cookie</button>
+        <button class="btn primary" id="ru-sync">Sync now</button>
+      </div>
     </div>
   </div>
 

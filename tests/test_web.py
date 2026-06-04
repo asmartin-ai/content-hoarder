@@ -124,6 +124,29 @@ def test_recover_route_non_reddit_400(tmp_db):
     assert _client(tmp_db).post("/items/youtube:v1/recover").status_code == 400
 
 
+def test_reddit_unsave_status_and_enable(tmp_db):
+    cl = _client(tmp_db)
+    s = cl.get("/reddit/unsave/status").get_json()
+    assert s == {"configured": False, "username": None, "enabled": False, "pending": 0}
+    assert cl.post("/reddit/unsave/enable", json={"enabled": True}).get_json()["enabled"] is True
+    assert cl.get("/reddit/unsave/status").get_json()["enabled"] is True
+
+
+def test_reddit_unsave_drain_no_auth_no_network(tmp_db):
+    # real drain short-circuits to auth_error when no cookie is configured (no network)
+    r = _client(tmp_db).post("/reddit/unsave/drain", json={})
+    assert r.status_code == 200 and r.get_json()["auth_error"] is True
+
+
+def test_reddit_unsave_auth_route(tmp_db, monkeypatch):
+    import content_hoarder.reddit_unsave as ru
+    monkeypatch.setattr(ru, "login", lambda c, cookie, **k: "asmartin-ai")
+    cl = _client(tmp_db)
+    assert cl.post("/reddit/unsave/auth", json={}).status_code == 400  # no cookie
+    r = cl.post("/reddit/unsave/auth", json={"cookie": "ck"}).get_json()
+    assert r == {"ok": True, "username": "asmartin-ai"}
+
+
 def test_set_category(tmp_db):
     cl = _client(tmp_db)
     r = cl.post("/items/youtube:v1/category", json={"category": "listenable"})

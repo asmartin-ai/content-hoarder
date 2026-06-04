@@ -165,6 +165,44 @@ def cmd_suggest(args) -> int:
     return 0
 
 
+def cmd_reddit_unsave(args) -> int:
+    from content_hoarder import db, reddit_unsave as ru
+    with _connect() as conn:
+        if args.login:
+            if not args.cookie:
+                print('error: --login requires --cookie "<reddit_session value>"', file=sys.stderr)
+                return 2
+            try:
+                username = ru.login(conn, args.cookie.strip())
+            except ru.RedditAuthError as exc:
+                print(f"cookie rejected: {exc}", file=sys.stderr)
+                return 1
+            print(f"Signed in as u/{username}")
+            return 0
+        if args.enable or args.disable:
+            db.set_setting(conn, "reddit_unsave_on_done", "1" if args.enable else "0")
+            print(f"unsave-on-done {'enabled' if args.enable else 'disabled'}")
+            return 0
+        if args.enqueue_existing:
+            n = db.enqueue_existing_done(conn)
+            print(f"queued {n} existing 'done' reddit item(s) for unsaving")
+            return 0
+        if args.drain:
+            res = ru.drain(conn, limit=args.limit, throttle=args.throttle,
+                           progress=lambda m: print(m, file=sys.stderr))
+            print(json.dumps(res, indent=2))
+            return 1 if res.get("auth_error") else 0
+        # default: status
+        auth = ru.get_auth(conn)
+        print(json.dumps({
+            "configured": auth is not None,
+            "username": auth.get("username") if auth else None,
+            "enabled": db.get_setting(conn, "reddit_unsave_on_done", "0") == "1",
+            "pending": ru.count_pending(conn),
+        }, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="content_hoarder", description="Local triage-first content manager.")
     sub = p.add_subparsers(dest="command", required=True)
@@ -241,6 +279,24 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--source")
     pg.add_argument("--limit", type=int, default=20)
     pg.set_defaults(func=cmd_suggest)
+
+    pu = sub.add_parser("reddit-unsave",
+                        help="Unsave reddit items (queued when triaged 'Done') from your Reddit "
+                             "Saved via a session cookie. No args = print status.")
+    pu.add_argument("--login", action="store_true",
+                    help="Validate + store a reddit_session cookie (use with --cookie).")
+    pu.add_argument("--cookie", help="The reddit_session cookie value (for --login).")
+    pu.add_argument("--enable", action="store_true", help="Turn unsave-on-done ON.")
+    pu.add_argument("--disable", action="store_true", help="Turn unsave-on-done OFF.")
+    pu.add_argument("--drain", action="store_true",
+                    help="Unsave queued items now (the scheduled job runs this). "
+                         "Exits non-zero if the cookie has expired.")
+    pu.add_argument("--enqueue-existing", action="store_true",
+                    help="One-time backfill: queue all reddit items already marked 'done'.")
+    pu.add_argument("--limit", type=int, default=None, help="Max items to unsave this drain run.")
+    pu.add_argument("--throttle", type=float, default=1.0,
+                    help="Seconds between unsave requests (default 1.0).")
+    pu.set_defaults(func=cmd_reddit_unsave)
 
     return p
 
