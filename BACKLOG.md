@@ -61,8 +61,12 @@ the categorizer (Epic 1) wants for accuracy.*
   `thumbnail` and splits the catch-all `reddit_media` bucket (~85% of reddit items) into precise
   `image`/`reddit_video`/`gallery` with real thumbnails + `media_url`; `media_type` overrides the
   URL-heuristic value non-destructively, videos keep a navigable permalink. Spec + as-built notes:
-  [`docs/reddit-media-refinement.md`](docs/reddit-media-refinement.md). Inline gallery image arrays
-  (from `media_metadata`) remain the Epic 7 follow-up.
+  [`docs/reddit-media-refinement.md`](docs/reddit-media-refinement.md).
+- [x] ~~**Inline gallery image arrays (from `media_metadata`).**~~ Shipped: the archive fetch now
+  extracts ordered full-size gallery URLs (`providers._gallery` from `gallery_data` + `media_metadata`)
+  into `metadata.gallery`; the browse media-modal renders them as an inline stacked lightbox
+  (`openGallery` in `app.js`, routed via a `data-gallery` attribute). Populated for all gallery items
+  on the next `enrich --source reddit --scores` pass. (Triage-card inline gallery still TODO.)
 
 ## Epic 5 — Inbox redesign follow-ups  (`enhancement`, `area:ui`)
 *Shipped: bigger cards + list swipe + undo snackbar; **sources as top tabs**; **status as a left
