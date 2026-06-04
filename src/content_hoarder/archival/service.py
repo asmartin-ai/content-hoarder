@@ -88,8 +88,8 @@ def _overlay_fields(fields: dict):
 
     # subreddit/permalink + the refined media fields (media_type overrides the
     # connector's URL-heuristic value via merge_upsert's incoming-non-empty-wins).
-    for key in ("subreddit", "permalink", "media_type", "media_url", "thumbnail"):
-        if fields.get(key):
+    for key in ("subreddit", "permalink", "media_type", "media_url", "thumbnail", "gallery"):
+        if fields.get(key):  # empty gallery list is falsy -> skipped for non-gallery posts
             md[key] = fields[key]
     if fields.get("score"):
         md["score"] = fields["score"]
