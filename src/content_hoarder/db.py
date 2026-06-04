@@ -72,6 +72,18 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     username      TEXT,
     updated_utc   INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS reddit_unsave (
+    fullname     TEXT PRIMARY KEY,                 -- items.fullname, e.g. "reddit:t3_abc123"
+    reddit_id    TEXT NOT NULL,                    -- the t3_/t1_ fullname the API wants (== items.source_id)
+    state        TEXT NOT NULL DEFAULT 'pending',  -- pending | done | failed
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    last_error   TEXT,
+    enqueued_utc INTEGER NOT NULL,
+    updated_utc  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_reddit_unsave_state ON reddit_unsave(state);
 """
 
 _FTS_SCHEMA = """
@@ -151,6 +163,9 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # A scheduled `reddit-unsave --drain` writes the same DB as a running `serve`; wait out a
+    # brief writer lock instead of failing with "database is locked".
+    conn.execute("PRAGMA busy_timeout=5000")
     init_db(conn)
     return conn
 
@@ -399,6 +414,61 @@ def get_random_batch(
 # Triage operations
 # ---------------------------------------------------------------------------
 
+def _unsave_enabled(conn: sqlite3.Connection) -> bool:
+    """Whether marking a reddit item 'done' should queue it for unsaving on Reddit."""
+    return get_setting(conn, "reddit_unsave_on_done", "0") == "1"
+
+
+def enqueue_unsave(conn: sqlite3.Connection, fullname: str) -> None:
+    """Queue a reddit post/comment for unsaving (idempotent). No-op for non-reddit items.
+
+    The reddit_id stored is items.source_id, which already carries the t3_/t1_ prefix
+    the Reddit API wants. Does NOT commit — the caller commits with the status change.
+    """
+    row = conn.execute(
+        "SELECT source, source_id FROM items WHERE fullname=?", (fullname,)
+    ).fetchone()
+    if row is None or row["source"] != "reddit":
+        return
+    sid = row["source_id"]
+    if not sid.startswith(("t1_", "t3_")):
+        return
+    now = int(time.time())
+    conn.execute(
+        "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) "
+        "VALUES(?, ?, 'pending', ?) "
+        "ON CONFLICT(fullname) DO UPDATE SET state='pending', updated_utc=excluded.enqueued_utc",
+        (fullname, sid, now),
+    )
+
+
+def dequeue_unsave(conn: sqlite3.Connection, fullname: str) -> None:
+    """Drop a still-pending unsave (a 'done' undone before the drain ran). Caller commits."""
+    conn.execute(
+        "DELETE FROM reddit_unsave WHERE fullname=? AND state='pending'", (fullname,)
+    )
+
+
+def enqueue_existing_done(conn: sqlite3.Connection) -> int:
+    """Backfill: queue every reddit post/comment already marked 'done' for unsaving.
+
+    Enabling the feature does not retroactively enqueue past Dones; this is the opt-in
+    one-time seed. Items already queued are left untouched. Returns the number added."""
+    now = int(time.time())
+    before = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+    conn.execute(
+        "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) "
+        "SELECT fullname, source_id, 'pending', ? FROM items "
+        "WHERE source='reddit' AND status='done' "
+        "AND (source_id LIKE 't3\\_%' ESCAPE '\\' OR source_id LIKE 't1\\_%' ESCAPE '\\') "
+        "ON CONFLICT(fullname) DO NOTHING",
+        (now,),
+    )
+    conn.commit()
+    after = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+    return after - before
+
+
 def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | None:
     """Set an item's triage status; record the previous one for undo."""
     if status not in VALID_STATUSES:
@@ -417,6 +487,11 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
         "UPDATE items SET status=?, status_prev=?, processed_utc=? WHERE fullname=?",
         (status, old, processed, fullname),
     )
+    if status == "done" and _unsave_enabled(conn):
+        try:  # best-effort, local-only — an enqueue hiccup must never fail the status write
+            enqueue_unsave(conn, fullname)
+        except Exception:  # noqa: BLE001
+            pass
     conn.commit()
     return _public_by_fullname(conn, fullname)
 
@@ -424,7 +499,7 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
 def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     """Revert the most recent status change (single step)."""
     row = conn.execute(
-        "SELECT status_prev FROM items WHERE fullname=?", (fullname,)
+        "SELECT status_prev, status FROM items WHERE fullname=?", (fullname,)
     ).fetchone()
     if row is None or row[0] is None:
         return _public_by_fullname(conn, fullname)
@@ -435,6 +510,8 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
         "UPDATE items SET status=?, status_prev=NULL, processed_utc=? WHERE fullname=?",
         (prev, processed, fullname),
     )
+    if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
+        dequeue_unsave(conn, fullname)
     conn.commit()
     return _public_by_fullname(conn, fullname)
 
@@ -447,6 +524,8 @@ def bulk_set_status(
         raise ValueError(f"invalid status: {status!r}")
     now = int(time.time())
     processed = None if status == "inbox" else now
+    enqueue = status == "done" and _unsave_enabled(conn)
+    changed: list[str] = []
     count = 0
     for fn in fullnames:
         # `AND status<>?` skips no-op updates so status_prev (single-step undo) is
@@ -457,6 +536,13 @@ def bulk_set_status(
             (status, processed, fn, status),
         )
         count += cur.rowcount
+        if enqueue and cur.rowcount:
+            changed.append(fn)
+    for fn in changed:  # enqueue_unsave no-ops for non-reddit; best-effort, local-only
+        try:
+            enqueue_unsave(conn, fn)
+        except Exception:  # noqa: BLE001
+            pass
     conn.commit()
     return count
 

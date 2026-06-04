@@ -152,6 +152,58 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"updated": n})
 
+    # -- reddit unsave: cookie auth + on-demand queue drain --------------
+
+    @app.get("/reddit/unsave/status")
+    def reddit_unsave_status():
+        from content_hoarder import reddit_unsave as ru
+        with conn() as c:
+            auth = ru.get_auth(c)
+            return jsonify({
+                "configured": auth is not None,
+                "username": auth.get("username") if auth else None,
+                "enabled": db.get_setting(c, "reddit_unsave_on_done", "0") == "1",
+                "pending": ru.count_pending(c),
+            })
+
+    @app.post("/reddit/unsave/auth")
+    def reddit_unsave_auth():
+        from content_hoarder import reddit_unsave as ru
+        body = request.get_json(silent=True) or {}
+        cookie = (body.get("cookie") or "").strip()
+        if not cookie:
+            return jsonify({"ok": False, "error": "paste your reddit_session cookie"}), 400
+        try:
+            with conn() as c:
+                username = ru.login(c, cookie)
+        except ru.RedditAuthError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        return jsonify({"ok": True, "username": username})
+
+    @app.post("/reddit/unsave/enable")
+    def reddit_unsave_enable():
+        body = request.get_json(silent=True) or {}
+        enabled = bool(body.get("enabled"))
+        with conn() as c:
+            db.set_setting(c, "reddit_unsave_on_done", "1" if enabled else "0")
+        return jsonify({"enabled": enabled})
+
+    @app.post("/reddit/unsave/drain")
+    def reddit_unsave_drain():
+        from content_hoarder import reddit_unsave as ru
+        body = request.get_json(silent=True) or {}
+        mx = body.get("max")
+        with conn() as c:
+            res = ru.drain(c, limit=int(mx) if mx else None)
+        return jsonify(res)
+
+    @app.post("/items/<path:fullname>/resave")
+    def resave_item(fullname):
+        from content_hoarder import reddit_unsave as ru
+        with conn() as c:
+            ok = ru.resave(c, fullname)
+        return jsonify({"resaved": ok})
+
     @app.get("/sources")
     def sources():
         # Optional ?status= cross-filters the per-source counts (tabs by active status).
