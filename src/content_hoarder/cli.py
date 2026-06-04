@@ -63,7 +63,12 @@ def cmd_enrich(args) -> int:
 def cmd_categorize(args) -> int:
     from content_hoarder import categorize as cat_mod
     with _connect() as conn:
-        if (args.source or "").lower() == "reddit":
+        if getattr(args, "llm", False):
+            from content_hoarder.assist import llm
+            res = llm.classify_source(conn, args.source or "youtube",
+                                      limit=args.limit, retry=args.all,
+                                      backend=getattr(args, "backend", "local"))
+        elif (args.source or "").lower() == "reddit":
             # Reddit gets multi-label tags (metadata.tags); --dry-run previews accuracy.
             res = cat_mod.tag_reddit_source(conn, limit=args.limit, retry=args.all,
                                             dry_run=args.dry_run)
@@ -462,6 +467,12 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--dry-run", action="store_true",
                     help="Preview tag assignment without writing (reddit multi-label tagging).")
     pc.add_argument("--topics", action="store_true", help="YouTube: multi-label topic tags instead of processing areas.")
+    pc.add_argument("--llm", action="store_true",
+                    help="Classify with an LLM (assist/llm.py) instead of heuristics; "
+                         "re-does the NULL/unknown tail by default.")
+    pc.add_argument("--backend", choices=("local", "fireworks"), default="local",
+                    help="LLM backend for --llm: local LM Studio (default) or Fireworks "
+                         "(needs FIREWORKS_API_KEY).")
     pc.set_defaults(func=cmd_categorize)
 
     ph = sub.add_parser("reddit-hydrate",

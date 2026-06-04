@@ -20,9 +20,11 @@ area. Goal: tag videos so they can be filtered into dedicated "processing areas"
   wotagei 3 / unknown 3054 — re-tune the allowlist + thresholds in `categorize.py`.
 - [x] ~~**"Processing areas" = category filters.**~~ Shipped: a category facet on `db.search_items`
   + `/items?category=` + the `#category` selector in the browse topbar.
-- [ ] **P2 — Local-LLM auto-classify (`assist/llm.py`).** Classify from title + channel
-  (listenable/watch/wotagei) with a manual override per item. Only after heuristics are validated.
-  *(WIP exists on the unmerged `feat/llm-auto-classify` branch — review + merge or rebase.)*
+- [x] ~~**Local-LLM auto-classify (`assist/llm.py`).**~~ Shipped: `llm.classify`/`classify_source`
+  classify into listenable/watch/wotagei/unknown via the injectable `_chat`, stored on
+  `metadata.category` + `category_source='llm'`; CLI `categorize --llm [--source --limit --all]`.
+  By default re-classifies the `NULL`/`unknown` tail (preserves confident heuristic/manual categories);
+  `--all` re-does every item. Offline tests inject `chat=`. Manual override remains `POST /items/<fn>/category`.
 - [x] ~~**P3 — Widen wotagei detection vocabulary.**~~ Shipped (trio/quad batch 2 winner GLM-5.1,
   `b6baa07` on main): `_WOTAGEI_RE` now also matches `otagei`/`打ち師`/`サイリウムダンス`/
   `ペンライトダンス`/`cyalume` (word-boundaried for precision; bare penlight/サイリウム excluded).
