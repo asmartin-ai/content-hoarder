@@ -64,6 +64,23 @@ def _thumb(rec: dict) -> str:
     return t if isinstance(t, str) and t.startswith("http") else ""
 
 
+def _gallery(rec: dict) -> list:
+    """Ordered list of full-size gallery image URLs from ``gallery_data`` + ``media_metadata``
+    (both returned by the archives). Empty list for non-gallery posts."""
+    if not rec.get("is_gallery"):
+        return []
+    mm = rec.get("media_metadata") or {}
+    items = (rec.get("gallery_data") or {}).get("items") or []
+    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(mm.keys())
+    urls = []
+    for mid in order:
+        s = (mm.get(mid) or {}).get("s") or {}
+        u = s.get("u") or s.get("gif") or s.get("mp4")
+        if u:
+            urls.append(html.unescape(u))
+    return urls
+
+
 def _media_type(rec: dict) -> str:
     """Classify a submission as image / reddit_video / gallery / link, or '' (unknown —
     the caller keeps the URL-heuristic value). Order matters: video and gallery win."""
@@ -95,6 +112,7 @@ def _norm_post(rec: dict) -> dict:
         "media_type": _media_type(rec),
         "media_url": _media_url(rec),
         "thumbnail": _thumb(rec),
+        "gallery": _gallery(rec),
     }
 
 

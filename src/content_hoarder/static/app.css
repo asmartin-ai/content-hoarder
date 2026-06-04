@@ -918,3 +918,7 @@ select {
 .media-img { width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; display: block; }
 .item-thumb.img-open { cursor: zoom-in; }
 .media-fallback { display: block; margin-top: 0.6rem; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
+
+/* reddit gallery lightbox (inline images from the archive's media_metadata) */
+.media-gallery { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 80vh; overflow: auto; }
+.media-gallery .gallery-img { max-height: none; }

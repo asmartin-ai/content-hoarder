@@ -90,6 +90,16 @@
       '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>';
     document.getElementById("media-modal").hidden = false;
   };
+  // Gallery posts (metadata.gallery from the archive's media_metadata) → stacked lightbox.
+  const openGallery = (urls) => {
+    const imgs = (urls || []).filter(safeUrl);
+    if (!imgs.length) return;
+    document.getElementById("media-body").innerHTML =
+      '<div class="media-gallery">' +
+      imgs.map((u) => '<img class="media-img gallery-img" loading="lazy" src="' + esc(u) + '" alt="">').join("") +
+      "</div>" + '<p class="media-fallback">' + imgs.length + " images</p>";
+    document.getElementById("media-modal").hidden = false;
+  };
   const closeMedia = () => {
     document.getElementById("media-modal").hidden = true;
     document.getElementById("media-body").innerHTML = "";  // stop playback
@@ -136,6 +146,10 @@
   };
 
   const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
+  // When the archive captured the gallery images, carry them so the click opens an inline
+  // lightbox instead of the Reddit embed. (No-op string for non-gallery items.)
+  const galleryAttr = (m) => (Array.isArray(m.gallery) && m.gallery.length)
+    ? ' data-gallery="' + esc(JSON.stringify(m.gallery)) + '"' : "";
   // Right-hand media slot: a thumbnail when we have one, else a click-to-load
   // Reddit preview button for media posts whose media URL wasn't captured.
   const mediaSlotHtml = (item) => {
@@ -150,7 +164,7 @@
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
         return '<img class="item-thumb rd-preview" loading="lazy" src="' + esc(t) +
-          '" data-permalink="' + esc(permalink) + '" alt="">';
+          '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">';
       }
       return '<img class="item-thumb" loading="lazy" src="' + esc(t) + '" alt="">';
     }
@@ -159,7 +173,7 @@
       const permalink = m.permalink || item.url || "";
       const label = /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : PREVIEW_TYPES[mt];
       return '<button class="item-thumb rd-preview" type="button" data-permalink="' +
-        esc(permalink) + '">' + label + "</button>";
+        esc(permalink) + '"' + galleryAttr(m) + ">" + label + "</button>";
     }
     return "";
   };
@@ -380,6 +394,12 @@
     if (actBtn) { actOnItem(fullname, actBtn.dataset.act, row); return; }
     const recBtn = e.target.closest("[data-recover]");
     if (recBtn) { recoverItem(fullname, row, recBtn); return; }
+    const gal = e.target.closest("[data-gallery]");
+    if (gal) {
+      try { openGallery(JSON.parse(gal.dataset.gallery)); }
+      catch (_) { openMedia(gal.dataset.permalink); }
+      return;
+    }
     const pv = e.target.closest(".rd-preview");
     if (pv) { openMedia(pv.dataset.permalink); return; }
     const imgEl = e.target.closest(".item-thumb.img-open");

@@ -144,6 +144,37 @@ def test_norm_post_extracts_media():
     assert ext["media_type"] == ""
 
 
+def test_norm_post_extracts_gallery_images():
+    from content_hoarder.archival.providers import _norm_post
+    g = _norm_post({"is_gallery": True,
+                    "gallery_data": {"items": [{"media_id": "m2"}, {"media_id": "m1"}]},
+                    "media_metadata": {
+                        "m1": {"s": {"u": "https://preview.redd.it/m1.jpg?width=1&amp;s=a"}},
+                        "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?s=b"}}}})
+    assert g["media_type"] == "gallery"
+    # order follows gallery_data.items; &amp; is unescaped
+    assert g["gallery"] == ["https://preview.redd.it/m2.jpg?s=b",
+                            "https://preview.redd.it/m1.jpg?width=1&s=a"]
+    assert _norm_post({"post_hint": "image"})["gallery"] == []  # non-gallery -> empty
+
+
+def test_recover_stores_gallery(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(
+        source="reddit", source_id="t3_gal", kind="post", title="G",
+        metadata={"permalink": "/r/x/comments/gal/g/", "media_type": "reddit_media"}))
+    conn.commit()
+    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(post_recs=[
+        {"id": "gal", "title": "G", "is_gallery": True,
+         "gallery_data": {"items": [{"media_id": "a"}, {"media_id": "b"}]},
+         "media_metadata": {"a": {"s": {"u": "https://preview.redd.it/a.jpg?s=1"}},
+                            "b": {"s": {"u": "https://preview.redd.it/b.jpg?s=2"}}}}]))
+    archival.recover(conn, scope="all", providers=[prov])
+    md = json.loads(db.get_item(conn, "reddit:t3_gal")["metadata"])
+    assert md["media_type"] == "gallery"
+    assert md["gallery"] == ["https://preview.redd.it/a.jpg?s=1", "https://preview.redd.it/b.jpg?s=2"]
+
+
 def test_media_refinement_overrides_heuristic_and_keeps_video_url(tmp_db):
     conn = db.connect(tmp_db)
     # two media posts as the connector's URL-heuristic imported them: generic reddit_media,
