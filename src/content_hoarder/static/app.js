@@ -466,6 +466,73 @@
     if (e.target === e.currentTarget) closeMedia();
   });
 
+  // -- reddit unsave: cookie auth + on-demand queue drain --
+  const ruModal = document.getElementById("reddit-modal");
+  const ruStatus = document.getElementById("ru-status");
+  const ruBanner = document.getElementById("ru-banner");
+  const ruEnable = document.getElementById("ru-enable");
+  const ruSync = document.getElementById("ru-sync");
+
+  const ruRender = (s) => {
+    ruEnable.checked = !!s.enabled;
+    ruSync.textContent = s.pending ? "Sync now (" + s.pending + ")" : "Sync now";
+    ruSync.disabled = !s.configured || !s.pending;
+    ruStatus.textContent = s.configured
+      ? "Connected as u/" + (s.username || "?") + " · " + s.pending + " queued to unsave"
+      : "Not connected — paste your reddit_session cookie below.";
+  };
+  const ruRefresh = () => getJSON("/reddit/unsave/status").then(ruRender).catch(() => {});
+  const ruWarn = (msg) => { ruBanner.textContent = msg; ruBanner.hidden = false; };
+
+  document.getElementById("btn-reddit").addEventListener("click", () => {
+    ruBanner.hidden = true;
+    ruModal.hidden = false;
+    closeDrawer();
+    ruRefresh();
+  });
+  document.getElementById("reddit-close").addEventListener("click", () => { ruModal.hidden = true; });
+  ruModal.addEventListener("click", (e) => { if (e.target === ruModal) ruModal.hidden = true; });
+
+  ruEnable.addEventListener("change", () => {
+    getJSON("/reddit/unsave/enable", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: ruEnable.checked }),
+    }).then(() => toast(ruEnable.checked ? "Unsave-on-Done enabled" : "Unsave-on-Done disabled"))
+      .catch(() => toast("Couldn’t change that setting"));
+  });
+
+  document.getElementById("ru-save-cookie").addEventListener("click", () => {
+    const field = document.getElementById("ru-cookie");
+    const cookie = field.value.trim();
+    if (!cookie) { ruWarn("Paste your reddit_session cookie first."); return; }
+    fetch("/reddit/unsave/auth", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cookie: cookie }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        field.value = "";
+        ruBanner.hidden = true;
+        toast("Connected as u/" + d.username);
+        ruRefresh();
+      } else {
+        ruWarn(d.error || "Cookie rejected.");
+      }
+    }).catch(() => ruWarn("Cookie validation failed — check your connection."));
+  });
+
+  ruSync.addEventListener("click", () => {
+    ruSync.disabled = true;
+    ruStatus.textContent = "Syncing…";
+    getJSON("/reddit/unsave/drain", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).then((res) => {
+      if (res.auth_error) ruWarn("Reddit session expired — re-paste your cookie.");
+      else toast("Unsaved " + res.unsaved + (res.failed ? " · " + res.failed + " failed" : ""));
+      ruRefresh();
+    }).catch(() => { toast("Sync failed"); ruRefresh(); });
+  });
+
   // -- import modal: file OR YouTube URL, with a pre-import count + Confirm --
   const importModal = document.getElementById("import-modal");
   const impUrl = document.getElementById("import-url");
