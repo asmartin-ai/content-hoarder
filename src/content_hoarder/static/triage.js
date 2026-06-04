@@ -80,6 +80,16 @@
   }
   function mediaHtml(item) {
     var m = item.metadata || {};
+    var mt = m.media_type;
+    // Reddit video/gallery → keep the click-to-load inline embed button (don't let a
+    // thumbnail replace it, which would drop the play/open affordance).
+    if (item.source === "reddit" && (mt === "reddit_video" || mt === "reddit_media" || mt === "gallery")) {
+      var permalink = m.permalink || item.url || "";
+      var label = mt === "reddit_video" ? "▶ Play"
+        : (mt === "gallery" || /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : "▶ Preview");
+      return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) + '">' +
+        '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
+    }
     var thumb = m.thumbnail || "";
     if (!thumb && item.url) {
       if (/\.(png|jpe?g|gif|webp)$/i.test(item.url)) thumb = item.url;
@@ -90,14 +100,6 @@
       var nsfw = m.over_18 ? " nsfw" : "";
       return '<div class="tcard-media' + nsfw + '"><img loading="lazy" src="' + esc(thumb) +
         '" alt="">' + (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") + "</div>";
-    }
-    // Reddit media posts with no thumbnail → click-to-load inline Reddit embed.
-    if (item.source === "reddit" && (m.media_type === "reddit_video" || m.media_type === "reddit_media")) {
-      var permalink = m.permalink || item.url || "";
-      var label = m.media_type === "reddit_video" ? "▶ Play"
-        : (/\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : "▶ Preview");
-      return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) + '">' +
-        '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
     }
     return "";
   }

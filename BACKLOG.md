@@ -56,10 +56,13 @@ the categorizer (Epic 1) wants for accuracy.*
 - [x] ~~**On-demand single-item recovery in the UI.**~~ Shipped: `archival.recover_one()` +
   `POST /items/<fn>/recover` + a "↻ Recover" button on `[removed]`/`[deleted]` reddit cards that
   patches the title/body in place (throttle off).
-- [ ] **P3 — Refine media metadata from the same fetch.** The local data has no `reddit_video`/
-  `preview`, so media is currently inferred by URL heuristics (`media_type` = `reddit_video` for
-  `v.redd.it`, else `reddit_media` for media posts with no captured URL). When the archival fetch runs,
-  populate real `thumbnail`/`reddit_video` URLs and split `reddit_media` into precise image/video.
+- [x] ~~**P3 — Refine media metadata from the same fetch.**~~ Shipped: the archive fetch
+  (`enrich --source reddit --scores`) now extracts `post_hint`/`is_video`/`is_gallery`/`media`/`preview`/
+  `thumbnail` and splits the catch-all `reddit_media` bucket (~85% of reddit items) into precise
+  `image`/`reddit_video`/`gallery` with real thumbnails + `media_url`; `media_type` overrides the
+  URL-heuristic value non-destructively, videos keep a navigable permalink. Spec + as-built notes:
+  [`docs/reddit-media-refinement.md`](docs/reddit-media-refinement.md). Inline gallery image arrays
+  (from `media_metadata`) remain the Epic 7 follow-up.
 
 ## Epic 5 — Inbox redesign follow-ups  (`enhancement`, `area:ui`)
 *Shipped: bigger cards + list swipe + undo snackbar; **sources as top tabs**; **status as a left
@@ -107,11 +110,13 @@ false positives.*
   via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
-- [ ] **P3 — Needs the API (keyless not possible):** (a) render **Reddit gallery images** inline — the
-  archives keep `is_gallery` but drop `media_metadata`, and reddit `.json` is 403 without OAuth; (b) the
-  true **"date added to Watch Later"** for YouTube (`playlistItems.publishedAt`). Keyless stopgaps already
-  shipped: galleries relabel to "🖼 Gallery"; sort by **playlist position**; score/upvote hydration via
-  the archives (`enrich --source reddit --scores`).
+- [ ] **P3 — Needs the API (keyless not possible):** (a) ~~render **Reddit gallery images** inline — the
+  archives keep `is_gallery` but drop `media_metadata`~~ **CORRECTION (2026-06-03 probe):** the archives
+  DO return `media_metadata` with full gallery image URLs — inline gallery rendering is keyless-feasible
+  via the archive fetch; folded into [`docs/reddit-media-refinement.md`](docs/reddit-media-refinement.md)
+  (Epic 4 spec); (b) the true **"date added to Watch Later"** for YouTube (`playlistItems.publishedAt`)
+  still needs OAuth. Keyless stopgaps already shipped: galleries relabel to "🖼 Gallery"; sort by
+  **playlist position**; score/upvote hydration via the archives (`enrich --source reddit --scores`).
 
 ## Epic 8 — Polish & infra  (`chore`)
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.

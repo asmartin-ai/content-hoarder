@@ -11,6 +11,7 @@ Field availability (verified against the live APIs):
   comments : id, body, author, subreddit, created_utc, (permalink/link_id vary)
 PullPush comments omit ``permalink``; Arctic-Shift includes it — hence two providers.
 """
+import html
 import re
 import time
 
@@ -40,6 +41,46 @@ def _norm_permalink(p: str) -> str:
     return ("https://www.reddit.com" + p) if p.startswith("/") else p
 
 
+def _media_url(rec: dict) -> str:
+    """Best direct media URL: the reddit_video fallback_url, else the resolved dest URL."""
+    rv = ((rec.get("media") or {}).get("reddit_video") or {}).get("fallback_url")
+    if rv:
+        return rv
+    rv = ((rec.get("secure_media") or {}).get("reddit_video") or {}).get("fallback_url")
+    if rv:
+        return rv
+    return rec.get("url_overridden_by_dest") or rec.get("url") or ""
+
+
+def _thumb(rec: dict) -> str:
+    """A thumbnail image URL: the hi-res preview image (HTML-unescaped), else the
+    ``thumbnail`` field when it's a real URL (skips self/default/nsfw/spoiler sentinels)."""
+    images = (rec.get("preview") or {}).get("images")
+    if isinstance(images, list) and images and isinstance(images[0], dict):
+        src = (images[0].get("source") or {}).get("url")
+        if src:
+            return html.unescape(src)
+    t = rec.get("thumbnail") or ""
+    return t if isinstance(t, str) and t.startswith("http") else ""
+
+
+def _media_type(rec: dict) -> str:
+    """Classify a submission as image / reddit_video / gallery / link, or '' (unknown —
+    the caller keeps the URL-heuristic value). Order matters: video and gallery win."""
+    if rec.get("is_video") or (rec.get("media") or {}).get("reddit_video"):
+        return "reddit_video"
+    if rec.get("is_gallery"):
+        return "gallery"
+    hint = rec.get("post_hint")
+    if hint == "image":
+        return "image"
+    if hint == "hosted:video":   # reddit-hosted video; "rich:video" is an external embed
+        return "reddit_video"    # (YouTube, Streamable, …) → fall through so the URL heuristic wins
+    if hint == "link":
+        return "link"
+    return ""
+
+
 def _norm_post(rec: dict) -> dict:
     return {
         "title": rec.get("title") or "",
@@ -51,6 +92,9 @@ def _norm_post(rec: dict) -> dict:
         "created_utc": rec.get("created_utc"),
         "score": rec.get("score") or 0,
         "over_18": 1 if rec.get("over_18") else 0,
+        "media_type": _media_type(rec),
+        "media_url": _media_url(rec),
+        "thumbnail": _thumb(rec),
     }
 
 

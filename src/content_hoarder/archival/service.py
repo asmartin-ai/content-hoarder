@@ -75,7 +75,9 @@ def _overlay_fields(fields: dict):
     author = fields.get("author")
     if author and author not in _PLACEHOLDERS:
         overlay["author"] = author
-    if fields.get("url"):
+    # Don't clobber a navigable permalink with a bare v.redd.it (which renders no page);
+    # videos keep their permalink click-URL, with the raw stream in metadata.media_url.
+    if fields.get("url") and fields.get("media_type") != "reddit_video":
         overlay["url"] = fields["url"]
     cu = fields.get("created_utc")
     if cu:
@@ -84,7 +86,9 @@ def _overlay_fields(fields: dict):
         except (TypeError, ValueError):
             pass
 
-    for key in ("subreddit", "permalink"):
+    # subreddit/permalink + the refined media fields (media_type overrides the
+    # connector's URL-heuristic value via merge_upsert's incoming-non-empty-wins).
+    for key in ("subreddit", "permalink", "media_type", "media_url", "thumbnail"):
         if fields.get(key):
             md[key] = fields[key]
     if fields.get("score"):
