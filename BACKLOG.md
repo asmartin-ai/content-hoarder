@@ -142,11 +142,18 @@ false positives.*
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
 [`docs/reddit-management.md`](docs/reddit-management.md)). Remaining work absorbed from the old project:*
 
-- [ ] **P2 — Reddit auto-categorization** (migrated from RSM's "inbox + autotagging" backlog). Extend
-  `categorize.py` (today YouTube-only) with Reddit **subreddit + title/body keyword** rules into
-  processing areas. Proposed categories: **NSFW** (distinguish erotic vs. other adult), **Vtubers**,
-  **Coding**, **Japan**, **Anime**, **Memes**, **Minecraft**. Heuristics first; optional local-LLM
-  assist after (Epic 1 pattern). NSFW is already flagged via `metadata.over_18`.
+- [~] **P2 — Reddit auto-categorization** (migrated from RSM's "inbox + autotagging" backlog).
+  **Backend shipped:** `categorize.py` now multi-label tags reddit items into `metadata.tags`
+  (a post can be `minecraft` + `memes`), keyless heuristics = subreddit map + conservative
+  subreddit/title keyword fallback. Buckets: `nsfw_erotic`, `nsfw_other`, `vtubers`, `coding`,
+  `japan`, `anime`, `memes`, `minecraft`, `defense`, `science`, `tips`. CLI `categorize --source
+  reddit [--dry-run]` (dry-run previews counts + samples, no writes). Validated on the real corpus:
+  ~35% tagged with good precision after dropping body-keyword matches.
+  **Remaining:** (a) **expand subreddit-map coverage** — ~65% still untagged (long tail of ~2,900
+  subs); (b) **tune the NSFW erotic/other split** — needs the user's actual NSFW subreddits (erotic
+  allowlist is a tiny seed, so `nsfw_erotic` is ~0 today); (c) **tags UI** — source-aware triage
+  chips + an index/Reddit-view tag filter (today the index dropdown is YouTube `category` only);
+  (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
 - [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs
   `/user/<name>/saved.json` with the `reddit_session` cookie (works keyless; ~100/page, ~0.5s/req),
   walks newest-first, and stops at a high-water mark (`settings.reddit_sync_newest`) — O(new) per sync.
