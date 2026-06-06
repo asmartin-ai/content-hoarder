@@ -60,6 +60,14 @@ incremental sync** — implemented in `reddit_sync.py`, exposed as the `reddit-s
   Reddit **GDPR data-export ZIP** (complete saved list, no scraping; porting RSM's ZIP/BDFR importers
   is a backlog item).
 
+> **Note — sync is additive / one-way.** Sync only *pulls newly-saved items in*; it does **not** detect
+> items you **unsaved elsewhere** (reddit.com or the Reddit app). `is_saved` flips to `0` only when
+> *content-hoarder itself* unsaves (the Done→drain queue, or the Reddit-view Unsave button), and
+> `merge_upsert` preserves `is_saved` on every re-sync — so an externally-unsaved post keeps showing as
+> saved here indefinitely. Reflecting external unsaves would need a separate **reconcile** pass that walks
+> the *entire* saved list and flips local `is_saved=1` rows no longer present (O(whole list) — keyless but
+> expensive, so a manual/periodic action). Not built; recorded here so the drift is understood.
+
 ## Cookie expiry
 `reddit_session` cookies expire every few days — same re-paste UX as the existing unsave feature
 (`reddit-unsave --login --cookie "<value>"`). A dead cookie surfaces a clear auth-error state.
