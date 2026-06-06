@@ -148,10 +148,12 @@ false positives.*
   subreddit/title keyword fallback. Buckets: `nsfw_erotic`, `nsfw_other`, `vtubers`, `coding`,
   `japan`, `anime`, `memes`, `minecraft`, `defense`, `science`, `tips`. CLI `categorize --source
   reddit [--dry-run]` (dry-run previews counts + samples, no writes). Validated on the real corpus:
-  ~35% tagged with good precision after dropping body-keyword matches.
-  **Remaining:** (a) **expand subreddit-map coverage** — ~65% still untagged (long tail of ~2,900
-  subs); (b) **tune the NSFW erotic/other split** — needs the user's actual NSFW subreddits (erotic
-  allowlist is a tiny seed, so `nsfw_erotic` is ~0 today); (c) **tags UI** — source-aware triage
+  ~43% tagged after a top-150 subreddit-map expansion, good precision (body-keyword matching dropped).
+  **Remaining:** (a) **more coverage** — ~57% still untagged; much of it is **gaming** (no bucket by
+  choice) + general/discussion subs (AskReddit, worldnews, …) + the long tail of ~2,900 subs;
+  (b) **NSFW split is near-inert** — only 53/64,859 items carry `over_18=1` (the RSM bulk lacks the
+  flag), so a real NSFW tag needs a **subreddit allowlist** from the user (erotic vs other); (c) **tags
+  UI** — source-aware triage
   chips + an index/Reddit-view tag filter (today the index dropdown is YouTube `category` only);
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
 - [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs

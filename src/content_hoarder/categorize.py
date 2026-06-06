@@ -132,6 +132,36 @@ _SUBREDDIT_TAGS = {
     "comedyheaven": ["memes"], "terriblefacebookmemes": ["memes"], "adhdmeme": ["memes"],
 }
 
+# Coverage expansion (top-150 subreddit scan). Conservative: only confident mappings into the
+# existing buckets; gaming/general/discussion subs are intentionally left untagged.
+_SUBREDDIT_TAGS.update({
+    # anime (series / fandom / weeb podcasts)
+    "trashtaste": ["anime"], "bocchitherock": ["anime"], "sonobisquedoll": ["anime"],
+    "shingekinokyojin": ["anime"], "killlakill": ["anime"],
+    "evangelionmemes": ["anime", "memes"], "okbuddyumamusume": ["anime", "memes"],
+    "okbuddytracen": ["anime", "memes"],
+    # vtubers
+    "vtubercirclejerk": ["vtubers", "memes"],
+    # coding / maker
+    "raspberry_pi": ["coding"], "arduino": ["coding"],
+    # defense / military / war
+    "warplaneporn": ["defense"], "acecombat": ["defense"], "ukraine": ["defense"],
+    "ukrainewarvideoreport": ["defense"], "ukrainianconflict": ["defense"],
+    # science & tech
+    "technology": ["science"],
+    # tips & guides
+    "lifehacks": ["tips"], "socialskills": ["tips"], "outoftheloop": ["tips"],
+    # japan
+    "japanesepeopletwitter": ["japan", "memes"],
+    # generic memes / humor
+    "historymemes": ["memes"], "polandball": ["memes"], "2meirl4meirl": ["memes"],
+    "starterpacks": ["memes"], "shitposting": ["memes"], "holup": ["memes"],
+    "bikinibottomtwitter": ["memes"], "whitepeopletwitter": ["memes"],
+    "blackpeopletwitter": ["memes"], "curatedtumblr": ["memes"], "worldjerking": ["memes"],
+    "dankmemesfromsite19": ["memes"], "funny": ["memes"], "okbuddyphd": ["memes"],
+    "196": ["memes"], "okbuddyvicodin": ["memes"], "bookscirclejerk": ["memes"],
+})
+
 # Keyword fallback for items whose subreddit isn't mapped — applied to the subreddit name +
 # title ONLY (never body: incidental body mentions, e.g. an AskReddit answer that says "Japan",
 # caused false positives) and only when the subreddit map produced no topic tag. Word-bounded.
