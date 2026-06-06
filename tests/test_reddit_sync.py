@@ -30,6 +30,9 @@ def _auth(conn, username="alice"):
     reddit_unsave.set_auth(conn, session_cookie="ck", modhash="mh", username=username)
 
 
+NOSLEEP = (lambda _s: None)  # keep multi-page tests instant
+
+
 def test_sync_inserts_new(conn):
     _auth(conn)
     res = reddit_sync.sync_saved_cookie(
@@ -45,7 +48,7 @@ def test_sync_stops_on_known(conn):
         ([child("t3_a"), child("t3_b")], "p2"),
         ([child("t3_a"), child("t3_b")], "p3"),  # whole page already known -> stop
     ])
-    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", max_pages=5)
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", max_pages=5, sleep=NOSLEEP)
     assert res["pages"] == 2 and res["new"] == 2 and res["updated"] == 2
     assert res["stopped"] == "all_known"
 
@@ -57,9 +60,21 @@ def test_sync_respects_max_pages(conn):
         ([child("t3_b")], "p3"),
         ([child("t3_c")], "p4"),  # never reached
     ])
-    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", max_pages=2)
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", max_pages=2, sleep=NOSLEEP)
     assert res["pages"] == 2 and res["new"] == 2 and res["stopped"] == "max_pages"
     assert db.get_item(conn, "reddit:t3_c") is None
+
+
+def test_sync_stops_at_high_water_mark(conn):
+    _auth(conn)
+    db.set_setting(conn, "reddit_sync_newest", "t3_b")  # newest from a prior sync
+    getf = make_getf([([child("t3_a"), child("t3_b"), child("t3_c")], "p2")])
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", sleep=NOSLEEP)
+    # t3_a is new; t3_b is the mark -> stop before processing t3_b / t3_c
+    assert res["new"] == 1 and res["stopped"] == "caught_up"
+    assert db.get_item(conn, "reddit:t3_a") is not None
+    assert db.get_item(conn, "reddit:t3_c") is None
+    assert db.get_setting(conn, "reddit_sync_newest") == "t3_a"  # advanced to new top
 
 
 def test_sync_auth_error_without_cookie(conn):
