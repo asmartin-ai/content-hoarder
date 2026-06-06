@@ -138,13 +138,6 @@ select {
     background: transparent;
 }
 
-/* "Firefox tabs" quick-filter toggle: lights up like a primary button when on. */
-#ff-tabs.active {
-    background-color: var(--accent);
-    color: #06231f;
-    border-color: transparent;
-    font-weight: 600;
-}
 
 .layout {
     display: flex;
