@@ -720,14 +720,20 @@ select {
 .act {
     flex: 1;
     max-width: 160px;
+    min-height: 44px;            /* comfortable touch target */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
     padding: 0.8rem;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     border: 1px solid var(--border);
     background-color: var(--panel2);
     color: var(--text);
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .act.keep {
@@ -941,3 +947,53 @@ select {
 /* reddit gallery lightbox (inline images from the archive's media_metadata) */
 .media-gallery { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 80vh; overflow: auto; }
 .media-gallery .gallery-img { max-height: none; }
+
+/* ============================================================
+   Main-app polish (frontend-design skill) — triage
+   ============================================================ */
+
+/* Action bar: tactile lift on hover, press on active, semantic colors kept.
+   The .act:active here intentionally follows the earlier one so it wins on press. */
+.act:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    filter: brightness(1.06);
+}
+.act:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    filter: none;
+}
+.act-label { line-height: 1; }
+.act-key {
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.12rem 0.36rem;
+    border-radius: var(--r-sm);
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+/* Keyboard hints are meaningless on touch — the swipe hint covers that path. */
+@media (pointer: coarse) { .act-key { display: none; } }
+
+/* Each next card reads as a fresh card sliding in (short, so it never fights a drag). */
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+/* No fill-mode: once it ends the card reverts to its base (opacity 1, no transform) so the
+   swipe's inline transform is never shadowed by a retained final keyframe. */
+.tcard { animation: card-in 150ms var(--ease); }
+
+/* Toast slides up as it appears (base transform keeps the -50% horizontal centering). */
+@keyframes toast-in {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.toast:not([hidden]) { animation: toast-in 200ms var(--ease); }
+
+/* Empty-batch state: celebratory icon + clear hierarchy. */
+.triage-empty-icon { font-size: 2.8rem; line-height: 1; margin-bottom: var(--sp-3); }
+.triage-empty p { font-size: var(--fs-lg); color: var(--text); margin: 0 0 var(--sp-4); }
