@@ -195,3 +195,37 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
 - [ ] **P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.** Where the learned
   skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
   (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
+
+## Epic 11 — Cross-source consolidation: condense duplicates into YouTube items  (`enhancement`, `area:dedup`)
+*The same thing is often saved across sources: a YouTube video, a Reddit post linking to it, an HN
+comment thread about it, and a Firefox tab of any of those. Today they're separate items. Condense
+them into one canonical item — **YouTube takes precedence over every other source** — that links out
+to its companion discussion threads.*
+
+- [ ] **P2 — Consolidate matched items into a canonical YouTube item.** A re-runnable script that
+  detects when a Reddit post / HN story / Firefox tab points at a YouTube video (extract the video id
+  from the item's `url` / link target) and folds them into one `youtube:<id>` item. The companions
+  survive only as links on the canonical item — e.g.
+  `metadata.companions = [{source, kind, permalink/url, fullname}]` — not as separate cards.
+  Non-destructive + **reversible** (retain the originals' fullnames so it can be undone).
+- [ ] **Card affordances.** On the YouTube card show **click-through links** to the companion Reddit
+  comments / HN thread, plus a small **icon/badge** signalling that an accompanying discussion exists,
+  so it's identifiable at a glance.
+- [ ] **Constraint — saved-only, never fetch.** Only consolidate threads **already saved**. Do NOT go
+  online to find or fetch a Reddit/HN thread for a video that doesn't have one saved — explicitly out
+  of scope.
+- [ ] **Precedence + matching.** YouTube > all. Match key = canonical YouTube video id from any
+  source's link. Cases: Firefox-tab→YouTube (already promoted at import via `firefox_youtube.py`),
+  Reddit link-post→YouTube, HN story-url→YouTube. (The standalone "📑 Firefox tabs" filter button was
+  removed — that import-time promotion still happens; this feature subsumes the rest.)
+
+## Epic 12 — Search operators in the search bar  (`enhancement`, `area:search`)
+*Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
+need separate filter controls.*
+
+- [ ] **P2 — Parse `key:value` operators alongside free text.** e.g. `source:youtube`,
+  `subreddit:hololive`, `kind:post`, `tag:minecraft`, `status:inbox`, `is:saved`/`is:nsfw`,
+  `before:2024-01-01`/`after:…`, `score:>100`, quoted `"exact phrase"`, and negation `-term`.
+  Translate them into the existing `search_items` filters so the bar drives the same query layer the
+  dropdowns do today, keeping the FTS path for the remaining free text. Grammar modelled on
+  Gmail/Discord/Google; chips/autocomplete are a later polish.
