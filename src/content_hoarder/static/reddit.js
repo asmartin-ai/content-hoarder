@@ -342,16 +342,24 @@
   if (syncBtn) {
     syncBtn.addEventListener('click', () => {
       syncBtn.disabled = true;
-      syncStatus.textContent = 'Syncing…';
-      fetch('/reddit/sync', { method: 'POST' })
+      syncStatus.textContent = 'Syncing newest…';
+      fetch('/reddit/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
         .then(r => r.json())
         .then(data => {
-          if (data.error) {
+          if (data.auth_error) {
+            syncStatus.textContent = 'Sync needs a reddit_session cookie — set it up first.';
+          } else if (data.error) {
             syncStatus.textContent = 'Error: ' + data.error;
           } else {
-            syncStatus.textContent = `Synced ${data.synced} items.`;
-            updateCounts(data.counts);
+            syncStatus.textContent =
+              '+' + data.new + ' new (' + data.fetched + ' fetched, ' + data.pages + 'p, ' + data.stopped + ').';
             loadItems();
+            loadHeaderCounts();
+            loadSubreddits();
           }
           syncBtn.disabled = false;
         })

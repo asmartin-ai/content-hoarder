@@ -173,6 +173,17 @@ def cmd_suggest(args) -> int:
     return 0
 
 
+def cmd_reddit_sync(args) -> int:
+    from content_hoarder import reddit_sync
+    max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
+    with _connect() as conn:
+        res = reddit_sync.sync_saved_cookie(
+            conn, max_pages=max_pages, progress=lambda m: print(m, file=sys.stderr)
+        )
+    print(json.dumps(res, indent=2))
+    return 1 if res.get("auth_error") else 0
+
+
 def cmd_reddit_unsave(args) -> int:
     from content_hoarder import db, reddit_unsave as ru
     with _connect() as conn:
@@ -296,6 +307,16 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--source")
     pg.add_argument("--limit", type=int, default=20)
     pg.set_defaults(func=cmd_suggest)
+
+    prs = sub.add_parser("reddit-sync",
+                         help="Pull newest saved items from Reddit via the session cookie "
+                              "(incremental: newest-first, stops once a page has no new items). "
+                              "Set the cookie first with `reddit-unsave --login --cookie ...`.")
+    prs.add_argument("--max-pages", type=int, default=None,
+                     help="Pages of 100 to fetch (default 3 newest pages).")
+    prs.add_argument("--full", action="store_true",
+                     help="Deeper backfill (up to 50 pages) — slower; for a first/large catch-up.")
+    prs.set_defaults(func=cmd_reddit_sync)
 
     pu = sub.add_parser("reddit-unsave",
                         help="Unsave reddit items (queued when triaged 'Done') from your Reddit "
