@@ -88,6 +88,14 @@
     return '<div class="tcard-dates" title="' + esc(tip.join("\n")) + '">' + vis.join(" · ") + "</div>";
   }
 
+  function tagChips(item) {
+    var tags = (item.metadata || {}).tags || [];
+    if (!tags.length) return "";
+    return '<div class="tag-chips">' + tags.map(function (t) {
+      return '<span class="tag-chip">' + esc(t) + "</span>";
+    }).join("") + "</div>";
+  }
+
   var CATEGORIES = ["listenable", "watch", "wotagei", "unknown"];
   function catHtml(item) {
     if (item.source !== "youtube") return "";  // category is a YouTube concept for now
@@ -152,6 +160,7 @@
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
       datesLine(item) +
+      tagChips(item) +
       catHtml(item) +
       recoverHtml(item) +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +

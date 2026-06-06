@@ -157,6 +157,12 @@
     if (f) lines.push("Synced here: " + fmtDate(f));
     return lines.join("\n");
   };
+  const tagChips = (item) => {
+    const tags = (item.metadata || {}).tags || [];
+    if (!tags.length) return "";
+    return '<div class="tag-chips">' +
+      tags.map((t) => '<span class="tag-chip">' + esc(t) + "</span>").join("") + "</div>";
+  };
 
   const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
   // When the archive captured the gallery images, carry them so the click opens an inline
@@ -212,6 +218,7 @@
           titleHtml +
           '<div class="item-meta">' + metaLine(item) + "</div>" +
           (item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "") +
+          tagChips(item) +
         "</div>" +
         mediaSlotHtml(item) +
         '<div class="item-actions">' +
@@ -234,6 +241,8 @@
     p.set("order", sv[1] || "desc");
     const cat = document.getElementById("category").value;
     if (cat) p.set("category", cat);
+    const tag = document.getElementById("tag").value;
+    if (tag) p.set("tag", tag);
     if (activeSource) p.set("source", activeSource);
     p.set("limit", "50");
     p.set("offset", String(offset));
@@ -330,6 +339,17 @@
       if (o.dataset.label == null) o.dataset.label = o.textContent;
       o.textContent = bc[o.value] != null ? o.dataset.label + " (" + bc[o.value] + ")" : o.dataset.label;
     });
+    // tag dropdown = Reddit multi-label tags, volume-sorted, e.g. "anime (4938)"; keep selection
+    const bt = d.by_tag || {};
+    const tagSel = document.getElementById("tag");
+    if (tagSel) {
+      const cur = tagSel.value;
+      const opts = ['<option value="">all tags</option>'];
+      Object.keys(bt).sort((a, b) => bt[b] - bt[a]).forEach((t) =>
+        opts.push('<option value="' + esc(t) + '">' + esc(t) + " (" + bt[t] + ")</option>"));
+      tagSel.innerHTML = opts.join("");
+      tagSel.value = cur;
+    }
   }).catch(() => {});
   // An item changing status moves both axes (status counts by source, tab counts by
   // status), so refresh them together.
@@ -677,6 +697,7 @@
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
   document.getElementById("category").addEventListener("change", () => load(true));
+  document.getElementById("tag").addEventListener("change", () => load(true));
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)

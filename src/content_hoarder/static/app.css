@@ -1051,3 +1051,10 @@ select {
 }
 .modal:not([hidden]) { animation: modal-overlay-in 140ms var(--ease); }
 .modal:not([hidden]) .modal-box { animation: modal-box-in 180ms var(--ease); }
+
+/* multi-label Reddit tag chips (metadata.tags) — browse list + triage card */
+.tag-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-1); }
+.tag-chip {
+    font-size: var(--fs-xs); line-height: 1.5; padding: 0 0.45rem; border-radius: 999px;
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+}
