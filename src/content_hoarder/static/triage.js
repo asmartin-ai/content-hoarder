@@ -70,6 +70,24 @@
     return bits.join(" · ");
   }
 
+  function fmtDate(ts) { return ts ? new Date(ts * 1000).toLocaleDateString() : ""; }
+  // Three distinct timestamps, labeled so they're never confused: when it was originally
+  // posted (created_utc), when it was added/saved in the source app (saved_utc — only some
+  // sources expose this), and when it synced into content-hoarder (first_seen_utc).
+  function datesLine(item) {
+    var c = item.created_utc, s = item.saved_utc, f = item.first_seen_utc;
+    // Show "added in source" only when it's a real source timestamp: distinct from the post
+    // time AND clearly earlier than our sync. Sources that just stamp it at import (e.g. HN)
+    // or don't expose it at all (Reddit, YouTube) would otherwise add misleading noise.
+    var showSaved = s && s !== c && s < f - 86400;
+    var vis = [], tip = [];
+    if (c) { vis.push("posted " + ago(c)); tip.push("Posted: " + fmtDate(c)); }
+    if (showSaved) { vis.push("saved " + ago(s)); tip.push("Added in source: " + fmtDate(s)); }
+    if (f) { vis.push("synced " + ago(f)); tip.push("Synced here: " + fmtDate(f)); }
+    if (!vis.length) return "";
+    return '<div class="tcard-dates" title="' + esc(tip.join("\n")) + '">' + vis.join(" · ") + "</div>";
+  }
+
   var CATEGORIES = ["listenable", "watch", "wotagei", "unknown"];
   function catHtml(item) {
     if (item.source !== "youtube") return "";  // category is a YouTube concept for now
@@ -129,11 +147,11 @@
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
       '<span class="tcard-stamp stamp-keep">✓ Keep</span>' +
       '<span class="tcard-stamp stamp-arch">🗑 Archive</span>' +
-      '<div class="tcard-head">' + badge(item) +
-      '<span class="tcard-age">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span></div>" +
+      '<div class="tcard-head">' + badge(item) + "</div>" +
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
+      datesLine(item) +
       catHtml(item) +
       recoverHtml(item) +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
