@@ -224,6 +224,7 @@ def create_app(db_path: str | None = None) -> Flask:
             "num_comments": m.get("num_comments") or 0,
             "created_utc": it.get("created_utc"),
             "saved_utc": it.get("saved_utc"),
+            "first_seen_utc": it.get("first_seen_utc"),
             "is_saved": it.get("is_saved"),
             "status": it.get("status"),
             "media_type": m.get("media_type") or "",
@@ -249,7 +250,9 @@ def create_app(db_path: str | None = None) -> Flask:
                 subreddit=a.get("subreddit") or None,
                 is_saved=_int(is_saved) if is_saved not in (None, "") else None,
                 fuzzy=a.get("fuzzy") == "1",
-                sort=a.get("sort", "last_seen_utc"),
+                # Default to newest-synced-first — the closest proxy to newest-saved-first, since
+                # Reddit exposes no save timestamp (see docs/reddit-management.md).
+                sort=a.get("sort", "first_seen_utc"),
                 order=a.get("order", "desc"),
                 limit=limit + 1, offset=offset,
             )

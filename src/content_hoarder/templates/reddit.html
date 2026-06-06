@@ -43,6 +43,13 @@
       <option value="0">Unsaved only</option>
     </select>
     <input type="text" id="filter-subreddit" placeholder="Subreddit…" autocomplete="off">
+    <select id="sort-select" title="Sort order" aria-label="Sort order">
+      <option value="first_seen_utc:desc" selected>Recently synced</option>
+      <option value="created_utc:desc">Recently posted</option>
+      <option value="score:desc">Top score</option>
+      <option value="subreddit:asc">Subreddit A–Z</option>
+      <option value="title:asc">Title A–Z</option>
+    </select>
     <span style="flex:1"></span>
     <div id="view-toggle">
       <button class="btn btn-ghost active" data-view="table">Table</button>

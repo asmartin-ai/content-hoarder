@@ -11,8 +11,10 @@
   let hasMore = true;        // server says more pages exist
   let loading = false;       // a fetch is in flight
   let reqSeq = 0;            // monotonically increasing request id (newest wins)
-  let sortKey = null;        // active sort column (null = default order)
-  let sortOrder = 'asc';     // 'asc' | 'desc'
+  // Default: newest-synced first. Reddit gives no save timestamp, but the cookie sync ingests
+  // saved.json newest-saved-first, so first_seen_utc is the closest stable proxy for save order.
+  let sortKey = 'first_seen_utc';
+  let sortOrder = 'desc';     // 'asc' | 'desc'
   let viewMode = localStorage.getItem('ch_reddit_view') || 'table';  // 'table' | 'grid'
   let allSubs = [];          // cached subreddit list for the sidebar
 
@@ -23,6 +25,7 @@
   const filterKind     = $('filter-kind');
   const filterSaved    = $('filter-saved');
   const filterSub      = $('filter-subreddit');
+  const sortSelect     = $('sort-select');
   const itemsPanel     = $('items-panel');
   const itemsBody      = $('items-body');
   const itemsTable     = $('items-table');
@@ -441,7 +444,25 @@
         th.classList.remove('sorted');
       }
     });
+    syncSortSelect();
   }
+
+  // Keep the dropdown in step with the current sort. A column sort with no matching option
+  // (e.g. author, or score ascending) shows no selection rather than a stale, misleading label.
+  function syncSortSelect() {
+    if (!sortSelect) return;
+    const want = sortKey + ':' + sortOrder;
+    const opt = Array.prototype.find.call(sortSelect.options, o => o.value === want);
+    sortSelect.selectedIndex = opt ? opt.index : -1;
+  }
+
+  if (sortSelect) sortSelect.addEventListener('change', () => {
+    const parts = sortSelect.value.split(':');
+    sortKey = parts[0];
+    sortOrder = parts[1] || 'desc';
+    updateSortIndicators();
+    loadItems();
+  });
 
   document.querySelectorAll('#items-table th.sortable').forEach(th => {
     th.addEventListener('click', () => {
@@ -675,6 +696,7 @@
 
   // ── Init ───────────────────────────────────────────────────────────────────
   applyView();
+  updateSortIndicators();
   loadItems();
   loadSubreddits();
   loadHeaderCounts();
