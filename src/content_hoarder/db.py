@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS reddit_unsave (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reddit_unsave_state ON reddit_unsave(state);
+
+CREATE TABLE IF NOT EXISTS reddit_threads (
+    fullname    TEXT PRIMARY KEY,   -- items.fullname, e.g. "reddit:t3_abc123"
+    thread_json TEXT NOT NULL,      -- raw Reddit <permalink>.json (post + comment tree)
+    hydrated_at INTEGER             -- when the thread was fetched/cached
+);
 """
 
 _FTS_SCHEMA = """
@@ -143,6 +149,9 @@ _SORT_COLUMNS = {
     "source": "source",
     "duration": "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
     "position": "CAST(json_extract(metadata, '$.position') AS INTEGER)",  # YouTube playlist order
+    "score": "CAST(json_extract(metadata, '$.score') AS INTEGER)",        # Reddit upvotes
+    "subreddit": "json_extract(metadata, '$.subreddit')",                 # Reddit subreddit (A–Z)
+    "kind": "kind",
 }
 
 
@@ -326,6 +335,7 @@ def search_items(
     kind: str | None = None,
     status: str | None = None,
     category: str | None = None,
+    subreddit: str | None = None,
     is_saved: int | None = None,
     open_in_firefox: bool = False,
     fuzzy: bool = False,
@@ -352,6 +362,9 @@ def search_items(
         if category:
             filters.append(f"json_extract({a}metadata, '$.category') = ?")
             params.append(category)
+        if subreddit:
+            filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
+            params.append(subreddit)
         if is_saved is not None:
             filters.append(f"{a}is_saved = ?")
             params.append(int(is_saved))
@@ -582,6 +595,96 @@ def bankruptcy(
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
     row = conn.execute("SELECT * FROM items WHERE fullname=?", (fullname,)).fetchone()
     return _row_to_public(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Reddit thread cache (post + comment tree; kept out of items.metadata so search
+# stays cheap — the JSON blobs are large). See AGENTS.md "Reddit management view".
+# ---------------------------------------------------------------------------
+
+def get_reddit_thread(conn: sqlite3.Connection, fullname: str) -> dict | None:
+    """Return the cached thread for an item, or None. Keys: thread_json, hydrated_at."""
+    row = conn.execute(
+        "SELECT thread_json, hydrated_at FROM reddit_threads WHERE fullname=?", (fullname,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def set_reddit_thread(
+    conn: sqlite3.Connection,
+    fullname: str,
+    thread_json: str,
+    hydrated_at: int | None = None,
+    *,
+    commit: bool = True,
+) -> None:
+    """Cache (or replace) a thread JSON blob for an item. Idempotent."""
+    conn.execute(
+        "INSERT INTO reddit_threads(fullname, thread_json, hydrated_at) VALUES(?, ?, ?) "
+        "ON CONFLICT(fullname) DO UPDATE SET "
+        "thread_json=excluded.thread_json, hydrated_at=excluded.hydrated_at",
+        (fullname, thread_json, hydrated_at if hydrated_at is not None else int(time.time())),
+    )
+    if commit:
+        conn.commit()
+
+
+def reddit_subreddit_counts(conn: sqlite3.Connection, status: str | None = None) -> list[dict]:
+    """Per-subreddit item counts for reddit items (descending), for the sidebar."""
+    sub = "json_extract(metadata, '$.subreddit')"
+    where = f"source='reddit' AND {sub} IS NOT NULL AND {sub} <> ''"
+    params: list = []
+    if status:
+        where += " AND status = ?"
+        params.append(status)
+    rows = conn.execute(
+        f"SELECT {sub} AS subreddit, COUNT(*) AS c FROM items WHERE {where} "
+        f"GROUP BY {sub} COLLATE NOCASE ORDER BY c DESC, subreddit COLLATE NOCASE ASC",
+        params,
+    ).fetchall()
+    return [{"subreddit": r["subreddit"], "count": r["c"]} for r in rows]
+
+
+def reddit_stats(conn: sqlite3.Connection) -> dict:
+    """Reddit-only stats for the management view's stats modal."""
+    sub = "json_extract(metadata, '$.subreddit')"
+    by_kind = {
+        r["k"]: r["c"] for r in conn.execute(
+            "SELECT kind AS k, COUNT(*) AS c FROM items WHERE source='reddit' GROUP BY kind")
+    }
+    by_status = _group_counts(conn, "status", "reddit")
+    top_subs = [
+        {"subreddit": r["s"], "count": r["c"]} for r in conn.execute(
+            f"SELECT {sub} AS s, COUNT(*) AS c FROM items "
+            f"WHERE source='reddit' AND {sub} IS NOT NULL AND {sub} <> '' "
+            f"GROUP BY {sub} COLLATE NOCASE ORDER BY c DESC LIMIT 15")
+    ]
+    distinct_subs = conn.execute(
+        f"SELECT COUNT(DISTINCT {sub} COLLATE NOCASE) FROM items "
+        f"WHERE source='reddit' AND {sub} IS NOT NULL AND {sub} <> ''"
+    ).fetchone()[0]
+    nsfw = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE source='reddit' "
+        "AND json_extract(metadata, '$.over_18') = 1"
+    ).fetchone()[0]
+    with_media = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE source='reddit' AND url <> ''"
+    ).fetchone()[0]
+    by_year = [
+        {"year": r["y"], "count": r["c"]} for r in conn.execute(
+            "SELECT CAST(strftime('%Y', created_utc, 'unixepoch') AS INTEGER) AS y, COUNT(*) AS c "
+            "FROM items WHERE source='reddit' AND created_utc > 0 GROUP BY y ORDER BY y")
+    ]
+    return {
+        "total": by_status and sum(by_status.values()) or 0,
+        "by_kind": by_kind,
+        "by_status": by_status,
+        "top_subreddits": top_subs,
+        "distinct_subreddits": distinct_subs,
+        "nsfw": nsfw,
+        "with_media": with_media,
+        "by_year": by_year,
+    }
 
 
 # ---------------------------------------------------------------------------

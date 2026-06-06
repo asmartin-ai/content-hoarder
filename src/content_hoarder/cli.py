@@ -95,6 +95,14 @@ def cmd_migrate_firefox_tabs(args) -> int:
     return 0
 
 
+def cmd_migrate_rsm_threads(args) -> int:
+    from content_hoarder import rsm_threads
+    with _connect() as conn:
+        res = rsm_threads.migrate_threads(conn, args.from_db, only_existing=not args.all_threads)
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def cmd_serve(args) -> int:
     from content_hoarder.web import create_app
     app = create_app()
@@ -163,6 +171,18 @@ def cmd_suggest(args) -> int:
         res = llm.suggest_inbox(conn, source=args.source, limit=args.limit)
     print(json.dumps(res, indent=2))
     return 0
+
+
+def cmd_reddit_sync(args) -> int:
+    from content_hoarder import reddit_sync
+    max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
+    with _connect() as conn:
+        res = reddit_sync.sync_saved_cookie(
+            conn, max_pages=max_pages, stop_on_known=not args.full,
+            progress=lambda m: print(m, file=sys.stderr),
+        )
+    print(json.dumps(res, indent=2))
+    return 1 if res.get("auth_error") else 0
 
 
 def cmd_reddit_unsave(args) -> int:
@@ -250,6 +270,15 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Commit changes (default: dry run). Run against a DB copy first.")
     pm.set_defaults(func=cmd_migrate_firefox_tabs)
 
+    prt = sub.add_parser("migrate-rsm-threads",
+                         help="One-time: copy cached thread JSON from a reddit-saved-manager "
+                              "data/app.db into the local reddit_threads cache (source is read-only).")
+    prt.add_argument("--from", dest="from_db", required=True, metavar="RSM_APP_DB",
+                     help="Path to the reddit-saved-manager data/app.db.")
+    prt.add_argument("--all-threads", action="store_true",
+                     help="Migrate threads even for items not present locally (default: skip orphans).")
+    prt.set_defaults(func=cmd_migrate_rsm_threads)
+
     ps = sub.add_parser("serve", help="Run the web app.")
     ps.add_argument("--host", help="Bind host (default 127.0.0.1; set to your Tailscale IP for mobile).")
     ps.add_argument("--port", type=int, help="Port (default 8788).")
@@ -279,6 +308,16 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--source")
     pg.add_argument("--limit", type=int, default=20)
     pg.set_defaults(func=cmd_suggest)
+
+    prs = sub.add_parser("reddit-sync",
+                         help="Pull newest saved items from Reddit via the session cookie "
+                              "(incremental: newest-first, stops once a page has no new items). "
+                              "Set the cookie first with `reddit-unsave --login --cookie ...`.")
+    prs.add_argument("--max-pages", type=int, default=None,
+                     help="Pages of 100 to fetch (default 3 newest pages).")
+    prs.add_argument("--full", action="store_true",
+                     help="Deeper backfill (up to 50 pages) — slower; for a first/large catch-up.")
+    prs.set_defaults(func=cmd_reddit_sync)
 
     pu = sub.add_parser("reddit-unsave",
                         help="Unsave reddit items (queued when triaged 'Done') from your Reddit "

@@ -115,6 +115,45 @@ def _classify_media(meta: dict, raw_url, permalink: str, body: str, kind: str) -
     return perma_url
 
 
+def child_to_item(ch: dict):
+    """A Reddit API listing child (``{"kind": "t1"/"t3", "data": {...}}``) → a normalized
+    content-hoarder item dict, or ``None`` if unusable. Shared by the JSON importer and the
+    cookie sync so both shape items identically (subreddit/score/over_18/media in metadata)."""
+    d = ch.get("data", ch) if isinstance(ch, dict) else {}
+    if not isinstance(d, dict):
+        return None
+    permalink = d.get("permalink") or ""
+    sid = d.get("name") or _sid_from_permalink(permalink)
+    if not sid and d.get("id"):
+        sid = ("t1_" if (isinstance(ch, dict) and ch.get("kind") == "t1") else "t3_") + d["id"]
+    if not sid:
+        return None
+    meta = {}
+    if d.get("subreddit"):
+        meta["subreddit"] = d["subreddit"]
+    if permalink:
+        meta["permalink"] = permalink
+    if d.get("score") is not None:
+        meta["score"] = d["score"]
+    if d.get("over_18") is not None:
+        meta["over_18"] = 1 if d["over_18"] else 0
+    kind = "comment" if str(sid).startswith("t1_") else "post"
+    body = d.get("selftext") or d.get("body") or ""
+    url = _classify_media(meta, d.get("url"), permalink, body, kind)
+    return new_item(
+        source="reddit",
+        source_id=sid,
+        kind=kind,
+        title=d.get("title") or _title_from_permalink(permalink),
+        body=body,
+        url=url,
+        author=d.get("author") or "",
+        created_utc=int(d.get("created_utc") or 0),
+        metadata=meta,
+        raw=d,
+    )
+
+
 def _is_rsm_db(path: Path) -> bool:
     try:
         con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
@@ -311,36 +350,6 @@ class RedditConnector(BaseConnector):
         else:
             children = []
         for ch in children:
-            d = ch.get("data", ch) if isinstance(ch, dict) else {}
-            if not isinstance(d, dict):
-                continue
-            permalink = d.get("permalink") or ""
-            sid = d.get("name") or _sid_from_permalink(permalink)
-            if not sid and d.get("id"):
-                sid = ("t1_" if ch.get("kind") == "t1" else "t3_") + d["id"]
-            if not sid:
-                continue
-            meta = {}
-            if d.get("subreddit"):
-                meta["subreddit"] = d["subreddit"]
-            if permalink:
-                meta["permalink"] = permalink
-            if d.get("score") is not None:
-                meta["score"] = d["score"]
-            if d.get("over_18") is not None:
-                meta["over_18"] = 1 if d["over_18"] else 0
-            kind = "comment" if str(sid).startswith("t1_") else "post"
-            body = d.get("selftext") or d.get("body") or ""
-            url = _classify_media(meta, d.get("url"), permalink, body, kind)
-            yield new_item(
-                source="reddit",
-                source_id=sid,
-                kind=kind,
-                title=d.get("title") or _title_from_permalink(permalink),
-                body=body,
-                url=url,
-                author=d.get("author") or "",
-                created_utc=int(d.get("created_utc") or 0),
-                metadata=meta,
-                raw=d,
-            )
+            item = child_to_item(ch)
+            if item:
+                yield item

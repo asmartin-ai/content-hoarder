@@ -110,6 +110,22 @@ Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved*
   Reddit no-op). `merge_upsert` already preserves `is_saved` across re-imports (gotcha #2).
 - Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it mutates real Reddit state).
 
+## Reddit management view (`/reddit`) — merged from reddit-saved-manager
+The RSM interface folded in over the generic `items` table. Full notes: `docs/reddit-management.md`.
+- **No schema change:** Reddit fields stay in `metadata`; `web._reddit_view` flattens them to the flat
+  shape `static/reddit.js` expects. `db.search_items` has a `subreddit=` filter + `score`/`subreddit` sorts.
+- **`reddit_threads` side table** caches post+comment-tree JSON — deliberately NOT in `metadata` (the
+  blobs are large and `metadata` is parsed on every row read). Use `db.get/set_reddit_thread`; parse via
+  `reddit_thread.py`.
+- **One-time thread migration:** `migrate-rsm-threads --from <RSM app.db>` (`rsm_threads.py`) reads RSM
+  read-only and re-keys `t3_x`→`reddit:t3_x`. It writes via db helpers (like `firefox_youtube.migrate`),
+  so it's exempt from the "connectors never touch the DB" rule — it is NOT a connector.
+- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,items/<fn>/thread,items/<fn>/unsave}`; undo
+  reuses `/items/<fn>/resave`. Frontend = `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed
+  to `/reddit/*`; OAuth/import/export/archival controls dropped via JS null-guards).
+- **Auth:** cookie-based incremental sync (newest-first, stop-on-overlap) is the intended default but is
+  pending a Phase-0 spike + a `reddit_session` cookie. OAuth lives on the unmerged `feat/reddit-oauth`.
+
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.
 - Never expose the web app to the public internet (Tailscale/LAN only).

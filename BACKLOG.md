@@ -126,3 +126,49 @@ false positives.*
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
+
+## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
+*The reddit-saved-manager interface is merged in as the `/reddit` view (see
+[`docs/reddit-management.md`](docs/reddit-management.md)). Remaining work absorbed from the old project:*
+
+- [ ] **P2 — Reddit auto-categorization** (migrated from RSM's "inbox + autotagging" backlog). Extend
+  `categorize.py` (today YouTube-only) with Reddit **subreddit + title/body keyword** rules into
+  processing areas. Proposed categories: **NSFW** (distinguish erotic vs. other adult), **Vtubers**,
+  **Coding**, **Japan**, **Anime**, **Memes**, **Minecraft**. Heuristics first; optional local-LLM
+  assist after (Epic 1 pattern). NSFW is already flagged via `metadata.over_18`.
+- [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs
+  `/user/<name>/saved.json` with the `reddit_session` cookie (works keyless; ~100/page, ~0.5s/req),
+  walks newest-first, and stops at a high-water mark (`settings.reddit_sync_newest`) — O(new) per sync.
+  `POST /reddit/sync` + a "Sync newest" button + `reddit-sync [--full] [--max-pages N]` CLI. Pulled the
+  244 items saved since the RSM export.
+- [ ] **P3 — Port RSM's richer importers.** Reddit **GDPR data-export ZIP** (keyless full saved-list
+  backfill — the canonical fallback if cookie sync is unviable), **BDFR JSON**, and recursive directory walk.
+- [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
+  groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
+- [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, merge `feat/reddit-oauth` (OAuth sync + live
+  thread fetch + OAuth save/unsave); prefer OAuth over the cookie path when configured.
+
+## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
+*Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
+subreddit/channel, kind, age, media type, title keywords). The app should learn from my own history
+and surface what I'm most likely to act on, instead of a flat random batch.*
+
+- [ ] **P2 — Learn a "likely-done" score from triage history.** Train a lightweight, local,
+  explainable model on each item's features (`source`, `metadata.subreddit`/`channel`, `kind`,
+  `media_type`, `category`, age buckets, title tokens) against the outcome (`status`:
+  done/keep/archived vs still inbox). Start with a transparent baseline — per-feature done-rate
+  (naive-Bayes / logistic regression over hashed tokens) computed from existing `items` rows — so it
+  needs **no new data**, just `processed_utc IS NOT NULL` history. Store the score on
+  `metadata.triage_score` (recompute via a `learn-triage` CLI command); fully offline (no API).
+  Surface a "why" (top contributing features) so suggestions stay trustworthy.
+- [ ] **P2 — "Smart triage" mode that mixes recency + likely-done.** A new triage batch mode that
+  interleaves **recent** items (newest `created_utc`/`first_seen_utc`) with **high likely-done-score**
+  items, instead of pure `ORDER BY RANDOM()`. Expose as `/random?mode=smart` (+ a toggle on the triage
+  card menu); e.g. take top-K by score, top-K by recency, shuffle the union, with a configurable mix
+  ratio. Reuses `db.get_random_batch` (extend with a `mode=` param).
+- [ ] **P3 — Feedback loop.** Re-fit the score periodically (or after every N triage actions) so it
+  tracks drift in what I care about; optionally fold in the local-LLM keep/skip suggestion
+  (`assist/llm.py`) and the heuristic category (`categorize.py`) as additional features.
+- [ ] **P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.** Where the learned
+  skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
+  (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
