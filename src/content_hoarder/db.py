@@ -676,7 +676,7 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
             "FROM items WHERE source='reddit' AND created_utc > 0 GROUP BY y ORDER BY y")
     ]
     return {
-        "total": by_status and sum(by_status.values()) or 0,
+        "total": sum(by_status.values()),  # 0 when there are no reddit items
         "by_kind": by_kind,
         "by_status": by_status,
         "top_subreddits": top_subs,

@@ -46,7 +46,9 @@ def sync_saved_cookie(
 
     ``stopped`` ∈ {``caught_up`` (re-reached the high-water mark), ``all_known`` (a page had 0
     new and there's no mark yet), ``max_pages``, ``exhausted`` (no more pages), ``empty``,
-    ``auth_error``}. Advances the high-water mark to the current top on success.
+    ``auth_error``}. The high-water mark only advances when the run reached a real boundary
+    (``caught_up``/``all_known``/``exhausted``) or it's the first sync (no mark yet) — never on
+    a ``max_pages`` truncation, which could otherwise skip the items below the cutoff forever.
     """
     getf = getf or _http_get
     sleep = sleep or time.sleep
@@ -107,12 +109,13 @@ def sync_saved_cookie(
             if not item:
                 continue
             result["fetched"] += 1
-            if db.get_item(conn, item["fullname"]) is not None:
-                result["updated"] += 1
-            else:
+            # merge_upsert already does one existence lookup internally and reports the
+            # outcome, so trust its return rather than a second get_item round-trip.
+            if db.merge_upsert(conn, item) == "inserted":
                 result["new"] += 1
                 page_new += 1
-            db.merge_upsert(conn, item)
+            else:
+                result["updated"] += 1
         conn.commit()
         if progress:
             progress(f"page {page + 1}: +{page_new} new ({len(children)} items)")
@@ -133,6 +136,12 @@ def sync_saved_cookie(
     else:
         result["stopped"] = "max_pages"
 
-    if newest:
+    # Advance the high-water mark ONLY when we contiguously covered the top of the saved
+    # list down to a real boundary: the previous mark (caught_up), a fully-known page
+    # (all_known), or the end of the list (exhausted). On a `max_pages` truncation there can
+    # be new items BELOW what we fetched but ABOVE the old mark; advancing past them here
+    # would skip them on every future sync (silent data gap). The very first sync (no mark
+    # yet) sets the initial baseline — run `reddit-sync --full` for a thorough first catch-up.
+    if newest and (mark is None or result["stopped"] in ("caught_up", "exhausted", "all_known")):
         db.set_setting(conn, _MARK_KEY, newest)
     return result

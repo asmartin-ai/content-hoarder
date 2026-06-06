@@ -22,7 +22,9 @@ separate DB); Reddit-specific fields live in each item's `metadata` blob and are
   trees, kept *out* of `metadata` so search stays cheap. Read/written via `db.get_reddit_thread` /
   `db.set_reddit_thread`; parsed by `reddit_thread.py`.
 - **Routes** (`web.py`): `GET /reddit` (page), `/reddit/items`, `/reddit/subreddits`, `/reddit/stats`,
-  `/reddit/items/<fn>/thread`, `POST /reddit/items/<fn>/unsave`. Undo reuses `/items/<fn>/resave`.
+  `/reddit/items/<fn>/thread`, `POST /reddit/items/<fn>/unsave` (enqueues + optimistically flips
+  `is_saved=0`), `POST /reddit/items/<fn>/undo` (cancels a still-pending unsave locally, or live
+  re-saves one already drained to Reddit).
 - **Frontend**: `templates/reddit.html` + `static/reddit.js` + `static/reddit.css`, reskinned from RSM
   to content-hoarder's palette.
 
@@ -45,13 +47,18 @@ incremental sync** — implemented in `reddit_sync.py`, exposed as the `reddit-s
 
 - It GETs `https://www.reddit.com/user/<username>/saved.json` with your `reddit_session` cookie
   (set once via `reddit-unsave --login --cookie "<value>"` — shared with the unsave queue),
-  **newest-first**, and **stops as soon as a page yields no new items** (`max_pages`, default 3;
+  **newest-first**, walking pages until it re-reaches the **high-water mark** (the newest fullname
+  from the last sync, stored in `settings['reddit_sync_newest']`) or hits `max_pages` (default 3;
   `--full` raises it to 50 for a deep catch-up). A routine sync therefore touches only the new
   saves — seconds, not an 11-minute full re-pull.
-- **Live validation (Phase 0) is still pending a cookie:** we must confirm `saved.json` actually
-  returns the listing with just the session cookie (not a login wall) and measure the rate. If it
-  doesn't, the keyless fallback is importing a Reddit **GDPR data-export ZIP** (complete saved list,
-  no scraping; porting RSM's ZIP/BDFR importers is a backlog item).
+- The mark **only advances when the run reached a real boundary** (re-hit the old mark, a fully-known
+  page, or the end of the list) — **never on a `max_pages` truncation**, which would otherwise skip
+  the items below the cutoff forever. The first sync (no mark yet) sets the baseline; if you have a
+  large backlog of new saves, run `reddit-sync --full` once for a thorough first catch-up.
+- **Live validation (Phase 0) passed:** `saved.json` returns the full listing with just the session
+  cookie (100/page, ~0.5s/req), no login wall. The keyless fallback if it ever breaks is importing a
+  Reddit **GDPR data-export ZIP** (complete saved list, no scraping; porting RSM's ZIP/BDFR importers
+  is a backlog item).
 
 ## Cookie expiry
 `reddit_session` cookies expire every few days — same re-paste UX as the existing unsave feature
