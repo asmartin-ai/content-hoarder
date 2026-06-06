@@ -35,7 +35,10 @@
           <option value="wotagei">wotagei</option>
           <option value="unknown">unknown</option>
         </select>
-        <select id="tag" title="Filter by Reddit tag"><option value="">all tags</option></select>
+        <details class="tag-filter" id="tag">
+          <summary id="tag-summary" title="Filter by Reddit tags (OR)">Tags</summary>
+          <div class="tag-filter-list" id="tag-filter-list"></div>
+        </details>
         <a class="btn" href="/reddit" title="Reddit management view">Reddit</a>
         <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
       </nav>

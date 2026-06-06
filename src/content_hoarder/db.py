@@ -335,7 +335,7 @@ def search_items(
     kind: str | None = None,
     status: str | None = None,
     category: str | None = None,
-    tag: str | None = None,
+    tags: list[str] | None = None,
     subreddit: str | None = None,
     is_saved: int | None = None,
     open_in_firefox: bool = False,
@@ -363,10 +363,11 @@ def search_items(
         if category:
             filters.append(f"json_extract({a}metadata, '$.category') = ?")
             params.append(category)
-        if tag:  # metadata.tags is a JSON list (multi-label); match any element
+        if tags:  # metadata.tags is a JSON list; OR-match any selected tag
+            ph = ",".join("?" for _ in tags)
             filters.append(
-                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value = ?)")
-            params.append(tag)
+                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))")
+            params.extend(tags)
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)

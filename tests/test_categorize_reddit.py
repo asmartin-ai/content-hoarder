@@ -53,9 +53,12 @@ def test_tag_filter_and_counts(conn):
     db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_z", kind="post",
                     title="z", metadata={"subreddit": "askreddit"}))  # untagged
     conn.commit()
-    # tag= matches any element of the metadata.tags list
-    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tag="minecraft")} == {"reddit:t3_x"}
-    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tag="memes")} == \
+    # tags= matches any element of the metadata.tags list (OR across the selected tags)
+    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tags=["minecraft"])} == {"reddit:t3_x"}
+    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tags=["memes"])} == \
+        {"reddit:t3_x", "reddit:t3_y"}
+    # multiple tags -> union
+    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tags=["minecraft", "anime"])} == \
         {"reddit:t3_x", "reddit:t3_y"}
     counts = db.tag_counts(conn)
     assert counts["memes"] == 2 and counts["minecraft"] == 1 and counts["anime"] == 1

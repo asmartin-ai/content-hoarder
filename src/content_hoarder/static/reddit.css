@@ -380,3 +380,23 @@ h1 { font-size: 16px; font-weight: 600; color: #2dd4bf; }
   font-size: 10px; line-height: 1.5; padding: 0 6px; border-radius: 999px;
   background: #1e222b; border: 1px solid #313845; color: #9aa4b2; white-space: nowrap;
 }
+
+/* tag filter: multi-select checkbox popover (<details>) + clickable chips */
+.tag-chip { cursor: pointer; }
+.tag-filter { position: relative; }
+.tag-filter > summary {
+  list-style: none; cursor: pointer; padding: 5px 12px; border-radius: 6px;
+  border: 1px solid #313845; background: #1e222b; color: #e5e7eb; font-size: 13px;
+}
+.tag-filter > summary::-webkit-details-marker { display: none; }
+.tag-filter[open] > summary { border-color: #2dd4bf; }
+.tag-filter-list {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+  background: #171a21; border: 1px solid #313845; border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .45); padding: 6px; min-width: 180px;
+  max-height: 320px; overflow: auto; display: flex; flex-direction: column; gap: 2px;
+}
+.tag-opt { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 6px;
+  font-size: 13px; color: #e5e7eb; cursor: pointer; white-space: nowrap; }
+.tag-opt:hover { background: #1e222b; }
+.tag-opt-cnt { margin-left: auto; color: #9aa4b2; font-variant-numeric: tabular-nums; }
