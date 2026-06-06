@@ -1,0 +1,86 @@
+import json
+
+from content_hoarder import db, models
+from content_hoarder.web import create_app
+
+# A minimal two-listing thread blob: [post listing, comment listing].
+THREAD = json.dumps([
+    {"data": {"children": [{"kind": "t3", "data": {
+        "title": "Hello", "author": "op", "selftext": "body text",
+        "subreddit": "hedgehogs", "permalink": "/r/hedgehogs/comments/a/hello/",
+        "score": 42, "url": "http://x", "created_utc": 1000}}]}},
+    {"data": {"children": [
+        {"kind": "t1", "data": {
+            "author": "c1", "body": "top", "score": 5,
+            "permalink": "/r/hedgehogs/comments/a/hello/c1/",
+            "replies": {"data": {"children": [
+                {"kind": "t1", "data": {"author": "c2", "body": "reply",
+                                        "score": 2, "permalink": "/x"}},
+            ]}}}},
+        {"kind": "more", "data": {}},   # must be skipped
+    ]}},
+])
+
+
+def _seed(dbp):
+    c = db.connect(dbp)
+    db.merge_upsert(c, models.new_item(source="reddit", source_id="t3_a", kind="post",
+                    title="Hedgehog", author="op", url="http://r/a",
+                    metadata={"subreddit": "hedgehogs", "score": 42, "over_18": 1}))
+    db.merge_upsert(c, models.new_item(source="reddit", source_id="t3_b", kind="post",
+                    title="Other", url="http://r/b", metadata={"subreddit": "aww", "score": 3}))
+    db.merge_upsert(c, models.new_item(source="youtube", source_id="v1", kind="video", title="Vid"))
+    db.set_reddit_thread(c, "reddit:t3_a", THREAD, 123)
+    c.commit()
+    c.close()
+
+
+def _client(tmp_db):
+    _seed(tmp_db)
+    return create_app(tmp_db).test_client()
+
+
+def test_subreddit_filter_case_insensitive(conn):
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_a", kind="post",
+                    title="A", metadata={"subreddit": "hh"}))
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_b", kind="post",
+                    title="B", metadata={"subreddit": "aww"}))
+    conn.commit()
+    assert [r["fullname"] for r in db.search_items(conn, source="reddit", subreddit="hh")] == ["reddit:t3_a"]
+    assert db.search_items(conn, source="reddit", subreddit="HH")  # COLLATE NOCASE
+
+
+def test_reddit_items_flat_shape(tmp_db):
+    r = _client(tmp_db).get("/reddit/items?subreddit=hedgehogs").get_json()
+    it = r["items"][0]
+    assert it["subreddit"] == "hedgehogs" and it["score"] == 42 and it["over_18"] == 1
+    assert it["fullname"] == "reddit:t3_a" and it["reddit_id"] == "t3_a"
+
+
+def test_subreddit_counts_and_stats(tmp_db):
+    cl = _client(tmp_db)
+    names = {s["subreddit"] for s in cl.get("/reddit/subreddits").get_json()["subreddits"]}
+    assert {"hedgehogs", "aww"} <= names
+    st = cl.get("/reddit/stats").get_json()
+    assert st["nsfw"] == 1
+    assert st["by_kind"].get("post") == 2
+    assert any(s["subreddit"] == "hedgehogs" for s in st["top_subreddits"])
+
+
+def test_thread_parse_and_route(tmp_db):
+    cl = _client(tmp_db)
+    res = cl.get("/reddit/items/reddit:t3_a/thread").get_json()
+    assert res["cached"] is True
+    assert res["post"]["title"] == "Hello" and res["post"]["score"] == 42
+    assert [c["depth"] for c in res["comments"]] == [0, 1]  # tree flattened, 'more' skipped
+    assert cl.get("/reddit/items/reddit:t3_b/thread").get_json()["cached"] is False
+    assert cl.get("/reddit/items/reddit:t3_zzz/thread").status_code == 404
+
+
+def test_unsave_enqueues(tmp_db):
+    cl = _client(tmp_db)
+    assert cl.post("/reddit/items/reddit:t3_a/unsave").get_json()["queued"] is True
+    c = db.connect(tmp_db)
+    n = c.execute("SELECT COUNT(*) FROM reddit_unsave WHERE state='pending'").fetchone()[0]
+    c.close()
+    assert n == 1

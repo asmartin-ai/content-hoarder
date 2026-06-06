@@ -204,6 +204,91 @@ def create_app(db_path: str | None = None) -> Flask:
             ok = ru.resave(c, fullname)
         return jsonify({"resaved": ok})
 
+    # -- reddit management view (reuses the RSM interface over the items table) --
+
+    def _reddit_view(it: dict) -> dict:
+        """Flatten a content-hoarder item into the flat shape the Reddit UI expects."""
+        m = it.get("metadata") or {}
+        return {
+            "fullname": it.get("fullname"),
+            "reddit_id": it.get("source_id"),
+            "kind": it.get("kind"),
+            "title": it.get("title"),
+            "body": it.get("body"),
+            "url": it.get("url"),
+            "permalink": m.get("permalink") or "",
+            "subreddit": m.get("subreddit") or "",
+            "author": it.get("author"),
+            "score": m.get("score") or 0,
+            "over_18": 1 if m.get("over_18") else 0,
+            "num_comments": m.get("num_comments") or 0,
+            "created_utc": it.get("created_utc"),
+            "saved_utc": it.get("saved_utc"),
+            "is_saved": it.get("is_saved"),
+            "status": it.get("status"),
+            "media_type": m.get("media_type") or "",
+            "media_url": m.get("media_url") or "",
+            "thumbnail": m.get("thumbnail") or "",
+            "gallery": m.get("gallery") or [],
+        }
+
+    @app.get("/reddit")
+    def reddit_page():
+        return render_template("reddit.html")
+
+    @app.get("/reddit/items")
+    def reddit_items():
+        a = request.args
+        limit = min(max(_int(a.get("limit"), 100), 1), 500)
+        offset = max(_int(a.get("offset"), 0), 0)
+        is_saved = a.get("is_saved")
+        with conn() as c:
+            rows = db.search_items(
+                c, a.get("q", ""),
+                source="reddit",
+                kind=a.get("kind") or None,
+                status=a.get("status") or None,
+                subreddit=a.get("subreddit") or None,
+                is_saved=_int(is_saved) if is_saved not in (None, "") else None,
+                fuzzy=a.get("fuzzy") == "1",
+                sort=a.get("sort", "last_seen_utc"),
+                order=a.get("order", "desc"),
+                limit=limit + 1, offset=offset,
+            )
+        has_more = len(rows) > limit
+        return jsonify({"items": [_reddit_view(r) for r in rows[:limit]], "has_more": has_more})
+
+    @app.get("/reddit/subreddits")
+    def reddit_subreddits():
+        status = request.args.get("status") or None
+        with conn() as c:
+            return jsonify({"subreddits": db.reddit_subreddit_counts(c, status=status)})
+
+    @app.get("/reddit/stats")
+    def reddit_stats_route():
+        with conn() as c:
+            return jsonify(db.reddit_stats(c))
+
+    @app.get("/reddit/items/<path:fullname>/thread")
+    def reddit_thread_route(fullname):
+        from content_hoarder import reddit_thread
+        with conn() as c:
+            res = reddit_thread.get_thread(c, fullname)
+        if res is None:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(res)
+
+    @app.post("/reddit/items/<path:fullname>/unsave")
+    def reddit_unsave_one(fullname):
+        # Queue for unsaving from the user's Reddit saved list. The Reddit call happens
+        # on drain (cookie/OAuth); here we just enqueue, which works fully offline.
+        with conn() as c:
+            if db.get_item(c, fullname) is None:
+                return jsonify({"error": "not found"}), 404
+            db.enqueue_unsave(c, fullname)
+            c.commit()
+        return jsonify({"queued": True, "fullname": fullname})
+
     @app.get("/sources")
     def sources():
         # Optional ?status= cross-filters the per-source counts (tabs by active status).
