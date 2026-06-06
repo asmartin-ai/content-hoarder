@@ -229,12 +229,31 @@
     return p.toString();
   };
 
+  // Placeholder rows so a fresh load never flashes an empty list (inert: aria-hidden + no pointer).
+  const SKELETON_ROW = '<div class="item skel" aria-hidden="true">' +
+    '<div class="skel-thumb"></div>' +
+    '<div class="skel-lines"><span></span><span></span></div></div>';
+
+  const setEmptyMessage = (el) => {
+    const q = document.getElementById("q").value.trim();
+    if (q) { el.dataset.kind = "search"; el.textContent = "No matches for “" + q + "”."; }
+    else if (activeStatus) { el.dataset.kind = "status"; el.textContent = "Nothing in " + activeStatus + " yet."; }
+    else { el.dataset.kind = "import"; el.textContent = "Nothing here yet — import a source to begin."; }
+  };
+
   const load = (reset) => {
     if (loading) return;
     loading = true;
     const box = document.getElementById("items");
-    if (reset) { offset = 0; box.innerHTML = ""; }
+    const emptyEl = document.getElementById("empty");
+    if (reset) {
+      offset = 0;
+      box.innerHTML = SKELETON_ROW.repeat(6);
+      emptyEl.hidden = true;
+      document.getElementById("loadmore").hidden = true;
+    }
     getJSON("/items?" + buildQuery()).then((data) => {
+      box.querySelectorAll(".item.skel").forEach((s) => s.remove());
       (data.items || []).forEach((it) => box.insertAdjacentHTML("beforeend", itemHtml(it)));
       box.querySelectorAll(".item:not([data-sw])").forEach((row) => {
         row.setAttribute("data-sw", "1");
@@ -243,10 +262,13 @@
           onLeft: () => actOnItem(row.dataset.fullname, "archived", row),
         });
       });
-      document.getElementById("empty").hidden = box.querySelector(".item") !== null;
+      const hasItems = box.querySelector(".item") !== null;
+      emptyEl.hidden = hasItems;
+      if (!hasItems) setEmptyMessage(emptyEl);
       document.getElementById("loadmore").hidden = !data.has_more;
       offset += (data.items || []).length;
-    }).catch(() => {}).finally(() => { loading = false; });
+    }).catch(() => { box.querySelectorAll(".item.skel").forEach((s) => s.remove()); })
+      .finally(() => { loading = false; });
   };
 
   // Source tabs. Counts are cross-filtered by the active status; the tab list stays
