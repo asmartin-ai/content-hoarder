@@ -24,6 +24,7 @@
   const filterFuzzy    = $('filter-fuzzy');
   const filterKind     = $('filter-kind');
   const filterSaved    = $('filter-saved');
+  const filterTag      = $('filter-tag');
   const filterSub      = $('filter-subreddit');
   const sortSelect     = $('sort-select');
   const itemsPanel     = $('items-panel');
@@ -68,6 +69,16 @@
         set('count-total', (d.total || 0) + ' total');
         set('count-inbox', (st.inbox || 0) + ' inbox');
         set('count-archived', (st.archived || 0) + ' archived');
+        // Data-driven tag dropdown (volume-sorted, e.g. "anime (4938)"); preserve selection.
+        const bt = d.by_tag || {};
+        if (filterTag) {
+          const cur = filterTag.value;
+          const opts = ['<option value="">All tags</option>'];
+          Object.keys(bt).sort((a, b) => bt[b] - bt[a]).forEach(t =>
+            opts.push(`<option value="${esc(t)}">${esc(t)} (${bt[t]})</option>`));
+          filterTag.innerHTML = opts.join('');
+          filterTag.value = cur;
+        }
       })
       .catch(() => {});
   }
@@ -80,6 +91,7 @@
     if (filterFuzzy && filterFuzzy.checked) params.set('fuzzy', '1');
     if (filterKind.value)   params.set('kind', filterKind.value);
     if (filterSaved.value !== '') params.set('is_saved', filterSaved.value);
+    if (filterTag && filterTag.value) params.set('tag', filterTag.value);
     const sub = filterSub.value.trim().replace(/^r\//, '');
     if (sub) params.set('subreddit', sub);
     if (sortKey) { params.set('sort', sortKey); params.set('order', sortOrder); }
@@ -155,6 +167,13 @@
     container.insertAdjacentHTML('beforeend', items.map(itemHtml).join(''));
   }
 
+  function tagChips(item) {
+    const tags = item.tags || [];
+    if (!tags.length) return '';
+    return '<span class="tag-chips">' +
+      tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join('') + '</span>';
+  }
+
   function rowHtml(item) {
     const isUnsaved = !item.is_saved;
     const title = item.title || item.body || '(no text)';
@@ -171,6 +190,7 @@
       <td class="item-title" title="${esc(title)}">
         <span class="media-badge media-${media.cls}" title="${esc(media.label)}">${media.icon}</span>
         ${nsfw}<a href="${esc(item.permalink)}" target="_blank">${esc(short)}</a>
+        ${tagChips(item)}
       </td>
       <td><span class="kind-badge ${kindClass}">${esc(item.kind)}</span></td>
       <td title="${esc(item.subreddit)}">r/${esc(item.subreddit)}</td>
@@ -203,6 +223,7 @@
           <a href="${esc(item.permalink)}" target="_blank" title="${esc(title)}">${esc(title.slice(0, 140))}</a>
         </div>
         <div class="card-meta">r/${esc(item.subreddit)} · u/${esc(item.author)}${score}</div>
+        ${tagChips(item)}
         <div class="action-btns">
           <button class="btn btn-ghost btn-sm" onclick="openThread('${esc(item.fullname)}')">Thread</button>
           ${isUnsaved
@@ -406,6 +427,7 @@
   if (filterFuzzy) filterFuzzy.addEventListener('change', loadItems);
   filterKind.addEventListener('change', loadItems);
   filterSaved.addEventListener('change', () => { loadItems(); loadSubreddits(); });
+  if (filterTag) filterTag.addEventListener('change', loadItems);
   filterSub.addEventListener('input', debounceLoad);
 
   // ── Infinite scroll ──────────────────────────────────────────────────────────

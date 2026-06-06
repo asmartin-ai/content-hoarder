@@ -155,8 +155,9 @@ false positives.*
   user-curated allowlist: `nsfw_erotic` (1,025 items / 65 subs), `nsfw_talk` (sex/RoleReversal/
   LetGirlsHaveFun, 384), `nsfw_other` (over_18 residual, 52); SFW `*Porn` aesthetic network excluded.
   Purpose: let the user **export + unsave** the erotic set (possibly migrate to another account).
-  (c) **tags UI** — source-aware triage
-  chips + an index/Reddit-view tag filter (today the index dropdown is YouTube `category` only);
+  (c) ~~tags UI~~ **done** — `tag=` filter dropdown (data-driven, volume-sorted with counts) on the
+  Reddit view **and** the browse view, plus tag chips rendered on Reddit rows/cards, browse rows, and
+  the triage card. Tags written to all 29,184 matched items.
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
 - [ ] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
   Saved list (to migrate to a separate account). (a) **Export by tag** — dump `nsfw_erotic` items
