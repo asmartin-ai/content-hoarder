@@ -228,8 +228,6 @@ def create_app(db_path: str | None = None) -> Flask:
             "status": it.get("status"),
             "media_type": m.get("media_type") or "",
             "media_url": m.get("media_url") or "",
-            "thumbnail": m.get("thumbnail") or "",
-            "gallery": m.get("gallery") or [],
         }
 
     @app.get("/reddit")
@@ -281,13 +279,39 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/reddit/items/<path:fullname>/unsave")
     def reddit_unsave_one(fullname):
         # Queue for unsaving from the user's Reddit saved list. The Reddit call happens
-        # on drain (cookie/OAuth); here we just enqueue, which works fully offline.
+        # on drain (cookie/OAuth); here we enqueue (works fully offline) and optimistically
+        # flip is_saved=0 so the Reddit-view row immediately toggles to its "Undo" state.
+        # A later drain confirms with Reddit; Undo (below) cancels a still-pending unsave.
         with conn() as c:
             if db.get_item(c, fullname) is None:
                 return jsonify({"error": "not found"}), 404
             db.enqueue_unsave(c, fullname)
+            c.execute("UPDATE items SET is_saved=0 WHERE fullname=?", (fullname,))
             c.commit()
-        return jsonify({"queued": True, "fullname": fullname})
+        return jsonify({"queued": True, "fullname": fullname, "is_saved": 0})
+
+    @app.post("/reddit/items/<path:fullname>/undo")
+    def reddit_undo_unsave(fullname):
+        # Undo a Reddit-view "Unsave". If the unsave is still queued (not yet drained to
+        # Reddit), just cancel it locally — no network call, never fails. If it was already
+        # drained (actually unsaved on Reddit), do a live re-save. Otherwise just restore the
+        # local flag. Returns {undone: bool} so the UI can report a genuine failure.
+        from content_hoarder import reddit_unsave as ru
+        with conn() as c:
+            if db.get_item(c, fullname) is None:
+                return jsonify({"error": "not found"}), 404
+            row = c.execute(
+                "SELECT state FROM reddit_unsave WHERE fullname=?", (fullname,)
+            ).fetchone()
+            state = row["state"] if row else None
+            if state == "done":  # already removed from Reddit -> needs a live re-save
+                ok = ru.resave(c, fullname)
+                return jsonify({"undone": bool(ok), "method": "resave"})
+            # pending (or never queued): cancel locally; no Reddit call needed.
+            db.dequeue_unsave(c, fullname)
+            c.execute("UPDATE items SET is_saved=1 WHERE fullname=?", (fullname,))
+            c.commit()
+        return jsonify({"undone": True, "method": "dequeued", "is_saved": 1})
 
     @app.post("/reddit/sync")
     def reddit_sync_route():

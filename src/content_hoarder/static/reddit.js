@@ -22,7 +22,6 @@
   const filterFuzzy    = $('filter-fuzzy');
   const filterKind     = $('filter-kind');
   const filterSaved    = $('filter-saved');
-  const filterSource   = $('filter-source');
   const filterSub      = $('filter-subreddit');
   const itemsPanel     = $('items-panel');
   const itemsBody      = $('items-body');
@@ -55,10 +54,6 @@
   function activeContainer() { return viewMode === 'grid' ? itemsGrid : itemsBody; }
 
   // ── Counts ─────────────────────────────────────────────────────────────────
-  function updateCounts(counts) {
-    if (!counts) return;  // /reddit/items carries no counts; header is filled by loadHeaderCounts()
-  }
-
   // The Reddit view uses content-hoarder's triage model (inbox/keep/archived/done),
   // not RSM's saved/unsaved, so header counts come from /reddit/stats.
   function loadHeaderCounts() {
@@ -110,7 +105,6 @@
         if (seq !== reqSeq) return;
         const items = data.items || [];
         renderItems(items, !replace);
-        updateCounts(data.counts);
         hasMore = !!data.has_more;
         offset += items.length;
         loading = false;
@@ -248,10 +242,16 @@
   };
 
   window.doUndo = function (fullname) {
-    fetch(`/items/${encodeURIComponent(fullname)}/resave`, { method: 'POST' })
+    fetch(`/reddit/items/${encodeURIComponent(fullname)}/undo`, { method: 'POST' })
       .then(r => r.json())
       .then(data => {
         if (data.error) { alert('Undo failed: ' + data.error); return; }
+        // A live re-save (already drained to Reddit) can genuinely fail — report it
+        // instead of silently treating it as success.
+        if (data.undone === false) {
+          alert('Could not re-save on Reddit — your reddit_session cookie may have expired.');
+          return;
+        }
         loadItems();
         loadHeaderCounts();
       });
@@ -382,7 +382,6 @@
             importStatus.textContent = 'Error: ' + data.error;
           } else {
             importStatus.textContent = `Imported ${data.imported} items.`;
-            updateCounts(data.counts);
             loadItems();
             loadSubreddits();
           }

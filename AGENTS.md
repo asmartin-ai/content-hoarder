@@ -120,9 +120,11 @@ The RSM interface folded in over the generic `items` table. Full notes: `docs/re
 - **One-time thread migration:** `migrate-rsm-threads --from <RSM app.db>` (`rsm_threads.py`) reads RSM
   read-only and re-keys `t3_x`→`reddit:t3_x`. It writes via db helpers (like `firefox_youtube.migrate`),
   so it's exempt from the "connectors never touch the DB" rule — it is NOT a connector.
-- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,items/<fn>/thread,items/<fn>/unsave}`; undo
-  reuses `/items/<fn>/resave`. Frontend = `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed
-  to `/reddit/*`; OAuth/import/export/archival controls dropped via JS null-guards).
+- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,items/<fn>/thread,items/<fn>/unsave,items/<fn>/undo}`.
+  Unsave enqueues + optimistically flips `is_saved=0`; undo cancels a still-pending unsave locally or live
+  re-saves a drained one (the generic `/items/<fn>/resave` primitive still exists). Frontend =
+  `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed to `/reddit/*`; OAuth/import/export/archival
+  controls dropped via JS null-guards).
 - **Auth:** cookie-based incremental sync (newest-first, stop-on-overlap) is the intended default but is
   pending a Phase-0 spike + a `reddit_session` cookie. OAuth lives on the unmerged `feat/reddit-oauth`.
 

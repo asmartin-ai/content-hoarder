@@ -141,6 +141,11 @@ false positives.*
   walks newest-first, and stops at a high-water mark (`settings.reddit_sync_newest`) — O(new) per sync.
   `POST /reddit/sync` + a "Sync newest" button + `reddit-sync [--full] [--max-pages N]` CLI. Pulled the
   244 items saved since the RSM export.
+- [x] ~~**Post-review hardening**~~ (`/code-review` follow-ups, 2026-06-06): fixed the high-water mark
+  advancing on a `max_pages` truncation (silent data gap); Reddit-view **Unsave** now optimistically
+  flips `is_saved` and **Undo** (`POST /reddit/items/<fn>/undo`) cancels a still-pending unsave locally
+  (no spurious live re-save) and surfaces a genuine re-save failure; dropped a redundant per-item
+  `get_item` in the sync loop + dead `updateCounts`/`filterSource`/`thumbnail`/`gallery`.
 - [ ] **P3 — Port RSM's richer importers.** Reddit **GDPR data-export ZIP** (keyless full saved-list
   backfill — the canonical fallback if cookie sync is unviable), **BDFR JSON**, and recursive directory walk.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k

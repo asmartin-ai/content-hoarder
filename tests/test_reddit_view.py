@@ -84,8 +84,25 @@ def test_reddit_page_renders(tmp_db):
 
 def test_unsave_enqueues(tmp_db):
     cl = _client(tmp_db)
-    assert cl.post("/reddit/items/reddit:t3_a/unsave").get_json()["queued"] is True
+    res = cl.post("/reddit/items/reddit:t3_a/unsave").get_json()
+    assert res["queued"] is True and res["is_saved"] == 0
     c = db.connect(tmp_db)
     n = c.execute("SELECT COUNT(*) FROM reddit_unsave WHERE state='pending'").fetchone()[0]
+    saved = c.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_a'").fetchone()[0]
     c.close()
     assert n == 1
+    assert saved == 0  # optimistically flipped so the UI toggles to its Undo state
+
+
+def test_undo_cancels_pending_unsave(tmp_db):
+    """Undo of a still-pending (not yet drained) unsave cancels it locally — no Reddit call,
+    the queue row is dropped, and is_saved is restored."""
+    cl = _client(tmp_db)
+    cl.post("/reddit/items/reddit:t3_a/unsave")
+    res = cl.post("/reddit/items/reddit:t3_a/undo").get_json()
+    assert res["undone"] is True and res["method"] == "dequeued" and res["is_saved"] == 1
+    c = db.connect(tmp_db)
+    pending = c.execute("SELECT COUNT(*) FROM reddit_unsave WHERE state='pending'").fetchone()[0]
+    saved = c.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_a'").fetchone()[0]
+    c.close()
+    assert pending == 0 and saved == 1

@@ -77,6 +77,21 @@ def test_sync_stops_at_high_water_mark(conn):
     assert db.get_setting(conn, "reddit_sync_newest") == "t3_a"  # advanced to new top
 
 
+def test_sync_keeps_mark_on_max_pages_truncation(conn):
+    """An established mark must NOT advance when a sync truncates at max_pages: the items
+    between the cutoff and the old mark are unfetched, so moving the mark to the new top
+    would skip them on every future sync (silent data gap)."""
+    _auth(conn)
+    db.set_setting(conn, "reddit_sync_newest", "t3_old")  # mark from a prior full sync
+    getf = make_getf([
+        ([child("t3_a")], "p2"),
+        ([child("t3_b")], "p3"),  # truncated by max_pages=2; t3_old never reached
+    ])
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", max_pages=2, sleep=NOSLEEP)
+    assert res["stopped"] == "max_pages" and res["new"] == 2
+    assert db.get_setting(conn, "reddit_sync_newest") == "t3_old"  # unchanged — no gap
+
+
 def test_sync_auth_error_without_cookie(conn):
     res = reddit_sync.sync_saved_cookie(conn, getf=make_getf([]), user_agent="ua")
     assert res["auth_error"] is True and res["stopped"] == "auth_error"
