@@ -15,6 +15,9 @@ Status: **Phase 1 (in development)**
   bulk keep/archive actions, Gmail-style swipe icons, source tabs + a status sidebar, and an undo snackbar.
 - **Processing areas:** heuristic categorization of videos into *listenable* / *watch* / *wotagei*
   (no LLM), filterable in the inbox; correct a tag from the triage card.
+- **Reddit management view** (`/reddit`): the reddit-saved-manager interface folded in — table/grid
+  browse, a subreddit sidebar, a cached thread/comment viewer, NSFW blur, and per-subreddit stats —
+  over your unified library; the **Triage** link drops you straight into Reddit-only swipe triage.
 - **Content recovery (non-destructive):** restore `[removed]`/`[deleted]` Reddit posts/comments (and
   un-hydrated saved comments) from PullPush/Arctic-Shift, and `[Private/Deleted video]` YouTube titles
   from the Wayback Machine.
@@ -44,6 +47,7 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | `categorize [--source youtube] [--all] [--limit N]` | Tag items *listenable* / *watch* / *wotagei* by heuristics (duration, channel allowlist, title keyword); stored on `metadata.category`. |
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
+| `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |

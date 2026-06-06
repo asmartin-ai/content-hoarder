@@ -126,3 +126,23 @@ false positives.*
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
+
+## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
+*The reddit-saved-manager interface is merged in as the `/reddit` view (see
+[`docs/reddit-management.md`](docs/reddit-management.md)). Remaining work absorbed from the old project:*
+
+- [ ] **P2 — Reddit auto-categorization** (migrated from RSM's "inbox + autotagging" backlog). Extend
+  `categorize.py` (today YouTube-only) with Reddit **subreddit + title/body keyword** rules into
+  processing areas. Proposed categories: **NSFW** (distinguish erotic vs. other adult), **Vtubers**,
+  **Coding**, **Japan**, **Anime**, **Memes**, **Minecraft**. Heuristics first; optional local-LLM
+  assist after (Epic 1 pattern). NSFW is already flagged via `metadata.over_18`.
+- [ ] **P2 — Cookie incremental sync** (Phase 0 spike + Phase 3). Confirm `reddit.com/user/<name>/saved.json`
+  works with the `reddit_session` cookie + measure rate; if viable, `reddit_sync.py` fetches newest-first
+  and stops on overlap (`max_pages`), with a `POST /reddit/sync` + "Sync newest" button and a `reddit-sync`
+  CLI. **Blocked on a cookie + a go/no-go.**
+- [ ] **P3 — Port RSM's richer importers.** Reddit **GDPR data-export ZIP** (keyless full saved-list
+  backfill — the canonical fallback if cookie sync is unviable), **BDFR JSON**, and recursive directory walk.
+- [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
+  groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
+- [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, merge `feat/reddit-oauth` (OAuth sync + live
+  thread fetch + OAuth save/unsave); prefer OAuth over the cookie path when configured.
