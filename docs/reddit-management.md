@@ -13,6 +13,11 @@ separate DB); Reddit-specific fields live in each item's `metadata` blob and are
 - **NSFW blur** with click-to-reveal.
 - One-click **unsave** (enqueues for the Reddit unsave drain) and **re-save** (undo).
 - The header **Triage** link opens `/triage?source=reddit` — one-click Reddit-only swipe triage.
+- **Sort** dropdown defaults to **Recently synced** (`first_seen_utc` desc) — the closest proxy to
+  newest-saved-first, since Reddit exposes no save timestamp (saved items are ingested newest-first,
+  so sync order tracks save order for incrementally-synced items; the legacy bulk import shares one
+  timestamp). Other options: Recently posted, Top score, Subreddit A–Z, Title A–Z. Table column
+  headers still sort and stay in sync with the dropdown.
 
 ## Architecture (how it maps onto content-hoarder)
 - **No schema change.** `subreddit/score/over_18/permalink/media_*` stay in `items.metadata`; the
