@@ -289,6 +289,16 @@ def create_app(db_path: str | None = None) -> Flask:
             c.commit()
         return jsonify({"queued": True, "fullname": fullname})
 
+    @app.post("/reddit/sync")
+    def reddit_sync_route():
+        from content_hoarder import reddit_sync
+        body = request.get_json(silent=True) or {}
+        mp = body.get("max_pages")
+        max_pages = int(mp) if mp else (50 if body.get("full") else 3)
+        with conn() as c:
+            res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages)
+        return jsonify(res)
+
     @app.get("/sources")
     def sources():
         # Optional ?status= cross-filters the per-source counts (tabs by active status).

@@ -16,6 +16,8 @@
       </nav>
     </div>
     <div class="header-right">
+      <button id="btn-sync" class="btn btn-primary"
+              title="Pull newest saved items from Reddit (needs a reddit_session cookie)">Sync newest</button>
       <button id="btn-stats" class="btn btn-ghost">Stats</button>
     </div>
   </header>
@@ -24,6 +26,7 @@
     <span class="count-badge" id="count-total">— total</span>
     <span class="count-badge" id="count-inbox">— inbox</span>
     <span class="count-badge" id="count-archived">— archived</span>
+    <span id="sync-status"></span>
   </div>
 
   <div id="toolbar">

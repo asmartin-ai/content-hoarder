@@ -37,18 +37,21 @@ Reads the RSM DB read-only and copies non-empty `thread_json` into `reddit_threa
 `t3_x` → `reddit:t3_x`. Idempotent. Re-run `import <RSM app.db>` first if you have newer saves, then
 `dedup` (URL dedup is safe + reversible; title dedup is looser — review before resolving).
 
-## Syncing new saves (status: pending a cookie)
+## Syncing new saves
 content-hoarder has **no Reddit API key**, so live OAuth sync is parked on the unmerged
-`feat/reddit-oauth` branch (dead code until a key arrives). The default sync path is **cookie-based
-and incremental** — but it is gated behind a feasibility spike that needs your `reddit_session`
-cookie:
+`feat/reddit-oauth` branch (dead code until a key arrives). The default is a **cookie-based
+incremental sync** — implemented in `reddit_sync.py`, exposed as the `reddit-sync` CLI and a
+**"Sync newest"** button on `/reddit`:
 
-- **Spike (Phase 0):** confirm `https://www.reddit.com/user/<name>/saved.json` returns your saved
-  listing with just the session cookie, and measure page size / rate limits.
-- If viable, sync fetches **newest-first and stops on overlap** (a configurable `max_pages`, default a
-  few hundred newest), so a normal sync is seconds — not an 11-minute full re-pull.
-- **Keyless full backfill fallback:** import a Reddit **GDPR data-export ZIP** (the complete saved
-  list, no scraping). Porting RSM's ZIP/BDFR importers is a backlog item.
+- It GETs `https://www.reddit.com/user/<username>/saved.json` with your `reddit_session` cookie
+  (set once via `reddit-unsave --login --cookie "<value>"` — shared with the unsave queue),
+  **newest-first**, and **stops as soon as a page yields no new items** (`max_pages`, default 3;
+  `--full` raises it to 50 for a deep catch-up). A routine sync therefore touches only the new
+  saves — seconds, not an 11-minute full re-pull.
+- **Live validation (Phase 0) is still pending a cookie:** we must confirm `saved.json` actually
+  returns the listing with just the session cookie (not a login wall) and measure the rate. If it
+  doesn't, the keyless fallback is importing a Reddit **GDPR data-export ZIP** (complete saved list,
+  no scraping; porting RSM's ZIP/BDFR importers is a backlog item).
 
 ## Cookie expiry
 `reddit_session` cookies expire every few days — same re-paste UX as the existing unsave feature
