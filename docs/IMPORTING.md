@@ -11,10 +11,10 @@ python -m content_hoarder import <path> --source X # or force a connector
 ---
 
 ## Reddit  ✅ done
-Imported from a copy of `/path/to/reddit-saved-manager\data\app.db` — **64,615 items**.
+Imported from a copy of `/path/to/reddit-saved-manager/data/app.db` — **64,615 items**.
 To re-sync later (after the Reddit tool pulls new saves):
 ```bash
-python -m content_hoarder import "/path/to/reddit-saved-manager\data\app.db"
+python -m content_hoarder import "/path/to/reddit-saved-manager/data/app.db"
 ```
 
 ### Recovering removed / un-hydrated Reddit content
