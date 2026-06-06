@@ -43,13 +43,20 @@
   <main id="triage-main" class="triage-main">
     <div id="card-stack" class="card-stack"><!-- current card injected here --></div>
     <div id="triage-empty" class="triage-empty" hidden>
-      <p>Inbox clear for this batch 🎉</p>
+      <div class="triage-empty-icon" aria-hidden="true">🎉</div>
+      <p>Inbox clear for this batch</p>
       <button id="next-batch" class="btn primary">Get another batch</button>
     </div>
     <div id="actions" class="triage-actions">
-      <button class="act archive" data-action="archived" title="Archive (←)">Archive</button>
-      <button class="act done" data-action="done" title="Done (D)">Done</button>
-      <button class="act keep" data-action="keep" title="Keep (→)">Keep</button>
+      <button class="act archive" data-action="archived" title="Archive (← or A)">
+        <span class="act-label">Archive</span><kbd class="act-key">A</kbd>
+      </button>
+      <button class="act done" data-action="done" title="Done (D)">
+        <span class="act-label">Done</span><kbd class="act-key">D</kbd>
+      </button>
+      <button class="act keep" data-action="keep" title="Keep (→ or K)">
+        <span class="act-label">Keep</span><kbd class="act-key">K</kbd>
+      </button>
     </div>
     <div class="triage-hint">Swipe ← archive · → keep · or use the buttons / A&nbsp;D&nbsp;K keys</div>
   </main>
