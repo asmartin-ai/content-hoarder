@@ -1,15 +1,18 @@
 """Heuristic content categorizer: tag items listenable / watch / wotagei / unknown.
 
-No LLM (asmartin-ai wants to validate heuristic accuracy first). The category is stored on
+No LLM (validate heuristic accuracy first). The category is stored on
 ``metadata.category`` non-destructively and is re-runnable. YouTube videos are the
 default target. An LLM auto-classifier is a separate backlog item.
 """
 from __future__ import annotations
 
+import json
 import re
 import time
+from functools import lru_cache
+from pathlib import Path
 
-from content_hoarder import db
+from content_hoarder import config, db
 from content_hoarder.models import parse_metadata
 
 # Title keywords that mark a wotagei (ヲタ芸) idol-event performance.
@@ -173,48 +176,36 @@ _KEYWORD_TAGS = [
     ("japan", re.compile(r"\bjapan(ese)?\b", re.IGNORECASE)),
 ]
 
-# NSFW classification (user-curated, lowercased). The over_18 flag is near-useless here (only
-# ~53/64.9k items carry it), so NSFW is driven by the subreddit. Three tags:
-#   nsfw_erotic — sexual imagery (the set the user exports/removes)
-#   nsfw_talk   — NSFW discussion (not imagery)
-#   nsfw_other  — non-erotic adult (gore/shock); over_18-flagged residual
-_NSFW_TALK_SUBS = {"sex", "rolereversal", "letgirlshavefun"}
-_NSFW_EROTIC_SUBS = {
-    "cosplaygirls", "nsfw_gif", "nsfw_gifs", "goddesses", "rule34", "rule34lol", "nsfw",
-    "cumsluts", "overwatch_porn", "adorableporn", "hentai", "hentai_gif", "hentai_irl",
-    "hentaimemes", "wholesomehentai", "realahegao", "thighdeology", "porn", "nsfwcosplay",
-    "petitegonewild", "asiansgonewild", "nsfwhardcore", "milf", "bimbofetish", "doujinshi",
-    "boobies", "nsfwfunny", "toocuteforporn", "nsfw_html5",
-}
-# SFW subs that contain an NSFW-looking token (Reddit's "*Porn" aesthetic network + puns/news).
-# These must NEVER be flagged NSFW; they keep their topic tags.
-_NSFW_SFW_EXCLUDE = {
-    "engineeringporn", "warplaneporn", "militaryporn", "spaceporn", "tankporn", "mapporn",
-    "unixporn", "historyporn", "cityporn", "designporn", "roomporn", "architectureporn",
-    "earthporn", "foodporn", "machineporn", "abandonedporn", "artefactporn", "quotesporn",
-    "manufacturingporn", "powerwashingporn", "warshipporn", "fakehistoryporn", "60fpsporn",
-    "shockwaveporn", "amateurroomporn", "bikinibottomtwitter", "anime_titties", "planesgonewild",
-    "zillowgonewild",  # SFW real-estate pun on the gonewild network
-}
-# Long-tail erotic name tokens (substring on the lowercased subreddit). Deliberately excludes
-# "porn" — that suffix is mostly the SFW network above (erotic "*porn" subs are in the allowlist).
-# NOTE: no "egirl" token — it matches inside SFW compounds (animEGIRLs, becausEGIRL,
-# thEGIRLsurvivalguide). Specific e-girl subs go in the explicit allowlist instead.
-_NSFW_EROTIC_RE = re.compile(
-    r"gonewild|nsfw|hentai|rule ?34|cumslut|ahegao|\blewd|\becchi|\bmilf|bimbo|\bfuta|"
-    r"doujin|yiff|\bboob|titties|tiddies|paizuri|oppai|\bnude|thicc|lingerie",
-    re.IGNORECASE,
-)
+# NSFW classification is subreddit-driven (the over_18 flag is too sparse to rely on). The rule
+# lists are intentionally NOT in source — they load from a gitignored JSON
+# (CONTENT_HOARDER_NSFW_RULES, default "nsfw_rules.json"; see nsfw_rules.example.json for the
+# schema). Without that file, reddit items simply aren't NSFW-tagged. Three tags:
+#   nsfw_erotic — sexual imagery   nsfw_talk — NSFW discussion   nsfw_other — over_18 residual
+@lru_cache(maxsize=8)
+def _load_nsfw_rules(path: str) -> dict:
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raw = {}
+    low = lambda xs: frozenset(str(x).lower() for x in (xs or []))  # noqa: E731
+    kws = [str(k) for k in (raw.get("erotic_keywords") or [])]
+    return {
+        "talk": low(raw.get("talk_subs")),
+        "erotic": low(raw.get("erotic_subs")),
+        "exclude": low(raw.get("sfw_exclude")),
+        "kw": re.compile("|".join(kws), re.IGNORECASE) if kws else None,
+    }
 
 
 def _nsfw_tag(sub: str, md: dict):
-    """The single NSFW tag for a subreddit (or None). Subreddit-driven; over_18 is only the
-    last-resort residual for non-erotic flagged content."""
-    if sub in _NSFW_TALK_SUBS:
+    """The single NSFW tag for a subreddit (or None). Subreddit-driven (rules from the gitignored
+    config); over_18 is only the last-resort residual for non-erotic flagged content."""
+    r = _load_nsfw_rules(config.get("CONTENT_HOARDER_NSFW_RULES") or "nsfw_rules.json")
+    if sub in r["talk"]:
         return "nsfw_talk"
-    if sub in _NSFW_EROTIC_SUBS:
+    if sub in r["erotic"]:
         return "nsfw_erotic"
-    if sub not in _NSFW_SFW_EXCLUDE and _NSFW_EROTIC_RE.search(sub):
+    if r["kw"] is not None and sub not in r["exclude"] and r["kw"].search(sub):
         return "nsfw_erotic"
     if md.get("over_18"):
         return "nsfw_other"

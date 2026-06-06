@@ -151,13 +151,13 @@ false positives.*
   ~43% tagged after a top-150 subreddit-map expansion, good precision (body-keyword matching dropped).
   **Remaining:** (a) **more coverage** — ~57% still untagged; much of it is **gaming** (no bucket by
   choice) + general/discussion subs (AskReddit, worldnews, …) + the long tail of ~2,900 subs;
-  (b) ~~NSFW split~~ **done** — `over_18` is near-useless (53 items), so NSFW is subreddit-driven via a
-  user-curated allowlist: `nsfw_erotic` (1,025 items / 65 subs), `nsfw_talk` (sex/RoleReversal/
-  LetGirlsHaveFun, 384), `nsfw_other` (over_18 residual, 52); SFW `*Porn` aesthetic network excluded.
-  Purpose: let the user **export + unsave** the erotic set (possibly migrate to another account).
+  (b) ~~NSFW split~~ **done** — `over_18` is too sparse to rely on, so NSFW is subreddit-driven via a
+  user-curated allowlist loaded from a **gitignored local config** (`nsfw_rules.json`; see
+  `nsfw_rules.example.json`): `nsfw_erotic`, `nsfw_talk`, `nsfw_other`; the SFW `*Porn` aesthetic
+  network is excluded. Purpose: let the user **export + unsave** the erotic set.
   (c) ~~tags UI~~ **done** — `tag=` filter dropdown (data-driven, volume-sorted with counts) on the
   Reddit view **and** the browse view, plus tag chips rendered on Reddit rows/cards, browse rows, and
-  the triage card. Tags written to all 29,184 matched items.
+  the triage card.
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
 - [ ] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
   Saved list (to migrate to a separate account). (a) **Export by tag** — dump `nsfw_erotic` items
