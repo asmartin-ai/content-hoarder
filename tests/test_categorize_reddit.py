@@ -45,6 +45,23 @@ def test_keyword_fallback_only_when_no_topic():
     assert categorize.reddit_tags(_item(sub="AskReddit", title="what's your favorite color?")) == []
 
 
+def test_tag_filter_and_counts(conn):
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_x", kind="post",
+                    title="x", metadata={"subreddit": "feedthememes", "tags": ["minecraft", "memes"]}))
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_y", kind="post",
+                    title="y", metadata={"subreddit": "anime", "tags": ["anime", "memes"]}))
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_z", kind="post",
+                    title="z", metadata={"subreddit": "askreddit"}))  # untagged
+    conn.commit()
+    # tag= matches any element of the metadata.tags list
+    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tag="minecraft")} == {"reddit:t3_x"}
+    assert {r["fullname"] for r in db.search_items(conn, source="reddit", tag="memes")} == \
+        {"reddit:t3_x", "reddit:t3_y"}
+    counts = db.tag_counts(conn)
+    assert counts["memes"] == 2 and counts["minecraft"] == 1 and counts["anime"] == 1
+    assert "askreddit" not in counts  # untagged item contributes nothing
+
+
 def test_tag_reddit_source_dry_run_then_write(conn):
     db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_a", kind="post",
                     title="modpack help", metadata={"subreddit": "feedthebeast"}))
