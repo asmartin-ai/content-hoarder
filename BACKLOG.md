@@ -114,6 +114,17 @@ false positives.*
   via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
+- [x] ~~**Differentiate posted / added-in-source / synced dates (UI).**~~ Shipped: the triage card and
+  the browse list now label **posted** (`created_utc`), **added in source** (`saved_utc` — shown only
+  when a source actually provides a real save timestamp; today HN/Obsidian/Keep do, Reddit/YouTube
+  don't), and **synced here** (`first_seen_utc`). Visible inline + full absolute-date tooltip.
+- [ ] **P3 — Per-item "added to playlist / Watch Later" date (needs API).** User wants "added to this
+  playlist 1 day ago". Source: YouTube Data API `playlistItems.list` → `snippet.publishedAt` (the moment
+  an item was added to the playlist) — **API key** for public playlists, **OAuth** for Watch Later.
+  `yt-dlp --flat-playlist` does not expose it, so this is gated on `feat/reddit-oauth`-style API work.
+  Store it in `saved_utc` (or `metadata.added_to_playlist_utc`) so the existing date display picks it up.
+  Note: **Reddit's save-date is genuinely unavailable** — no cookie/OAuth endpoint returns *when* you
+  saved an item (`saved.json` gives newest-first *order* only, no timestamp). Don't chase it.
 - [ ] **P3 — Needs the API (keyless not possible):** (a) ~~render **Reddit gallery images** inline — the
   archives keep `is_gallery` but drop `media_metadata`~~ **CORRECTION (2026-06-03 probe):** the archives
   DO return `media_metadata` with full gallery image URLs — inline gallery rendering is keyless-feasible

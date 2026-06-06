@@ -145,6 +145,19 @@
     return parts.join(" · ");
   };
 
+  // Distinguish posted (created_utc) / added-in-source (saved_utc) / synced (first_seen_utc).
+  // The list shows the posted age inline; the full labeled breakdown is the hover/long-press tooltip.
+  const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString() : "");
+  const dateTitle = (item) => {
+    const c = item.created_utc, s = item.saved_utc, f = item.first_seen_utc;
+    const lines = [];
+    if (c) lines.push("Posted: " + fmtDate(c));
+    // Only a genuine source timestamp (distinct from post time, clearly before our sync).
+    if (s && s !== c && s < f - 86400) lines.push("Added in source: " + fmtDate(s));
+    if (f) lines.push("Synced here: " + fmtDate(f));
+    return lines.join("\n");
+  };
+
   const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
   // When the archive captured the gallery images, carry them so the click opens an inline
   // lightbox instead of the Reddit embed. (No-op string for non-gallery items.)
@@ -193,7 +206,9 @@
         '<input type="checkbox" class="sel">' +
         '<div class="item-main">' +
           '<div class="item-head">' + badgeHtml(item) +
-            '<span class="item-age">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span></div>" +
+            '<span class="item-age" title="' + esc(dateTitle(item)) + '">' +
+              esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) +
+            "</span></div>" +
           titleHtml +
           '<div class="item-meta">' + metaLine(item) + "</div>" +
           (item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "") +

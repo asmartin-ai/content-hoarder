@@ -632,6 +632,13 @@ select {
     font-size: 0.85rem;
 }
 
+.tcard-dates {
+    margin-top: var(--sp-1);
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+}
+
 .tcard-snippet {
     color: #c8cdd6;
     margin-top: 0.6rem;
