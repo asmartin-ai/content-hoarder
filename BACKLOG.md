@@ -158,6 +158,14 @@ false positives.*
   (c) **tags UI** — source-aware triage
   chips + an index/Reddit-view tag filter (today the index dropdown is YouTube `category` only);
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
+- [ ] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
+  Saved list (to migrate to a separate account). (a) **Export by tag** — dump `nsfw_erotic` items
+  (permalink/url/title → CSV/JSON) so they can be re-saved elsewhere; generalize the existing
+  `/export` + `export` CLI with a `tag=` filter (the `tag=` search filter already exists). (b)
+  **Bulk-unsave by tag** — enqueue every `nsfw_erotic` item into the existing `reddit_unsave` queue
+  (`db.enqueue_unsave`) and drain it (cookie path) to remove them from Reddit Saved. Reversible until
+  drained; surface a count + confirm step before draining. Consider `nsfw_talk` as a separate optional
+  target.
 - [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs
   `/user/<name>/saved.json` with the `reddit_session` cookie (works keyless; ~100/page, ~0.5s/req),
   walks newest-first, and stops at a high-water mark (`settings.reddit_sync_newest`) — O(new) per sync.
