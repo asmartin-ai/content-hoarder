@@ -136,10 +136,11 @@ false positives.*
   processing areas. Proposed categories: **NSFW** (distinguish erotic vs. other adult), **Vtubers**,
   **Coding**, **Japan**, **Anime**, **Memes**, **Minecraft**. Heuristics first; optional local-LLM
   assist after (Epic 1 pattern). NSFW is already flagged via `metadata.over_18`.
-- [ ] **P2 — Cookie incremental sync** (Phase 0 spike + Phase 3). Confirm `reddit.com/user/<name>/saved.json`
-  works with the `reddit_session` cookie + measure rate; if viable, `reddit_sync.py` fetches newest-first
-  and stops on overlap (`max_pages`), with a `POST /reddit/sync` + "Sync newest" button and a `reddit-sync`
-  CLI. **Blocked on a cookie + a go/no-go.**
+- [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs
+  `/user/<name>/saved.json` with the `reddit_session` cookie (works keyless; ~100/page, ~0.5s/req),
+  walks newest-first, and stops at a high-water mark (`settings.reddit_sync_newest`) — O(new) per sync.
+  `POST /reddit/sync` + a "Sync newest" button + `reddit-sync [--full] [--max-pages N]` CLI. Pulled the
+  244 items saved since the RSM export.
 - [ ] **P3 — Port RSM's richer importers.** Reddit **GDPR data-export ZIP** (keyless full saved-list
   backfill — the canonical fallback if cookie sync is unviable), **BDFR JSON**, and recursive directory walk.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
