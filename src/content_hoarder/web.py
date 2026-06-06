@@ -294,9 +294,10 @@ def create_app(db_path: str | None = None) -> Flask:
         from content_hoarder import reddit_sync
         body = request.get_json(silent=True) or {}
         mp = body.get("max_pages")
-        max_pages = int(mp) if mp else (50 if body.get("full") else 3)
+        full = bool(body.get("full"))
+        max_pages = int(mp) if mp else (50 if full else 3)
         with conn() as c:
-            res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages)
+            res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
 
     @app.get("/sources")
