@@ -426,5 +426,8 @@
         srcFilter.appendChild(o);
       }
     });
+    // Honor ?source=<id> so the "Reddit"/"Triage" links land pre-filtered.
+    var qsSource = new URLSearchParams(location.search).get("source");
+    if (qsSource && srcFilter) srcFilter.value = qsSource;
   }).then(loadBatch).catch(loadBatch);
 })();

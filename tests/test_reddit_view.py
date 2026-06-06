@@ -77,6 +77,11 @@ def test_thread_parse_and_route(tmp_db):
     assert cl.get("/reddit/items/reddit:t3_zzz/thread").status_code == 404
 
 
+def test_reddit_page_renders(tmp_db):
+    r = _client(tmp_db).get("/reddit")
+    assert r.status_code == 200 and b"/static/reddit.js" in r.data
+
+
 def test_unsave_enqueues(tmp_db):
     cl = _client(tmp_db)
     assert cl.post("/reddit/items/reddit:t3_a/unsave").get_json()["queued"] is True
