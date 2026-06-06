@@ -15,13 +15,25 @@ def test_subreddit_map_single_and_multilabel():
     assert categorize.reddit_tags(_item(sub="LifeProTips")) == ["tips"]
 
 
-def test_nsfw_erotic_vs_other():
-    # over_18 + an erotic sub -> nsfw_erotic; over_18 elsewhere -> nsfw_other (+ topic tags).
-    assert categorize.reddit_tags(_item(sub="gonewild", over_18=1)) == ["nsfw_erotic"]
-    assert categorize.reddit_tags(_item(sub="NonCredibleDefense", over_18=1)) == \
-        ["nsfw_other", "defense", "memes"]
-    # not flagged 18+ -> no nsfw tag at all
-    assert "nsfw_other" not in categorize.reddit_tags(_item(sub="NonCredibleDefense"))
+def test_nsfw_erotic_talk_other_and_sfw_exclusions():
+    rt = categorize.reddit_tags
+    # explicit erotic allowlist (subreddit-driven, no over_18 needed)
+    assert rt(_item(sub="cosplaygirls")) == ["nsfw_erotic"]
+    assert rt(_item(sub="TooCuteForPorn")) == ["nsfw_erotic"]      # erotic despite the name
+    assert rt(_item(sub="wholesomehentai")) == ["nsfw_erotic"]
+    # long-tail erotic token catch
+    assert rt(_item(sub="SomeRandomGoneWild")) == ["nsfw_erotic"]
+    # nsfw_talk (discussion)
+    assert rt(_item(sub="sex")) == ["nsfw_talk"]
+    assert rt(_item(sub="RoleReversal")) == ["nsfw_talk"]
+    # SFW "*Porn" aesthetic / pun / news subs are never NSFW; topic tag preserved
+    assert rt(_item(sub="EarthPorn")) == []
+    assert rt(_item(sub="MilitaryPorn")) == ["defense"]
+    assert "nsfw_erotic" not in rt(_item(sub="anime_titties"))     # world-news sub, not erotic
+    assert "nsfw_erotic" not in rt(_item(sub="planesgonewild"))    # aviation pun
+    # over_18 residual -> nsfw_other (non-erotic flagged), combined with topic tags
+    assert rt(_item(sub="NonCredibleDefense", over_18=1)) == ["nsfw_other", "defense", "memes"]
+    assert "nsfw_other" not in rt(_item(sub="NonCredibleDefense"))  # not flagged -> no nsfw
 
 
 def test_keyword_fallback_only_when_no_topic():

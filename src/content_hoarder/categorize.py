@@ -86,7 +86,7 @@ def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool 
 # ---------------------------------------------------------------------------
 
 REDDIT_TAGS = (
-    "nsfw_erotic", "nsfw_other", "vtubers", "coding", "japan",
+    "nsfw_erotic", "nsfw_talk", "nsfw_other", "vtubers", "coding", "japan",
     "anime", "memes", "minecraft", "defense", "science", "tips",
 )
 
@@ -173,10 +173,52 @@ _KEYWORD_TAGS = [
     ("japan", re.compile(r"\bjapan(ese)?\b", re.IGNORECASE)),
 ]
 
-# Erotic-vs-other split for over_18 items. Erotic = sexual; everything else flagged 18+
-# (gore, shock, combat footage, etc.) -> nsfw_other. Small seeds — tune against the dry-run.
-_EROTIC_SUBS = {"gonewild", "nsfw", "rule34", "hentai", "ecchi", "hololewd"}
-_EROTIC_RE = re.compile(r"\b(hentai|ecchi|lewd|rule ?34)\b", re.IGNORECASE)
+# NSFW classification (user-curated, lowercased). The over_18 flag is near-useless here (only
+# ~53/64.9k items carry it), so NSFW is driven by the subreddit. Three tags:
+#   nsfw_erotic — sexual imagery (the set the user exports/removes)
+#   nsfw_talk   — NSFW discussion (not imagery)
+#   nsfw_other  — non-erotic adult (gore/shock); over_18-flagged residual
+_NSFW_TALK_SUBS = {"sex", "rolereversal", "letgirlshavefun"}
+_NSFW_EROTIC_SUBS = {
+    "cosplaygirls", "nsfw_gif", "nsfw_gifs", "goddesses", "rule34", "rule34lol", "nsfw",
+    "cumsluts", "overwatch_porn", "adorableporn", "hentai", "hentai_gif", "hentai_irl",
+    "hentaimemes", "wholesomehentai", "realahegao", "thighdeology", "porn", "nsfwcosplay",
+    "petitegonewild", "asiansgonewild", "nsfwhardcore", "milf", "bimbofetish", "doujinshi",
+    "boobies", "nsfwfunny", "toocuteforporn", "nsfw_html5",
+}
+# SFW subs that contain an NSFW-looking token (Reddit's "*Porn" aesthetic network + puns/news).
+# These must NEVER be flagged NSFW; they keep their topic tags.
+_NSFW_SFW_EXCLUDE = {
+    "engineeringporn", "warplaneporn", "militaryporn", "spaceporn", "tankporn", "mapporn",
+    "unixporn", "historyporn", "cityporn", "designporn", "roomporn", "architectureporn",
+    "earthporn", "foodporn", "machineporn", "abandonedporn", "artefactporn", "quotesporn",
+    "manufacturingporn", "powerwashingporn", "warshipporn", "fakehistoryporn", "60fpsporn",
+    "shockwaveporn", "amateurroomporn", "bikinibottomtwitter", "anime_titties", "planesgonewild",
+    "zillowgonewild",  # SFW real-estate pun on the gonewild network
+}
+# Long-tail erotic name tokens (substring on the lowercased subreddit). Deliberately excludes
+# "porn" — that suffix is mostly the SFW network above (erotic "*porn" subs are in the allowlist).
+# NOTE: no "egirl" token — it matches inside SFW compounds (animEGIRLs, becausEGIRL,
+# thEGIRLsurvivalguide). Specific e-girl subs go in the explicit allowlist instead.
+_NSFW_EROTIC_RE = re.compile(
+    r"gonewild|nsfw|hentai|rule ?34|cumslut|ahegao|\blewd|\becchi|\bmilf|bimbo|\bfuta|"
+    r"doujin|yiff|\bboob|titties|tiddies|paizuri|oppai|\bnude|thicc|lingerie",
+    re.IGNORECASE,
+)
+
+
+def _nsfw_tag(sub: str, md: dict):
+    """The single NSFW tag for a subreddit (or None). Subreddit-driven; over_18 is only the
+    last-resort residual for non-erotic flagged content."""
+    if sub in _NSFW_TALK_SUBS:
+        return "nsfw_talk"
+    if sub in _NSFW_EROTIC_SUBS:
+        return "nsfw_erotic"
+    if sub not in _NSFW_SFW_EXCLUDE and _NSFW_EROTIC_RE.search(sub):
+        return "nsfw_erotic"
+    if md.get("over_18"):
+        return "nsfw_other"
+    return None
 
 
 def reddit_tags(item: dict) -> list[str]:
@@ -191,13 +233,15 @@ def reddit_tags(item: dict) -> list[str]:
             tags.append(t)
 
     # NSFW is an independent axis — it combines with whatever topic tags follow.
-    if md.get("over_18"):
-        add("nsfw_erotic" if (sub in _EROTIC_SUBS or _EROTIC_RE.search(title)) else "nsfw_other")
+    nsfw = _nsfw_tag(sub, md)
+    if nsfw:
+        add(nsfw)
 
     for t in _SUBREDDIT_TAGS.get(sub, []):
         add(t)
 
-    has_topic = any(t not in ("nsfw_erotic", "nsfw_other") for t in tags)
+    _NSFW = ("nsfw_erotic", "nsfw_talk", "nsfw_other")
+    has_topic = any(t not in _NSFW for t in tags)
     if not has_topic:
         hay = sub + " " + title  # subreddit + title only — body mentions are too noisy
         for tag, rx in _KEYWORD_TAGS:

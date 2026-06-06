@@ -151,9 +151,11 @@ false positives.*
   ~43% tagged after a top-150 subreddit-map expansion, good precision (body-keyword matching dropped).
   **Remaining:** (a) **more coverage** — ~57% still untagged; much of it is **gaming** (no bucket by
   choice) + general/discussion subs (AskReddit, worldnews, …) + the long tail of ~2,900 subs;
-  (b) **NSFW split is near-inert** — only 53/64,859 items carry `over_18=1` (the RSM bulk lacks the
-  flag), so a real NSFW tag needs a **subreddit allowlist** from the user (erotic vs other); (c) **tags
-  UI** — source-aware triage
+  (b) ~~NSFW split~~ **done** — `over_18` is near-useless (53 items), so NSFW is subreddit-driven via a
+  user-curated allowlist: `nsfw_erotic` (1,025 items / 65 subs), `nsfw_talk` (sex/RoleReversal/
+  LetGirlsHaveFun, 384), `nsfw_other` (over_18 residual, 52); SFW `*Porn` aesthetic network excluded.
+  Purpose: let the user **export + unsave** the erotic set (possibly migrate to another account).
+  (c) **tags UI** — source-aware triage
   chips + an index/Reddit-view tag filter (today the index dropdown is YouTube `category` only);
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
 - [x] ~~**P2 — Cookie incremental sync**~~ Shipped + live-validated: `reddit_sync.py` GETs
