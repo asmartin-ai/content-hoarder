@@ -4,7 +4,7 @@ Collected while building overnight so you can answer when you're back. None are 
 I worked around them and built the connectors so they're ready once you provide the data.
 
 ## Data to import (connectors are built and tested with synthetic fixtures)
-1. **Reddit** — The connector can read your existing `F:\reddit-saved-manager\data\app.db`
+1. **Reddit** — The connector can read your existing `K:\Projects\reddit-saved-manager\data\app.db`
    read-only and fold its ~64k items in. **OK to run it against a *copy* of that DB?** (I'll
    copy first, never touch the original.) It also reads RSM CSV/JSON exports.
 2. **YouTube** — To bring in WL2/WL3, run for each playlist:
@@ -49,11 +49,11 @@ and a browse/list mode with bulk actions; reversible **bankruptcy**. Browser-ver
 **45 tests passing**, all offline. 7 commits on `main`.
 
 **Reddit import is validated and ready:** I did a read-only schema check of
-`F:\reddit-saved-manager\data\app.db` — 64,615 rows, all with fullname/permalink/subreddit/score, so
+`K:\Projects\reddit-saved-manager\data\app.db` — 64,615 rows, all with fullname/permalink/subreddit/score, so
 the connector will import them cleanly (with metadata) once you say go. **I did NOT import anything.**
 
 ## Quick decisions for you (no rush)
-1. **Reddit import:** OK to run `content_hoarder import "F:\reddit-saved-manager\data\app.db"` against a
+1. **Reddit import:** OK to run `content_hoarder import "K:\Projects\reddit-saved-manager\data\app.db"` against a
    **copy** (I'll copy first)? It will load all ~64.6k items into the inbox.
 2. **Theme / triage batch size:** kept defaults (dark theme, 20-item batches) — change if you like.
 3. **Dedup aggressiveness:** current dedup only matches *identical normalized URLs* and is reversible.

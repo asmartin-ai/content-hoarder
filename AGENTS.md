@@ -65,7 +65,7 @@ inbox; `status_prev` enables one-step undo.
 6. Add `tests/test_connector_<id>.py` + a tiny fixture under `fixtures/<id>/`.
 
 ## Per-source inputs (v1)
-- **reddit**: read `F:\reddit-saved-manager\data\app.db` (read-only) or its CSV/JSON/MD export →
+- **reddit**: read `K:\Projects\reddit-saved-manager\data\app.db` (read-only) or its CSV/JSON/MD export →
   `subreddit/permalink/score/over_18` go to `metadata`; `fullname="reddit:<t3_/t1_id>"`.
 - **youtube**: `yt-dlp --flat-playlist --dump-single-json <PLAYLIST_URL>` JSON (top-level
   `_type=playlist`, `entries[]`); also a WL array/NDJSON fallback. `url=https://youtu.be/<id>`,
