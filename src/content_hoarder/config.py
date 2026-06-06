@@ -11,6 +11,7 @@ from pathlib import Path
 
 _DEFAULTS = {
     "CONTENT_HOARDER_DB": "data/app.db",
+    "CONTENT_HOARDER_NSFW_RULES": "nsfw_rules.json",  # gitignored; see nsfw_rules.example.json
     "CONTENT_HOARDER_HOST": "127.0.0.1",
     "CONTENT_HOARDER_PORT": "8788",
     "FLASK_SECRET_KEY": "dev-insecure-change-me",

@@ -1,3 +1,5 @@
+import json
+
 from content_hoarder import categorize, db, models
 
 
@@ -15,25 +17,35 @@ def test_subreddit_map_single_and_multilabel():
     assert categorize.reddit_tags(_item(sub="LifeProTips")) == ["tips"]
 
 
-def test_nsfw_erotic_talk_other_and_sfw_exclusions():
+def test_nsfw_tags_from_external_rules(tmp_path, monkeypatch):
+    # Rules load from a gitignored JSON; use synthetic names so no real NSFW data lives in tests.
+    rules = {
+        "talk_subs": ["talky"],
+        "erotic_subs": ["allowsub", "tricky_named_sub"],
+        "sfw_exclude": ["safe_xtoken_sub"],
+        "erotic_keywords": ["xtoken"],
+    }
+    p = tmp_path / "nsfw.json"
+    p.write_text(json.dumps(rules), encoding="utf-8")
+    monkeypatch.setenv("CONTENT_HOARDER_NSFW_RULES", str(p))
     rt = categorize.reddit_tags
-    # explicit erotic allowlist (subreddit-driven, no over_18 needed)
-    assert rt(_item(sub="cosplaygirls")) == ["nsfw_erotic"]
-    assert rt(_item(sub="TooCuteForPorn")) == ["nsfw_erotic"]      # erotic despite the name
-    assert rt(_item(sub="wholesomehentai")) == ["nsfw_erotic"]
-    # long-tail erotic token catch
-    assert rt(_item(sub="SomeRandomGoneWild")) == ["nsfw_erotic"]
-    # nsfw_talk (discussion)
-    assert rt(_item(sub="sex")) == ["nsfw_talk"]
-    assert rt(_item(sub="RoleReversal")) == ["nsfw_talk"]
-    # SFW "*Porn" aesthetic / pun / news subs are never NSFW; topic tag preserved
-    assert rt(_item(sub="EarthPorn")) == []
-    assert rt(_item(sub="MilitaryPorn")) == ["defense"]
-    assert "nsfw_erotic" not in rt(_item(sub="anime_titties"))     # world-news sub, not erotic
-    assert "nsfw_erotic" not in rt(_item(sub="planesgonewild"))    # aviation pun
-    # over_18 residual -> nsfw_other (non-erotic flagged), combined with topic tags
+    assert rt(_item(sub="allowsub")) == ["nsfw_erotic"]            # explicit erotic allowlist
+    assert rt(_item(sub="tricky_named_sub")) == ["nsfw_erotic"]
+    assert rt(_item(sub="talky")) == ["nsfw_talk"]                 # discussion allowlist
+    assert rt(_item(sub="some_xtoken_sub")) == ["nsfw_erotic"]     # keyword long-tail (substring)
+    assert rt(_item(sub="safe_xtoken_sub")) == []                  # sfw_exclude wins over keyword
+    # over_18 residual -> nsfw_other, combined with real topic tags
     assert rt(_item(sub="NonCredibleDefense", over_18=1)) == ["nsfw_other", "defense", "memes"]
     assert "nsfw_other" not in rt(_item(sub="NonCredibleDefense"))  # not flagged -> no nsfw
+    assert rt(_item(sub="plainsub")) == []                         # unknown -> no nsfw tag
+
+
+def test_nsfw_disabled_without_rules_file(tmp_path, monkeypatch):
+    # No rules file -> erotic/talk classification is silently off (graceful for a fresh clone);
+    # the over_18 residual is built-in (not rules-driven), so it still applies.
+    monkeypatch.setenv("CONTENT_HOARDER_NSFW_RULES", str(tmp_path / "missing.json"))
+    assert categorize.reddit_tags(_item(sub="anything")) == []
+    assert categorize.reddit_tags(_item(sub="anything", over_18=1)) == ["nsfw_other"]
 
 
 def test_keyword_fallback_only_when_no_topic():

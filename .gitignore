@@ -1,5 +1,7 @@
 # Environment / secrets
 .env
+# NSFW rule lists — kept out of source; see nsfw_rules.example.json for the schema
+/nsfw_rules.json
 
 # Local data — NEVER commit (years of personal content from many accounts)
 data/

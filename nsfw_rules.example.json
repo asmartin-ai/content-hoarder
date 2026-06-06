@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy to nsfw_rules.json (gitignored) and fill in to enable NSFW tagging. talk_subs/erotic_subs/sfw_exclude are lowercased subreddit names; erotic_keywords are regex fragments matched (case-insensitive, substring) against the lowercased subreddit name for the long tail. Empty arrays = NSFW tagging disabled.",
+  "talk_subs": [],
+  "erotic_subs": [],
+  "sfw_exclude": [],
+  "erotic_keywords": []
+}
