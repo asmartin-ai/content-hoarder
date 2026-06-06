@@ -17,6 +17,7 @@
   let sortOrder = 'desc';     // 'asc' | 'desc'
   let viewMode = localStorage.getItem('ch_reddit_view') || 'table';  // 'table' | 'grid'
   let allSubs = [];          // cached subreddit list for the sidebar
+  let selectedTags = new Set();  // active tag filter (OR across selected tags)
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -24,7 +25,9 @@
   const filterFuzzy    = $('filter-fuzzy');
   const filterKind     = $('filter-kind');
   const filterSaved    = $('filter-saved');
-  const filterTag      = $('filter-tag');
+  const filterTag      = $('filter-tag');        // <details> wrapper
+  const tagFilterList  = $('tag-filter-list');
+  const tagSummary     = $('tag-summary');
   const filterSub      = $('filter-subreddit');
   const sortSelect     = $('sort-select');
   const itemsPanel     = $('items-panel');
@@ -69,18 +72,21 @@
         set('count-total', (d.total || 0) + ' total');
         set('count-inbox', (st.inbox || 0) + ' inbox');
         set('count-archived', (st.archived || 0) + ' archived');
-        // Data-driven tag dropdown (volume-sorted, e.g. "anime (4938)"); preserve selection.
-        const bt = d.by_tag || {};
-        if (filterTag) {
-          const cur = filterTag.value;
-          const opts = ['<option value="">All tags</option>'];
-          Object.keys(bt).sort((a, b) => bt[b] - bt[a]).forEach(t =>
-            opts.push(`<option value="${esc(t)}">${esc(t)} (${bt[t]})</option>`));
-          filterTag.innerHTML = opts.join('');
-          filterTag.value = cur;
-        }
+        renderTagFilter(d.by_tag || {});
       })
       .catch(() => {});
+  }
+
+  // Data-driven tag checkboxes (volume-sorted, with counts); selection persists across rebuilds.
+  function renderTagFilter(byTag) {
+    if (!tagFilterList) return;
+    tagFilterList.innerHTML = Object.keys(byTag).sort((a, b) => byTag[b] - byTag[a]).map(t =>
+      `<label class="tag-opt"><input type="checkbox" value="${esc(t)}"${selectedTags.has(t) ? ' checked' : ''}>` +
+      ` ${esc(t)} <span class="tag-opt-cnt">${byTag[t]}</span></label>`).join('');
+    updateTagSummary();
+  }
+  function updateTagSummary() {
+    if (tagSummary) tagSummary.textContent = selectedTags.size ? `Tags (${selectedTags.size})` : 'Tags';
   }
 
   // ── Load items ─────────────────────────────────────────────────────────────
@@ -91,7 +97,7 @@
     if (filterFuzzy && filterFuzzy.checked) params.set('fuzzy', '1');
     if (filterKind.value)   params.set('kind', filterKind.value);
     if (filterSaved.value !== '') params.set('is_saved', filterSaved.value);
-    if (filterTag && filterTag.value) params.set('tag', filterTag.value);
+    selectedTags.forEach(t => params.append('tag', t));
     const sub = filterSub.value.trim().replace(/^r\//, '');
     if (sub) params.set('subreddit', sub);
     if (sortKey) { params.set('sort', sortKey); params.set('order', sortOrder); }
@@ -427,8 +433,27 @@
   if (filterFuzzy) filterFuzzy.addEventListener('change', loadItems);
   filterKind.addEventListener('change', loadItems);
   filterSaved.addEventListener('change', () => { loadItems(); loadSubreddits(); });
-  if (filterTag) filterTag.addEventListener('change', loadItems);
+  if (tagFilterList) tagFilterList.addEventListener('change', e => {
+    const cb = e.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+    if (cb.checked) selectedTags.add(cb.value); else selectedTags.delete(cb.value);
+    updateTagSummary();
+    loadItems();
+  });
   filterSub.addEventListener('input', debounceLoad);
+
+  // Click a tag chip on a row/card → add that tag to the active filter (check its box).
+  itemsPanel.addEventListener('click', e => {
+    const chip = e.target.closest('.tag-chip');
+    if (!chip) return;
+    const t = chip.textContent.trim();
+    if (selectedTags.has(t)) return;
+    selectedTags.add(t);
+    const cb = tagFilterList && tagFilterList.querySelector('input[value="' + t + '"]');
+    if (cb) cb.checked = true;
+    updateTagSummary();
+    loadItems();
+  });
 
   // ── Infinite scroll ──────────────────────────────────────────────────────────
   itemsPanel.addEventListener('scroll', maybeLoadMore);

@@ -108,6 +108,7 @@
   let offset = 0, activeSource = "", activeStatus = "inbox", loading = false;
   const sources = {};
   const selected = new Set();
+  const selectedTags = new Set();   // active tag filter (OR across selected tags)
 
   const badgeHtml = (item) => {
     const s = sources[item.source] || { label: item.source, badge_color: "#888" };
@@ -162,6 +163,20 @@
     if (!tags.length) return "";
     return '<div class="tag-chips">' +
       tags.map((t) => '<span class="tag-chip">' + esc(t) + "</span>").join("") + "</div>";
+  };
+  // Data-driven tag checkboxes (volume-sorted, with counts); selection persists across rebuilds.
+  const renderTagFilter = (byTag) => {
+    const list = document.getElementById("tag-filter-list");
+    if (!list) return;
+    list.innerHTML = Object.keys(byTag).sort((a, b) => byTag[b] - byTag[a]).map((t) =>
+      '<label class="tag-opt"><input type="checkbox" value="' + esc(t) + '"' +
+      (selectedTags.has(t) ? " checked" : "") + "> " + esc(t) +
+      ' <span class="tag-opt-cnt">' + byTag[t] + "</span></label>").join("");
+    updateTagSummary();
+  };
+  const updateTagSummary = () => {
+    const s = document.getElementById("tag-summary");
+    if (s) s.textContent = selectedTags.size ? "Tags (" + selectedTags.size + ")" : "Tags";
   };
 
   const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
@@ -241,8 +256,7 @@
     p.set("order", sv[1] || "desc");
     const cat = document.getElementById("category").value;
     if (cat) p.set("category", cat);
-    const tag = document.getElementById("tag").value;
-    if (tag) p.set("tag", tag);
+    selectedTags.forEach((t) => p.append("tag", t));
     if (activeSource) p.set("source", activeSource);
     p.set("limit", "50");
     p.set("offset", String(offset));
@@ -339,17 +353,7 @@
       if (o.dataset.label == null) o.dataset.label = o.textContent;
       o.textContent = bc[o.value] != null ? o.dataset.label + " (" + bc[o.value] + ")" : o.dataset.label;
     });
-    // tag dropdown = Reddit multi-label tags, volume-sorted, e.g. "anime (4938)"; keep selection
-    const bt = d.by_tag || {};
-    const tagSel = document.getElementById("tag");
-    if (tagSel) {
-      const cur = tagSel.value;
-      const opts = ['<option value="">all tags</option>'];
-      Object.keys(bt).sort((a, b) => bt[b] - bt[a]).forEach((t) =>
-        opts.push('<option value="' + esc(t) + '">' + esc(t) + " (" + bt[t] + ")</option>"));
-      tagSel.innerHTML = opts.join("");
-      tagSel.value = cur;
-    }
+    renderTagFilter(d.by_tag || {});
   }).catch(() => {});
   // An item changing status moves both axes (status counts by source, tab counts by
   // status), so refresh them together.
@@ -443,6 +447,18 @@
     const row = e.target.closest(".item");
     if (!row) return;
     const fullname = row.dataset.fullname;
+    const chip = e.target.closest(".tag-chip");   // add tag to filter (before card-select fallthrough)
+    if (chip) {
+      const t = chip.textContent.trim();
+      if (!selectedTags.has(t)) {
+        selectedTags.add(t);
+        const cb = document.querySelector('#tag-filter-list input[value="' + t + '"]');
+        if (cb) cb.checked = true;
+        updateTagSummary();
+        load(true);
+      }
+      return;
+    }
     const actBtn = e.target.closest("[data-act]");
     if (actBtn) { actOnItem(fullname, actBtn.dataset.act, row); return; }
     const recBtn = e.target.closest("[data-recover]");
@@ -697,7 +713,13 @@
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
   document.getElementById("category").addEventListener("change", () => load(true));
-  document.getElementById("tag").addEventListener("change", () => load(true));
+  document.getElementById("tag-filter-list").addEventListener("change", (e) => {
+    const cb = e.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+    if (cb.checked) selectedTags.add(cb.value); else selectedTags.delete(cb.value);
+    updateTagSummary();
+    load(true);
+  });
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)

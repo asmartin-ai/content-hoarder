@@ -242,3 +242,7 @@ need separate filter controls.*
   Translate them into the existing `search_items` filters so the bar drives the same query layer the
   dropdowns do today, keeping the FTS path for the remaining free text. Grammar modelled on
   Gmail/Discord/Google; chips/autocomplete are a later polish.
+- [ ] **Tag operator semantics.** The tag checkbox filter is **OR-only** today (`tag=a&tag=b` →
+  has-any). Operators should let the user pick: repeated `tag:` as AND vs. `tag:a,b`/`tag:a|b` as OR
+  (per the user's request to specify multi-tag logic via search). `search_items` already takes a
+  `tags=[]` list — add an AND mode there.

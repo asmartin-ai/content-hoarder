@@ -42,7 +42,10 @@
       <option value="1">Saved only</option>
       <option value="0">Unsaved only</option>
     </select>
-    <select id="filter-tag" title="Filter by tag"><option value="">All tags</option></select>
+    <details class="tag-filter" id="filter-tag">
+      <summary id="tag-summary" title="Filter by tags (OR)">Tags</summary>
+      <div class="tag-filter-list" id="tag-filter-list"></div>
+    </details>
     <input type="text" id="filter-subreddit" placeholder="Subreddit…" autocomplete="off">
     <select id="sort-select" title="Sort order" aria-label="Sort order">
       <option value="first_seen_utc:desc" selected>Recently synced</option>
