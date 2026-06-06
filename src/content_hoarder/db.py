@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS reddit_unsave (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reddit_unsave_state ON reddit_unsave(state);
+
+CREATE TABLE IF NOT EXISTS reddit_threads (
+    fullname    TEXT PRIMARY KEY,   -- items.fullname, e.g. "reddit:t3_abc123"
+    thread_json TEXT NOT NULL,      -- raw Reddit <permalink>.json (post + comment tree)
+    hydrated_at INTEGER             -- when the thread was fetched/cached
+);
 """
 
 _FTS_SCHEMA = """
@@ -582,6 +588,38 @@ def bankruptcy(
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
     row = conn.execute("SELECT * FROM items WHERE fullname=?", (fullname,)).fetchone()
     return _row_to_public(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Reddit thread cache (post + comment tree; kept out of items.metadata so search
+# stays cheap — the JSON blobs are large). See AGENTS.md "Reddit management view".
+# ---------------------------------------------------------------------------
+
+def get_reddit_thread(conn: sqlite3.Connection, fullname: str) -> dict | None:
+    """Return the cached thread for an item, or None. Keys: thread_json, hydrated_at."""
+    row = conn.execute(
+        "SELECT thread_json, hydrated_at FROM reddit_threads WHERE fullname=?", (fullname,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def set_reddit_thread(
+    conn: sqlite3.Connection,
+    fullname: str,
+    thread_json: str,
+    hydrated_at: int | None = None,
+    *,
+    commit: bool = True,
+) -> None:
+    """Cache (or replace) a thread JSON blob for an item. Idempotent."""
+    conn.execute(
+        "INSERT INTO reddit_threads(fullname, thread_json, hydrated_at) VALUES(?, ?, ?) "
+        "ON CONFLICT(fullname) DO UPDATE SET "
+        "thread_json=excluded.thread_json, hydrated_at=excluded.hydrated_at",
+        (fullname, thread_json, hydrated_at if hydrated_at is not None else int(time.time())),
+    )
+    if commit:
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------
