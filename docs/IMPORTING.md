@@ -3,7 +3,7 @@
 All imports are idempotent — re-running never duplicates or clobbers your triage state.
 
 ```bash
-# from K:\Projects\content-hoarder, with the venv active:
+# from /path/to/content-hoarder, with the venv active:
 python -m content_hoarder import <path>            # auto-detects the source
 python -m content_hoarder import <path> --source X # or force a connector
 ```
@@ -11,10 +11,10 @@ python -m content_hoarder import <path> --source X # or force a connector
 ---
 
 ## Reddit  ✅ done
-Imported from a copy of `K:\Projects\reddit-saved-manager\data\app.db` — **64,615 items**.
+Imported from a copy of `/path/to/reddit-saved-manager/data/app.db` — **64,615 items**.
 To re-sync later (after the Reddit tool pulls new saves):
 ```bash
-python -m content_hoarder import "K:\Projects\reddit-saved-manager\data\app.db"
+python -m content_hoarder import "/path/to/reddit-saved-manager/data/app.db"
 ```
 
 ### Recovering removed / un-hydrated Reddit content

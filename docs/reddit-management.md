@@ -37,7 +37,7 @@ separate DB); Reddit-specific fields live in each item's `metadata` blob and are
 The 64.6k Reddit items were already imported. To bring over RSM's cached threads:
 
 ```bash
-python -m content_hoarder migrate-rsm-threads --from "K:\Projects\reddit-saved-manager\data\app.db"
+python -m content_hoarder migrate-rsm-threads --from "/path/to/reddit-saved-manager/data/app.db"
 ```
 
 Reads the RSM DB read-only and copies non-empty `thread_json` into `reddit_threads`, re-keyed

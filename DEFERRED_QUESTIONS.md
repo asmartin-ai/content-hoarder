@@ -1,6 +1,6 @@
 # Deferred questions / notes (autonomous run 2026-06-01)
 
-Questions and decisions raised while working autonomously — for asmartin-ai to review later.
+Questions and decisions raised while working autonomously — to review later.
 Each feature was implemented, committed, and run through `/code-review` (real findings fixed inline).
 
 ## ✅ Shipped this run (10 features — each committed + `/code-review`'d, fixes applied)
@@ -32,7 +32,7 @@ Each feature was implemented, committed, and run through `/code-review` (real fi
 
 ## Partial imports (sampled, finish when you want)
 - Firefox tabs: connector built + imported **1 of ~17** TabExports (326 tabs). Import the rest with
-  `python -m content_hoarder import "K:\Users\asmartin-ai\Downloads\TabExports\<file>.txt" --source firefox`
+  `python -m content_hoarder import "/path/to/Downloads/TabExports\<file>.txt" --source firefox`
   (the daily exports overlap heavily, so they de-dup by URL).
 
 ## Data jobs NOT run (per "build + small sample")

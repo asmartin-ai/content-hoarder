@@ -72,8 +72,10 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
   re-importing the overlapping daily exports de-dups by URL.
 
 ## Privacy & data safety
-The SQLite database (`data/app.db`), all exports, and `.env` are gitignored. Personal data and API
-keys are never committed — only tiny synthetic fixtures live in the repo (for tests).
+The SQLite database (`data/app.db`), all exports, `.env`, and `nsfw_rules.json` are gitignored.
+Personal data and API keys are never committed — only tiny synthetic fixtures live in the repo (for
+tests). To configure locally, copy `.env.example` → `.env` and (optionally) `nsfw_rules.example.json`
+→ `nsfw_rules.json`.
 
 ## License
-Personal project — no formal license yet.
+[MIT](LICENSE).

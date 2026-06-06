@@ -49,7 +49,7 @@ Triage on your phone enqueues; let your PC drain when it's on. Windows Task Sche
 
 ```
 schtasks /Create /TN "content-hoarder reddit unsave" /SC MINUTE /MO 30 /TR ^
-  "K:\Projects\content-hoarder\.venv\Scripts\python.exe -m content_hoarder reddit-unsave --drain --limit 200"
+  "/path/to/content-hoarder/.venv/Scripts/python.exe -m content_hoarder reddit-unsave --drain --limit 200"
 ```
 
 `--drain` prints a JSON summary (`{selected, unsaved, failed, auth_error, remaining}`) and exits non-zero
