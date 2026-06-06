@@ -335,6 +335,7 @@ def search_items(
     kind: str | None = None,
     status: str | None = None,
     category: str | None = None,
+    tag: str | None = None,
     subreddit: str | None = None,
     is_saved: int | None = None,
     open_in_firefox: bool = False,
@@ -362,6 +363,10 @@ def search_items(
         if category:
             filters.append(f"json_extract({a}metadata, '$.category') = ?")
             params.append(category)
+        if tag:  # metadata.tags is a JSON list (multi-label); match any element
+            filters.append(
+                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value = ?)")
+            params.append(tag)
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)
@@ -645,6 +650,16 @@ def reddit_subreddit_counts(conn: sqlite3.Connection, status: str | None = None)
     return [{"subreddit": r["subreddit"], "count": r["c"]} for r in rows]
 
 
+def tag_counts(conn: sqlite3.Connection) -> dict:
+    """Per-tag item counts across reddit items (``metadata.tags`` is a JSON list), descending."""
+    rows = conn.execute(
+        "SELECT je.value AS tag, COUNT(*) AS c "
+        "FROM items, json_each(items.metadata, '$.tags') je "
+        "WHERE items.source='reddit' GROUP BY je.value ORDER BY c DESC"
+    ).fetchall()
+    return {r["tag"]: r["c"] for r in rows}
+
+
 def reddit_stats(conn: sqlite3.Connection) -> dict:
     """Reddit-only stats for the management view's stats modal."""
     sub = "json_extract(metadata, '$.subreddit')"
@@ -679,6 +694,7 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
         "total": sum(by_status.values()),  # 0 when there are no reddit items
         "by_kind": by_kind,
         "by_status": by_status,
+        "by_tag": tag_counts(conn),
         "top_subreddits": top_subs,
         "distinct_subreddits": distinct_subs,
         "nsfw": nsfw,
@@ -749,6 +765,7 @@ def get_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
         "by_source": by_source,
         "by_kind": _group_counts(conn, "kind", source),
         "by_category": _category_counts(conn, source),
+        "by_tag": tag_counts(conn),
         "by_status": by_status,
         "processed_this_week": processed_week,
         "with_url": with_url,
