@@ -749,6 +749,36 @@
     applyDensity(saved || "comfortable");
   })();
 
+  // Keyboard: J/K move focus · S keep · E archive · Y done · X select (browse).
+  (function () {
+    var box = document.getElementById("items");
+    var fi = -1;
+    function rows() { return Array.prototype.slice.call(box.querySelectorAll(".item:not(.skel)")); }
+    function focus(i) {
+      var r = rows();
+      if (!r.length) { fi = -1; return; }
+      fi = Math.max(0, Math.min(i, r.length - 1));
+      r.forEach(function (el, idx) { el.classList.toggle("kfocus", idx === fi); });
+      if (r[fi]) r[fi].scrollIntoView({ block: "nearest" });
+    }
+    function cur() { var r = rows(); return fi >= 0 ? r[fi] : null; }
+    document.addEventListener("keydown", function (e) {
+      if (/input|select|textarea/i.test(e.target.tagName || "") || e.metaKey || e.ctrlKey || e.altKey) return;
+      var k = e.key.toLowerCase();
+      if (k === "j" || k === "arrowdown") { e.preventDefault(); focus(fi < 0 ? 0 : fi + 1); }
+      else if (k === "k" || k === "arrowup") { e.preventDefault(); focus(fi < 0 ? 0 : fi - 1); }
+      else if (k === "s" || k === "e" || k === "y") {
+        var row = cur(); if (!row) return;
+        actOnItem(row.dataset.fullname, k === "s" ? "keep" : k === "e" ? "archived" : "done", row);
+        setTimeout(function () { focus(fi); }, 60);  // land on the next row after removal
+      } else if (k === "x") {
+        var r2 = cur(); if (!r2) return;
+        var cb = r2.querySelector(".sel");
+        if (cb) { cb.checked = !cb.checked; toggleSel(r2.dataset.fullname, cb.checked, r2); }
+      }
+    });
+  })();
+
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)
