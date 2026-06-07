@@ -70,16 +70,25 @@
 
   // Reddit's blockquote + platform.js embed was retired (the script now 404s), so embed the
   // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
+  // Reddit permalinks are stored relative ("/r/sub/comments/…"); make them absolute so
+  // the embed + the "Open on Reddit" link don't resolve against our own origin.
+  const redditUrl = (permalink) => {
+    const p = (permalink || "").trim();
+    if (!p) return "";
+    if (/^https?:\/\//i.test(p)) return p;
+    return "https://www.reddit.com" + (p.charAt(0) === "/" ? p : "/" + p);
+  };
   const redditEmbedUrl = (permalink) => {
-    const base = (permalink || "").split("#")[0].split("?")[0]
+    const base = redditUrl(permalink).split("#")[0].split("?")[0]
       .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
     return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   };
   const openMedia = (permalink) => {
-    if (!safeUrl(permalink)) return;
+    const url = redditUrl(permalink);
+    if (!safeUrl(url)) return;
     document.getElementById("media-body").innerHTML =
       '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) + '" loading="lazy"></iframe>' +
-      '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+      '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
     document.getElementById("media-modal").hidden = false;
   };
   // Image posts open a simple lightbox (reliable; no Reddit dependency).
@@ -637,9 +646,8 @@
     const plainThumb = e.target.closest(".item-thumb"); // a plain thumbnail (no preview handler) → open the item url
     if (plainThumb && row.dataset.url) { window.open(row.dataset.url, "_blank", "noopener"); return; }
     if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
-    if (e.target.closest("a")) return;                  // let title links open
-    const cb = row.querySelector(".sel");               // whole-card click toggles selection
-    if (cb) { cb.checked = !cb.checked; toggleSel(fullname, cb.checked, row); }
+    if (e.target.closest("a, button, input, .item-av")) return;  // links / buttons / avatar handle themselves
+    if (row.dataset.url) window.open(row.dataset.url, "_blank", "noopener");  // a row-body click opens the item
   });
 
   document.querySelectorAll("[data-bulk]").forEach((btn) => {

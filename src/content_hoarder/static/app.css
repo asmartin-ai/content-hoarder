@@ -73,6 +73,7 @@ body {
 
 .topnav {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
 }
@@ -573,6 +574,10 @@ select {
 .toast[hidden] {
     display: none;
 }
+
+/* on the triage page, lift the toast above the fixed action bar so the Undo chip
+   doesn't overlap the Keep button */
+body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 
 .toast-undo {
     margin-left: 0.5rem;
