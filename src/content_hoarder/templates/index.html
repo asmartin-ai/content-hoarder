@@ -87,7 +87,14 @@
         <button class="btn" data-bulk="done">Done</button>
         <button class="btn ghost" id="sel-clear">Clear</button>
       </div>
+      <div id="progress-strip" class="progress-strip" hidden>
+        <span class="ps-streak" title="Items processed in a row">&#128293; <b id="ps-streak-n">0</b></span>
+        <div class="ps-bar"><div id="ps-fill" class="ps-fill"></div></div>
+        <span class="ps-label"><b id="ps-done">0</b> processed this session</span>
+      </div>
       <div class="list-toolbar">
+        <button type="button" id="focus-toggle" class="btn ghost" aria-pressed="false"
+                title="Focus mode — dim everything but the list">Focus</button>
         <div class="density-seg" role="group" aria-label="List density">
           <button type="button" class="seg-btn" data-density="compact" aria-label="Compact density" title="Compact">&#8801;</button>
           <button type="button" class="seg-btn" data-density="comfortable" aria-label="Comfortable density" title="Comfortable">&#9776;</button>
