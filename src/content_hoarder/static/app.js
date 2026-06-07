@@ -197,10 +197,13 @@
   const renderTagFilter = (byTag) => {
     const list = document.getElementById("tag-filter-list");
     if (!list) return;
-    list.innerHTML = Object.keys(byTag).sort((a, b) => byTag[b] - byTag[a]).map((t) =>
+    const tags = Object.keys(byTag);
+    list.innerHTML = tags.sort((a, b) => byTag[b] - byTag[a]).map((t) =>
       '<label class="tag-opt"><input type="checkbox" value="' + esc(t) + '"' +
       (selectedTags.has(t) ? " checked" : "") + "> " + esc(t) +
       ' <span class="tag-opt-cnt">' + byTag[t] + "</span></label>").join("");
+    const det = document.getElementById("tag");   // hide the whole sidebar section when there are no tags
+    if (det) det.hidden = tags.length === 0;
     updateTagSummary();
   };
   const updateTagSummary = () => {

@@ -1084,6 +1084,31 @@ select {
 .tag-opt:hover { background: var(--panel2); }
 .tag-opt-cnt { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
+/* tag filter relocated into the sidebar rail: full-width collapsible, inline
+   (not a floating popover) scrollable list. */
+.side-tags { margin: 0 0 1rem; }
+.side-tags > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+.side-tags > summary::after {
+    content: "\25BE";
+    color: var(--muted);
+    font-size: 0.8em;
+    transition: transform var(--dur-fast) var(--ease);
+}
+.side-tags[open] > summary::after { transform: rotate(180deg); }
+.side-tags .tag-filter-list {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin-top: var(--sp-2);
+    box-shadow: none;
+    max-height: 40vh;
+}
+
 /* ============================================================
    inbox row — design-system anatomy: source avatar (⇄ select),
    meta line, hover-reveal icon actions, and three densities.
