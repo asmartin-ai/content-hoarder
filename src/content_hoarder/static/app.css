@@ -389,21 +389,68 @@ select {
 }
 
 .item-thumb {
-    width: 120px;
-    height: 72px;
-    object-fit: cover;
-    border-radius: 8px;
     flex-shrink: 0;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    background: var(--panel2);
+    cursor: pointer;
 }
 
-/* trailing icon actions — always visible (muted), brighten to the status color on hover */
+/* trailing icon actions */
 .item-actions {
     display: flex;
     flex-direction: row;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.1rem;
     flex-shrink: 0;
 }
+/* list densities: actions sit in a fixed right slot, opacity-revealed on hover (no slide) */
+.items.density-compact .item-actions,
+.items.density-comfortable .item-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: var(--act-w, 116px);
+    padding-right: 0.4rem;
+    background: linear-gradient(to right, transparent, var(--row-hover) 45%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) var(--ease);
+}
+.items.density-compact .item:hover .item-actions,
+.items.density-compact .item:focus-within .item-actions,
+.items.density-comfortable .item:hover .item-actions,
+.items.density-comfortable .item:focus-within .item-actions { opacity: 1; pointer-events: auto; }
+
+/* compact ▶ media-pill — pinned right; swaps out for the action icons on hover */
+.media-flag {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    height: 20px;
+    min-width: 24px;
+    padding: 0 6px;
+    border: none;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 0.66rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.media-flag:hover { background: var(--accent-strong); }
+.media-flag:active { transform: scale(0.9); }
+.media-flag::after { content: ""; position: absolute; inset: -12px; }  /* ~44px tap target */
+.items.density-compact .media-flag { display: inline-flex; align-self: center; margin-left: 0.4rem; }
+.items.density-compact .item:hover .media-flag,
+.items.density-compact .item:focus-within .media-flag { opacity: 0; visibility: hidden; pointer-events: none; }
+
 .item-actions button {
     display: inline-flex;
     align-items: center;
@@ -1228,10 +1275,15 @@ select {
 /* touch / no-hover devices: keep the source glyph visible (no hover to swap it) */
 @media (hover: none) {
     .item .item-av .av-face { opacity: 1; }
+    /* no hover on touch: keep the list-density action icons visible (per user; a swipe-only
+       mobile mode is a tracked backlog item), and drop the compact ▶ pill to avoid overlap. */
+    .items.density-compact .item-actions,
+    .items.density-comfortable .item-actions { opacity: 1; pointer-events: auto; }
+    .items.density-compact .media-flag { display: none; }
 }
 
-/* ---- density: compact (single dense line) ---- */
-.items.density-compact .item-fg { align-items: center; padding: 0.36rem 0.85rem; gap: 0.6rem; }
+/* ---- density: compact (single dense line; no thumb — a ▶ media-pill instead) ---- */
+.items.density-compact .item-fg { align-items: center; padding: 0.36rem 0.85rem; gap: 0.6rem; --act-w: 104px; }
 .items.density-compact .item-av { width: 26px; height: 26px; margin-top: 0; }
 .items.density-compact .av-face { font-size: 0.7rem; }
 .items.density-compact .item-main {
@@ -1252,13 +1304,27 @@ select {
 .items.density-compact .item-snippet,
 .items.density-compact .tag-chips,
 .items.density-compact .item-recover { display: none; }
-.items.density-compact .item-thumb { width: 40px; height: 30px; margin-top: 0; }
+.items.density-compact .item-thumb { display: none; }
 
-/* ---- density: comfortable (default — two lines + snippet + thumb) ---- */
-.items.density-comfortable .item-fg { align-items: flex-start; }
-.items.density-comfortable .item-thumb { width: 72px; height: 56px; margin-top: 2px; }
+/* ---- density: comfortable (two lines + snippet + full-height pinned thumb) ---- */
+.items.density-comfortable .item-fg { align-items: flex-start; padding: 0.7rem 0.9rem; --act-w: 116px; }
+.items.density-comfortable .item-av { margin-top: 0.1rem; }
+.items.density-comfortable .item-snippet { -webkit-line-clamp: 1; }
+.items.density-comfortable .tag-chips { display: none; }
+/* pinned thumb: fills the row height, edges fade via a mask vignette; reserve the action slot */
+.items.density-comfortable .item-fg:has(.item-thumb) .item-thumb {
+    width: 112px;
+    height: auto;
+    align-self: stretch;
+    margin-top: -0.7rem;
+    margin-bottom: -0.7rem;
+    margin-right: var(--act-w, 116px);
+    border-radius: 0;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 12px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 12px), transparent 100%);
+}
 
-/* ---- density: card — large, single-column cards with a hero thumb ---- */
+/* ---- density: card — large single-column cards: card-head, hero thumb, bottom tag/action row ---- */
 .items.density-card {
     background: transparent;
     border: none;
@@ -1268,34 +1334,19 @@ select {
 }
 .items.density-card .item { border: 1px solid var(--border); border-radius: var(--r-md); }
 .items.density-card .item-fg { flex-direction: column; align-items: stretch; padding: 0; gap: 0; border-left: none; }
-.items.density-card .item-av {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 2;
-    margin: 0;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-.items.density-card .item-thumb {
-    order: -1;
-    width: 100%;
-    height: 200px;
-    border-radius: 0;
-}
-.items.density-card .item-main { padding: 0.85rem 1rem 1rem; }
+.items.density-card .card-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem 0; }
+.items.density-card .card-head .item-av { width: 30px; height: 30px; margin: 0; }
+.items.density-card .ch-sub { font-weight: var(--fw-medium); font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.items.density-card .item-time { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.items.density-card .item-thumb { width: 100%; border-radius: 0; }
+.items.density-card img.item-thumb { height: auto; max-height: 360px; object-fit: cover; display: block; }
+.items.density-card .item-thumb:not(img) { height: 150px; }
+.items.density-card .item-main { padding: 0 0.9rem 0.7rem; gap: 0.3rem; }
 .items.density-card .item-title { font-size: var(--fs-lg); white-space: normal; line-height: var(--lh-tight); }
 .items.density-card .item-snippet { -webkit-line-clamp: 3; }
-.items.density-card .item-actions {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: var(--scrim);
-    border-radius: var(--r-sm);
-    padding: 2px;
-}
-/* card with no hero thumb: reserve top space so the floating avatar/actions
-   don't overlap the title */
-.items.density-card .item-fg:not(:has(.item-thumb)) .item-main { padding-top: 2.75rem; }
+.items.density-card .card-tagrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
+.items.density-card .card-tagrow .tag-chips { flex: 1; min-width: 0; margin: 0; }
+.items.density-card .card-tagrow .item-actions { flex-shrink: 0; }
 
 /* ---- ADHD dopamine loop: progress/streak strip, focus mode, time-to-consume ---- */
 .progress-strip {
