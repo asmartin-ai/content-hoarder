@@ -110,9 +110,15 @@
   const selected = new Set();
   const selectedTags = new Set();   // active tag filter (OR across selected tags)
 
-  const badgeHtml = (item) => {
+  // Leading source avatar (a colored circle with the source initial) that doubles
+  // as the row's select control — the checkbox is revealed on hover / when selected.
+  const sourceAvatar = (item) => {
     const s = sources[item.source] || { label: item.source, badge_color: "#888" };
-    return '<span class="badge" style="--c:' + esc(s.badge_color) + '">' + esc(s.label) + "</span>";
+    const initial = (s.label || item.source || "?").trim().charAt(0).toUpperCase();
+    return '<span class="item-av" style="--src:' + esc(s.badge_color) + '" title="' + esc(s.label) + '">' +
+      '<span class="av-face">' + esc(initial) + "</span>" +
+      '<input type="checkbox" class="sel" aria-label="Select item">' +
+      "</span>";
   };
 
   // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
@@ -212,35 +218,38 @@
     return "";
   };
 
+  // Posted/synced age, shown in the meta line so it stays visible at every density.
+  const ageMeta = (item) =>
+    '<span class="m-age" title="' + esc(dateTitle(item)) + '">' +
+    esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) + "</span>";
+
   const itemHtml = (item) => {
     const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     const recoverBtn = isRemoved(item)
-      ? '<button class="recover-btn" data-recover type="button">↻ Recover</button>' : "";
+      ? '<div class="item-recover"><button class="recover-btn" data-recover type="button">↻ Recover</button></div>' : "";
+    const ml = metaLine(item);
+    const metaInner = (ml ? '<span class="m-info">' + ml + '</span><span class="sep">·</span>' : "") + ageMeta(item);
     return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
       '<div class="item-bg" aria-hidden="true">' +
-        '<span class="ic ic-keep">✓ Keep</span>' +
-        '<span class="ic ic-arch">Archive 🗑</span>' +
+        '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
+        '<span class="ic ic-done">Done ' + window.chIcon("done") + "</span>" +
       "</div>" +
       '<div class="item-fg">' +
-        '<input type="checkbox" class="sel">' +
+        sourceAvatar(item) +
         '<div class="item-main">' +
-          '<div class="item-head">' + badgeHtml(item) +
-            '<span class="item-age" title="' + esc(dateTitle(item)) + '">' +
-              esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) +
-            "</span></div>" +
           titleHtml +
-          '<div class="item-meta">' + metaLine(item) + "</div>" +
+          '<div class="item-meta">' + metaInner + "</div>" +
           (item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "") +
           tagChips(item) +
+          recoverBtn +
         "</div>" +
         mediaSlotHtml(item) +
         '<div class="item-actions">' +
-          recoverBtn +
-          '<button data-act="keep">Keep</button>' +
-          '<button data-act="archived">Archive</button>' +
-          '<button data-act="done">Done</button>' +
+          '<button class="keep" data-act="keep" type="button" title="Keep" aria-label="Keep">' + window.chIcon("keep") + "</button>" +
+          '<button class="arch" data-act="archived" type="button" title="Archive" aria-label="Archive">' + window.chIcon("archive") + "</button>" +
+          '<button class="done" data-act="done" type="button" title="Done" aria-label="Mark done">' + window.chIcon("done") + "</button>" +
         "</div>" +
       "</div></div>";
   };
@@ -292,8 +301,8 @@
       box.querySelectorAll(".item:not([data-sw])").forEach((row) => {
         row.setAttribute("data-sw", "1");
         if (window.attachSwipe) window.attachSwipe(row, {
-          onRight: () => actOnItem(row.dataset.fullname, "keep", row),
-          onLeft: () => actOnItem(row.dataset.fullname, "archived", row),
+          onRight: () => actOnItem(row.dataset.fullname, "archived", row),
+          onLeft: () => actOnItem(row.dataset.fullname, "done", row),
         });
       });
       const hasItems = box.querySelector(".item") !== null;
@@ -720,6 +729,26 @@
     updateTagSummary();
     load(true);
   });
+  // Density toggle (compact / comfortable / card), persisted in localStorage.
+  (function () {
+    var box = document.getElementById("items");
+    var DENS = ["compact", "comfortable", "card"];
+    function applyDensity(d) {
+      if (DENS.indexOf(d) === -1) d = "comfortable";
+      DENS.forEach(function (x) { box.classList.toggle("density-" + x, x === d); });
+      document.querySelectorAll("[data-density]").forEach(function (b) {
+        b.classList.toggle("active", b.dataset.density === d);
+        b.setAttribute("aria-pressed", String(b.dataset.density === d));
+      });
+      try { localStorage.setItem("ch-density", d); } catch (e) {}
+    }
+    document.querySelectorAll("[data-density]").forEach(function (b) {
+      b.addEventListener("click", function () { applyDensity(b.dataset.density); });
+    });
+    var saved; try { saved = localStorage.getItem("ch-density"); } catch (e) {}
+    applyDensity(saved || "comfortable");
+  })();
+
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)
