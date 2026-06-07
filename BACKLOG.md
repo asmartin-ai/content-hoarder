@@ -285,15 +285,15 @@ need separate filter controls.*
 - [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
   the inbox; audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
   `openGallery`) against real Reddit data. Bigger than a quick fix — needs a media-handling pass.
-- [ ] **P2 — Reddit "Sync newest" button cut off.** The reddit header crowds at some widths (the new
+- [x] ~~**Reddit "Sync newest" button cut off.**~~ Fixed (v2 pass): the header now wraps. The reddit header crowds at some widths (the new
   theme toggle); fix `header-right` wrapping/spacing in `reddit.css`.
-- [ ] **P2 — Dropdowns clip into the search bar.** At some window widths the topbar selects overlap the
+- [x] ~~**Dropdowns clip into the search bar.**~~ Fixed (v2 pass): the tag filter moved to the sidebar and the topnav wraps. At some window widths the topbar selects overlap the
   search field and become unclickable; fix `.topbar` wrap/stacking in `app.css`.
-- [ ] **P2 — Group-select only via the checkbox/avatar.** A whole-row click should open the item; only
+- [x] ~~**Group-select only via the checkbox/avatar.**~~ Fixed (v2 pass): a row-body click opens the item; only the avatar toggles selection. A whole-row click should open the item; only
   the avatar/checkbox should toggle selection (tighten the `#items` delegated handler).
-- [ ] **P2 — Triage done/Undo chip overlaps the Keep button.** Reposition the undo chip / action bar
+- [x] ~~**Triage done/Undo chip overlaps the Keep button.**~~ Fixed (v2 pass): the toast is lifted above the fixed action bar. Reposition the undo chip / action bar
   so they don't collide.
-- [ ] **P2 — "Open on reddit" preview URL is malformed.** It builds a relative `/r/…` path (resolving
+- [x] ~~**"Open on reddit" preview URL is malformed.**~~ Fixed (v2 pass): Reddit permalinks are normalized to absolute www.reddit.com URLs. It builds a relative `/r/…` path (resolving
   to `127.0.0.1:8788/r/…`); render Reddit permalinks as absolute `https://www.reddit.com/…`.
 
 ## Epic 14 — Settings menu  (`enhancement`, `area:ui`)
