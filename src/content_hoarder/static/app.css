@@ -747,19 +747,19 @@ select {
 
 .act.keep {
     background-color: var(--keep);
-    color: #04231a;
+    color: var(--keep-ink);
     border-color: transparent;
 }
 
 .act.archive {
-    background-color: var(--danger);
-    color: #2a0a0a;
+    background-color: var(--archive);
+    color: var(--archive-ink);
     border-color: transparent;
 }
 
 .act.done {
     background-color: var(--done);
-    color: #04203f;
+    color: var(--done-ink);
     border-color: transparent;
 }
 
