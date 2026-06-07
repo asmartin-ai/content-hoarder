@@ -109,6 +109,8 @@
   const sources = {};
   const selected = new Set();
   const selectedTags = new Set();   // active tag filter (OR across selected tags)
+  const loadedItems = [];           // cache of loaded items, for re-render on density change
+  let currentDensity = "comfortable"; // set by applyDensity; itemHtml branches on it (card vs list)
 
   // ADHD dopamine loop: batch size + processed-this-session counter & streak.
   const BATCH = 25;
@@ -177,13 +179,25 @@
     return "";
   };
 
-  const metaLine = (item) => {
+  // Short origin label (subreddit / channel / playlist / source) for the card header.
+  const subLabel = (item) => {
+    const m = item.metadata || {};
+    if (m.subreddit) return "r/" + m.subreddit;
+    if (m.channel) return m.channel;
+    if (m.playlist) return m.playlist;
+    const s = sources[item.source];
+    return s ? s.label : item.source;
+  };
+  // hideSub omits the origin (subreddit/channel/playlist) — the card shows it in its header.
+  const metaLine = (item, hideSub) => {
     const m = item.metadata || {};
     const parts = [];
     if (item.author) parts.push("by " + esc(item.author));
-    if (m.subreddit) parts.push("r/" + esc(m.subreddit));
-    if (m.channel) parts.push(esc(m.channel));
-    if (m.playlist) parts.push(esc(m.playlist));
+    if (!hideSub) {
+      if (m.subreddit) parts.push("r/" + esc(m.subreddit));
+      if (m.channel) parts.push(esc(m.channel));
+      if (m.playlist) parts.push(esc(m.playlist));
+    }
     if (item.source === "youtube") { const ud = uploadDate(item); if (ud) parts.push("📅 " + ud); }
     if (item.kind) parts.push(esc(item.kind));
     if (m.category && m.category !== "unknown") parts.push("🏷 " + esc(m.category));
@@ -240,15 +254,15 @@
     if (t) {
       const full = imageUrl(item);
       if (full) {                                         // direct image → open in lightbox
-        return '<img class="item-thumb img-open" loading="lazy" src="' + esc(t) +
+        return '<img class="item-thumb img-open" src="' + esc(t) +
           '" data-img="' + esc(full) + '" alt="">';
       }
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
-        return '<img class="item-thumb rd-preview" loading="lazy" src="' + esc(t) +
+        return '<img class="item-thumb rd-preview" src="' + esc(t) +
           '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">';
       }
-      return '<img class="item-thumb" loading="lazy" src="' + esc(t) + '" alt="">';
+      return '<img class="item-thumb" src="' + esc(t) + '" alt="">';
     }
     const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
@@ -285,39 +299,78 @@
     return '<span class="consume ' + verb + '">' + amt + " " + verb + "</span>";
   };
 
+  // Static fragments (chIcon is available at module-eval time; build once, reuse per row).
+  const ACTIONS_HTML =
+    '<div class="item-actions">' +
+      '<button class="keep" data-act="keep" type="button" title="Keep" aria-label="Keep">' + window.chIcon("keep") + "</button>" +
+      '<button class="arch" data-act="archived" type="button" title="Archive" aria-label="Archive">' + window.chIcon("archive") + "</button>" +
+      '<button class="done" data-act="done" type="button" title="Mark done" aria-label="Mark done">' + window.chIcon("done") + "</button>" +
+    "</div>";
+  const REVEAL_HTML =
+    '<div class="item-bg" aria-hidden="true">' +
+      '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
+      '<span class="ic ic-done">Done ' + window.chIcon("done") + "</span>" +
+    "</div>";
+
+  // Renders one row. Branches on currentDensity: card has a distinct layout
+  // (card-head + hero thumb + body + card-tagrow); compact/comfortable share the
+  // flat layout (avatar · body · thumb · media-pill · actions), CSS-differentiated.
   const itemHtml = (item) => {
     const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     const recoverBtn = isRemoved(item)
       ? '<div class="item-recover"><button class="recover-btn" data-recover type="button">↻ Recover</button></div>' : "";
-    const metaBits = [];
-    const ml = metaLine(item);
-    if (ml) metaBits.push('<span class="m-info">' + ml + "</span>");
-    metaBits.push(ageMeta(item));
-    const consume = consumeMeta(item);
-    if (consume) metaBits.push(consume);
-    const metaInner = metaBits.join('<span class="sep">·</span>');
-    return '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) + '" style="--src:' + srcAccent(item.source) + '">' +
-      '<div class="item-bg" aria-hidden="true">' +
-        '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
-        '<span class="ic ic-done">Done ' + window.chIcon("done") + "</span>" +
-      "</div>" +
+    const media = mediaSlotHtml(item);
+    const snippet = item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "";
+    const metaHtml = (hideSub, withAge) => {
+      const bits = [];
+      const ml = metaLine(item, hideSub);
+      if (ml) bits.push('<span class="m-info">' + ml + "</span>");
+      if (withAge) bits.push(ageMeta(item));
+      const consume = consumeMeta(item);
+      if (consume) bits.push(consume);
+      return '<div class="item-meta">' + bits.join('<span class="sep">·</span>') + "</div>";
+    };
+    const urlAttr = safeUrl(item.url) ? ' data-url="' + esc(item.url) + '"' : "";
+    const head = '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) +
+      '"' + urlAttr + ' style="--src:' + srcAccent(item.source) + '">' + REVEAL_HTML;
+
+    if (currentDensity === "card") {
+      return head +
+        '<div class="item-fg">' +
+          '<div class="card-head">' + sourceAvatar(item) +
+            '<span class="ch-sub">' + esc(subLabel(item)) + "</span>" +
+            '<span class="item-time" title="' + esc(dateTitle(item)) + '">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span>" +
+          "</div>" +
+          media +
+          '<div class="item-main">' +
+            titleHtml +
+            metaHtml(true, false) +
+            snippet +
+            '<div class="card-tagrow">' + (tagChips(item) || '<div class="tag-chips"></div>') + ACTIONS_HTML + "</div>" +
+            recoverBtn +
+          "</div>" +
+        "</div></div>";
+    }
+
+    // compact / comfortable
+    const pill = media
+      ? '<button class="media-flag" type="button" title="Open media" aria-label="Open media"><span class="mf-play">▶</span></button>'
+      : "";
+    return head +
       '<div class="item-fg">' +
         sourceAvatar(item) +
         '<div class="item-main">' +
           titleHtml +
-          '<div class="item-meta">' + metaInner + "</div>" +
-          (item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "") +
+          metaHtml(false, true) +
+          snippet +
           tagChips(item) +
           recoverBtn +
         "</div>" +
-        mediaSlotHtml(item) +
-        '<div class="item-actions">' +
-          '<button class="keep" data-act="keep" type="button" title="Keep" aria-label="Keep">' + window.chIcon("keep") + "</button>" +
-          '<button class="arch" data-act="archived" type="button" title="Archive" aria-label="Archive">' + window.chIcon("archive") + "</button>" +
-          '<button class="done" data-act="done" type="button" title="Done" aria-label="Mark done">' + window.chIcon("done") + "</button>" +
-        "</div>" +
+        media +
+        pill +
+        ACTIONS_HTML +
       "</div></div>";
   };
 
@@ -351,6 +404,28 @@
     else { el.dataset.kind = "import"; el.textContent = "Nothing here yet — import a source to begin."; }
   };
 
+  const attachRowSwipe = (row) => {
+    if (row.dataset.sw) return;
+    row.setAttribute("data-sw", "1");
+    if (window.attachSwipe) window.attachSwipe(row, {
+      onRight: () => actOnItem(row.dataset.fullname, "archived", row),
+      onLeft: () => actOnItem(row.dataset.fullname, "done", row),
+    });
+  };
+  // Re-apply selection state to a (re-)rendered row.
+  const restoreRowState = (row) => {
+    if (selected.has(row.dataset.fullname)) {
+      row.classList.add("selected");
+      const cb = row.querySelector(".sel"); if (cb) cb.checked = true;
+    }
+  };
+  // Re-render all cached rows — used when density changes (card vs list markup differ).
+  const renderAll = () => {
+    const box = document.getElementById("items");
+    box.innerHTML = loadedItems.map(itemHtml).join("");
+    box.querySelectorAll(".item").forEach((row) => { attachRowSwipe(row); restoreRowState(row); });
+  };
+
   const load = (reset) => {
     if (loading) return;
     loading = true;
@@ -358,20 +433,18 @@
     const emptyEl = document.getElementById("empty");
     if (reset) {
       offset = 0;
+      loadedItems.length = 0;
       box.innerHTML = SKELETON_ROW.repeat(6);
       emptyEl.hidden = true;
       document.getElementById("loadmore").hidden = true;
     }
     getJSON("/items?" + buildQuery()).then((data) => {
       box.querySelectorAll(".item.skel").forEach((s) => s.remove());
-      (data.items || []).forEach((it) => box.insertAdjacentHTML("beforeend", itemHtml(it)));
-      box.querySelectorAll(".item:not([data-sw])").forEach((row) => {
-        row.setAttribute("data-sw", "1");
-        if (window.attachSwipe) window.attachSwipe(row, {
-          onRight: () => actOnItem(row.dataset.fullname, "archived", row),
-          onLeft: () => actOnItem(row.dataset.fullname, "done", row),
-        });
+      (data.items || []).forEach((it) => {
+        loadedItems.push(it);
+        box.insertAdjacentHTML("beforeend", itemHtml(it));
       });
+      box.querySelectorAll(".item:not([data-sw])").forEach((row) => { attachRowSwipe(row); restoreRowState(row); });
       const hasItems = box.querySelector(".item") !== null;
       emptyEl.hidden = hasItems;
       if (!hasItems) setEmptyMessage(emptyEl);
@@ -555,6 +628,14 @@
     if (pv) { openMedia(pv.dataset.permalink); return; }
     const imgEl = e.target.closest(".item-thumb.img-open");
     if (imgEl) { openImage(imgEl.dataset.img); return; }
+    const flag = e.target.closest(".media-flag");       // compact ▶ pill → open the (hidden) thumb's media
+    if (flag) {
+      const t = row.querySelector(".item-thumb");
+      if (t) t.click(); else if (row.dataset.url) window.open(row.dataset.url, "_blank", "noopener");
+      return;
+    }
+    const plainThumb = e.target.closest(".item-thumb"); // a plain thumbnail (no preview handler) → open the item url
+    if (plainThumb && row.dataset.url) { window.open(row.dataset.url, "_blank", "noopener"); return; }
     if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
     if (e.target.closest("a")) return;                  // let title links open
     const cb = row.querySelector(".sel");               // whole-card click toggles selection
@@ -810,12 +891,15 @@
     var DENS = ["compact", "comfortable", "card"];
     function applyDensity(d) {
       if (DENS.indexOf(d) === -1) d = "comfortable";
+      var changed = d !== currentDensity;
+      currentDensity = d;
       DENS.forEach(function (x) { box.classList.toggle("density-" + x, x === d); });
       document.querySelectorAll("[data-density]").forEach(function (b) {
         b.classList.toggle("active", b.dataset.density === d);
         b.setAttribute("aria-pressed", String(b.dataset.density === d));
       });
       try { localStorage.setItem("ch-density", d); } catch (e) {}
+      if (changed && loadedItems.length) renderAll();   // card vs list markup differ → re-render
     }
     document.querySelectorAll("[data-density]").forEach(function (b) {
       b.addEventListener("click", function () { applyDensity(b.dataset.density); });
