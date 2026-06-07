@@ -284,27 +284,32 @@ select {
     min-width: 0;
 }
 
+/* "Sync" list: one edge-to-edge panel with hairline-divided rows */
 .items {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
 }
 
 .item {
     position: relative;
     overflow: hidden;
     background-color: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border-bottom: 1px solid var(--border);
 }
+.item:last-child { border-bottom: none; }
 
 /* sliding foreground over a fixed icon background (Gmail-style swipe reveal) */
 .item-fg {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.7rem;
     align-items: flex-start;
-    padding: 0.85rem 1rem;
+    padding: 0.7rem 0.9rem;
     background-color: var(--panel);
+    border-left: 3px solid var(--src, transparent);
     position: relative;
     z-index: 1;
     will-change: transform;
@@ -391,38 +396,33 @@ select {
     flex-shrink: 0;
 }
 
+/* trailing icon actions — always visible (muted), brighten to the status color on hover */
 .item-actions {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.1rem;
     flex-shrink: 0;
-    max-width: 0;
-    opacity: 0;
-    overflow: hidden;
-    pointer-events: none;
-    transition: max-width var(--dur) var(--ease), opacity var(--dur) var(--ease);
 }
-.item:hover .item-actions,
-.item-actions:focus-within { max-width: 150px; opacity: 1; pointer-events: auto; }
-
 .item-actions button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     flex-shrink: 0;
-    font-size: 1.05rem;
+    font-size: 1.02rem;
     border-radius: var(--r-sm);
-    border: 1px solid var(--border);
-    background-color: var(--panel2);
+    border: none;
+    background: transparent;
     color: var(--muted);
     cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.item-actions button.keep:hover { color: var(--keep); border-color: var(--keep); }
-.item-actions button.arch:hover { color: var(--archive); border-color: var(--archive); }
-.item-actions button.done:hover { color: var(--done); border-color: var(--done); }
+.item-actions button:hover { background: var(--panel2); }
+.item-actions button.keep:hover { color: var(--keep); background: var(--keep-tint); }
+.item-actions button.arch:hover { color: var(--archive); background: var(--archive-tint); }
+.item-actions button.done:hover { color: var(--done); background: var(--done-tint); }
 
 .badge {
     --c: #888;
@@ -840,11 +840,8 @@ select {
     vertical-align: middle;
 }
 .tcard-title, .modal-box h2 { letter-spacing: -0.01em; line-height: 1.25; }
-.item { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
-.item:hover {
-    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
-}
+.item:hover .item-fg { background-color: var(--row-hover); }
+.item.selected .item-fg { background-color: var(--accent-tint); }
 .act:active { transform: translateY(1px); }
 .btn:disabled, .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 
@@ -883,8 +880,7 @@ select {
     touch-action: pan-y;
     user-select: none;
 }
-.item.selected { border-color: var(--accent); }
-.item.kfocus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.item.kfocus .item-fg { box-shadow: inset 0 0 0 2px var(--accent); }
 .item-title { font-size: var(--fs-md); }
 
 /* import modal */
@@ -1084,19 +1080,29 @@ select {
 .tag-opt:hover { background: var(--panel2); }
 .tag-opt-cnt { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* tag filter relocated into the sidebar rail: full-width collapsible, inline
-   (not a floating popover) scrollable list. */
-.side-tags { margin: 0 0 1rem; }
+/* tag filter in the sidebar rail: a collapsible uppercase-eyebrow header over a
+   clean, scrollable rail-item list (design rail styling, kept collapsible). */
+.side-tags { margin: 0; }
 .side-tags > summary {
+    list-style: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
     width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0 0.6rem 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--dim);
+    cursor: pointer;
 }
 .side-tags > summary::after {
     content: "\25BE";
-    color: var(--muted);
-    font-size: 0.8em;
+    font-size: 0.9em;
     transition: transform var(--dur-fast) var(--ease);
 }
 .side-tags[open] > summary::after { transform: rotate(180deg); }
@@ -1104,10 +1110,22 @@ select {
     position: static;
     width: 100%;
     min-width: 0;
-    margin-top: var(--sp-2);
+    margin-top: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
     box-shadow: none;
-    max-height: 40vh;
+    max-height: 42vh;
+    overflow: auto;
 }
+.side-tags .tag-opt {
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--r-sm);
+    font-size: var(--fs-sm);
+    color: var(--text);
+}
+.side-tags .tag-opt:hover { background: var(--row-hover); }
+.side-tags .tag-opt-cnt { color: var(--muted); }
 
 /* ============================================================
    inbox row — design-system anatomy: source avatar (⇄ select),
@@ -1135,31 +1153,37 @@ select {
 .density-seg .seg-btn:hover { color: var(--text); }
 .density-seg .seg-btn.active { background: var(--accent-tint); color: var(--accent); }
 
-/* meta line spans */
-.item-meta .sep { margin: 0 0.4ch; color: var(--dim); }
-.item-meta .m-age { color: var(--dim); }
+/* meta line (flex so the consume dot + parts align) */
+.item-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+.item-meta .sep { color: var(--dim); }
+.item-meta .m-age { color: var(--dim); font-variant-numeric: tabular-nums; }
 .item-meta .m-info { color: var(--muted); }
 .item-recover { margin-top: 0.35rem; }
 
-/* source avatar — colored circle with the source initial; the overlaid checkbox
-   is hidden at rest and revealed on hover / focus / when the row is selected. */
+/* source avatar — rounded-square tile in the source color with a white glyph
+   (r/ ▶ ◇ …); the overlaid checkbox is revealed on hover / focus / selection. */
 .item-av {
     position: relative;
     flex-shrink: 0;
     width: 34px;
     height: 34px;
-    margin-top: 2px;
-    border-radius: var(--r-pill);
+    margin-top: 1px;
+    border-radius: var(--r-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--src, var(--accent)) 22%, var(--panel2));
 }
 .item-av .av-face {
-    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    background: var(--src, var(--accent));
+    color: #fff;
     font-weight: 700;
-    font-size: var(--fs-sm);
-    color: var(--src, var(--text));
+    font-size: 0.82rem;
     transition: opacity var(--dur-fast) var(--ease);
 }
 .item-av .sel {
@@ -1168,7 +1192,7 @@ select {
     margin: 0;
     width: 100%;
     height: 100%;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     cursor: pointer;
     opacity: 0;
     -webkit-appearance: none;
@@ -1179,8 +1203,8 @@ select {
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: var(--r-pill);
-    border: 2px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    border: 1.5px solid var(--border-strong);
     background: var(--panel2);
 }
 .item-av .sel:checked::before { border-color: var(--accent); background: var(--accent); }
@@ -1201,20 +1225,15 @@ select {
 .item:hover .item-av .av-face,
 .item.selected .item-av .av-face { opacity: 0; }
 
-/* media thumb eases as the layout shifts under the revealed actions */
-.item-thumb { transition: transform var(--dur) var(--ease); }
-
-/* touch / no-hover devices: keep actions and the source face visible */
+/* touch / no-hover devices: keep the source glyph visible (no hover to swap it) */
 @media (hover: none) {
-    .item-actions { max-width: 150px; opacity: 1; pointer-events: auto; }
     .item .item-av .av-face { opacity: 1; }
-    .item .item-av .sel { opacity: 1; }
 }
 
 /* ---- density: compact (single dense line) ---- */
-.items.density-compact { gap: 2px; }
-.items.density-compact .item-fg { align-items: center; padding: 0.4rem 0.75rem; gap: 0.6rem; }
+.items.density-compact .item-fg { align-items: center; padding: 0.36rem 0.85rem; gap: 0.6rem; }
 .items.density-compact .item-av { width: 26px; height: 26px; margin-top: 0; }
+.items.density-compact .av-face { font-size: 0.7rem; }
 .items.density-compact .item-main {
     display: flex;
     align-items: baseline;
@@ -1225,6 +1244,7 @@ select {
 .items.density-compact .item-meta {
     margin: 0;
     flex: 1 1 auto;
+    flex-wrap: nowrap;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1232,22 +1252,26 @@ select {
 .items.density-compact .item-snippet,
 .items.density-compact .tag-chips,
 .items.density-compact .item-recover { display: none; }
-.items.density-compact .item-thumb { width: 56px; height: 36px; }
+.items.density-compact .item-thumb { width: 40px; height: 30px; margin-top: 0; }
 
 /* ---- density: comfortable (default — two lines + snippet + thumb) ---- */
 .items.density-comfortable .item-fg { align-items: flex-start; }
+.items.density-comfortable .item-thumb { width: 72px; height: 56px; margin-top: 2px; }
 
-/* ---- density: card (gallery grid, full-bleed hero thumb) ---- */
+/* ---- density: card — large, single-column cards with a hero thumb ---- */
 .items.density-card {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
     gap: 0.85rem;
 }
-.items.density-card .item-fg { flex-direction: column; align-items: stretch; padding: 0; gap: 0; }
+.items.density-card .item { border: 1px solid var(--border); border-radius: var(--r-md); }
+.items.density-card .item-fg { flex-direction: column; align-items: stretch; padding: 0; gap: 0; border-left: none; }
 .items.density-card .item-av {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 10px;
+    left: 10px;
     z-index: 2;
     margin: 0;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
@@ -1255,20 +1279,23 @@ select {
 .items.density-card .item-thumb {
     order: -1;
     width: 100%;
-    height: 150px;
+    height: 200px;
     border-radius: 0;
 }
-.items.density-card .item-main { padding: 0.7rem 0.85rem; }
+.items.density-card .item-main { padding: 0.85rem 1rem 1rem; }
+.items.density-card .item-title { font-size: var(--fs-lg); white-space: normal; line-height: var(--lh-tight); }
+.items.density-card .item-snippet { -webkit-line-clamp: 3; }
 .items.density-card .item-actions {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    max-width: none;
+    top: 10px;
+    right: 10px;
     background: var(--scrim);
     border-radius: var(--r-sm);
     padding: 2px;
 }
-.items.density-card .item:hover .item-thumb { transform: none; }
+/* card with no hero thumb: reserve top space so the floating avatar/actions
+   don't overlap the title */
+.items.density-card .item-fg:not(:has(.item-thumb)) .item-main { padding-top: 2.75rem; }
 
 /* ---- ADHD dopamine loop: progress/streak strip, focus mode, time-to-consume ---- */
 .progress-strip {
@@ -1310,5 +1337,23 @@ select {
 }
 #focus-toggle.active { border-color: var(--accent); color: var(--accent); }
 
-/* time-to-consume estimate — the actionable "how long" cue */
-.item-meta .consume { color: var(--accent); font-variant-numeric: tabular-nums; }
+/* time-to-consume — a type-colored dot (read=red · watch=green · listen=blue) */
+.item-meta .consume {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.item-meta .consume::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+}
+.item-meta .consume.read::before { background: var(--done); opacity: 0.9; }
+.item-meta .consume.watch::before { background: var(--archive); opacity: 0.9; }
+.item-meta .consume.listen::before { background: var(--keep); opacity: 0.9; }
