@@ -54,11 +54,11 @@
   <main class="layout">
     <aside id="sidebar">
       <ul id="status-nav" class="status-nav">
-        <li data-status="inbox" class="active"><span>Inbox</span><span class="cnt" data-cnt="inbox">0</span></li>
-        <li data-status="keep"><span>Keep</span><span class="cnt" data-cnt="keep">0</span></li>
-        <li data-status="archived"><span>Archived</span><span class="cnt" data-cnt="archived">0</span></li>
-        <li data-status="done"><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
-        <li data-status=""><span>All</span><span class="cnt" data-cnt="all">0</span></li>
+        <li data-status="inbox" class="active"><span class="nav-ico nav-ico-dot" aria-hidden="true">&#9679;</span><span>Inbox</span><span class="cnt" data-cnt="inbox">0</span></li>
+        <li data-status="keep"><span class="nav-ico" data-ico="keep" aria-hidden="true"></span><span>Keep</span><span class="cnt" data-cnt="keep">0</span></li>
+        <li data-status="archived"><span class="nav-ico" data-ico="archive" aria-hidden="true"></span><span>Archived</span><span class="cnt" data-cnt="archived">0</span></li>
+        <li data-status="done"><span class="nav-ico" data-ico="done" aria-hidden="true"></span><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
+        <li data-status=""><span class="nav-ico nav-ico-all" aria-hidden="true">&#8801;</span><span>All</span><span class="cnt" data-cnt="all">0</span></li>
       </ul>
       <div class="side-actions">
         <button id="btn-import" class="btn">Import…</button>
@@ -168,6 +168,7 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+  <script src="/static/icons.js"></script>
   <script src="/static/swipe.js"></script>
   <script src="/static/app.js"></script>
 </body>

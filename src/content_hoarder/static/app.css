@@ -234,7 +234,21 @@ select {
     font-weight: 600;
     box-shadow: inset 2px 0 0 var(--accent);
 }
-.status-nav .cnt { color: var(--muted); font-variant-numeric: tabular-nums; }
+.status-nav .cnt { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+/* leading status icon (SVG for keep/archive/done, glyph for inbox/all) */
+.nav-ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    flex-shrink: 0;
+    font-size: var(--fs-md);
+    line-height: 1;
+}
+.status-nav [data-ico="keep"] { color: var(--keep); }
+.status-nav [data-ico="archive"] { color: var(--archive); }
+.status-nav [data-ico="done"] { color: var(--done); }
+.nav-ico-dot, .nav-ico-all { color: var(--dim); }
 
 /* Keep / Archive / Done legend */
 .legend { margin-top: 1rem; font-size: var(--fs-sm); color: var(--muted); }
