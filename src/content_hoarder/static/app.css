@@ -105,7 +105,7 @@ select {
 
 .btn.primary {
     background-color: var(--accent);
-    color: #06231f;
+    color: var(--accent-ink);
     border-color: transparent;
     font-weight: 600;
 }
@@ -427,7 +427,7 @@ select {
 .badge {
     --c: #888;
     background-color: var(--c);
-    color: #06231f;
+    color: var(--accent-ink);
     font-size: 0.7rem;
     font-weight: 700;
     padding: 0.1rem 0.45rem;
@@ -530,7 +530,7 @@ select {
 .toast-undo {
     margin-left: 0.5rem;
     background-color: var(--accent);
-    color: #06231f;
+    color: var(--accent-ink);
     border: none;
     border-radius: 6px;
     padding: 0.2rem 0.6rem;
@@ -814,8 +814,8 @@ select {
     border-radius: 8px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem; }
 .ai-btn:hover { border-color: var(--accent); }
 .ai-verdict { font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px; }
-.ai-keep { background: var(--keep); color: #04231a; }
-.ai-skip { background: var(--danger); color: #2a0a0a; }
+.ai-keep { background: var(--keep); color: var(--keep-ink); }
+.ai-skip { background: var(--archive); color: var(--archive-ink); }
 .ai-reason { color: var(--muted); }
 .ai-tag { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
     border-radius: 999px; padding: 0 0.45rem; margin-left: 0.25rem; color: var(--muted); }
@@ -871,7 +871,7 @@ select {
     padding: 0.25rem 0.65rem; border-radius: 999px; border: 1px solid var(--border);
     background: var(--panel2); color: var(--text); cursor: pointer; font-size: var(--fs-sm);
 }
-.chip.active { background: var(--accent); color: #06231f; border-color: transparent; font-weight: 600; }
+.chip.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
