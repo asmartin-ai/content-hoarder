@@ -7,7 +7,9 @@
   <title>content-hoarder</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js"></script>
 </head>
 <body data-page="browse">
   <div class="header-stack">
@@ -19,6 +21,8 @@
         <label class="chk"><input type="checkbox" id="fuzzy"> fuzzy</label>
       </div>
       <nav class="topnav">
+        <button type="button" class="icon-btn theme-toggle" data-theme-toggle
+                aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
         <select id="sort" title="Sort">
           <option value="first_seen_utc:desc">recently added</option>
           <option value="created_utc:asc">oldest first</option>

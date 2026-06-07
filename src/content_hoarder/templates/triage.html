@@ -7,7 +7,9 @@
   <title>Triage · content-hoarder</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js"></script>
 </head>
 <body data-page="triage">
   <header class="topbar triage-bar">
@@ -15,6 +17,8 @@
     <a class="btn ghost" href="/reddit">Reddit</a>
     <span id="progress" class="progress"></span>
     <div class="bar-right">
+      <button type="button" class="icon-btn theme-toggle" data-theme-toggle
+              aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
       <button id="undo-btn" class="btn ghost" type="button" disabled>&#8630;&nbsp;Undo</button>
       <select id="source-filter" class="src-filter" title="Limit to source">
         <option value="">all sources</option>
