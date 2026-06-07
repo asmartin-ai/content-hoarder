@@ -37,6 +37,9 @@ Thumbs.db
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json
 
+# Design-system reference bundle (vendored separately into static/; not product source)
+design-ref/
+
 # Allow only the tiny curated synthetic test fixtures
 !fixtures/
 !fixtures/**
