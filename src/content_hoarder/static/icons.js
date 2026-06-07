@@ -1,4 +1,4 @@
-﻿/* chIcon — inline-SVG action icons (recolor via currentColor).
+/* chIcon — inline-SVG action icons (recolor via currentColor).
    Keep = bookmark (Save, by Alvida) · Archive = box (archive, by Kudicon) ·
    Done = wastebasket (Trash, by Julynn B.). Noun Project, CC BY 3.0 — see
    CREDITS.md. Vanilla port of the design-system icons.js (React dropped):
