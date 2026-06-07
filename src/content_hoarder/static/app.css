@@ -1090,7 +1090,7 @@ select {
    ============================================================ */
 
 /* density toolbar (segmented control) */
-.list-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
+.list-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
 .density-seg {
     display: inline-flex;
     border: 1px solid var(--border);
@@ -1244,3 +1244,46 @@ select {
     padding: 2px;
 }
 .items.density-card .item:hover .item-thumb { transform: none; }
+
+/* ---- ADHD dopamine loop: progress/streak strip, focus mode, time-to-consume ---- */
+.progress-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: var(--fs-sm);
+    color: var(--muted);
+}
+.ps-streak { white-space: nowrap; color: var(--text); }
+.ps-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--accent-tint);
+    overflow: hidden;
+}
+.ps-fill {
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    border-radius: var(--r-pill);
+    transition: width var(--dur) var(--ease);
+}
+.ps-label { white-space: nowrap; }
+
+/* focus mode — dim the chrome, spotlight the list */
+.focus-mode .tabs,
+.focus-mode .side-actions,
+.focus-mode .legend,
+.focus-mode .install-hint {
+    opacity: 0.3;
+    transition: opacity var(--dur) var(--ease);
+}
+#focus-toggle.active { border-color: var(--accent); color: var(--accent); }
+
+/* time-to-consume estimate — the actionable "how long" cue */
+.item-meta .consume { color: var(--accent); font-variant-numeric: tabular-nums; }

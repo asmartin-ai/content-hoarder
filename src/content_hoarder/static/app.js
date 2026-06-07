@@ -110,6 +110,29 @@
   const selected = new Set();
   const selectedTags = new Set();   // active tag filter (OR across selected tags)
 
+  // ADHD dopamine loop: batch size + processed-this-session counter & streak.
+  const BATCH = 25;
+  const PROGRESS_GOAL = 20;
+  let sessionDone = 0, streak = 0;
+  const updateProgress = () => {
+    const strip = document.getElementById("progress-strip");
+    if (!strip) return;
+    strip.hidden = sessionDone === 0;
+    const dn = document.getElementById("ps-done");
+    const sn = document.getElementById("ps-streak-n");
+    const fill = document.getElementById("ps-fill");
+    if (dn) dn.textContent = String(sessionDone);
+    if (sn) sn.textContent = String(streak);
+    if (fill) fill.style.width = ((sessionDone % PROGRESS_GOAL) / PROGRESS_GOAL * 100) + "%";
+  };
+  const bumpProgress = (n) => {
+    const before = sessionDone;
+    sessionDone += n; streak += n;
+    updateProgress();
+    if (Math.floor(sessionDone / PROGRESS_GOAL) > Math.floor(before / PROGRESS_GOAL))
+      toast("🎉 " + sessionDone + " processed — keep going");
+  };
+
   // Leading source avatar (a colored circle with the source initial) that doubles
   // as the row's select control — the checkbox is revealed on hover / when selected.
   const sourceAvatar = (item) => {
@@ -223,14 +246,39 @@
     '<span class="m-age" title="' + esc(dateTitle(item)) + '">' +
     esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) + "</span>";
 
+  // Time-to-consume estimate, gated on available data: YouTube duration → "N min
+  // watch/listen"; a text body → "N min read". Returns "" when there's no signal.
+  const READ_WPM = 200;
+  const consumeMeta = (item) => {
+    const m = item.metadata || {};
+    let mins = 0, verb = "";
+    if (item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0) {
+      mins = Math.max(1, Math.round(m.duration / 60));
+      verb = m.category === "listenable" ? "listen" : "watch";
+    } else if (item.body && item.body.trim()) {
+      const words = item.body.trim().split(/\s+/).length;
+      if (words >= 40) { mins = Math.max(1, Math.round(words / READ_WPM)); verb = "read"; }
+    }
+    if (!mins) return "";
+    const amt = mins >= 60
+      ? Math.floor(mins / 60) + "h" + (mins % 60 ? " " + (mins % 60) + "m" : "")
+      : mins + " min";
+    return '<span class="consume">' + amt + " " + verb + "</span>";
+  };
+
   const itemHtml = (item) => {
     const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     const recoverBtn = isRemoved(item)
       ? '<div class="item-recover"><button class="recover-btn" data-recover type="button">↻ Recover</button></div>' : "";
+    const metaBits = [];
     const ml = metaLine(item);
-    const metaInner = (ml ? '<span class="m-info">' + ml + '</span><span class="sep">·</span>' : "") + ageMeta(item);
+    if (ml) metaBits.push('<span class="m-info">' + ml + "</span>");
+    metaBits.push(ageMeta(item));
+    const consume = consumeMeta(item);
+    if (consume) metaBits.push(consume);
+    const metaInner = metaBits.join('<span class="sep">·</span>');
     return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
       '<div class="item-bg" aria-hidden="true">' +
         '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
@@ -267,7 +315,7 @@
     if (cat) p.set("category", cat);
     selectedTags.forEach((t) => p.append("tag", t));
     if (activeSource) p.set("source", activeSource);
-    p.set("limit", "50");
+    p.set("limit", String(BATCH));
     p.set("offset", String(offset));
     return p.toString();
   };
@@ -406,7 +454,12 @@
 
   const undoItem = (fullname) => {
     getJSON("/items/" + encodeURIComponent(fullname) + "/undo", { method: "POST" })
-      .then(() => { load(true); loadSources(); loadCounts(); })
+      .then(() => {
+        streak = 0;
+        sessionDone = Math.max(0, sessionDone - 1);
+        updateProgress();
+        load(true); loadSources(); loadCounts();
+      })
       .catch(() => {});
   };
 
@@ -418,6 +471,7 @@
       selected.delete(fullname);
       if (row && activeStatus && activeStatus !== status) row.remove();
       snackbar(cap(status), () => undoItem(fullname));
+      bumpProgress(1);
       refreshNavDebounced();
     }).catch(() => snackbar("Failed", null));
   };
@@ -491,6 +545,7 @@
   document.querySelectorAll("[data-bulk]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (!selected.size) return;
+      const n = selected.size;
       getJSON("/bulk/status", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullnames: Array.from(selected), status: btn.dataset.bulk }),
@@ -498,6 +553,7 @@
         toast("Bulk marked " + btn.dataset.bulk);
         selected.clear();
         document.getElementById("bulkbar").hidden = true;
+        bumpProgress(n);
         load(true);
         refreshNav();
       }).catch(() => {});
@@ -777,6 +833,25 @@
         if (cb) { cb.checked = !cb.checked; toggleSel(r2.dataset.fullname, cb.checked, r2); }
       }
     });
+  })();
+
+  // Focus mode — dim the chrome to spotlight the list; persisted. Also label the
+  // batch button with the page size ("Show N more").
+  (function () {
+    var fbtn = document.getElementById("focus-toggle");
+    if (fbtn) {
+      var setFocus = function (on) {
+        document.body.classList.toggle("focus-mode", on);
+        fbtn.setAttribute("aria-pressed", String(on));
+        fbtn.classList.toggle("active", on);
+        try { localStorage.setItem("ch-focus", on ? "1" : "0"); } catch (e) {}
+      };
+      fbtn.addEventListener("click", function () { setFocus(!document.body.classList.contains("focus-mode")); });
+      var sf; try { sf = localStorage.getItem("ch-focus"); } catch (e) {}
+      if (sf === "1") setFocus(true);
+    }
+    var lm = document.getElementById("loadmore");
+    if (lm) lm.textContent = "Show " + BATCH + " more";
   })();
 
   document.getElementById("loadmore").addEventListener("click", () => load(false));
