@@ -153,8 +153,8 @@
     var m = item.metadata || {};
     var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
-      '<span class="tcard-stamp stamp-keep">✓ Keep</span>' +
-      '<span class="tcard-stamp stamp-arch">🗑 Archive</span>' +
+      '<span class="tcard-stamp stamp-arch">' + window.chIcon("archive") + ' Archive</span>' +
+      '<span class="tcard-stamp stamp-done">Done ' + window.chIcon("done") + '</span>' +
       '<div class="tcard-head">' + badge(item) + "</div>" +
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
@@ -204,7 +204,7 @@
   function commit(status) {
     if (!queue.length) return;
     var item = queue[0];
-    var dir = status === "keep" ? 1 : (status === "archived" ? -1 : 0);
+    var dir = status === "archived" ? 1 : -1;  // archive flings right, done/keep fling left
     animateOut(stack.querySelector(".tcard"), dir);
     fetchJSON("/items/" + encodeURIComponent(item.fullname) + "/status", {
       method: "POST",
@@ -256,8 +256,8 @@
       var dx = e.clientX - startX;
       card.style.transform = "translateX(" + dx + "px) rotate(" + (dx * 0.04) + "deg)";
       card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 320));
-      card.classList.toggle("swipe-keep", dx > 40);
-      card.classList.toggle("swipe-arch", dx < -40);
+      card.classList.toggle("swipe-arch", dx > 40);
+      card.classList.toggle("swipe-done", dx < -40);
     });
     function end(e) {
       if (!dragging) return;
@@ -265,11 +265,11 @@
       var dx = e.clientX - startX;
       card.style.transition = "transform .2s ease-out, opacity .2s ease-out";
       if (Math.abs(dx) >= COMMIT_PX) {
-        commit(dx > 0 ? "keep" : "archived");
+        commit(dx > 0 ? "archived" : "done");
       } else {
         card.style.transform = "translateX(0) rotate(0)";
         card.style.opacity = "1";
-        card.classList.remove("swipe-keep", "swipe-arch");
+        card.classList.remove("swipe-arch", "swipe-done");
       }
     }
     card.addEventListener("pointerup", end);
@@ -376,9 +376,9 @@
   document.addEventListener("keydown", function (e) {
     if (/input|select|textarea/i.test((e.target.tagName || ""))) return;
     var k = e.key.toLowerCase();
-    if (k === "a" || k === "arrowleft") commit("archived");
-    else if (k === "k" || k === "arrowright") commit("keep");
-    else if (k === "d") commit("done");
+    if (k === "e" || k === "arrowright") commit("archived");
+    else if (k === "y" || k === "arrowleft") commit("done");
+    else if (k === "s") commit("keep");
     else if (k === "z" || k === "u") undo();
   });
   var nb = document.getElementById("next-batch");
