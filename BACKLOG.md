@@ -86,6 +86,16 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [x] ~~**Cross-filtered counts.**~~ Shipped: `/stats?source=` + `/sources?status=` cross-filter the
   sidebar status counts and the source-tab counts (the tab list stays stable at 0).
 
+- [x] ~~**Card-view text clipping.**~~ Fixed in the v2 row pass: card is now card-head + adaptive
+  hero + a bottom tag/action row (no fixed crop, no title overlap).
+- [ ] **P2 — Categories in the sidebar / as a tag type.** Move the category facet into the left rail
+  (like status + tags); consider modeling "processing areas" as a reserved tag namespace so one filter
+  UI covers both. Touches `categorize.py` buckets + the rail + `search_items`.
+- [ ] **P3 — Zoom into the image / gallery modal.** Scroll/pinch-to-zoom (+ pan) in the media lightbox
+  and gallery viewer (`openImage`/`openGallery` in `app.js`).
+- [ ] **P3 — More ergonomic keyboard controls.** Revisit the browse/triage key map (today
+  J/K · S/E/Y · X) for one-hand use; add a discoverable `?` cheatsheet.
+
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
 false positives.*
@@ -138,6 +148,13 @@ false positives.*
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
 
+- [ ] **P2 — Redesign the app icon.** New mark: a backwards "E" forming an "H" (hoarder). Replace
+  `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.
+- [ ] **P3 — 60fps UI.** Audit list/scroll/swipe for jank (avoid layout thrash, prefer transforms /
+  `will-change`, throttle handlers); target smooth 60fps on the Pixel-6 target.
+- [ ] **P3 — README mobile quickstart.** Document running the PWA on a phone over Tailscale
+  (`serve --host <tailscale-ip>`, install-to-home-screen, safe-area / edge-gesture notes).
+
 ## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
 [`docs/reddit-management.md`](docs/reddit-management.md)). Remaining work absorbed from the old project:*
@@ -184,6 +201,12 @@ false positives.*
 - [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, merge `feat/reddit-oauth` (OAuth sync + live
   thread fetch + OAuth save/unsave); prefer OAuth over the cookie path when configured.
 
+- [ ] **P3 — Reddit comments sort option in the inbox.** Pick a comment sort (best/top/new) when
+  opening a Reddit thread inline.
+- [ ] **P2 — Extend tagging beyond Reddit (YouTube, etc.).** The multi-label tag system (this epic /
+  `categorize.py`) is reddit-only today; apply tags to YouTube videos (channel/title heuristics) so the
+  tag filter spans sources.
+
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
 subreddit/channel, kind, age, media type, title keywords). The app should learn from my own history
@@ -208,6 +231,13 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
 - [ ] **P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.** Where the learned
   skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
   (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
+
+- [ ] **P2 — Shuffle / mixed-content mode.** A triage/browse mode that interleaves a *mix* of sources
+  and categories (not grouped) for variety; complements smart-triage above.
+- [ ] **P2 — Default "All" view sorted by "easy to triage".** Use the learned likely-done score (this
+  epic) to order the default All view so quick wins surface first, instead of recency/random.
+- Note: the user's "analytics/learning → triage suggestion" idea (collect activity offline, batch-
+  process, suggest) is exactly this epic — folded here.
 
 ## Epic 11 — Cross-source consolidation: condense duplicates into YouTube items  (`enhancement`, `area:dedup`)
 *The same thing is often saved across sources: a YouTube video, a Reddit post linking to it, an HN
@@ -246,3 +276,67 @@ need separate filter controls.*
   has-any). Operators should let the user pick: repeated `tag:` as AND vs. `tag:a,b`/`tag:a|b` as OR
   (per the user's request to specify multi-tag logic via search). `search_items` already takes a
   `tags=[]` list — add an AND mode there.
+
+## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
+*Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
+
+- [x] ~~**Card-view text clipping / title overlap.**~~ Fixed by the v2 card (adaptive hero + bottom
+  action row). (Also noted in Epic 5.)
+- [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
+  the inbox; audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
+  `openGallery`) against real Reddit data. Bigger than a quick fix — needs a media-handling pass.
+- [ ] **P2 — Reddit "Sync newest" button cut off.** The reddit header crowds at some widths (the new
+  theme toggle); fix `header-right` wrapping/spacing in `reddit.css`.
+- [ ] **P2 — Dropdowns clip into the search bar.** At some window widths the topbar selects overlap the
+  search field and become unclickable; fix `.topbar` wrap/stacking in `app.css`.
+- [ ] **P2 — Group-select only via the checkbox/avatar.** A whole-row click should open the item; only
+  the avatar/checkbox should toggle selection (tighten the `#items` delegated handler).
+- [ ] **P2 — Triage done/Undo chip overlaps the Keep button.** Reposition the undo chip / action bar
+  so they don't collide.
+- [ ] **P2 — "Open on reddit" preview URL is malformed.** It builds a relative `/r/…` path (resolving
+  to `127.0.0.1:8788/r/…`); render Reddit permalinks as absolute `https://www.reddit.com/…`.
+
+## Epic 14 — Settings menu  (`enhancement`, `area:ui`)
+*A single settings cog consolidating preferences that are currently scattered or absent.*
+
+- [ ] **P2 — Settings cog + panel.** A gear in the header opening a settings sheet.
+- [ ] **P2 — View density in settings** (compact / cozy / cards) — surface the existing density toggle.
+- [ ] **P2 — Light/dark theme toggle in settings** — surface the existing `theme.js` toggle.
+- [ ] **P3 — "Swipe only on mobile" toggle.** Enable swipe gestures on touch only (desktop uses
+  buttons/keyboard). Pairs with the Mobile UX epic.
+- [ ] **P3 — Batch vs. infinite-scroll toggle + batch size.** Choose "Show N more" vs. scroll-to-load,
+  and the batch size, in settings (today `BATCH = 25` is hard-coded).
+- [ ] **P3 — Hide the Stats button under settings.** Move Stats into the settings menu to de-clutter.
+
+## Epic 15 — Reddit / HN as-app navigation  (`enhancement`, `area:reddit`)
+*Make saved items behave like the native apps when tapped.*
+
+- [ ] **P2 — Tap subreddit → open the subreddit; tap user → open the user page.** Make the meta-line
+  subreddit/author tappable to the right Reddit destination.
+- [ ] **P2 — Reddit image-link → open the comments thread, not the raw image URL.**
+- [ ] **P2 — Hacker News item → open the HN discussion thread, not the linked article.**
+
+## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
+*Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
+mobile-friendly".*
+
+- [ ] **P1 — Swipe must not trigger horizontal page scroll.** Lock the layout to the device width
+  (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
+- [ ] **P2 — NSFW blur in the inbox/triage** — adopt the Reddit view's blur for over-18 media.
+- [ ] **P2 — Tap thumbnail opens the view modal; long-press enters group-select.** Today a thumbnail
+  tap on mobile doesn't open the modal.
+- [ ] **P2 — Swipe physics feel.** The current swipe is a little stiff; add momentum/spring + better
+  thresholds for a smoother feel.
+- [ ] **P3 — Mobile-friendly scrollbar** (Nova-Launcher-style fast-scroll handle).
+- [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
+  touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
+- [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
+
+## Epic 17 — Unify the Reddit and Inbox/Triage surfaces  (`enhancement`, `area:ui`)
+- [ ] **P2 — One unified surface.** Fold the dedicated `/reddit` view's capabilities (subreddit rail,
+  table/grid, thread viewer) into the main inbox + triage so there aren't two UIs to maintain. Large;
+  sequence after the settings + mobile work.
+
+## Epic 18 — Custom YouTube view  (`enhancement`, `area:youtube`)
+- [ ] **P3 — A YouTube-specific surface.** A view tuned for video triage (duration, channel grouping,
+  watch/listen processing-areas, playlist order), analogous to the `/reddit` view.
