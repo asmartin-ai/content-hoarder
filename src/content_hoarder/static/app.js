@@ -133,13 +133,29 @@
       toast("🎉 " + sessionDone + " processed — keep going");
   };
 
-  // Leading source avatar (a colored circle with the source initial) that doubles
-  // as the row's select control — the checkbox is revealed on hover / when selected.
+  // Per-source glyph + accent token (from the design system): the avatar shows
+  // r/ ▶ ◇ etc., and the row stripe/avatar use the themed --source-* color
+  // (so Firefox is blue), independent of the connector's API badge color.
+  const CH_SOURCES = {
+    reddit:     { glyph: "r/", token: "--source-reddit" },
+    youtube:    { glyph: "▶",  token: "--source-youtube" },
+    hackernews: { glyph: "Y",  token: "--source-hackernews" },
+    obsidian:   { glyph: "◇",  token: "--source-obsidian" },
+    keep:       { glyph: "✎",  token: "--source-keep" },
+    firefox:    { glyph: "⊕",  token: "--source-firefox" },
+  };
+  const srcAccent = (source) => {
+    const m = CH_SOURCES[source];
+    return m ? "var(" + m.token + ")" : "var(--accent)";
+  };
+  // Leading source avatar (solid source-color tile with the source glyph) that
+  // doubles as the row's select control — checkbox revealed on hover / select.
   const sourceAvatar = (item) => {
-    const s = sources[item.source] || { label: item.source, badge_color: "#888" };
-    const initial = (s.label || item.source || "?").trim().charAt(0).toUpperCase();
-    return '<span class="item-av" style="--src:' + esc(s.badge_color) + '" title="' + esc(s.label) + '">' +
-      '<span class="av-face">' + esc(initial) + "</span>" +
+    const s = sources[item.source] || { label: item.source };
+    const m = CH_SOURCES[item.source];
+    const glyph = m ? m.glyph : (s.label || item.source || "?").trim().charAt(0).toUpperCase();
+    return '<span class="item-av" title="' + esc(s.label || item.source) + '">' +
+      '<span class="av-face">' + esc(glyph) + "</span>" +
       '<input type="checkbox" class="sel" aria-label="Select item">' +
       "</span>";
   };
@@ -266,7 +282,7 @@
     const amt = mins >= 60
       ? Math.floor(mins / 60) + "h" + (mins % 60 ? " " + (mins % 60) + "m" : "")
       : mins + " min";
-    return '<span class="consume">' + amt + " " + verb + "</span>";
+    return '<span class="consume ' + verb + '">' + amt + " " + verb + "</span>";
   };
 
   const itemHtml = (item) => {
@@ -282,7 +298,7 @@
     const consume = consumeMeta(item);
     if (consume) metaBits.push(consume);
     const metaInner = metaBits.join('<span class="sep">·</span>');
-    return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
+    return '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) + '" style="--src:' + srcAccent(item.source) + '">' +
       '<div class="item-bg" aria-hidden="true">' +
         '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
         '<span class="ic ic-done">Done ' + window.chIcon("done") + "</span>" +
