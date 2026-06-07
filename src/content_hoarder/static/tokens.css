@@ -1,0 +1,232 @@
+/* ============================================================
+   content-hoarder . design tokens (single entry point)
+   Vendored from the design system (tokens/colors.css +
+   typography.css + spacing.css). Source of truth for all
+   color/type/space/radius/elevation/motion values.
+   Set theme via data-theme="light"|"dark" on <html>;
+   no attribute = dark (the product's native identity).
+   ============================================================ */
+/* ============================================================
+   content-hoarder · color tokens  (light + dark, themeable)
+
+   Set the theme by putting data-theme="light" | "dark" on <html>.
+   No attribute = dark (the product's native identity).
+
+   The single brand accent is a calm, soft TEAL — gentler than neon,
+   distinct from the warm source badges (reddit/youtube/firefox) and
+   from the cool status blue, and it holds up in both light and dark.
+   Status stays a fixed three-color language: keep=blue, archive=green,
+   done=red. Source badges are the only place outside brand appears.
+   ============================================================ */
+
+/* ---- DARK (default) ------------------------------------------------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* surface stack (darkest → lightest) */
+  --bg: #0f1115;          /* app background — the void behind everything */
+  --panel: #171a21;       /* cards, headers, modals */
+  --panel2: #1e222b;      /* inset controls, hovered rows, chips */
+  --row-hover: #1c2129;   /* list-row hover wash */
+  --border: #262b34;      /* hairline dividers + card outlines */
+  --border-strong: #313845; /* control borders (inputs, ghost buttons) */
+
+  /* text */
+  --text: #e5e7eb;        /* primary copy */
+  --muted: #9aa4b2;       /* secondary copy, metadata, labels */
+  --dim: #6b7280;         /* tertiary — counts, empty hints, timestamps */
+
+  /* accent (the one brand color) — soft teal */
+  --accent: #56c4b5;      /* primary actions, active marks, focus */
+  --accent-strong: #2f9d8d; /* pressed/hover primary — deeper, more distinct */
+  --accent-ink: #06231f;  /* dark ink — text/icon ON an accent fill */
+  --accent-tint: rgba(86, 196, 181, 0.16); /* selected row / progress track fill */
+
+  /* semantic status */
+  --keep: #60a5fa;        /* keep — worth revisiting (blue) */
+  --keep-ink: #04203f;
+  --archive: #34d399;      /* archive — set aside, out of the way (green) */
+  --archive-ink: #04231a;
+  --done: #f87171;        /* done — finished with it (red) */
+  --done-ink: #2a0a0a;
+
+  /* status tints (swipe reveals, selected rows) */
+  --keep-tint: rgba(96, 165, 250, 0.16);
+  --archive-tint: rgba(52, 211, 153, 0.16);
+  --done-tint: rgba(248, 113, 113, 0.16);
+
+  /* scrims & overlays */
+  --scrim: rgba(0, 0, 0, 0.6);     /* modal backdrop */
+  --fade-to: var(--bg);            /* triage action-bar fade target */
+}
+
+/* ---- LIGHT ---------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f5f6f8;          /* cool off-white app field */
+  --panel: #ffffff;       /* cards, headers, modals */
+  --panel2: #eceef2;      /* inset controls, chips */
+  --row-hover: #f1f3f6;   /* list-row hover wash */
+  --border: #e3e6ea;      /* hairline dividers + card outlines */
+  --border-strong: #cdd2da; /* control borders */
+
+  --text: #1b1e24;
+  --muted: #5c6573;
+  --dim: #98a1ad;
+
+  --accent: #2a9d8f;
+  --accent-strong: #16776b;
+  --accent-ink: #ffffff;
+  --accent-tint: rgba(42, 157, 143, 0.12);
+
+  --keep: #2563eb;
+  --keep-ink: #ffffff;
+  --archive: #15a34a;
+  --archive-ink: #ffffff;
+  --done: #dc2626;
+  --done-ink: #ffffff;
+
+  --keep-tint: rgba(37, 99, 235, 0.10);
+  --archive-tint: rgba(21, 163, 74, 0.12);
+  --done-tint: rgba(220, 38, 38, 0.10);
+
+  --scrim: rgba(20, 24, 33, 0.38);
+  --fade-to: var(--bg);
+}
+
+/* ---- per-source badge colors (theme-independent brand) -------------- */
+:root {
+  --source-reddit: #ff4500;
+  --source-youtube: #ff0000;
+  --source-hackernews: #ff6600;
+  --source-obsidian: #7c3aed;
+  --source-keep: #fbbc04;
+  --source-firefox: #4c6ef5;
+}
+
+/* ============================================================
+   semantic aliases — prefer these in components
+   ============================================================ */
+:root {
+  --surface-app: var(--bg);
+  --surface-card: var(--panel);
+  --surface-inset: var(--panel2);
+  --surface-hover: var(--row-hover);
+
+  --text-body: var(--text);
+  --text-muted: var(--muted);
+  --text-dim: var(--dim);
+  --text-on-accent: var(--accent-ink);
+
+  --border-hairline: var(--border);
+  --border-control: var(--border-strong);
+
+  --focus-ring: var(--accent);
+
+  --status-inbox: var(--text);
+  --status-keep: var(--keep);
+  --status-archived: var(--archive);
+  --status-done: var(--done);
+}
+
+/* ============================================================
+   content-hoarder · typography tokens
+   System UI stack only — zero webfonts, by design. A local-first
+   tool ships nothing it doesn't need; the OS font is instant,
+   familiar, and renders crisply on the dark surface. Numbers use
+   tabular figures wherever counts line up (sidebars, scores).
+   ============================================================ */
+
+:root {
+  /* ---- families ---- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ---- type scale (rem) ---- */
+  --fs-xs: 0.75rem;   /* 12px — counts, kbd hints, tag chips, timestamps */
+  --fs-sm: 0.85rem;   /* 13.6px — secondary controls, meta, snippets */
+  --fs-md: 0.95rem;   /* 15.2px — body, list titles, status nav */
+  --fs-lg: 1.15rem;   /* 18.4px — brand wordmark, card titles, empty state */
+  --fs-xl: 1.4rem;    /* 22.4px — section / page headings */
+
+  /* ---- weights ---- */
+  --fw-regular: 400; /* @kind other */
+  --fw-medium: 600;  /* @kind other */
+  --fw-bold: 700;    /* @kind other */
+  --fw-heavy: 800;   /* @kind other */
+
+  /* ---- line-height ---- */
+  --lh-tight: 1.25;   /* @kind other */
+  --lh-snug: 1.4;     /* @kind other */
+  --lh-normal: 1.55;  /* @kind other */
+
+  /* ---- tracking ---- */
+  --tracking-tight: -0.01em; /* large display text */
+  --tracking-label: 0.05em;  /* uppercased section labels */
+
+  /* ---- semantic aliases ---- */
+  --text-heading: var(--fs-xl);
+  --text-title: var(--fs-lg);
+  --text-body-size: var(--fs-md);
+  --text-meta: var(--fs-sm);
+  --text-caption: var(--fs-xs);
+}
+
+/* ============================================================
+   content-hoarder · spacing, radius, elevation & motion
+   A tight 0.25rem rhythm — this is a dense, scannable triage
+   surface, not an airy marketing page. Radii step up with the
+   size of the thing they round: chips & inputs (8), cards &
+   modals (12), the big triage card (16).
+   ============================================================ */
+
+:root {
+  /* ---- spacing rhythm (0.25rem base) ---- */
+  --sp-1: 0.25rem;  /* 4px  — chip gaps, icon gaps, tag-chip rows */
+  --sp-2: 0.5rem;   /* 8px  — control gaps, button padding-y */
+  --sp-3: 0.75rem;  /* 12px — card inner padding, popover padding */
+  --sp-4: 1rem;     /* 16px — layout gutters, section spacing */
+  --sp-5: 1.5rem;   /* 24px — major separation */
+
+  /* ---- corner radius ---- */
+  --r-sm: 8px;   /* inputs, buttons, chips, small thumbs */
+  --r-md: 12px;  /* cards, modals, popovers, action buttons */
+  --r-lg: 16px;  /* triage swipe card */
+  --r-pill: 999px; /* badges, tag chips, count pills */
+
+  /* ---- elevation (tuned per-theme below) ---- */
+  --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.18);     /* resting list rows */
+  --shadow-row-hover: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.35);    /* modals, menus, drawer */
+  --shadow-toast: 0 6px 20px rgba(0, 0, 0, 0.4);
+
+  /* ---- motion ---- */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1); /* @kind other */
+  --dur: 160ms;        /* @kind other */
+  --dur-fast: 120ms;   /* @kind other */
+  --dur-slow: 200ms;   /* @kind other */
+
+  /* ---- interaction surfaces ---- */
+  --touch-min: 44px;   /* minimum tap target (triage actions, mobile rows) */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  /* ---- semantic aliases ---- */
+  --gap-tight: var(--sp-1);
+  --gap-control: var(--sp-2);
+  --pad-card: var(--sp-3);
+  --gap-layout: var(--sp-4);
+  --radius-control: var(--r-sm);
+  --radius-card: var(--r-md);
+}
+
+/* Lighter, cooler shadows for light theme — heavy black drop shadows read
+   as dirt on white. Softer ambient + tight contact shadow instead. */
+:root[data-theme="light"] {
+  --shadow-row: 0 1px 2px rgba(20, 24, 33, 0.06);
+  --shadow-row-hover: 0 4px 14px rgba(20, 24, 33, 0.10);
+  --shadow-pop: 0 12px 34px rgba(20, 24, 33, 0.16);
+  --shadow-toast: 0 8px 24px rgba(20, 24, 33, 0.18);
+}

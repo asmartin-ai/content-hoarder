@@ -15,7 +15,7 @@
 
     function reset() {
       fg.style.transform = "";
-      el.classList.remove("swipe-keep", "swipe-arch");
+      el.classList.remove("swipe-arch", "swipe-done");
     }
 
     el.addEventListener("pointerdown", function (e) {
@@ -38,8 +38,8 @@
       }
       if (!horizontal) return;                 // vertical → let the list scroll
       fg.style.transform = "translateX(" + dx + "px)";
-      el.classList.toggle("swipe-keep", dx > 40);   // reveals the left (keep) icon
-      el.classList.toggle("swipe-arch", dx < -40);  // reveals the right (archive) icon
+      el.classList.toggle("swipe-arch", dx > 40);   // drag right → archive (reveal on left edge)
+      el.classList.toggle("swipe-done", dx < -40);  // drag left → done (reveal on right edge)
     });
 
     function end(e) {

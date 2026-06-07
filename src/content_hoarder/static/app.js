@@ -70,16 +70,25 @@
 
   // Reddit's blockquote + platform.js embed was retired (the script now 404s), so embed the
   // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
+  // Reddit permalinks are stored relative ("/r/sub/comments/…"); make them absolute so
+  // the embed + the "Open on Reddit" link don't resolve against our own origin.
+  const redditUrl = (permalink) => {
+    const p = (permalink || "").trim();
+    if (!p) return "";
+    if (/^https?:\/\//i.test(p)) return p;
+    return "https://www.reddit.com" + (p.charAt(0) === "/" ? p : "/" + p);
+  };
   const redditEmbedUrl = (permalink) => {
-    const base = (permalink || "").split("#")[0].split("?")[0]
+    const base = redditUrl(permalink).split("#")[0].split("?")[0]
       .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
     return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   };
   const openMedia = (permalink) => {
-    if (!safeUrl(permalink)) return;
+    const url = redditUrl(permalink);
+    if (!safeUrl(url)) return;
     document.getElementById("media-body").innerHTML =
       '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) + '" loading="lazy"></iframe>' +
-      '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+      '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
     document.getElementById("media-modal").hidden = false;
   };
   // Image posts open a simple lightbox (reliable; no Reddit dependency).
@@ -109,10 +118,57 @@
   const sources = {};
   const selected = new Set();
   const selectedTags = new Set();   // active tag filter (OR across selected tags)
+  const loadedItems = [];           // cache of loaded items, for re-render on density change
+  let currentDensity = "comfortable"; // set by applyDensity; itemHtml branches on it (card vs list)
 
-  const badgeHtml = (item) => {
-    const s = sources[item.source] || { label: item.source, badge_color: "#888" };
-    return '<span class="badge" style="--c:' + esc(s.badge_color) + '">' + esc(s.label) + "</span>";
+  // ADHD dopamine loop: batch size + processed-this-session counter & streak.
+  const BATCH = 25;
+  const PROGRESS_GOAL = 20;
+  let sessionDone = 0, streak = 0;
+  const updateProgress = () => {
+    const strip = document.getElementById("progress-strip");
+    if (!strip) return;
+    strip.hidden = sessionDone === 0;
+    const dn = document.getElementById("ps-done");
+    const sn = document.getElementById("ps-streak-n");
+    const fill = document.getElementById("ps-fill");
+    if (dn) dn.textContent = String(sessionDone);
+    if (sn) sn.textContent = String(streak);
+    if (fill) fill.style.width = ((sessionDone % PROGRESS_GOAL) / PROGRESS_GOAL * 100) + "%";
+  };
+  const bumpProgress = (n) => {
+    const before = sessionDone;
+    sessionDone += n; streak += n;
+    updateProgress();
+    if (Math.floor(sessionDone / PROGRESS_GOAL) > Math.floor(before / PROGRESS_GOAL))
+      toast("🎉 " + sessionDone + " processed — keep going");
+  };
+
+  // Per-source glyph + accent token (from the design system): the avatar shows
+  // r/ ▶ ◇ etc., and the row stripe/avatar use the themed --source-* color
+  // (so Firefox is blue), independent of the connector's API badge color.
+  const CH_SOURCES = {
+    reddit:     { glyph: "r/", token: "--source-reddit" },
+    youtube:    { glyph: "▶",  token: "--source-youtube" },
+    hackernews: { glyph: "Y",  token: "--source-hackernews" },
+    obsidian:   { glyph: "◇",  token: "--source-obsidian" },
+    keep:       { glyph: "✎",  token: "--source-keep" },
+    firefox:    { glyph: "⊕",  token: "--source-firefox" },
+  };
+  const srcAccent = (source) => {
+    const m = CH_SOURCES[source];
+    return m ? "var(" + m.token + ")" : "var(--accent)";
+  };
+  // Leading source avatar (solid source-color tile with the source glyph) that
+  // doubles as the row's select control — checkbox revealed on hover / select.
+  const sourceAvatar = (item) => {
+    const s = sources[item.source] || { label: item.source };
+    const m = CH_SOURCES[item.source];
+    const glyph = m ? m.glyph : (s.label || item.source || "?").trim().charAt(0).toUpperCase();
+    return '<span class="item-av" title="' + esc(s.label || item.source) + '">' +
+      '<span class="av-face">' + esc(glyph) + "</span>" +
+      '<input type="checkbox" class="sel" aria-label="Select item">' +
+      "</span>";
   };
 
   // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
@@ -132,13 +188,25 @@
     return "";
   };
 
-  const metaLine = (item) => {
+  // Short origin label (subreddit / channel / playlist / source) for the card header.
+  const subLabel = (item) => {
+    const m = item.metadata || {};
+    if (m.subreddit) return "r/" + m.subreddit;
+    if (m.channel) return m.channel;
+    if (m.playlist) return m.playlist;
+    const s = sources[item.source];
+    return s ? s.label : item.source;
+  };
+  // hideSub omits the origin (subreddit/channel/playlist) — the card shows it in its header.
+  const metaLine = (item, hideSub) => {
     const m = item.metadata || {};
     const parts = [];
     if (item.author) parts.push("by " + esc(item.author));
-    if (m.subreddit) parts.push("r/" + esc(m.subreddit));
-    if (m.channel) parts.push(esc(m.channel));
-    if (m.playlist) parts.push(esc(m.playlist));
+    if (!hideSub) {
+      if (m.subreddit) parts.push("r/" + esc(m.subreddit));
+      if (m.channel) parts.push(esc(m.channel));
+      if (m.playlist) parts.push(esc(m.playlist));
+    }
     if (item.source === "youtube") { const ud = uploadDate(item); if (ud) parts.push("📅 " + ud); }
     if (item.kind) parts.push(esc(item.kind));
     if (m.category && m.category !== "unknown") parts.push("🏷 " + esc(m.category));
@@ -168,10 +236,13 @@
   const renderTagFilter = (byTag) => {
     const list = document.getElementById("tag-filter-list");
     if (!list) return;
-    list.innerHTML = Object.keys(byTag).sort((a, b) => byTag[b] - byTag[a]).map((t) =>
+    const tags = Object.keys(byTag);
+    list.innerHTML = tags.sort((a, b) => byTag[b] - byTag[a]).map((t) =>
       '<label class="tag-opt"><input type="checkbox" value="' + esc(t) + '"' +
       (selectedTags.has(t) ? " checked" : "") + "> " + esc(t) +
       ' <span class="tag-opt-cnt">' + byTag[t] + "</span></label>").join("");
+    const det = document.getElementById("tag");   // hide the whole sidebar section when there are no tags
+    if (det) det.hidden = tags.length === 0;
     updateTagSummary();
   };
   const updateTagSummary = () => {
@@ -192,15 +263,15 @@
     if (t) {
       const full = imageUrl(item);
       if (full) {                                         // direct image → open in lightbox
-        return '<img class="item-thumb img-open" loading="lazy" src="' + esc(t) +
+        return '<img class="item-thumb img-open" src="' + esc(t) +
           '" data-img="' + esc(full) + '" alt="">';
       }
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
-        return '<img class="item-thumb rd-preview" loading="lazy" src="' + esc(t) +
+        return '<img class="item-thumb rd-preview" src="' + esc(t) +
           '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">';
       }
-      return '<img class="item-thumb" loading="lazy" src="' + esc(t) + '" alt="">';
+      return '<img class="item-thumb" src="' + esc(t) + '" alt="">';
     }
     const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
@@ -212,36 +283,103 @@
     return "";
   };
 
+  // Posted/synced age, shown in the meta line so it stays visible at every density.
+  const ageMeta = (item) =>
+    '<span class="m-age" title="' + esc(dateTitle(item)) + '">' +
+    esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) + "</span>";
+
+  // Time-to-consume estimate, gated on available data: YouTube duration → "N min
+  // watch/listen"; a text body → "N min read". Returns "" when there's no signal.
+  const READ_WPM = 200;
+  const consumeMeta = (item) => {
+    const m = item.metadata || {};
+    let mins = 0, verb = "";
+    if (item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0) {
+      mins = Math.max(1, Math.round(m.duration / 60));
+      verb = m.category === "listenable" ? "listen" : "watch";
+    } else if (item.body && item.body.trim()) {
+      const words = item.body.trim().split(/\s+/).length;
+      if (words >= 40) { mins = Math.max(1, Math.round(words / READ_WPM)); verb = "read"; }
+    }
+    if (!mins) return "";
+    const amt = mins >= 60
+      ? Math.floor(mins / 60) + "h" + (mins % 60 ? " " + (mins % 60) + "m" : "")
+      : mins + " min";
+    return '<span class="consume ' + verb + '">' + amt + " " + verb + "</span>";
+  };
+
+  // Static fragments (chIcon is available at module-eval time; build once, reuse per row).
+  const ACTIONS_HTML =
+    '<div class="item-actions">' +
+      '<button class="keep" data-act="keep" type="button" title="Keep" aria-label="Keep">' + window.chIcon("keep") + "</button>" +
+      '<button class="arch" data-act="archived" type="button" title="Archive" aria-label="Archive">' + window.chIcon("archive") + "</button>" +
+      '<button class="done" data-act="done" type="button" title="Mark done" aria-label="Mark done">' + window.chIcon("done") + "</button>" +
+    "</div>";
+  const REVEAL_HTML =
+    '<div class="item-bg" aria-hidden="true">' +
+      '<span class="ic ic-arch">' + window.chIcon("archive") + " Archive</span>" +
+      '<span class="ic ic-done">Done ' + window.chIcon("done") + "</span>" +
+    "</div>";
+
+  // Renders one row. Branches on currentDensity: card has a distinct layout
+  // (card-head + hero thumb + body + card-tagrow); compact/comfortable share the
+  // flat layout (avatar · body · thumb · media-pill · actions), CSS-differentiated.
   const itemHtml = (item) => {
     const titleHtml = safeUrl(item.url)
       ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     const recoverBtn = isRemoved(item)
-      ? '<button class="recover-btn" data-recover type="button">↻ Recover</button>' : "";
-    return '<div class="item" data-fullname="' + esc(item.fullname) + '">' +
-      '<div class="item-bg" aria-hidden="true">' +
-        '<span class="ic ic-keep">✓ Keep</span>' +
-        '<span class="ic ic-arch">Archive 🗑</span>' +
-      "</div>" +
+      ? '<div class="item-recover"><button class="recover-btn" data-recover type="button">↻ Recover</button></div>' : "";
+    const media = mediaSlotHtml(item);
+    const snippet = item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "";
+    const metaHtml = (hideSub, withAge) => {
+      const bits = [];
+      const ml = metaLine(item, hideSub);
+      if (ml) bits.push('<span class="m-info">' + ml + "</span>");
+      if (withAge) bits.push(ageMeta(item));
+      const consume = consumeMeta(item);
+      if (consume) bits.push(consume);
+      return '<div class="item-meta">' + bits.join('<span class="sep">·</span>') + "</div>";
+    };
+    const urlAttr = safeUrl(item.url) ? ' data-url="' + esc(item.url) + '"' : "";
+    const head = '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) +
+      '"' + urlAttr + ' style="--src:' + srcAccent(item.source) + '">' + REVEAL_HTML;
+
+    if (currentDensity === "card") {
+      return head +
+        '<div class="item-fg">' +
+          '<div class="card-head">' + sourceAvatar(item) +
+            '<span class="ch-sub">' + esc(subLabel(item)) + "</span>" +
+            '<span class="item-time" title="' + esc(dateTitle(item)) + '">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span>" +
+          "</div>" +
+          media +
+          '<div class="item-main">' +
+            titleHtml +
+            metaHtml(true, false) +
+            snippet +
+            '<div class="card-tagrow">' + (tagChips(item) || '<div class="tag-chips"></div>') + ACTIONS_HTML + "</div>" +
+            recoverBtn +
+          "</div>" +
+        "</div></div>";
+    }
+
+    // compact / comfortable
+    const pill = media
+      ? '<button class="media-flag" type="button" title="Open media" aria-label="Open media"><span class="mf-play">▶</span></button>'
+      : "";
+    return head +
       '<div class="item-fg">' +
-        '<input type="checkbox" class="sel">' +
+        sourceAvatar(item) +
         '<div class="item-main">' +
-          '<div class="item-head">' + badgeHtml(item) +
-            '<span class="item-age" title="' + esc(dateTitle(item)) + '">' +
-              esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) +
-            "</span></div>" +
           titleHtml +
-          '<div class="item-meta">' + metaLine(item) + "</div>" +
-          (item.body ? '<div class="item-snippet">' + esc(item.body.slice(0, 240)) + "</div>" : "") +
+          metaHtml(false, true) +
+          snippet +
           tagChips(item) +
-        "</div>" +
-        mediaSlotHtml(item) +
-        '<div class="item-actions">' +
           recoverBtn +
-          '<button data-act="keep">Keep</button>' +
-          '<button data-act="archived">Archive</button>' +
-          '<button data-act="done">Done</button>' +
         "</div>" +
+        media +
+        pill +
+        ACTIONS_HTML +
       "</div></div>";
   };
 
@@ -258,7 +396,7 @@
     if (cat) p.set("category", cat);
     selectedTags.forEach((t) => p.append("tag", t));
     if (activeSource) p.set("source", activeSource);
-    p.set("limit", "50");
+    p.set("limit", String(BATCH));
     p.set("offset", String(offset));
     return p.toString();
   };
@@ -275,6 +413,28 @@
     else { el.dataset.kind = "import"; el.textContent = "Nothing here yet — import a source to begin."; }
   };
 
+  const attachRowSwipe = (row) => {
+    if (row.dataset.sw) return;
+    row.setAttribute("data-sw", "1");
+    if (window.attachSwipe) window.attachSwipe(row, {
+      onRight: () => actOnItem(row.dataset.fullname, "archived", row),
+      onLeft: () => actOnItem(row.dataset.fullname, "done", row),
+    });
+  };
+  // Re-apply selection state to a (re-)rendered row.
+  const restoreRowState = (row) => {
+    if (selected.has(row.dataset.fullname)) {
+      row.classList.add("selected");
+      const cb = row.querySelector(".sel"); if (cb) cb.checked = true;
+    }
+  };
+  // Re-render all cached rows — used when density changes (card vs list markup differ).
+  const renderAll = () => {
+    const box = document.getElementById("items");
+    box.innerHTML = loadedItems.map(itemHtml).join("");
+    box.querySelectorAll(".item").forEach((row) => { attachRowSwipe(row); restoreRowState(row); });
+  };
+
   const load = (reset) => {
     if (loading) return;
     loading = true;
@@ -282,20 +442,18 @@
     const emptyEl = document.getElementById("empty");
     if (reset) {
       offset = 0;
+      loadedItems.length = 0;
       box.innerHTML = SKELETON_ROW.repeat(6);
       emptyEl.hidden = true;
       document.getElementById("loadmore").hidden = true;
     }
     getJSON("/items?" + buildQuery()).then((data) => {
       box.querySelectorAll(".item.skel").forEach((s) => s.remove());
-      (data.items || []).forEach((it) => box.insertAdjacentHTML("beforeend", itemHtml(it)));
-      box.querySelectorAll(".item:not([data-sw])").forEach((row) => {
-        row.setAttribute("data-sw", "1");
-        if (window.attachSwipe) window.attachSwipe(row, {
-          onRight: () => actOnItem(row.dataset.fullname, "keep", row),
-          onLeft: () => actOnItem(row.dataset.fullname, "archived", row),
-        });
+      (data.items || []).forEach((it) => {
+        loadedItems.push(it);
+        box.insertAdjacentHTML("beforeend", itemHtml(it));
       });
+      box.querySelectorAll(".item:not([data-sw])").forEach((row) => { attachRowSwipe(row); restoreRowState(row); });
       const hasItems = box.querySelector(".item") !== null;
       emptyEl.hidden = hasItems;
       if (!hasItems) setEmptyMessage(emptyEl);
@@ -397,7 +555,12 @@
 
   const undoItem = (fullname) => {
     getJSON("/items/" + encodeURIComponent(fullname) + "/undo", { method: "POST" })
-      .then(() => { load(true); loadSources(); loadCounts(); })
+      .then(() => {
+        streak = 0;
+        sessionDone = Math.max(0, sessionDone - 1);
+        updateProgress();
+        load(true); loadSources(); loadCounts();
+      })
       .catch(() => {});
   };
 
@@ -409,6 +572,7 @@
       selected.delete(fullname);
       if (row && activeStatus && activeStatus !== status) row.remove();
       snackbar(cap(status), () => undoItem(fullname));
+      bumpProgress(1);
       refreshNavDebounced();
     }).catch(() => snackbar("Failed", null));
   };
@@ -473,15 +637,23 @@
     if (pv) { openMedia(pv.dataset.permalink); return; }
     const imgEl = e.target.closest(".item-thumb.img-open");
     if (imgEl) { openImage(imgEl.dataset.img); return; }
+    const flag = e.target.closest(".media-flag");       // compact ▶ pill → open the (hidden) thumb's media
+    if (flag) {
+      const t = row.querySelector(".item-thumb");
+      if (t) t.click(); else if (row.dataset.url) window.open(row.dataset.url, "_blank", "noopener");
+      return;
+    }
+    const plainThumb = e.target.closest(".item-thumb"); // a plain thumbnail (no preview handler) → open the item url
+    if (plainThumb && row.dataset.url) { window.open(row.dataset.url, "_blank", "noopener"); return; }
     if (e.target.classList.contains("sel")) { toggleSel(fullname, e.target.checked, row); return; }
-    if (e.target.closest("a")) return;                  // let title links open
-    const cb = row.querySelector(".sel");               // whole-card click toggles selection
-    if (cb) { cb.checked = !cb.checked; toggleSel(fullname, cb.checked, row); }
+    if (e.target.closest("a, button, input, .item-av")) return;  // links / buttons / avatar handle themselves
+    if (row.dataset.url) window.open(row.dataset.url, "_blank", "noopener");  // a row-body click opens the item
   });
 
   document.querySelectorAll("[data-bulk]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (!selected.size) return;
+      const n = selected.size;
       getJSON("/bulk/status", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullnames: Array.from(selected), status: btn.dataset.bulk }),
@@ -489,6 +661,7 @@
         toast("Bulk marked " + btn.dataset.bulk);
         selected.clear();
         document.getElementById("bulkbar").hidden = true;
+        bumpProgress(n);
         load(true);
         refreshNav();
       }).catch(() => {});
@@ -720,6 +893,79 @@
     updateTagSummary();
     load(true);
   });
+  // Density toggle (compact / comfortable / card), persisted in localStorage.
+  (function () {
+    var box = document.getElementById("items");
+    var DENS = ["compact", "comfortable", "card"];
+    function applyDensity(d) {
+      if (DENS.indexOf(d) === -1) d = "comfortable";
+      var changed = d !== currentDensity;
+      currentDensity = d;
+      DENS.forEach(function (x) { box.classList.toggle("density-" + x, x === d); });
+      document.querySelectorAll("[data-density]").forEach(function (b) {
+        b.classList.toggle("active", b.dataset.density === d);
+        b.setAttribute("aria-pressed", String(b.dataset.density === d));
+      });
+      try { localStorage.setItem("ch-density", d); } catch (e) {}
+      if (changed && loadedItems.length) renderAll();   // card vs list markup differ → re-render
+    }
+    document.querySelectorAll("[data-density]").forEach(function (b) {
+      b.addEventListener("click", function () { applyDensity(b.dataset.density); });
+    });
+    var saved; try { saved = localStorage.getItem("ch-density"); } catch (e) {}
+    applyDensity(saved || "comfortable");
+  })();
+
+  // Keyboard: J/K move focus · S keep · E archive · Y done · X select (browse).
+  (function () {
+    var box = document.getElementById("items");
+    var fi = -1;
+    function rows() { return Array.prototype.slice.call(box.querySelectorAll(".item:not(.skel)")); }
+    function focus(i) {
+      var r = rows();
+      if (!r.length) { fi = -1; return; }
+      fi = Math.max(0, Math.min(i, r.length - 1));
+      r.forEach(function (el, idx) { el.classList.toggle("kfocus", idx === fi); });
+      if (r[fi]) r[fi].scrollIntoView({ block: "nearest" });
+    }
+    function cur() { var r = rows(); return fi >= 0 ? r[fi] : null; }
+    document.addEventListener("keydown", function (e) {
+      if (/input|select|textarea/i.test(e.target.tagName || "") || e.metaKey || e.ctrlKey || e.altKey) return;
+      var k = e.key.toLowerCase();
+      if (k === "j" || k === "arrowdown") { e.preventDefault(); focus(fi < 0 ? 0 : fi + 1); }
+      else if (k === "k" || k === "arrowup") { e.preventDefault(); focus(fi < 0 ? 0 : fi - 1); }
+      else if (k === "s" || k === "e" || k === "y") {
+        var row = cur(); if (!row) return;
+        actOnItem(row.dataset.fullname, k === "s" ? "keep" : k === "e" ? "archived" : "done", row);
+        // Row removal (if any) is async; leave focus for the next J/K to re-clamp
+        // rather than racing the network round-trip.
+      } else if (k === "x") {
+        var r2 = cur(); if (!r2) return;
+        var cb = r2.querySelector(".sel");
+        if (cb) { cb.checked = !cb.checked; toggleSel(r2.dataset.fullname, cb.checked, r2); }
+      }
+    });
+  })();
+
+  // Focus mode — dim the chrome to spotlight the list; persisted. Also label the
+  // batch button with the page size ("Show N more").
+  (function () {
+    var fbtn = document.getElementById("focus-toggle");
+    if (fbtn) {
+      var setFocus = function (on) {
+        document.body.classList.toggle("focus-mode", on);
+        fbtn.setAttribute("aria-pressed", String(on));
+        fbtn.classList.toggle("active", on);
+        try { localStorage.setItem("ch-focus", on ? "1" : "0"); } catch (e) {}
+      };
+      fbtn.addEventListener("click", function () { setFocus(!document.body.classList.contains("focus-mode")); });
+      var sf; try { sf = localStorage.getItem("ch-focus"); } catch (e) {}
+      if (sf === "1") setFocus(true);
+    }
+    var lm = document.getElementById("loadmore");
+    if (lm) lm.textContent = "Show " + BATCH + " more";
+  })();
+
   document.getElementById("loadmore").addEventListener("click", () => load(false));
 
   if ("serviceWorker" in navigator)

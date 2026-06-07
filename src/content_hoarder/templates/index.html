@@ -7,7 +7,9 @@
   <title>content-hoarder</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js"></script>
 </head>
 <body data-page="browse">
   <div class="header-stack">
@@ -19,6 +21,8 @@
         <label class="chk"><input type="checkbox" id="fuzzy"> fuzzy</label>
       </div>
       <nav class="topnav">
+        <button type="button" class="icon-btn theme-toggle" data-theme-toggle
+                aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
         <select id="sort" title="Sort">
           <option value="first_seen_utc:desc">recently added</option>
           <option value="created_utc:asc">oldest first</option>
@@ -35,10 +39,6 @@
           <option value="wotagei">wotagei</option>
           <option value="unknown">unknown</option>
         </select>
-        <details class="tag-filter" id="tag">
-          <summary id="tag-summary" title="Filter by Reddit tags (OR)">Tags</summary>
-          <div class="tag-filter-list" id="tag-filter-list"></div>
-        </details>
         <a class="btn" href="/reddit" title="Reddit management view">Reddit</a>
         <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
       </nav>
@@ -50,12 +50,16 @@
   <main class="layout">
     <aside id="sidebar">
       <ul id="status-nav" class="status-nav">
-        <li data-status="inbox" class="active"><span>Inbox</span><span class="cnt" data-cnt="inbox">0</span></li>
-        <li data-status="keep"><span>Keep</span><span class="cnt" data-cnt="keep">0</span></li>
-        <li data-status="archived"><span>Archived</span><span class="cnt" data-cnt="archived">0</span></li>
-        <li data-status="done"><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
-        <li data-status=""><span>All</span><span class="cnt" data-cnt="all">0</span></li>
+        <li data-status="inbox" class="active"><span class="nav-ico nav-ico-dot" aria-hidden="true">&#9679;</span><span>Inbox</span><span class="cnt" data-cnt="inbox">0</span></li>
+        <li data-status="keep"><span class="nav-ico" data-ico="keep" aria-hidden="true"></span><span>Keep</span><span class="cnt" data-cnt="keep">0</span></li>
+        <li data-status="archived"><span class="nav-ico" data-ico="archive" aria-hidden="true"></span><span>Archived</span><span class="cnt" data-cnt="archived">0</span></li>
+        <li data-status="done"><span class="nav-ico" data-ico="done" aria-hidden="true"></span><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
+        <li data-status=""><span class="nav-ico nav-ico-all" aria-hidden="true">&#8801;</span><span>All</span><span class="cnt" data-cnt="all">0</span></li>
       </ul>
+      <details class="tag-filter side-tags" id="tag">
+        <summary id="tag-summary" title="Filter by tags (OR)">Tags</summary>
+        <div class="tag-filter-list" id="tag-filter-list"></div>
+      </details>
       <div class="side-actions">
         <button id="btn-import" class="btn">Import…</button>
         <button id="btn-stats" class="btn">Stats</button>
@@ -82,6 +86,20 @@
         <button class="btn" data-bulk="archived">Archive</button>
         <button class="btn" data-bulk="done">Done</button>
         <button class="btn ghost" id="sel-clear">Clear</button>
+      </div>
+      <div id="progress-strip" class="progress-strip" hidden>
+        <span class="ps-streak" title="Items processed in a row">&#128293; <b id="ps-streak-n">0</b></span>
+        <div class="ps-bar"><div id="ps-fill" class="ps-fill"></div></div>
+        <span class="ps-label"><b id="ps-done">0</b> processed this session</span>
+      </div>
+      <div class="list-toolbar">
+        <button type="button" id="focus-toggle" class="btn ghost" aria-pressed="false"
+                title="Focus mode — dim everything but the list">Focus</button>
+        <div class="density-seg" role="group" aria-label="List density">
+          <button type="button" class="seg-btn" data-density="compact" aria-label="Compact density" title="Compact">&#8801;</button>
+          <button type="button" class="seg-btn" data-density="comfortable" aria-label="Comfortable density" title="Comfortable">&#9776;</button>
+          <button type="button" class="seg-btn" data-density="card" aria-label="Card density" title="Card">&#9638;</button>
+        </div>
       </div>
       <div id="items" class="items"></div>
       <p id="empty" class="empty" hidden>Nothing here yet — import a source to begin.</p>
@@ -164,6 +182,7 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+  <script src="/static/icons.js"></script>
   <script src="/static/swipe.js"></script>
   <script src="/static/app.js"></script>
 </body>

@@ -7,7 +7,9 @@
   <title>Triage · content-hoarder</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js"></script>
 </head>
 <body data-page="triage">
   <header class="topbar triage-bar">
@@ -15,6 +17,8 @@
     <a class="btn ghost" href="/reddit">Reddit</a>
     <span id="progress" class="progress"></span>
     <div class="bar-right">
+      <button type="button" class="icon-btn theme-toggle" data-theme-toggle
+              aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
       <button id="undo-btn" class="btn ghost" type="button" disabled>&#8630;&nbsp;Undo</button>
       <select id="source-filter" class="src-filter" title="Limit to source">
         <option value="">all sources</option>
@@ -48,20 +52,21 @@
       <button id="next-batch" class="btn primary">Get another batch</button>
     </div>
     <div id="actions" class="triage-actions">
-      <button class="act archive" data-action="archived" title="Archive (← or A)">
-        <span class="act-label">Archive</span><kbd class="act-key">A</kbd>
+      <button class="act done" data-action="done" title="Done (← or Y)">
+        <span class="act-label">Done</span><kbd class="act-key">Y</kbd>
       </button>
-      <button class="act done" data-action="done" title="Done (D)">
-        <span class="act-label">Done</span><kbd class="act-key">D</kbd>
+      <button class="act keep" data-action="keep" title="Keep (S)">
+        <span class="act-label">Keep</span><kbd class="act-key">S</kbd>
       </button>
-      <button class="act keep" data-action="keep" title="Keep (→ or K)">
-        <span class="act-label">Keep</span><kbd class="act-key">K</kbd>
+      <button class="act archive" data-action="archived" title="Archive (→ or E)">
+        <span class="act-label">Archive</span><kbd class="act-key">E</kbd>
       </button>
     </div>
-    <div class="triage-hint">Swipe ← archive · → keep · or use the buttons / A&nbsp;D&nbsp;K keys</div>
+    <div class="triage-hint">Swipe → archive · ← done · or use the buttons / S&nbsp;E&nbsp;Y keys</div>
   </main>
 
   <div id="toast" class="toast" hidden></div>
+  <script src="/static/icons.js"></script>
   <script src="/static/triage.js"></script>
 </body>
 </html>
