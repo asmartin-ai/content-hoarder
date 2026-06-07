@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
   <title>Reddit · content-hoarder</title>
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/reddit.css">
+  <script src="/static/theme.js"></script>
 </head>
 <body>
   <header>
@@ -16,6 +19,8 @@
       </nav>
     </div>
     <div class="header-right">
+      <button type="button" class="btn btn-ghost theme-toggle" data-theme-toggle
+              aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
       <button id="btn-sync" class="btn btn-primary"
               title="Pull newest saved items from Reddit (needs a reddit_session cookie)">Sync newest</button>
       <button id="btn-stats" class="btn btn-ghost">Stats</button>

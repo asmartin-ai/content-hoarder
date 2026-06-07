@@ -8,37 +8,13 @@
     display: none !important;
 }
 
+/* All design tokens now live in tokens.css (linked before this file).
+   These two aliases bridge legacy names still used across app.css / reddit.css
+   to the design-system tokens, so the status-color remap (archive → green) and
+   the theme-tuned shadows apply automatically without touching every call site. */
 :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --panel2: #1e222b;
-    --text: #e5e7eb;
-    --muted: #9aa4b2;
-    --accent: #2dd4bf;
-    --border: #262b34;
-    --danger: #f87171;
-    --keep: #34d399;
-    --done: #60a5fa;
-
-    /* type scale */
-    --fs-xs: 0.75rem;
-    --fs-sm: 0.85rem;
-    --fs-md: 0.95rem;
-    --fs-lg: 1.15rem;
-    --fs-xl: 1.4rem;
-    /* spacing rhythm */
-    --sp-1: 0.25rem;
-    --sp-2: 0.5rem;
-    --sp-3: 0.75rem;
-    --sp-4: 1rem;
-    --sp-5: 1.5rem;
-    /* radius / elevation / motion */
-    --r-sm: 8px;
-    --r-md: 12px;
-    --r-lg: 16px;
-    --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-    --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
-    --dur: 160ms;
+    --danger: var(--archive);    /* legacy archive alias → green */
+    --shadow: var(--shadow-pop); /* legacy shadow alias → theme-tuned popover shadow */
 }
 
 body {
