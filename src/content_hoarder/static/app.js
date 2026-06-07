@@ -121,27 +121,72 @@
   const loadedItems = [];           // cache of loaded items, for re-render on density change
   let currentDensity = "comfortable"; // set by applyDensity; itemHtml branches on it (card vs list)
 
-  // ADHD dopamine loop: batch size + processed-this-session counter & streak.
+  // ADHD dopamine loop: batch size + triaged-today counter & streak.
   const BATCH = 25;
   const PROGRESS_GOAL = 20;
-  let sessionDone = 0, streak = 0;
+  const PROGRESS_STORE = "ch-progress";
+  const todayKey = () => {
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    return now.getFullYear() + "-" + mm + "-" + dd;
+  };
+  const readTodayTriaged = () => {
+    try {
+      const raw = localStorage.getItem(PROGRESS_STORE);
+      if (!raw) return 0;
+      const data = JSON.parse(raw);
+      return data && data.day === todayKey() && Number.isFinite(data.count) ? data.count : 0;
+    } catch (e) {
+      return 0;
+    }
+  };
+  const writeTodayTriaged = (count) => {
+    try {
+      localStorage.setItem(PROGRESS_STORE, JSON.stringify({ day: todayKey(), count: Math.max(0, count) }));
+    } catch (e) {}
+  };
+  let todayTriaged = readTodayTriaged();
+  let streak = 0;
+  let inboxCount = 0;
+  let lastProgressDelta = null;
   const updateProgress = () => {
     const strip = document.getElementById("progress-strip");
     if (!strip) return;
-    strip.hidden = sessionDone === 0;
+    strip.hidden = inboxCount === 0 && todayTriaged === 0;
+    const left = document.getElementById("ps-left");
     const dn = document.getElementById("ps-done");
+    const streakPill = document.getElementById("ps-streak");
     const sn = document.getElementById("ps-streak-n");
     const fill = document.getElementById("ps-fill");
-    if (dn) dn.textContent = String(sessionDone);
+    const progress = todayTriaged % PROGRESS_GOAL;
+    const pct = progress === 0 && todayTriaged > 0 ? 100 : (progress / PROGRESS_GOAL * 100);
+    if (left) left.textContent = String(Math.max(0, inboxCount));
+    if (dn) dn.textContent = String(todayTriaged);
+    if (streakPill) streakPill.hidden = streak < 2;
     if (sn) sn.textContent = String(streak);
-    if (fill) fill.style.width = ((sessionDone % PROGRESS_GOAL) / PROGRESS_GOAL * 100) + "%";
+    if (fill) fill.style.width = pct + "%";
+  };
+  const adjustInboxCount = (fromStatus, toStatus, count) => {
+    if (fromStatus === "inbox" && toStatus !== "inbox") inboxCount = Math.max(0, inboxCount - count);
+    if (fromStatus !== "inbox" && toStatus === "inbox") inboxCount += count;
+  };
+  const bumpStreakPill = () => {
+    const pill = document.getElementById("ps-streak");
+    if (!pill || pill.hidden) return;
+    pill.classList.remove("bump");
+    void pill.offsetWidth;
+    pill.classList.add("bump");
   };
   const bumpProgress = (n) => {
-    const before = sessionDone;
-    sessionDone += n; streak += n;
+    const before = todayTriaged;
+    todayTriaged += n;
+    streak += n;
+    writeTodayTriaged(todayTriaged);
     updateProgress();
-    if (Math.floor(sessionDone / PROGRESS_GOAL) > Math.floor(before / PROGRESS_GOAL))
-      toast("🎉 " + sessionDone + " processed — keep going");
+    if (streak >= 2) bumpStreakPill();
+    if (Math.floor(todayTriaged / PROGRESS_GOAL) > Math.floor(before / PROGRESS_GOAL))
+      toast("🎉 " + todayTriaged + " triaged today — keep going");
   };
 
   // Per-source glyph + accent token (from the design system): the avatar shows
@@ -343,7 +388,8 @@
     };
     const urlAttr = safeUrl(item.url) ? ' data-url="' + esc(item.url) + '"' : "";
     const head = '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) +
-      '"' + urlAttr + ' style="--src:' + srcAccent(item.source) + '">' + REVEAL_HTML;
+      '" data-status="' + esc(item.status || "inbox") + '"' + urlAttr +
+      ' style="--src:' + srcAccent(item.source) + '">' + REVEAL_HTML;
 
     if (currentDensity === "card") {
       return head +
@@ -499,6 +545,7 @@
       const el = document.querySelector('[data-cnt="' + k + '"]');
       if (el) el.textContent = v || 0;
     };
+    inboxCount = bs.inbox || 0;
     set("inbox", bs.inbox);
     set("keep", bs.keep);
     set("archived", bs.archived);
@@ -512,6 +559,7 @@
       o.textContent = bc[o.value] != null ? o.dataset.label + " (" + bc[o.value] + ")" : o.dataset.label;
     });
     renderTagFilter(d.by_tag || {});
+    updateProgress();
   }).catch(() => {});
   // An item changing status moves both axes (status counts by source, tab counts by
   // status), so refresh them together.
@@ -557,7 +605,12 @@
     getJSON("/items/" + encodeURIComponent(fullname) + "/undo", { method: "POST" })
       .then(() => {
         streak = 0;
-        sessionDone = Math.max(0, sessionDone - 1);
+        if (lastProgressDelta && lastProgressDelta.fullname === fullname) {
+          todayTriaged = Math.max(0, todayTriaged - lastProgressDelta.count);
+          writeTodayTriaged(todayTriaged);
+          adjustInboxCount(lastProgressDelta.toStatus, lastProgressDelta.fromStatus, lastProgressDelta.count);
+          lastProgressDelta = null;
+        }
         updateProgress();
         load(true); loadSources(); loadCounts();
       })
@@ -565,12 +618,16 @@
   };
 
   const actOnItem = (fullname, status, row) => {
+    const fromStatus = row ? (row.dataset.status || activeStatus || "inbox") : (activeStatus || "inbox");
     getJSON("/items/" + encodeURIComponent(fullname) + "/status", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: status }),
     }).then(() => {
       selected.delete(fullname);
+      if (row) row.dataset.status = status;
       if (row && activeStatus && activeStatus !== status) row.remove();
+      adjustInboxCount(fromStatus, status, 1);
+      lastProgressDelta = { fullname: fullname, count: 1, fromStatus: fromStatus, toStatus: status };
       snackbar(cap(status), () => undoItem(fullname));
       bumpProgress(1);
       refreshNavDebounced();
@@ -654,13 +711,20 @@
     btn.addEventListener("click", () => {
       if (!selected.size) return;
       const n = selected.size;
+      const targetStatus = btn.dataset.bulk;
+      const movedFromInbox = Array.from(selected).reduce((sum, fullname) => {
+        const row = document.querySelector('.item[data-fullname="' + CSS.escape(fullname) + '"]');
+        return sum + (row && row.dataset.status === "inbox" && targetStatus !== "inbox" ? 1 : 0);
+      }, 0);
       getJSON("/bulk/status", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullnames: Array.from(selected), status: btn.dataset.bulk }),
+        body: JSON.stringify({ fullnames: Array.from(selected), status: targetStatus }),
       }).then(() => {
-        toast("Bulk marked " + btn.dataset.bulk);
+        toast("Bulk marked " + targetStatus);
         selected.clear();
         document.getElementById("bulkbar").hidden = true;
+        if (movedFromInbox) adjustInboxCount("inbox", targetStatus, movedFromInbox);
+        lastProgressDelta = null;
         bumpProgress(n);
         load(true);
         refreshNav();
@@ -882,7 +946,24 @@
     }).catch(() => { impStatus.textContent = "Import failed."; impConfirmBtn.disabled = false; });
   });
 
-  document.getElementById("q").addEventListener("input", debounce(() => load(true), 250));
+  const qInput = document.getElementById("q");
+  const qClear = document.getElementById("q-clear");
+  const syncSearchClear = () => {
+    if (qClear) qClear.hidden = !qInput.value.trim();
+  };
+  const onQueryInput = debounce(() => load(true), 250);
+  qInput.addEventListener("input", () => {
+    syncSearchClear();
+    onQueryInput();
+  });
+  if (qClear) {
+    qClear.addEventListener("click", () => {
+      qInput.value = "";
+      syncSearchClear();
+      qInput.focus();
+      load(true);
+    });
+  }
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
   document.getElementById("category").addEventListener("change", () => load(true));
@@ -903,8 +984,10 @@
       currentDensity = d;
       DENS.forEach(function (x) { box.classList.toggle("density-" + x, x === d); });
       document.querySelectorAll("[data-density]").forEach(function (b) {
-        b.classList.toggle("active", b.dataset.density === d);
-        b.setAttribute("aria-pressed", String(b.dataset.density === d));
+        var on = b.dataset.density === d;
+        b.classList.toggle("active", on);
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", String(on));
       });
       try { localStorage.setItem("ch-density", d); } catch (e) {}
       if (changed && loadedItems.length) renderAll();   // card vs list markup differ → re-render
@@ -956,6 +1039,7 @@
         document.body.classList.toggle("focus-mode", on);
         fbtn.setAttribute("aria-pressed", String(on));
         fbtn.classList.toggle("active", on);
+        fbtn.classList.toggle("on", on);
         try { localStorage.setItem("ch-focus", on ? "1" : "0"); } catch (e) {}
       };
       fbtn.addEventListener("click", function () { setFocus(!document.body.classList.contains("focus-mode")); });
@@ -964,6 +1048,8 @@
     }
     var lm = document.getElementById("loadmore");
     if (lm) lm.textContent = "Show " + BATCH + " more";
+    syncSearchClear();
+    updateProgress();
   })();
 
   document.getElementById("loadmore").addEventListener("click", () => load(false));
