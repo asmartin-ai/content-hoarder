@@ -826,7 +826,8 @@
       else if (k === "s" || k === "e" || k === "y") {
         var row = cur(); if (!row) return;
         actOnItem(row.dataset.fullname, k === "s" ? "keep" : k === "e" ? "archived" : "done", row);
-        setTimeout(function () { focus(fi); }, 60);  // land on the next row after removal
+        // Row removal (if any) is async; leave focus for the next J/K to re-clamp
+        // rather than racing the network round-trip.
       } else if (k === "x") {
         var r2 = cur(); if (!r2) return;
         var cb = r2.querySelector(".sel");

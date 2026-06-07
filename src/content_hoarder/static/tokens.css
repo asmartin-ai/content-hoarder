@@ -1,5 +1,5 @@
-﻿/* ============================================================
-   content-hoarder · design tokens (single entry point)
+/* ============================================================
+   content-hoarder . design tokens (single entry point)
    Vendored from the design system (tokens/colors.css +
    typography.css + spacing.css). Source of truth for all
    color/type/space/radius/elevation/motion values.
@@ -7,12 +7,12 @@
    no attribute = dark (the product's native identity).
    ============================================================ */
 /* ============================================================
-   content-hoarder Â· color tokens  (light + dark, themeable)
+   content-hoarder · color tokens  (light + dark, themeable)
 
    Set the theme by putting data-theme="light" | "dark" on <html>.
    No attribute = dark (the product's native identity).
 
-   The single brand accent is a calm, soft TEAL â€” gentler than neon,
+   The single brand accent is a calm, soft TEAL — gentler than neon,
    distinct from the warm source badges (reddit/youtube/firefox) and
    from the cool status blue, and it holds up in both light and dark.
    Status stays a fixed three-color language: keep=blue, archive=green,
@@ -24,8 +24,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* surface stack (darkest â†’ lightest) */
-  --bg: #0f1115;          /* app background â€” the void behind everything */
+  /* surface stack (darkest → lightest) */
+  --bg: #0f1115;          /* app background — the void behind everything */
   --panel: #171a21;       /* cards, headers, modals */
   --panel2: #1e222b;      /* inset controls, hovered rows, chips */
   --row-hover: #1c2129;   /* list-row hover wash */
@@ -35,20 +35,20 @@
   /* text */
   --text: #e5e7eb;        /* primary copy */
   --muted: #9aa4b2;       /* secondary copy, metadata, labels */
-  --dim: #6b7280;         /* tertiary â€” counts, empty hints, timestamps */
+  --dim: #6b7280;         /* tertiary — counts, empty hints, timestamps */
 
-  /* accent (the one brand color) â€” soft teal */
+  /* accent (the one brand color) — soft teal */
   --accent: #56c4b5;      /* primary actions, active marks, focus */
-  --accent-strong: #2f9d8d; /* pressed/hover primary â€” deeper, more distinct */
-  --accent-ink: #06231f;  /* dark ink â€” text/icon ON an accent fill */
+  --accent-strong: #2f9d8d; /* pressed/hover primary — deeper, more distinct */
+  --accent-ink: #06231f;  /* dark ink — text/icon ON an accent fill */
   --accent-tint: rgba(86, 196, 181, 0.16); /* selected row / progress track fill */
 
   /* semantic status */
-  --keep: #60a5fa;        /* keep â€” worth revisiting (blue) */
+  --keep: #60a5fa;        /* keep — worth revisiting (blue) */
   --keep-ink: #04203f;
-  --archive: #34d399;      /* archive â€” set aside, out of the way (green) */
+  --archive: #34d399;      /* archive — set aside, out of the way (green) */
   --archive-ink: #04231a;
-  --done: #f87171;        /* done â€” finished with it (red) */
+  --done: #f87171;        /* done — finished with it (red) */
   --done-ink: #2a0a0a;
 
   /* status tints (swipe reveals, selected rows) */
@@ -107,7 +107,7 @@
 }
 
 /* ============================================================
-   semantic aliases â€” prefer these in components
+   semantic aliases — prefer these in components
    ============================================================ */
 :root {
   --surface-app: var(--bg);
@@ -132,8 +132,8 @@
 }
 
 /* ============================================================
-   content-hoarder Â· typography tokens
-   System UI stack only â€” zero webfonts, by design. A local-first
+   content-hoarder · typography tokens
+   System UI stack only — zero webfonts, by design. A local-first
    tool ships nothing it doesn't need; the OS font is instant,
    familiar, and renders crisply on the dark surface. Numbers use
    tabular figures wherever counts line up (sidebars, scores).
@@ -145,11 +145,11 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   /* ---- type scale (rem) ---- */
-  --fs-xs: 0.75rem;   /* 12px â€” counts, kbd hints, tag chips, timestamps */
-  --fs-sm: 0.85rem;   /* 13.6px â€” secondary controls, meta, snippets */
-  --fs-md: 0.95rem;   /* 15.2px â€” body, list titles, status nav */
-  --fs-lg: 1.15rem;   /* 18.4px â€” brand wordmark, card titles, empty state */
-  --fs-xl: 1.4rem;    /* 22.4px â€” section / page headings */
+  --fs-xs: 0.75rem;   /* 12px — counts, kbd hints, tag chips, timestamps */
+  --fs-sm: 0.85rem;   /* 13.6px — secondary controls, meta, snippets */
+  --fs-md: 0.95rem;   /* 15.2px — body, list titles, status nav */
+  --fs-lg: 1.15rem;   /* 18.4px — brand wordmark, card titles, empty state */
+  --fs-xl: 1.4rem;    /* 22.4px — section / page headings */
 
   /* ---- weights ---- */
   --fw-regular: 400; /* @kind other */
@@ -175,8 +175,8 @@
 }
 
 /* ============================================================
-   content-hoarder Â· spacing, radius, elevation & motion
-   A tight 0.25rem rhythm â€” this is a dense, scannable triage
+   content-hoarder · spacing, radius, elevation & motion
+   A tight 0.25rem rhythm — this is a dense, scannable triage
    surface, not an airy marketing page. Radii step up with the
    size of the thing they round: chips & inputs (8), cards &
    modals (12), the big triage card (16).
@@ -184,11 +184,11 @@
 
 :root {
   /* ---- spacing rhythm (0.25rem base) ---- */
-  --sp-1: 0.25rem;  /* 4px  â€” chip gaps, icon gaps, tag-chip rows */
-  --sp-2: 0.5rem;   /* 8px  â€” control gaps, button padding-y */
-  --sp-3: 0.75rem;  /* 12px â€” card inner padding, popover padding */
-  --sp-4: 1rem;     /* 16px â€” layout gutters, section spacing */
-  --sp-5: 1.5rem;   /* 24px â€” major separation */
+  --sp-1: 0.25rem;  /* 4px  — chip gaps, icon gaps, tag-chip rows */
+  --sp-2: 0.5rem;   /* 8px  — control gaps, button padding-y */
+  --sp-3: 0.75rem;  /* 12px — card inner padding, popover padding */
+  --sp-4: 1rem;     /* 16px — layout gutters, section spacing */
+  --sp-5: 1.5rem;   /* 24px — major separation */
 
   /* ---- corner radius ---- */
   --r-sm: 8px;   /* inputs, buttons, chips, small thumbs */
@@ -222,7 +222,7 @@
   --radius-card: var(--r-md);
 }
 
-/* Lighter, cooler shadows for light theme â€” heavy black drop shadows read
+/* Lighter, cooler shadows for light theme — heavy black drop shadows read
    as dirt on white. Softer ambient + tight contact shadow instead. */
 :root[data-theme="light"] {
   --shadow-row: 0 1px 2px rgba(20, 24, 33, 0.06);
@@ -230,4 +230,3 @@
   --shadow-pop: 0 12px 34px rgba(20, 24, 33, 0.16);
   --shadow-toast: 0 8px 24px rgba(20, 24, 33, 0.18);
 }
-

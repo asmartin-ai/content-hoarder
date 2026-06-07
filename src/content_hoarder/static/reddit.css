@@ -1,4 +1,4 @@
-﻿/* Reskinned from reddit-saved-manager to content-hoarder's palette (teal accent,
+/* Reskinned from reddit-saved-manager to content-hoarder's palette (teal accent,
    var(--bg) bg). Layout/structure unchanged; semantic colors (NSFW red, kind badges) kept. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -13,7 +13,7 @@ body {
   overflow: hidden;
 }
 
-/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Header ─────────────────────────────────────────────────────────────── */
 header {
   display: flex;
   align-items: center;
@@ -35,7 +35,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   color: var(--muted);
 }
 
-/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -49,15 +49,15 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   text-decoration: none;
   transition: background 0.15s;
 }
-.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-.btn-primary:hover { background: var(--accent); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent-strong); }
+.btn-primary:hover { background: var(--accent-strong); }
 .btn-ghost { background: var(--border); color: var(--text); border-color: var(--border-strong); }
 .btn-ghost:hover { background: var(--border); }
 .btn-danger { background: #8b2020; color: #ffc; border-color: #a02020; }
 .btn-danger:hover { background: #a02020; }
 .btn-sm { padding: 3px 8px; font-size: 12px; }
 
-/* â”€â”€ Status bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Status bar ──────────────────────────────────────────────────────────── */
 #status-bar {
   display: flex;
   align-items: center;
@@ -77,7 +77,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 }
 #sync-status { font-size: 12px; color: var(--muted); margin-left: 8px; }
 
-/* â”€â”€ Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
   display: flex;
   gap: 8px;
@@ -100,7 +100,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 #filter-subreddit { width: 130px; }
 #toolbar select { cursor: pointer; }
 
-/* â”€â”€ Import/export bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Import/export bar ───────────────────────────────────────────────────── */
 #import-export-bar {
   display: flex;
   align-items: center;
@@ -122,7 +122,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   cursor: pointer;
 }
 
-/* â”€â”€ Main layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Main layout ─────────────────────────────────────────────────────────── */
 #main {
   display: flex;
   flex: 1;
@@ -130,7 +130,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   min-height: 0;
 }
 
-/* â”€â”€ Items panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Items panel ─────────────────────────────────────────────────────────── */
 #items-panel {
   flex: 1;
   overflow-y: auto;
@@ -190,7 +190,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 
 #items-table tbody tr:hover { background: var(--panel2); }
 #items-table tbody tr.unsaved-row { opacity: 0.55; }
-#items-table tbody tr.selected-row { background: #1e2a1e; }
+#items-table tbody tr.selected-row { background: var(--accent-tint); }
 
 .item-title { color: var(--text); }
 .media-badge {
@@ -215,10 +215,10 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 .source-badge { font-size: 11px; color: var(--dim); }
 .empty-msg { text-align: center; color: var(--dim); padding: 40px; }
 
-/* â”€â”€ Action buttons in table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Action buttons in table ─────────────────────────────────────────────── */
 .action-btns { display: flex; gap: 4px; flex-wrap: nowrap; }
 
-/* â”€â”€ Detail panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Detail panel ────────────────────────────────────────────────────────── */
 #detail-panel {
   width: 420px;
   min-width: 280px;
@@ -275,18 +275,18 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 
 #detail-loading { color: var(--muted); text-align: center; padding: 40px; }
 
-/* [ARCHIVAL] begin â€” removable styles */
+/* [ARCHIVAL] begin — removable styles */
 #hydrate-status { font-size: 12px; color: var(--muted); }
 #archive-links { display: inline-flex; gap: 6px; }
 #archive-links .btn { font-size: 12px; padding: 3px 8px; }
 /* [ARCHIVAL] end */
 
-/* â”€â”€ Toolbar extras: fuzzy checkbox + view toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toolbar extras: fuzzy checkbox + view toggle ───────────────────────────── */
 .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
 #view-toggle { display: inline-flex; gap: 4px; }
-#view-toggle .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#view-toggle .btn.active { background: var(--accent); color: #fff; border-color: var(--accent-strong); }
 
-/* â”€â”€ Subreddit sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Subreddit sidebar ──────────────────────────────────────────────────────── */
 #subreddit-sidebar {
   width: 220px;
   flex-shrink: 0;
@@ -315,11 +315,11 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   padding: 4px 10px; font-size: 12px; color: var(--muted); cursor: pointer; gap: 6px;
 }
 .sub-item:hover { background: var(--panel2); }
-.sub-item.active { background: #1e2a1e; color: #fff; }
+.sub-item.active { background: var(--accent-tint); color: var(--accent); }
 .sub-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub-count { color: var(--dim); font-variant-numeric: tabular-nums; }
 
-/* â”€â”€ Grid view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Grid view ──────────────────────────────────────────────────────────────── */
 #items-grid {
   column-count: 4; column-gap: 12px; padding: 12px;
 }
@@ -331,7 +331,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
 }
 .card.unsaved-row { opacity: 0.55; }
-.card.selected-row { border-color: #3a5a3a; }
+.card.selected-row { border-color: var(--accent); }
 .card-media { position: relative; background: #000; line-height: 0; }
 .card-media img, .card-media video { width: 100%; height: auto; display: block; max-height: 480px; object-fit: contain; }
 .card-body { padding: 8px 10px; }
@@ -341,7 +341,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 .card-meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
 .card .action-btns { display: flex; gap: 4px; }
 
-/* â”€â”€ NSFW blur â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── NSFW blur ──────────────────────────────────────────────────────────────── */
 .card-media.nsfw img, .card-media.nsfw video { filter: blur(28px); }
 .nsfw-overlay {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -349,7 +349,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
   cursor: pointer; line-height: 1;
 }
 
-/* â”€â”€ Stats modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Stats modal ────────────────────────────────────────────────────────────── */
 .modal {
   position: fixed; inset: 0; background: rgba(0,0,0,0.6);
   display: flex; align-items: center; justify-content: center; z-index: 10;
@@ -401,8 +401,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 .tag-opt:hover { background: var(--panel2); }
 .tag-opt-cnt { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-
-/* keyboard focus + reduced motion — the reddit view links only tokens.css + this file */
+/* keyboard focus + reduced motion - the reddit view links only tokens.css + this file */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
