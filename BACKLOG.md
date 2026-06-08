@@ -257,8 +257,17 @@ to its companion discussion threads.*
   comments / HN thread), labelled by source and opening in a new tab. The companion record now resolves
   the *discussion* URL — a reddit permalink or the **HN thread** (`item?id=…` from the story id), never
   the matched video link. Verified in-browser against a consolidated copy of the live DB.
-- [x] ~~**Constraint — saved-only, never fetch.**~~ Honored: `plan()` skips any video with no local
-  `youtube:<id>` row (the 128 "skipped_no_youtube" above) — it never goes online to find a thread.
+- [x] ~~**Promote link-only videos into YouTube items.**~~ Shipped: when a Reddit post / HN story links
+  to a YouTube video with **no** local `youtube:<id>` row, `migrate()` now **promotes** the link into a
+  new keyless `youtube:<id>` item (derived `i.ytimg.com` thumbnail, provisional title from the post with
+  the HN `[video]` marker stripped + `title_source='companion'`, `promoted_by='consolidate'`), inheriting
+  the post's triage status/processed-time, then folds the post in as a companion chip. The point of such a
+  post is to watch the video, so the video becomes the canonical item. `undo` deletes the promoted rows
+  (full round-trip). A later `enrich --source youtube` fills exact titles. Live DB: 128 promoted.
+- [x] ~~**Constraint — never fetch (saved-only relaxed → promote).**~~ Still never goes online: the
+  promoted row is built from the video id alone (mirrors `firefox_youtube.py` tab promotion). The earlier
+  saved-only rule (skip any video with no local `youtube:<id>` row) was relaxed per user decision in favor
+  of promotion (above).
 - [x] ~~**Precedence + matching.**~~ Honored: match key = canonical YouTube video id (`firefox.youtube_id`)
   from any source's link; YouTube is always the survivor. Firefox-tab→YouTube is still promoted at import
   (`firefox_youtube.py`); Reddit link-post→YouTube and HN story→YouTube fold here.
