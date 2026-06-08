@@ -122,16 +122,17 @@ def cmd_consolidate(args) -> int:
     if not args.apply:
         if args.undo:
             print(
-                f"(dry run — would clear companions/unmark consolidated rows for "
-                f"{res['candidates']} candidate item(s); re-run with --apply to commit. "
-                f"Run against a COPY of the DB first.)",
+                f"(dry run — would clear companions/unmark consolidated rows and delete promoted "
+                f"youtube rows across {res['candidates']} candidate item(s); re-run with --apply to "
+                f"commit. Run against a COPY of the DB first.)",
                 file=sys.stderr,
             )
         else:
             print(
-                f"(dry run — {res['foldable']} item(s) would be consolidated into existing youtube rows; "
-                f"{res['skipped_no_youtube']} item(s) link to YouTube but have no local youtube row and are skipped; "
-                f"re-run with --apply to commit. Run against a COPY of the DB first.)",
+                f"(dry run — {res['foldable']} item(s) would fold into existing youtube rows; "
+                f"{res['promoted']} item(s) link to not-yet-saved YouTube videos and would be promoted into "
+                f"{res['youtube_created']} new youtube item(s); re-run with --apply to commit. "
+                f"Run against a COPY of the DB first.)",
                 file=sys.stderr,
             )
     return 0
