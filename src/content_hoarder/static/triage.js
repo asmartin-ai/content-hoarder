@@ -120,6 +120,26 @@
     }).join("") + "</div>";
   }
 
+  // Companion discussion threads folded onto a canonical YouTube item (Epic 11).
+  var COMP_LABEL = { reddit: "Reddit", hackernews: "Hacker News", firefox: "Firefox" };
+  function companionHref(c) {
+    var u = ((c && (c.permalink || c.url)) || "").trim();
+    if (/^\/r\//i.test(u)) u = "https://www.reddit.com" + u;
+    return safeUrl(u);
+  }
+  function companionsHtml(item) {
+    var list = (item.metadata || {}).companions;
+    var cs = Array.isArray(list) ? list.filter(companionHref) : [];
+    if (!cs.length) return "";
+    var links = cs.map(function (c) {
+      var label = COMP_LABEL[c.source] || (sources[c.source] || {}).label || c.source || "link";
+      return '<a class="comp-link" href="' + esc(companionHref(c)) +
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(label) + " ↗</a>";
+    }).join("");
+    return '<div class="companions" title="Saved discussion threads for this video">' +
+      '<span class="comp-lead" aria-hidden="true">💬</span>' + links + "</div>";
+  }
+
   var CATEGORIES = ["listenable", "watch", "wotagei", "unknown"];
   function catHtml(item) {
     if (item.source !== "youtube") return "";  // category is a YouTube concept for now
@@ -185,6 +205,7 @@
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
       datesLine(item) +
+      companionsHtml(item) +
       tagChips(item) +
       catHtml(item) +
       recoverHtml(item) +

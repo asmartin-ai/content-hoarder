@@ -1327,6 +1327,22 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 /* Chips are clickable in the browse list (.item), but display-only on triage cards. */
 .item .tag-chip { cursor: pointer; }
 
+/* Companion discussion links folded onto a canonical YouTube item (Epic 11).
+   Kept visible at every density (unlike snippet/tag-chips) so the 💬 lead stays
+   an at-a-glance "an accompanying discussion exists" signal. */
+.companions {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--muted);
+}
+.companions .comp-lead { line-height: 1; opacity: 0.85; }
+.comp-link {
+    display: inline-flex; align-items: center;
+    padding: 0 0.45rem; line-height: 1.6; border-radius: 999px;
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--muted); text-decoration: none; white-space: nowrap;
+}
+.comp-link:hover { color: var(--accent); border-color: var(--accent); }
+
 .side-section {
     border-top: 1px solid var(--border);
     padding-top: 0.85rem;
@@ -1578,6 +1594,8 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 .items.density-compact .tag-chips,
 .items.density-compact .item-recover { display: none; }
 .items.density-compact .item-thumb { display: none; }
+/* keep the companion chip whole at the end of the dense line; let meta ellipsize instead */
+.items.density-compact .companions { flex: 0 0 auto; margin-top: 0; flex-wrap: nowrap; }
 
 /* ---- density: comfortable (two lines + snippet + full-height pinned thumb) ---- */
 .items.density-comfortable .item-av { margin-top: 0.1rem; }
