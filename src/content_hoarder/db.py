@@ -18,6 +18,7 @@ import time
 
 from content_hoarder.models import (
     ITEM_FIELDS,
+    NSFW_TAGS,
     VALID_STATUSES,
     build_search_text,
     parse_metadata,
@@ -519,11 +520,11 @@ def search_items(
                 )
                 params.extend(tags)
         if nsfw:
-            ph = ",".join("?" for _ in ("nsfw_erotic", "nsfw_other", "nsfw_talk"))
+            ph = ",".join("?" for _ in NSFW_TAGS)
             filters.append(
                 f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
             )
-            params.extend(["nsfw_erotic", "nsfw_other", "nsfw_talk"])
+            params.extend(NSFW_TAGS)
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)
@@ -585,6 +586,14 @@ def search_items(
         bind = [match_expr] + params + [int(limit), int(offset)]
     else:
         add_filters("")
+        # No positive FTS term to hang a NOT off of (e.g. a `-term`-only query), so apply
+        # the negations as plain search_text exclusions instead — otherwise they'd be
+        # silently dropped. (`\W+` tokens are word-chars only, so escape just LIKE's `_`.)
+        for term in exclude:
+            for tk in (t for t in re.split(r"\W+", term or "") if t):
+                esc = tk.lower().replace("\\", r"\\").replace("_", r"\_").replace("%", r"\%")
+                filters.append(r"LOWER(search_text) NOT LIKE ? ESCAPE '\'")
+                params.append("%" + esc + "%")
         where = (" WHERE " + " AND ".join(filters)) if filters else ""
         sql = (
             f"SELECT * FROM items{where} {_order_clause(sort, order)} LIMIT ? OFFSET ?"

@@ -16,8 +16,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-
-_NSFW_TAGS = ("nsfw_erotic", "nsfw_other", "nsfw_talk")
+from content_hoarder.models import NSFW_TAGS  # canonical vocabulary (DB-free leaf module)
 
 
 @dataclass(frozen=True)
@@ -278,4 +277,4 @@ def parse(q: str) -> ParsedQuery:
 
 def nsfw_tags() -> tuple[str, ...]:
     """Expose the NSFW tag vocabulary for callers/tests."""
-    return _NSFW_TAGS
+    return NSFW_TAGS
