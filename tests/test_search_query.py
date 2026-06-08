@@ -14,6 +14,15 @@ def test_parse_basic_operators_and_leftover_text():
     assert p.status == "inbox"
 
 
+def test_parse_normalizes_source_kind_status_value_case():
+    # Stored values are canonical-lowercase; a capitalized operator must still match.
+    p = search_query.parse("source:YouTube kind:Video status:Inbox subreddit:HoloLive")
+    assert p.source == "youtube"
+    assert p.kind == "video"
+    assert p.status == "inbox"
+    assert p.subreddit == "HoloLive"  # left as-typed (matched COLLATE NOCASE downstream)
+
+
 def test_parse_unknown_key_value_falls_through_to_text():
     p = search_query.parse("foo wat:bar")
     assert p.text == "foo wat:bar"
