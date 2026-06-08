@@ -25,4 +25,6 @@ def test_categorize_source_sets_category(tmp_db):
     assert res["selected"] == 2
     assert res["by_category"]["listenable"] == 1 and res["by_category"]["watch"] == 1
     item = db.get_item(conn, "youtube:v_long")
-    assert json.loads(item["metadata"])["category"] == "listenable"
+    md = json.loads(item["metadata"])
+    assert md["category"] == "listenable"
+    assert md["tags"] == ["listenable"]

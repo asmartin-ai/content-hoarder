@@ -36,6 +36,39 @@ def test_metadata_shallow_merge(conn):
     assert md == {"a": 1, "b": 2}
 
 
+def test_processing_category_is_mirrored_to_tags(conn):
+    db.merge_upsert(conn, mk(source="youtube", source_id="v1",
+                             metadata={"category": "watch", "tags": ["existing", "listenable"]}))
+    md = json.loads(db.get_item(conn, "youtube:v1")["metadata"])
+    assert md["category"] == "watch"
+    assert md["tags"] == ["existing", "watch"]
+    assert db.search_items(conn, "", tags=["watch"])[0]["fullname"] == "youtube:v1"
+    assert db.search_items(conn, "", category="watch")[0]["fullname"] == "youtube:v1"
+
+    db.merge_upsert(conn, mk(source="youtube", source_id="v1",
+                             metadata={"category": "listenable", "tags": ["fresh", "watch"]}))
+    md = json.loads(db.get_item(conn, "youtube:v1")["metadata"])
+    assert md["category"] == "listenable"
+    assert md["tags"] == ["existing", "fresh", "listenable"]
+
+    assert db.set_category(conn, "youtube:v1", "unknown") is True
+    md = json.loads(db.get_item(conn, "youtube:v1")["metadata"])
+    assert md["category"] == "unknown"
+    assert md["tags"] == ["existing", "fresh"]
+    assert db.search_items(conn, "", tags=["watch"]) == []
+
+
+def test_normalize_processing_tags_backfills_legacy_metadata(conn):
+    db.merge_upsert(conn, mk(source="youtube", source_id="v1"))
+    conn.execute(
+        "UPDATE items SET metadata=? WHERE fullname='youtube:v1'",
+        (json.dumps({"category": "listenable"}),),
+    )
+    assert db.normalize_processing_tags(conn) == 1
+    md = json.loads(db.get_item(conn, "youtube:v1")["metadata"])
+    assert md["tags"] == ["listenable"]
+
+
 def test_search_exact_and_metadata_fold(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="Hedgehog care",
                              metadata={"subreddit": "hedgehogs"}))
@@ -123,6 +156,24 @@ def test_sort_oldest_first_and_by_duration(conn):
     assert [i["source_id"] for i in db.search_items(conn, "", sort="created_utc", order="asc")] == ["1", "2"]
     assert db.search_items(conn, "", sort="duration", order="asc")[0]["source_id"] == "1"   # 60s first
     assert db.search_items(conn, "", sort="duration", order="desc")[0]["source_id"] == "2"  # 3600s first
+
+
+def test_category_counts_cross_filter_by_source_and_status(conn):
+    db.merge_upsert(conn, mk(source="youtube", source_id="v1", metadata={"category": "watch"}))
+    db.merge_upsert(conn, mk(source="youtube", source_id="v2", metadata={"category": "watch"}))
+    db.merge_upsert(conn, mk(source="youtube", source_id="v3", metadata={"category": "listenable"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_a", metadata={"category": "watch"}))
+    db.set_status(conn, "youtube:v2", "keep")
+    db.set_status(conn, "reddit:t3_a", "keep")
+
+    all_youtube = {r["category"]: r["count"] for r in db.category_counts(conn, source="youtube")}
+    keep_only = {r["category"]: r["count"] for r in db.category_counts(conn, source="youtube", status="keep")}
+
+    assert all_youtube == {"listenable": 1, "watch": 2, "wotagei": 0, "unknown": 0}
+    assert keep_only == {"listenable": 0, "watch": 1, "wotagei": 0, "unknown": 0}
+
+    assert db.tag_counts(conn, source="youtube") == {"watch": 2, "listenable": 1}
+    assert db.tag_counts(conn, source="youtube", status="keep") == {"watch": 1}
 
 
 def test_init_db_idempotent(conn):

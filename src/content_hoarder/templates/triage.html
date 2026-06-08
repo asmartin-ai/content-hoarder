@@ -53,17 +53,35 @@
     </div>
     <div id="actions" class="triage-actions">
       <button class="act done" data-action="done" title="Done (← or Y)">
+        <span class="act-ic" data-ico="done" aria-hidden="true"></span>
         <span class="act-label">Done</span><kbd class="act-key">Y</kbd>
       </button>
       <button class="act keep" data-action="keep" title="Keep (S)">
+        <span class="act-ic" data-ico="keep" aria-hidden="true"></span>
         <span class="act-label">Keep</span><kbd class="act-key">S</kbd>
       </button>
       <button class="act archive" data-action="archived" title="Archive (→ or E)">
+        <span class="act-ic" data-ico="archive" aria-hidden="true"></span>
         <span class="act-label">Archive</span><kbd class="act-key">E</kbd>
       </button>
     </div>
     <div class="triage-hint">Swipe → archive · ← done · or use the buttons / S&nbsp;E&nbsp;Y keys</div>
   </main>
+
+  <div id="shortcut-modal" class="modal" hidden>
+    <div class="modal-box shortcut-box">
+      <button class="modal-close" id="shortcut-close" type="button">&times;</button>
+      <h2>Keyboard shortcuts</h2>
+      <div class="shortcut-list">
+        <div class="shortcut-row"><span><kbd>S</kbd></span><span>Keep</span></div>
+        <div class="shortcut-row"><span><kbd>E</kbd> / <kbd>&rarr;</kbd></span><span>Archive</span></div>
+        <div class="shortcut-row"><span><kbd>Y</kbd> / <kbd>&larr;</kbd></span><span>Done</span></div>
+        <div class="shortcut-row"><span><kbd>U</kbd> / <kbd>Z</kbd></span><span>Undo</span></div>
+        <div class="shortcut-row"><span><kbd>?</kbd></span><span>Toggle this sheet</span></div>
+      </div>
+      <p class="shortcut-note">Swipe right to archive and left to mark done.</p>
+    </div>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
   <script src="/static/icons.js"></script>

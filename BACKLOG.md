@@ -245,22 +245,23 @@ comment thread about it, and a Firefox tab of any of those. Today they're separa
 them into one canonical item — **YouTube takes precedence over every other source** — that links out
 to its companion discussion threads.*
 
-- [ ] **P2 — Consolidate matched items into a canonical YouTube item.** A re-runnable script that
-  detects when a Reddit post / HN story / Firefox tab points at a YouTube video (extract the video id
-  from the item's `url` / link target) and folds them into one `youtube:<id>` item. The companions
-  survive only as links on the canonical item — e.g.
-  `metadata.companions = [{source, kind, permalink/url, fullname}]` — not as separate cards.
-  Non-destructive + **reversible** (retain the originals' fullnames so it can be undone).
-- [ ] **Card affordances.** On the YouTube card show **click-through links** to the companion Reddit
-  comments / HN thread, plus a small **icon/badge** signalling that an accompanying discussion exists,
-  so it's identifiable at a glance.
-- [ ] **Constraint — saved-only, never fetch.** Only consolidate threads **already saved**. Do NOT go
-  online to find or fetch a Reddit/HN thread for a video that doesn't have one saved — explicitly out
-  of scope.
-- [ ] **Precedence + matching.** YouTube > all. Match key = canonical YouTube video id from any
-  source's link. Cases: Firefox-tab→YouTube (already promoted at import via `firefox_youtube.py`),
-  Reddit link-post→YouTube, HN story-url→YouTube. (The standalone "📑 Firefox tabs" filter button was
-  removed — that import-time promotion still happens; this feature subsumes the rest.)
+- [x] ~~**P2 — Consolidate matched items into a canonical YouTube item.**~~ Shipped: `consolidate.py`
+  (`plan`/`migrate`/`unconsolidate`, re-runnable, non-destructive, reversible) folds a Reddit post / HN
+  story / Firefox tab that points at a YouTube video into one `youtube:<id>` row — appends a de-duped
+  `metadata.companions = [{source, kind, permalink|url, fullname}]` record and stamps
+  `consolidated_into` on the folded row. CLI `consolidate [--apply] [--undo]` (dry-run default);
+  `search_items(include_consolidated=False)` hides folded companions from the main list (per-source
+  `/reddit` opts in). Live DB dry-run: 8 foldable, 128 skipped (no local youtube row).
+- [x] ~~**Card affordances.**~~ Shipped: the canonical YouTube row (all three browse densities) and the
+  triage card show a `💬` "discussion exists" lead + per-companion **click-through links** (Reddit
+  comments / HN thread), labelled by source and opening in a new tab. The companion record now resolves
+  the *discussion* URL — a reddit permalink or the **HN thread** (`item?id=…` from the story id), never
+  the matched video link. Verified in-browser against a consolidated copy of the live DB.
+- [x] ~~**Constraint — saved-only, never fetch.**~~ Honored: `plan()` skips any video with no local
+  `youtube:<id>` row (the 128 "skipped_no_youtube" above) — it never goes online to find a thread.
+- [x] ~~**Precedence + matching.**~~ Honored: match key = canonical YouTube video id (`firefox.youtube_id`)
+  from any source's link; YouTube is always the survivor. Firefox-tab→YouTube is still promoted at import
+  (`firefox_youtube.py`); Reddit link-post→YouTube and HN story→YouTube fold here.
 
 ## Epic 12 — Search operators in the search bar  (`enhancement`, `area:search`)
 *Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
@@ -276,10 +277,36 @@ need separate filter controls.*
   has-any). Operators should let the user pick: repeated `tag:` as AND vs. `tag:a,b`/`tag:a|b` as OR
   (per the user's request to specify multi-tag logic via search). `search_items` already takes a
   `tags=[]` list — add an AND mode there.
+- [ ] **P2 — Fuzzy-by-default; `"quotes"` for exact.** Flip the search default so free-text queries
+  are **fuzzy** (typo-tolerant / loose match) without needing the `#fuzzy` checkbox, and treat a
+  `"quoted phrase"` as an opt-out → **exact** match. Removes a manual toggle for the common case and
+  aligns with the Gmail/Google mental model. Wire into `search_items`: default `fuzzy=True` for
+  bare terms, parse quoted spans as exact (folds into the quoted-phrase operator above), and either
+  drop the `#fuzzy` checkbox or repurpose it as an "exact" override. Note the FTS-vs-fuzzy path
+  interaction when both quoted and unquoted terms appear in one query.
 
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
+- [ ] **P2 — Rework the comfortable density layout.** The design-v2 round-2 pass made comfortable rows
+  fixed-height with edge-to-edge cropped thumbnails (`app.css` `.items.density-comfortable .item-thumb`),
+  but the result is unsatisfactory in practice. Revisit the row height / thumbnail crop / spacing so
+  comfortable reads well; compare against `design-ref/design_handoff_screens/01-inbox-comfortable-dark.png`
+  but treat it as a starting point, not gospel (the fixed-height was an intentional deviation). Capture
+  the specific gripes (thumbnail proportions? vertical rhythm? action-slot alignment?) before reworking.
+- [ ] **P2 — Tag-chip overload on enriched YouTube cards.** Enriched YouTube videos render a wall of
+  tag chips (e.g. the "I made a Self-Soldering Circuit" card shows ~25: `arduino`, `atmega`, `avr`,
+  `circuit design`, `diy reflow`, `high voltage`, …). **Root cause:** the per-item chip renderers
+  (`tagChips` in `static/app.js` *and* `static/triage.js`) print the raw `metadata.tags` array
+  unfiltered, and the `enrich --source youtube` pass dumps every yt-dlp keyword into `metadata.tags`
+  (~28,950 unique across the corpus). The sidebar rail already sidesteps this by restricting to the
+  curated `categorize.FILTER_TAGS` (~15) via `db.tag_counts` — but the cards don't. **Investigate +
+  decide a display strategy**, e.g.: (a) on cards, show only curated `FILTER_TAGS` chips (expose the
+  vocabulary to the frontend, mirroring the rail) and drop raw keywords from the visible set; (b) cap to
+  N chips with a "+M more" expander; (c) a hybrid — curated first, then a few keywords behind the
+  expander. Keep all keywords in `metadata.tags` for FTS/search (non-destructive); this is display-only.
+  Touches `tagChips` (app.js + triage.js), the card/`.tag-chips` CSS, and possibly a `FILTER_TAGS`
+  endpoint/payload. Relates to Epic 9 (tagging) and the FILTER_TAGS perf work in the round-2 handoff.
 - [x] ~~**Card-view text clipping / title overlap.**~~ Fixed by the v2 card (adaptive hero + bottom
   action row). (Also noted in Epic 5.)
 - [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
