@@ -179,3 +179,58 @@ def test_category_counts_cross_filter_by_source_and_status(conn):
 def test_init_db_idempotent(conn):
     db.init_db(conn)
     db.init_db(conn)
+
+
+def test_search_tags_all_or_nsfw_and_score_and_dates(conn):
+    # Two reddit posts, one NSFW + high score, one SFW + low score.
+    db.merge_upsert(conn, mk(
+        source="reddit",
+        source_id="t3_a",
+        title="A",
+        created_utc=1672444800,  # 2022-12-31
+        metadata={"tags": ["coding", "memes", "nsfw_other"], "score": 150, "subreddit": "hh"},
+    ))
+    db.merge_upsert(conn, mk(
+        source="reddit",
+        source_id="t3_b",
+        title="B",
+        created_utc=1675209600,  # 2023-02-01
+        metadata={"tags": ["coding"], "score": 10, "subreddit": "hh"},
+    ))
+
+    # OR tags (any matches)
+    r = db.search_items(conn, "", tags=["memes", "coding"], tags_all=False, sort="title", order="asc")
+    assert [x["source_id"] for x in r] == ["t3_a", "t3_b"]
+
+    # AND tags (all must match)
+    r = db.search_items(conn, "", tags=["coding", "memes"], tags_all=True)
+    assert [x["source_id"] for x in r] == ["t3_a"]
+
+    # NSFW tag bucket
+    r = db.search_items(conn, "", nsfw=True)
+    assert [x["source_id"] for x in r] == ["t3_a"]
+
+    # Score bounds (inclusive min/max)
+    r = db.search_items(conn, "", score_min=100)
+    assert [x["source_id"] for x in r] == ["t3_a"]
+
+    r = db.search_items(conn, "", score_max=10)
+    assert [x["source_id"] for x in r] == ["t3_b"]
+
+    # Date filters: before is exclusive, after inclusive, and created_utc=0 rows are excluded.
+    assert [x["source_id"] for x in db.search_items(conn, "", before=1672531200)] == ["t3_a"]
+    assert [x["source_id"] for x in db.search_items(conn, "", after=1672531200)] == ["t3_b"]
+
+
+def test_search_exact_and_exclude(conn):
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="hedgehog removed"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="hedgehog ok"))
+
+    r = db.search_items(conn, "hedgehog", exclude=["removed"], sort="title", order="asc")
+    assert [x["source_id"] for x in r] == ["2"]
+
+    r = db.search_items(conn, "", exact=["hedgehog ok"])
+    assert [x["source_id"] for x in r] == ["2"]
+
+    # Exclude-only must not crash (FTS5 requires a positive term).
+    db.search_items(conn, "", exclude=["removed"])
