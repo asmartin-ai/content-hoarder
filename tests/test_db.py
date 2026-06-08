@@ -232,5 +232,6 @@ def test_search_exact_and_exclude(conn):
     r = db.search_items(conn, "", exact=["hedgehog ok"])
     assert [x["source_id"] for x in r] == ["2"]
 
-    # Exclude-only must not crash (FTS5 requires a positive term).
-    db.search_items(conn, "", exclude=["removed"])
+    # Exclude-only (no positive term) still filters via search_text, not just "doesn't crash".
+    r = db.search_items(conn, "", exclude=["removed"], sort="title", order="asc")
+    assert [x["source_id"] for x in r] == ["2"]
