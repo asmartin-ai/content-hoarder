@@ -191,3 +191,76 @@ def test_categories_route_cross_filters_by_source_and_status(tmp_db):
 
     assert cats["total"] == 1
     assert counts == {"listenable": 0, "watch": 1, "wotagei": 0, "unknown": 0}
+
+
+def test_items_search_operators(tmp_db):
+    # Seed a DB specifically for operator coverage.
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(
+        source="reddit",
+        source_id="t3_a",
+        kind="post",
+        title="Hedgehog removed",
+        created_utc=1672444800,  # 2022-12-31
+        now=1000,
+        metadata={"subreddit": "hh", "tags": ["coding", "memes", "nsfw_other"], "score": 150},
+    ))
+    db.merge_upsert(conn, models.new_item(
+        source="reddit",
+        source_id="t3_b",
+        kind="post",
+        title="Hedgehog ok",
+        created_utc=1675209600,  # 2023-02-01
+        now=2000,
+        metadata={"subreddit": "hh", "tags": ["coding"], "score": 10},
+    ))
+    db.merge_upsert(conn, models.new_item(
+        source="youtube",
+        source_id="v1",
+        kind="video",
+        title="Vid",
+        created_utc=1675209600,
+        now=3000,
+    ))
+    conn.commit()
+    conn.close()
+
+    cl = create_app(tmp_db).test_client()
+
+    # source: operator
+    r = cl.get("/items?q=source:reddit").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a", "reddit:t3_b"}
+
+    # precedence: operator wins over explicit query param when present
+    r = cl.get("/items?source=youtube&q=source:reddit").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a", "reddit:t3_b"}
+
+    # tags: AND via repetition
+    r = cl.get("/items?q=tag:coding%20tag:memes").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a"}
+
+    # tags: OR via comma
+    r = cl.get("/items?q=tag:memes,coding").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a", "reddit:t3_b"}
+
+    # is:nsfw => membership in nsfw_* tags
+    r = cl.get("/items?q=is:nsfw").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a"}
+
+    # before/after date bounds
+    r = cl.get("/items?q=before:2023-01-01").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a"}
+
+    r = cl.get("/items?q=after:2023-01-01").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_b", "youtube:v1"}
+
+    # score:
+    r = cl.get("/items?q=score:>100").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_a"}
+
+    # -negation combines with FTS free-text
+    r = cl.get("/items?q=hedgehog%20-removed").get_json()
+    assert {i["fullname"] for i in r["items"]} == {"reddit:t3_b"}
+
+    # malformed operators degrade to free text and must not 500
+    assert cl.get("/items?q=before:notadate").status_code == 200
