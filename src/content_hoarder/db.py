@@ -23,6 +23,8 @@ from content_hoarder.models import (
     parse_metadata,
 )
 
+PROCESSING_TAGS = ("listenable", "watch", "wotagei")
+
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
@@ -190,6 +192,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     _ensure_fts_built(conn)
     conn.commit()
+    # NOTE: normalize_processing_tags() is a one-time legacy backfill — it scans every
+    # category-tagged item (~120ms on the live DB). init_db() runs on EVERY connection
+    # (see connect()), so the backfill must NOT live here. It runs once from the `init-db`
+    # CLI command; going forward set_category()/merge_upsert() keep the tag mirror in sync.
 
 
 def _ensure_fts_built(conn: sqlite3.Connection) -> None:
@@ -240,6 +246,71 @@ def get_item(conn: sqlite3.Connection, fullname: str) -> dict | None:
     return _row_to_raw(row) if row else None
 
 
+def _tag_list(value) -> list[str]:
+    """Coerce metadata.tags to a stable, de-duplicated string list."""
+    raw = value if isinstance(value, list) else [value] if value else []
+    out: list[str] = []
+    for t in raw:
+        s = str(t).strip()
+        if s and s not in out:
+            out.append(s)
+    return out
+
+
+def metadata_with_category_tag(metadata, category: str) -> dict:
+    """Mirror a legacy category into metadata.tags, preserving unrelated tags."""
+    md = parse_metadata(metadata)
+    cat = (category or "").strip().lower()
+    tags = [t for t in _tag_list(md.get("tags")) if t not in PROCESSING_TAGS]
+    if cat in PROCESSING_TAGS:
+        tags.append(cat)
+    md["tags"] = tags
+    if cat:
+        md["category"] = cat
+    return md
+
+
+def _update_metadata(conn: sqlite3.Connection, row: dict, metadata: dict) -> None:
+    item = dict(row)
+    item["metadata"] = json.dumps(metadata, ensure_ascii=False)
+    item["search_text"] = build_search_text(item, metadata)
+    conn.execute(
+        "UPDATE items SET metadata=?, search_text=?, last_seen_utc=? WHERE fullname=?",
+        (
+            item["metadata"],
+            item["search_text"],
+            int(item.get("last_seen_utc") or time.time()),
+            item["fullname"],
+        ),
+    )
+
+
+def set_category(conn: sqlite3.Connection, fullname: str, category: str) -> bool:
+    """Set metadata.category and keep the processing-area tag mirror in sync."""
+    row = get_item(conn, fullname)
+    if row is None:
+        return False
+    md = metadata_with_category_tag(row.get("metadata"), category)
+    _update_metadata(conn, row, md)
+    return True
+
+
+def normalize_processing_tags(conn: sqlite3.Connection) -> int:
+    """Backfill category-derived processing tags for existing rows, idempotently."""
+    rows = conn.execute(
+        "SELECT * FROM items WHERE json_extract(metadata, '$.category') IS NOT NULL"
+    ).fetchall()
+    changed = 0
+    for r in rows:
+        row = dict(r)
+        before = parse_metadata(row.get("metadata"))
+        after = metadata_with_category_tag(before, str(before.get("category") or ""))
+        if after != before:
+            _update_metadata(conn, row, after)
+            changed += 1
+    return changed
+
+
 # ---------------------------------------------------------------------------
 # Upsert (non-destructive overlay)
 # ---------------------------------------------------------------------------
@@ -255,8 +326,16 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
     (``status``, ``processed_utc``, ``status_prev``, ``is_saved``,
     ``metadata.karakeep_id``) and never moves ``first_seen_utc`` forward.
     """
+    incoming_md = parse_metadata(item.get("metadata"))
+    incoming_category = str(incoming_md.get("category") or "")
+
     existing = get_item(conn, item["fullname"])
     if existing is None:
+        if incoming_category:
+            item = dict(item)
+            incoming_md = metadata_with_category_tag(incoming_md, incoming_category)
+            item["metadata"] = json.dumps(incoming_md, ensure_ascii=False)
+            item["search_text"] = build_search_text(item, incoming_md)
         conn.execute(_INSERT_SQL, item)
         return "inserted"
 
@@ -273,9 +352,20 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
 
     # metadata: shallow-merge (incoming non-empty values win; keep prior keys).
     emd = parse_metadata(existing.get("metadata"))
-    for k, v in parse_metadata(item.get("metadata")).items():
+    for k, v in incoming_md.items():
+        if k == "tags" and incoming_category:
+            tags = _tag_list(emd.get("tags"))
+            for t in _tag_list(v):
+                if t not in tags:
+                    tags.append(t)
+            emd["tags"] = tags
+            continue
         if v not in (None, "", [], {}):
             emd[k] = v
+    if incoming_category:
+        emd = metadata_with_category_tag(emd, incoming_category)
+    elif emd.get("category"):
+        emd = metadata_with_category_tag(emd, str(emd.get("category") or ""))
     merged["metadata"] = json.dumps(emd, ensure_ascii=False)
 
     if item.get("hydrated_at"):
@@ -339,6 +429,7 @@ def search_items(
     subreddit: str | None = None,
     is_saved: int | None = None,
     open_in_firefox: bool = False,
+    include_consolidated: bool = False,
     fuzzy: bool = False,
     sort: str = "last_seen_utc",
     order: str = "desc",
@@ -361,8 +452,17 @@ def search_items(
             filters.append(f"{a}status = ?")
             params.append(status)
         if category:
-            filters.append(f"json_extract({a}metadata, '$.category') = ?")
-            params.append(category)
+            if category in PROCESSING_TAGS:
+                filters.append(
+                    "("
+                    f"json_extract({a}metadata, '$.category') = ? OR "
+                    f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value = ?)"
+                    ")"
+                )
+                params.extend([category, category])
+            else:
+                filters.append(f"json_extract({a}metadata, '$.category') = ?")
+                params.append(category)
         if tags:  # metadata.tags is a JSON list; OR-match any selected tag
             ph = ",".join("?" for _ in tags)
             filters.append(
@@ -376,6 +476,9 @@ def search_items(
             params.append(int(is_saved))
         if open_in_firefox:  # the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
             filters.append(f"json_extract({a}metadata, '$.open_in_firefox') = 1")
+        if not include_consolidated:
+            filters.append(
+                f"json_extract({a}metadata, '$.consolidated_into') IS NULL")
 
     q = (q or "").strip()
     match_expr = ""
@@ -651,12 +754,36 @@ def reddit_subreddit_counts(conn: sqlite3.Connection, status: str | None = None)
     return [{"subreddit": r["subreddit"], "count": r["c"]} for r in rows]
 
 
-def tag_counts(conn: sqlite3.Connection) -> dict:
-    """Per-tag item counts across reddit items (``metadata.tags`` is a JSON list), descending."""
+def tag_counts(
+    conn: sqlite3.Connection,
+    *,
+    source: str | None = None,
+    status: str | None = None,
+) -> dict:
+    """Counts for the curated filter tags (``categorize.FILTER_TAGS``), descending.
+
+    ``metadata.tags`` also holds non-facet values (e.g. YouTube per-video keywords from the
+    enrich pass), so the result is restricted to the curated vocabulary — otherwise the browse
+    rail would render tens of thousands of one-off keyword tags. Optionally cross-filtered by
+    source/status so the rail composes with the active source tab + status nav.
+    """
+    from content_hoarder.categorize import FILTER_TAGS
+
+    placeholders = ",".join("?" for _ in FILTER_TAGS)
+    where = [f"je.value IN ({placeholders})"]
+    params: list = list(FILTER_TAGS)
+    if source:
+        where.append("items.source = ?")
+        params.append(source)
+    if status:
+        where.append("items.status = ?")
+        params.append(status)
     rows = conn.execute(
         "SELECT je.value AS tag, COUNT(*) AS c "
         "FROM items, json_each(items.metadata, '$.tags') je "
-        "WHERE items.source='reddit' GROUP BY je.value ORDER BY c DESC"
+        "WHERE " + " AND ".join(where) +
+        " GROUP BY je.value ORDER BY c DESC, je.value COLLATE NOCASE ASC",
+        params,
     ).fetchall()
     return {r["tag"]: r["c"] for r in rows}
 
@@ -695,7 +822,7 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
         "total": sum(by_status.values()),  # 0 when there are no reddit items
         "by_kind": by_kind,
         "by_status": by_status,
-        "by_tag": tag_counts(conn),
+        "by_tag": tag_counts(conn, source="reddit"),
         "top_subreddits": top_subs,
         "distinct_subreddits": distinct_subs,
         "nsfw": nsfw,
@@ -708,9 +835,21 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
 # Stats
 # ---------------------------------------------------------------------------
 
-def _group_counts(conn: sqlite3.Connection, column: str, source: str | None = None) -> dict:
-    where = " WHERE source = ?" if source else ""
-    params = (source,) if source else ()
+def _group_counts(
+    conn: sqlite3.Connection,
+    column: str,
+    source: str | None = None,
+    status: str | None = None,
+) -> dict:
+    filters = []
+    params: list = []
+    if source:
+        filters.append("source = ?")
+        params.append(source)
+    if status:
+        filters.append("status = ?")
+        params.append(status)
+    where = " WHERE " + " AND ".join(filters) if filters else ""
     rows = conn.execute(
         f"SELECT {column} AS k, COUNT(*) AS c FROM items{where} GROUP BY {column} ORDER BY c DESC",
         params,
@@ -718,14 +857,57 @@ def _group_counts(conn: sqlite3.Connection, column: str, source: str | None = No
     return {(r["k"] or ""): r["c"] for r in rows}
 
 
-def _category_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
-    where = " WHERE source = ?" if source else ""
-    params = (source,) if source else ()
-    rows = conn.execute(
-        f"SELECT json_extract(metadata, '$.category') AS k, COUNT(*) AS c "
-        f"FROM items{where} GROUP BY k", params,
-    ).fetchall()
-    return {r["k"]: r["c"] for r in rows if r["k"]}
+def _count_items(
+    conn: sqlite3.Connection,
+    *,
+    source: str | None = None,
+    status: str | None = None,
+) -> int:
+    where = []
+    params: list = []
+    if source:
+        where.append("source = ?")
+        params.append(source)
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    sql = "SELECT COUNT(*) FROM items"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    return conn.execute(sql, params).fetchone()[0]
+
+
+def category_counts(
+    conn: sqlite3.Connection,
+    *,
+    source: str | None = None,
+    status: str | None = None,
+) -> list[dict]:
+    """Per-category counts with stable ordering from ``categorize.VALID_CATEGORIES``.
+
+    Optional ``source`` / ``status`` cross-filter the counts so the browse category tabs can
+    compose with the active source/status filters while still showing 0-count categories.
+    """
+    from content_hoarder.categorize import VALID_CATEGORIES
+
+    where = []
+    params: list = []
+    if source:
+        where.append("source = ?")
+        params.append(source)
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    sql = (
+        "SELECT json_extract(metadata, '$.category') AS k, COUNT(*) AS c "
+        "FROM items"
+    )
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " GROUP BY k"
+    rows = conn.execute(sql, params).fetchall()
+    counts = {r["k"]: r["c"] for r in rows if r["k"]}
+    return [{"category": cat, "count": counts.get(cat, 0)} for cat in VALID_CATEGORIES]
 
 
 def source_counts(conn: sqlite3.Connection, status: str | None = None) -> list[dict]:
@@ -745,30 +927,51 @@ def source_counts(conn: sqlite3.Connection, status: str | None = None) -> list[d
     return [{"source": r["source"], "count": r["c"]} for r in rows]
 
 
-def get_counts(conn: sqlite3.Connection, source: str | None = None) -> dict:
-    where = " WHERE source = ?" if source else ""
-    sp = (source,) if source else ()
-    extra = " AND source = ?" if source else ""
-    total = conn.execute(f"SELECT COUNT(*) FROM items{where}", sp).fetchone()[0]
+def get_counts(
+    conn: sqlite3.Connection,
+    source: str | None = None,
+    status: str | None = None,
+    *,
+    light: bool = False,
+) -> dict:
+    filters = []
+    params: list = []
+    if source:
+        filters.append("source = ?")
+        params.append(source)
+    if status:
+        filters.append("status = ?")
+        params.append(status)
+    where = " WHERE " + " AND ".join(filters) if filters else ""
+    total = conn.execute(f"SELECT COUNT(*) FROM items{where}", params).fetchone()[0]
     by_status = _group_counts(conn, "status", source)
+    if light:
+        # Hot path: the browse rail refreshes status counts after every triage action. It only
+        # needs by_status (index-backed, ~3ms) — skip the unindexed full-table scans below
+        # (by_kind / processed_this_week / with_url, ~170ms total) that only the Stats modal uses.
+        return {"total": total, "inbox": by_status.get("inbox", 0), "by_status": by_status}
     by_source = _group_counts(conn, "source")  # global — drives the Stats modal chart
+    source_extra = " AND source = ?" if source else ""
+    source_params = (source,) if source else ()
     week_ago = int(time.time()) - 7 * 86400
     processed_week = conn.execute(
-        f"SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL AND processed_utc >= ?{extra}",
-        (week_ago, *sp),
+        f"SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL AND processed_utc >= ?{source_extra}",
+        (week_ago, *source_params),
     ).fetchone()[0]
     with_url = conn.execute(
-        f"SELECT COUNT(*) FROM items WHERE url <> ''{extra}", sp
+        f"SELECT COUNT(*) FROM items WHERE url <> ''{source_extra}", source_params
     ).fetchone()[0]
     return {
         "total": total,
         "inbox": by_status.get("inbox", 0),
         "by_source": by_source,
-        "by_kind": _group_counts(conn, "kind", source),
-        "by_category": _category_counts(conn, source),
-        "by_tag": tag_counts(conn),
+        "by_kind": _group_counts(conn, "kind", source, status),
         "by_status": by_status,
         "processed_this_week": processed_week,
         "with_url": with_url,
         "distinct_sources": len(by_source),
     }
+    # by_tag / by_category are intentionally NOT computed here: each is a full json_each /
+    # json_extract scan over the items table (~130ms / ~185ms on the live DB), and /stats is
+    # refreshed after every triage action. The browse rail fetches them lazily from the
+    # dedicated /tags and /categories endpoints (on navigation only), keeping this path cheap.

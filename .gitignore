@@ -26,6 +26,9 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+.pytest-tmp/
+.pytest-review-tmp/
+.pytest-*-tmp/
 .mypy_cache/
 
 # OS / editor
@@ -33,6 +36,7 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+.continue/
 
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json

@@ -17,29 +17,52 @@
       <button id="nav-toggle" class="icon-btn nav-toggle" aria-label="Menu" aria-expanded="false">&#9776;</button>
       <h1 class="brand">content&#8209;hoarder</h1>
       <div class="search">
-        <input id="q" type="search" placeholder="Search everything…" autocomplete="off">
-        <label class="chk"><input type="checkbox" id="fuzzy"> fuzzy</label>
+        <span class="mag" aria-hidden="true">&#128269;</span>
+        <input id="q" type="search" placeholder="Search everything..." autocomplete="off">
+        <button type="button" id="q-clear" class="clear" aria-label="Clear search" hidden>&times;</button>
+        <label class="chk search-fuzzy"><input type="checkbox" id="fuzzy"> fuzzy</label>
       </div>
       <nav class="topnav">
-        <button type="button" class="icon-btn theme-toggle" data-theme-toggle
-                aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
-        <select id="sort" title="Sort">
-          <option value="first_seen_utc:desc">recently added</option>
-          <option value="created_utc:asc">oldest first</option>
-          <option value="created_utc:desc">newest first</option>
-          <option value="title:asc">title (A&ndash;Z)</option>
-          <option value="duration:asc">shortest first</option>
-          <option value="duration:desc">longest first</option>
-          <option value="position:asc">playlist order (YouTube)</option>
-        </select>
-        <select id="category" title="Category (processing area)">
-          <option value="">all categories</option>
-          <option value="listenable">listenable</option>
-          <option value="watch">watch</option>
-          <option value="wotagei">wotagei</option>
-          <option value="unknown">unknown</option>
-        </select>
-        <a class="btn" href="/reddit" title="Reddit management view">Reddit</a>
+        <label class="sort-tool">
+          <span>Sort</span>
+          <select id="sort" title="Sort">
+            <option value="first_seen_utc:desc">recently added</option>
+            <option value="created_utc:asc">oldest first</option>
+            <option value="created_utc:desc">newest first</option>
+            <option value="title:asc">title (A&ndash;Z)</option>
+            <option value="duration:asc">shortest first</option>
+            <option value="duration:desc">longest first</option>
+            <option value="position:asc">playlist order (YouTube)</option>
+          </select>
+        </label>
+        <div class="menu visual-menu">
+          <button id="visual-menu-btn" class="icon-btn" type="button" aria-label="Visual settings"
+                  aria-haspopup="true" aria-expanded="false">&#8942;</button>
+          <div id="visual-menu-pop" class="menu-pop visual-menu-pop" hidden role="menu">
+            <span class="menu-label">View</span>
+            <button type="button" class="menu-row" data-density="compact" role="menuitem" aria-pressed="false">
+              <span class="density-mark compact" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span>Compact</span>
+            </button>
+            <button type="button" class="menu-row" data-density="comfortable" role="menuitem" aria-pressed="false">
+              <span class="density-mark comfy" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span>Comfortable</span>
+            </button>
+            <button type="button" class="menu-row" data-density="card" role="menuitem" aria-pressed="false">
+              <span class="density-mark card" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span>Card view</span>
+            </button>
+            <span class="menu-label menu-label-spaced">Display</span>
+            <button type="button" id="theme-menu-toggle" class="menu-row" role="menuitem">
+              <span class="nav-ico nav-ico-all" aria-hidden="true">&#9789;</span>
+              <span>Light/dark theme</span>
+            </button>
+            <button type="button" id="focus-toggle" class="menu-row" role="menuitem" aria-pressed="false">
+              <span class="nav-ico nav-ico-all" aria-hidden="true">&#9680;</span>
+              <span>Focus mode</span>
+            </button>
+          </div>
+        </div>
         <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
       </nav>
     </header>
@@ -56,26 +79,37 @@
         <li data-status="done"><span class="nav-ico" data-ico="done" aria-hidden="true"></span><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
         <li data-status=""><span class="nav-ico nav-ico-all" aria-hidden="true">&#8801;</span><span>All</span><span class="cnt" data-cnt="all">0</span></li>
       </ul>
-      <details class="tag-filter side-tags" id="tag">
-        <summary id="tag-summary" title="Filter by tags (OR)">Tags</summary>
-        <div class="tag-filter-list" id="tag-filter-list"></div>
-      </details>
-      <div class="side-actions">
-        <button id="btn-import" class="btn">Import…</button>
-        <button id="btn-stats" class="btn">Stats</button>
-        <button id="btn-reddit" class="btn">Reddit&nbsp;sync</button>
-      </div>
-      <div class="legend">
-        <h2 class="side-title">What they mean</h2>
-        <ul>
-          <li><b class="lg-inbox">Inbox</b> — not sorted yet</li>
-          <li><b class="lg-keep">Keep</b> — worth revisiting</li>
-          <li><b class="lg-arch">Archived</b> — set aside, out of the way</li>
-          <li><b class="lg-done">Done</b> — finished with it</li>
+
+      <section class="side-section side-tags" id="tag-section">
+        <button type="button" class="side-title side-title-toggle" id="tag-toggle"
+                aria-expanded="true" aria-controls="tag-filter-list">
+          <span id="tag-summary">Tags</span>
+        </button>
+        <ul id="tag-filter-list" class="status-nav tag-nav"></ul>
+      </section>
+
+      <section class="side-section side-tools">
+        <h2 class="side-title">Tools</h2>
+        <ul class="status-nav utility-nav">
+          <li id="btn-import" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#43;</span><span>Import</span></li>
+          <li id="btn-stats" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#9635;</span><span>Stats</span></li>
+          <li id="btn-reddit" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#8635;</span><span>Reddit sync</span></li>
+          <li><a href="/reddit" title="Reddit management view"><span class="nav-ico nav-ico-all" aria-hidden="true">r/</span><span>Reddit</span></a></li>
         </ul>
-      </div>
+      </section>
+
+      <details class="side-foot legend-foot">
+        <summary>What they mean</summary>
+        <ul>
+          <li><b class="lg-inbox">Inbox</b> &mdash; not sorted yet</li>
+          <li><b class="lg-keep">Keep</b> &mdash; worth revisiting</li>
+          <li><b class="lg-arch">Archived</b> &mdash; set aside, out of the way</li>
+          <li><b class="lg-done">Done</b> &mdash; finished with it</li>
+        </ul>
+      </details>
+
       <div id="install-hint" class="install-hint" hidden>
-        Add to your phone: <b>Firefox menu → Install</b>
+        Add to your phone: <b>Firefox menu &rarr; Install</b>
       </div>
     </aside>
 
@@ -87,23 +121,33 @@
         <button class="btn" data-bulk="done">Done</button>
         <button class="btn ghost" id="sel-clear">Clear</button>
       </div>
+
       <div id="progress-strip" class="progress-strip" hidden>
-        <span class="ps-streak" title="Items processed in a row">&#128293; <b id="ps-streak-n">0</b></span>
-        <div class="ps-bar"><div id="ps-fill" class="ps-fill"></div></div>
-        <span class="ps-label"><b id="ps-done">0</b> processed this session</span>
-      </div>
-      <div class="list-toolbar">
-        <button type="button" id="focus-toggle" class="btn ghost" aria-pressed="false"
-                title="Focus mode — dim everything but the list">Focus</button>
-        <div class="density-seg" role="group" aria-label="List density">
-          <button type="button" class="seg-btn" data-density="compact" aria-label="Compact density" title="Compact">&#8801;</button>
-          <button type="button" class="seg-btn" data-density="comfortable" aria-label="Comfortable density" title="Comfortable">&#9776;</button>
-          <button type="button" class="seg-btn" data-density="card" aria-label="Card density" title="Card">&#9638;</button>
+        <div class="pulse-main">
+          <div class="pulse-top">
+            <span class="pulse-label"><b id="ps-left">0</b> left in Inbox</span>
+            <span class="pulse-count"><b id="ps-done">0</b> triaged today</span>
+          </div>
+          <div class="ps-bar"><div id="ps-fill" class="ps-fill"></div></div>
         </div>
+        <span id="ps-streak" class="streak" title="Items processed in a row" hidden>&#128293; <b id="ps-streak-n">0</b></span>
       </div>
+
+      <div class="focus-cue"><span aria-hidden="true">&#9680;</span> Focus mode &mdash; one thing at a time. Press S keep &middot; E archive</div>
+
       <div id="items" class="items"></div>
-      <p id="empty" class="empty" hidden>Nothing here yet — import a source to begin.</p>
+      <p id="empty" class="empty" hidden>Nothing here yet &mdash; import a source to begin.</p>
       <div class="loadmore-wrap"><button id="loadmore" class="btn" hidden>Load more</button></div>
+
+      <div class="kbar">
+        <span class="k"><kbd>J</kbd> move</span>
+        <span class="k"><kbd>K</kbd> move</span>
+        <span class="k"><kbd>S</kbd> keep</span>
+        <span class="k"><kbd>E</kbd> archive</span>
+        <span class="k"><kbd>Y</kbd> done</span>
+        <span class="k"><kbd>X</kbd> select</span>
+        <span class="k">or swipe / hover a row</span>
+      </div>
     </section>
   </main>
 
@@ -123,7 +167,7 @@
         your Reddit <b>Saved</b> list. A scheduled job (or the button below) does the unsaving, so
         triage stays instant and nothing is lost if your cookie expires.</p>
       <div id="ru-banner" class="ru-banner" hidden></div>
-      <p id="ru-status" class="ru-status">Checking…</p>
+      <p id="ru-status" class="ru-status">Checking...</p>
       <label class="chk ru-toggle"><input type="checkbox" id="ru-enable">
         Unsave items when I mark them Done</label>
       <label class="import-field">
@@ -131,8 +175,8 @@
         <input type="password" id="ru-cookie" autocomplete="off"
                placeholder="paste your reddit_session cookie value">
       </label>
-      <p class="ru-hint">Get it in your browser: DevTools → Application → Cookies →
-        <code>reddit.com</code> → <code>reddit_session</code>. It expires every few days — re-paste
+      <p class="ru-hint">Get it in your browser: DevTools &rarr; Application &rarr; Cookies &rarr;
+        <code>reddit.com</code> &rarr; <code>reddit_session</code>. It expires every few days &mdash; re-paste
         it when sync reports the session expired.</p>
       <div class="import-actions">
         <button class="btn" id="ru-save-cookie">Save cookie</button>
@@ -147,19 +191,19 @@
       <h2>Import content</h2>
       <div class="import-help">
         <p>Add saved content from a file, or paste a YouTube playlist/video URL. Re-importing is
-          non-destructive — your triage progress is never overwritten.</p>
+          non-destructive &mdash; your triage progress is never overwritten.</p>
         <ul>
-          <li><b>Reddit</b> — reddit-saved-manager <code>app.db</code>, or a <code>.csv</code>/<code>.json</code> export</li>
-          <li><b>YouTube</b> — a playlist/video <b>URL</b> below, or a <code>yt-dlp --flat-playlist</code> JSON file</li>
-          <li><b>Hacker News</b> — Materialistic <code>.db</code>, or a <code>.txt</code> list of story IDs</li>
-          <li><b>Obsidian / Keep</b> — whole folders: use the <code>import</code> CLI (browsers can't upload folders)</li>
+          <li><b>Reddit</b> &mdash; reddit-saved-manager <code>app.db</code>, or a <code>.csv</code>/<code>.json</code> export</li>
+          <li><b>YouTube</b> &mdash; a playlist/video <b>URL</b> below, or a <code>yt-dlp --flat-playlist</code> JSON file</li>
+          <li><b>Hacker News</b> &mdash; Materialistic <code>.db</code>, or a <code>.txt</code> list of story IDs</li>
+          <li><b>Obsidian / Keep</b> &mdash; whole folders: use the <code>import</code> CLI (browsers can't upload folders)</li>
         </ul>
       </div>
       <label class="import-field">
         <span>YouTube playlist / video URL</span>
-        <input type="url" id="import-url" placeholder="https://www.youtube.com/playlist?list=…" autocomplete="off">
+        <input type="url" id="import-url" placeholder="https://www.youtube.com/playlist?list=..." autocomplete="off">
       </label>
-      <div class="import-or">— or —</div>
+      <div class="import-or">&mdash; or &mdash;</div>
       <label class="import-field">
         <span>Choose a file</span>
         <input type="file" id="import-file" accept=".db,.sqlite,.sqlite3,.csv,.json,.txt">
@@ -178,6 +222,22 @@
     <div class="modal-box media-box">
       <button class="modal-close" id="media-close">&times;</button>
       <div id="media-body"></div>
+    </div>
+  </div>
+
+  <div id="shortcut-modal" class="modal" hidden>
+    <div class="modal-box shortcut-box">
+      <button class="modal-close" id="shortcut-close" type="button">&times;</button>
+      <h2>Keyboard shortcuts</h2>
+      <div class="shortcut-list">
+        <div class="shortcut-row"><span><kbd>J</kbd> / <kbd>K</kbd></span><span>Move focus</span></div>
+        <div class="shortcut-row"><span><kbd>S</kbd></span><span>Keep</span></div>
+        <div class="shortcut-row"><span><kbd>E</kbd></span><span>Archive</span></div>
+        <div class="shortcut-row"><span><kbd>Y</kbd></span><span>Done</span></div>
+        <div class="shortcut-row"><span><kbd>X</kbd></span><span>Select row</span></div>
+        <div class="shortcut-row"><span><kbd>?</kbd></span><span>Toggle this sheet</span></div>
+      </div>
+      <p class="shortcut-note">Rows also support swipe and hover actions.</p>
     </div>
   </div>
 

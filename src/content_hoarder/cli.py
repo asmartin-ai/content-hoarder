@@ -16,9 +16,12 @@ def _connect():
 
 
 def cmd_init_db(args) -> int:
-    with _connect():
-        pass
-    print(f"Initialized database at {config.db_path()}")
+    from content_hoarder import db
+    with _connect() as conn:
+        backfilled = db.normalize_processing_tags(conn)  # one-time legacy category→tag mirror
+        conn.commit()
+    note = f" (backfilled {backfilled} processing-tag rows)" if backfilled else ""
+    print(f"Initialized database at {config.db_path()}{note}")
     return 0
 
 
@@ -105,6 +108,32 @@ def cmd_migrate_rsm_threads(args) -> int:
     with _connect() as conn:
         res = rsm_threads.migrate_threads(conn, args.from_db, only_existing=not args.all_threads)
     print(json.dumps(res, indent=2))
+    return 0
+
+
+def cmd_consolidate(args) -> int:
+    from content_hoarder import consolidate
+    with _connect() as conn:
+        if args.undo:
+            res = consolidate.unconsolidate(conn, apply=args.apply)
+        else:
+            res = consolidate.migrate(conn, apply=args.apply)
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        if args.undo:
+            print(
+                f"(dry run — would clear companions/unmark consolidated rows for "
+                f"{res['candidates']} candidate item(s); re-run with --apply to commit. "
+                f"Run against a COPY of the DB first.)",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"(dry run — {res['foldable']} item(s) would be consolidated into existing youtube rows; "
+                f"{res['skipped_no_youtube']} item(s) link to YouTube but have no local youtube row and are skipped; "
+                f"re-run with --apply to commit. Run against a COPY of the DB first.)",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -286,6 +315,16 @@ def build_parser() -> argparse.ArgumentParser:
     prt.add_argument("--all-threads", action="store_true",
                      help="Migrate threads even for items not present locally (default: skip orphans).")
     prt.set_defaults(func=cmd_migrate_rsm_threads)
+
+    pcon = sub.add_parser(
+        "consolidate",
+        help="Re-runnable migration: fold reddit/HN/etc links-to-YouTube into canonical youtube:<id> rows.",
+    )
+    pcon.add_argument("--apply", action="store_true",
+                      help="Commit changes (default: dry run). Run against a DB copy first.")
+    pcon.add_argument("--undo", action="store_true",
+                      help="Undo consolidation (default: consolidate).")
+    pcon.set_defaults(func=cmd_consolidate)
 
     ps = sub.add_parser("serve", help="Run the web app.")
     ps.add_argument("--host", help="Bind host (default 127.0.0.1; set to your Tailscale IP for mobile).")
