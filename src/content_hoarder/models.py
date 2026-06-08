@@ -22,6 +22,10 @@ ITEM_FIELDS: tuple[str, ...] = (
 
 VALID_STATUSES = ("inbox", "keep", "archived", "done")
 
+# The NSFW tag buckets (subreddit-driven; see categorize.py). Canonical here so the
+# query layer (db.search_items) and the search-bar parser share one source of truth.
+NSFW_TAGS = ("nsfw_erotic", "nsfw_other", "nsfw_talk")
+
 # Metadata keys that are worth folding into the full-text search blob.
 _META_SEARCH_KEYS = ("subreddit", "channel", "tags", "labels", "playlist", "domain")
 

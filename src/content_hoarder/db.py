@@ -18,6 +18,7 @@ import time
 
 from content_hoarder.models import (
     ITEM_FIELDS,
+    NSFW_TAGS,
     VALID_STATUSES,
     build_search_text,
     parse_metadata,
@@ -388,12 +389,44 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
 # Search
 # ---------------------------------------------------------------------------
 
-def _fts_query(q: str) -> str:
-    """Build a safe FTS5 MATCH expression. Each token is quoted so FTS5 operator
-    keywords (OR/AND/NOT/NEAR) are treated as string literals, not syntax — an
-    unquoted bare 'OR' would raise an fts5 syntax error and 500 the request."""
+def _fts_query(
+    q: str,
+    *,
+    exact: list[str] | None = None,
+    exclude: list[str] | None = None,
+) -> str:
+    """Build a safe FTS5 MATCH expression.
+
+    - Each bare token is quoted so FTS5 operator keywords (OR/AND/NOT/NEAR) are
+      treated as literals, not syntax.
+    - ``exact`` phrases are added as FTS5 phrase terms (also quoted).
+    - ``exclude`` terms are appended as ``NOT "term"`` clauses.
+
+    IMPORTANT: the caller must ensure there is at least one *positive* term
+    (either ``q`` tokens or ``exact``). FTS5 rejects queries that contain only NOTs.
+    """
+    exact = exact or []
+    exclude = exclude or []
+
     toks = [t for t in re.split(r"\W+", q or "", flags=re.UNICODE) if t]
-    return " ".join('"' + t + '"' for t in toks)
+    parts: list[str] = ['"' + t + '"' for t in toks]
+
+    for phrase in exact:
+        p = (phrase or "").strip()
+        if not p:
+            continue
+        parts.append('"' + p.replace('"', '""') + '"')
+
+    if not parts:
+        return ""
+
+    out = " ".join(parts)
+
+    for term in exclude:
+        for t in [x for x in re.split(r"\W+", term or "", flags=re.UNICODE) if x]:
+            out += ' NOT "' + t.replace('"', '""') + '"'
+
+    return out
 
 
 def _trigram_match(q: str) -> str:
@@ -426,8 +459,16 @@ def search_items(
     status: str | None = None,
     category: str | None = None,
     tags: list[str] | None = None,
+    tags_all: bool = False,
     subreddit: str | None = None,
     is_saved: int | None = None,
+    nsfw: bool = False,
+    before: int | None = None,
+    after: int | None = None,
+    score_min: int | None = None,
+    score_max: int | None = None,
+    exact: list[str] | None = None,
+    exclude: list[str] | None = None,
     open_in_firefox: bool = False,
     include_consolidated: bool = False,
     fuzzy: bool = False,
@@ -463,14 +504,50 @@ def search_items(
             else:
                 filters.append(f"json_extract({a}metadata, '$.category') = ?")
                 params.append(category)
-        if tags:  # metadata.tags is a JSON list; OR-match any selected tag
-            ph = ",".join("?" for _ in tags)
+        if tags:
+            if tags_all:
+                # AND: require membership for every tag.
+                for t in tags:
+                    filters.append(
+                        f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value = ?)"
+                    )
+                    params.append(t)
+            else:
+                # OR: match any selected tag.
+                ph = ",".join("?" for _ in tags)
+                filters.append(
+                    f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
+                )
+                params.extend(tags)
+        if nsfw:
+            ph = ",".join("?" for _ in NSFW_TAGS)
             filters.append(
-                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))")
-            params.extend(tags)
+                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
+            )
+            params.extend(NSFW_TAGS)
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)
+        if before is not None or after is not None:
+            # created_utc=0 means "unknown" for many sparse imports; avoid treating 0 as
+            # "ancient" when date filters are active.
+            filters.append(f"{a}created_utc > 0")
+        if before is not None:
+            filters.append(f"{a}created_utc < ?")
+            params.append(int(before))
+        if after is not None:
+            filters.append(f"{a}created_utc >= ?")
+            params.append(int(after))
+        if score_min is not None or score_max is not None:
+            # Exclude NULL scores when a score filter is active.
+            filters.append(f"json_extract({a}metadata, '$.score') IS NOT NULL")
+            score_expr = f"CAST(json_extract({a}metadata, '$.score') AS INTEGER)"
+            if score_min is not None:
+                filters.append(f"{score_expr} >= ?")
+                params.append(int(score_min))
+            if score_max is not None:
+                filters.append(f"{score_expr} <= ?")
+                params.append(int(score_max))
         if is_saved is not None:
             filters.append(f"{a}is_saved = ?")
             params.append(int(is_saved))
@@ -481,14 +558,22 @@ def search_items(
                 f"json_extract({a}metadata, '$.consolidated_into') IS NULL")
 
     q = (q or "").strip()
+    exact = exact or []
+    exclude = exclude or []
+
     match_expr = ""
     fts_table = ""
-    if q:
-        if fuzzy:
+
+    # FTS5 requires at least one positive term; if the query is only operators/negations,
+    # fall back to the plain filtered SELECT path.
+    has_positive = bool(q) or bool(exact)
+
+    if has_positive:
+        if fuzzy and q and not exact and not exclude:
             match_expr = _trigram_match(q)
             fts_table = "items_trgm"
         if not match_expr:  # exact (or fuzzy fell back for short queries)
-            match_expr = _fts_query(q)
+            match_expr = _fts_query(q, exact=exact, exclude=exclude)
             fts_table = "items_fts"
 
     if match_expr and fts_table:
@@ -501,6 +586,14 @@ def search_items(
         bind = [match_expr] + params + [int(limit), int(offset)]
     else:
         add_filters("")
+        # No positive FTS term to hang a NOT off of (e.g. a `-term`-only query), so apply
+        # the negations as plain search_text exclusions instead — otherwise they'd be
+        # silently dropped. (`\W+` tokens are word-chars only, so escape just LIKE's `_`.)
+        for term in exclude:
+            for tk in (t for t in re.split(r"\W+", term or "") if t):
+                esc = tk.lower().replace("\\", r"\\").replace("_", r"\_").replace("%", r"\%")
+                filters.append(r"LOWER(search_text) NOT LIKE ? ESCAPE '\'")
+                params.append("%" + esc + "%")
         where = (" WHERE " + " AND ".join(filters)) if filters else ""
         sql = (
             f"SELECT * FROM items{where} {_order_clause(sort, order)} LIMIT ? OFFSET ?"
