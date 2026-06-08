@@ -14,3 +14,7 @@ All from [the Noun Project](https://thenounproject.com/), licensed **CC BY 3.0**
 | wastebasket | **Done** | Trash, by **Julynn B.** |
 
 Per CC BY 3.0, attribution is retained here. No icon-font or external icon dependency is used.
+
+## Source icon (`firefox.svg`)
+Mozilla Firefox icon by **Just UI**, [Icon-Icons.com](https://icon-icons.com/authors/322-just-ui).
+Adapted only by setting `fill="currentColor"` so it recolors to the source-avatar foreground.

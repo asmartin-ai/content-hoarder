@@ -137,7 +137,7 @@ def create_app(db_path: str | None = None) -> Flask:
         with conn() as c:
             if db.get_item(c, fullname) is None:
                 return jsonify({"error": "not found"}), 404
-            db.merge_upsert(c, {"fullname": fullname, "metadata": {"category": cat}})
+            db.set_category(c, fullname, cat)
             c.commit()
         return jsonify({"fullname": fullname, "category": cat})
 
@@ -347,12 +347,47 @@ def create_app(db_path: str | None = None) -> Flask:
             })
         return jsonify({"sources": out})
 
+    @app.get("/categories")
+    def categories():
+        source = request.args.get("source") or None
+        status = request.args.get("status") or None
+        with conn() as c:
+            rows = db.category_counts(c, source=source, status=status)
+            total = db._count_items(c, source=source, status=status)
+        return jsonify({
+            "total": total,
+            "categories": [
+                {
+                    "id": r["category"],
+                    "label": str(r["category"]).capitalize(),
+                    "count": r["count"],
+                }
+                for r in rows
+            ],
+        })
+
+    @app.get("/tags")
+    def tags():
+        # Curated filter-tag counts for the browse rail, cross-filtered by the active
+        # source/status. Kept off the hot /stats path (it's a json_each scan) so the
+        # per-action status refresh stays cheap; the rail refetches this only on navigation.
+        source = request.args.get("source") or None
+        status = request.args.get("status") or None
+        with conn() as c:
+            counts = db.tag_counts(c, source=source, status=status)
+        return jsonify({"tags": counts, "total": sum(counts.values())})
+
     @app.get("/stats")
     def stats():
-        # Optional ?source= cross-filters the status counts (sidebar by active source).
+        # Optional ?source=/status= cross-filter the status/kind totals (rail + Stats modal).
+        # ?light=1 returns just the status counts (the rail's per-action refresh) and skips the
+        # full-table scans the Stats modal needs. Tag/category facet counts live on /tags and
+        # /categories — see db.get_counts.
         source = request.args.get("source") or None
+        status = request.args.get("status") or None
+        light = request.args.get("light") == "1"
         with conn() as c:
-            return jsonify(db.get_counts(c, source=source))
+            return jsonify(db.get_counts(c, source=source, status=status, light=light))
 
     @app.post("/import")
     def do_import():

@@ -90,7 +90,7 @@ def yt_item(vid: str, title: str = "", window: str = "", pinned: bool = False) -
 class FirefoxConnector(BaseConnector):
     id = "firefox"
     label = "Firefox Tabs"
-    badge_color = "#ff7139"
+    badge_color = "#0060df"
 
     def can_import(self, path: Path) -> bool:
         p = Path(path)

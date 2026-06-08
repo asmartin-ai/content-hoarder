@@ -16,9 +16,12 @@ def _connect():
 
 
 def cmd_init_db(args) -> int:
-    with _connect():
-        pass
-    print(f"Initialized database at {config.db_path()}")
+    from content_hoarder import db
+    with _connect() as conn:
+        backfilled = db.normalize_processing_tags(conn)  # one-time legacy category→tag mirror
+        conn.commit()
+    note = f" (backfilled {backfilled} processing-tag rows)" if backfilled else ""
+    print(f"Initialized database at {config.db_path()}{note}")
     return 0
 
 
