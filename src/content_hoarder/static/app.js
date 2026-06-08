@@ -37,6 +37,7 @@
     let t;
     return function () { clearTimeout(t); t = setTimeout(fn, ms); };
   };
+  const isTypingTarget = (el) => /input|select|textarea/i.test((el && el.tagName) || "");
 
   const thumb = (item) => {
     const m = item.metadata || {};
@@ -113,11 +114,29 @@
     document.getElementById("media-modal").hidden = true;
     document.getElementById("media-body").innerHTML = "";  // stop playback
   };
+  const shortcutModal = document.getElementById("shortcut-modal");
+  const closeShortcuts = () => {
+    if (shortcutModal) shortcutModal.hidden = true;
+  };
+  const toggleShortcuts = () => {
+    if (!shortcutModal) return;
+    shortcutModal.hidden = !shortcutModal.hidden;
+  };
+
+  const headerStack = document.querySelector(".header-stack");
+  const syncHeaderHeight = () => {
+    if (!headerStack) return;
+    document.documentElement.style.setProperty("--header-stack-h", headerStack.offsetHeight + "px");
+  };
+  if (headerStack && "ResizeObserver" in window) new ResizeObserver(syncHeaderHeight).observe(headerStack);
+  window.addEventListener("resize", syncHeaderHeight);
+  syncHeaderHeight();
 
   let offset = 0, activeSource = "", activeStatus = "inbox", loading = false;
   const sources = {};
   const selected = new Set();
   const selectedTags = new Set();   // active tag filter (OR across selected tags)
+  const revealedNsfw = new Set();
   const loadedItems = [];           // cache of loaded items, for re-render on density change
   let currentDensity = "comfortable"; // set by applyDensity; itemHtml branches on it (card vs list)
 
@@ -192,6 +211,8 @@
   // Per-source glyph + accent token (from the design system): the avatar shows
   // r/ ▶ ◇ etc., and the row stripe/avatar use the themed --source-* color
   // (so Firefox is blue), independent of the connector's API badge color.
+  const isNsfw = (item) => !!((item.metadata || {}).over_18);
+
   const CH_SOURCES = {
     reddit:     { glyph: "r/", token: "--source-reddit" },
     youtube:    { glyph: "▶",  token: "--source-youtube" },
@@ -200,6 +221,7 @@
     keep:       { glyph: "✎",  token: "--source-keep" },
     firefox:    { glyph: "⊕",  token: "--source-firefox" },
   };
+  CH_SOURCES.firefox = { icon: "firefox", token: "--source-firefox" };
   const srcAccent = (source) => {
     const m = CH_SOURCES[source];
     return m ? "var(" + m.token + ")" : "var(--accent)";
@@ -209,11 +231,25 @@
   const sourceAvatar = (item) => {
     const s = sources[item.source] || { label: item.source };
     const m = CH_SOURCES[item.source];
-    const glyph = m ? m.glyph : (s.label || item.source || "?").trim().charAt(0).toUpperCase();
+    const glyph = m && m.icon
+      ? window.chIcon(m.icon, { size: "0.82rem", className: "av-svg" })
+      : esc(m ? m.glyph : (s.label || item.source || "?").trim().charAt(0).toUpperCase());
     return '<span class="item-av" title="' + esc(s.label || item.source) + '">' +
-      '<span class="av-face">' + esc(glyph) + "</span>" +
+      '<span class="av-face">' + glyph + "</span>" +
       '<input type="checkbox" class="sel" aria-label="Select item">' +
       "</span>";
+  };
+
+  const hnThreadUrl = (item) => {
+    const id = (item && item.source === "hackernews" && item.source_id) ? String(item.source_id).trim() : "";
+    return id ? "https://news.ycombinator.com/item?id=" + encodeURIComponent(id) : "";
+  };
+  const itemUrl = (item) => item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "") : (item.url || "");
+  const metaAnchor = (href, label, cls) => {
+    const url = safeUrl(href);
+    if (!url) return esc(label);
+    return '<a class="' + cls + '" href="' + esc(url) +
+      '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(label) + "</a>";
   };
 
   // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
@@ -246,9 +282,12 @@
   const metaLine = (item, hideSub) => {
     const m = item.metadata || {};
     const parts = [];
-    if (item.author) parts.push("by " + esc(item.author));
+    if (item.author) {
+      if (item.source === "reddit") parts.push("by " + metaAnchor("https://www.reddit.com/user/" + encodeURIComponent(item.author), item.author, "meta-link"));
+      else parts.push("by " + esc(item.author));
+    }
     if (!hideSub) {
-      if (m.subreddit) parts.push("r/" + esc(m.subreddit));
+      if (m.subreddit) parts.push(metaAnchor("https://www.reddit.com/r/" + encodeURIComponent(m.subreddit), "r/" + m.subreddit, "meta-link"));
       if (m.channel) parts.push(esc(m.channel));
       if (m.playlist) parts.push(esc(m.playlist));
     }
@@ -282,24 +321,48 @@
     const list = document.getElementById("tag-filter-list");
     if (!list) return;
     const tags = Object.keys(byTag);
-    list.innerHTML = tags.sort((a, b) => byTag[b] - byTag[a]).map((t) =>
-      '<label class="tag-opt"><input type="checkbox" value="' + esc(t) + '"' +
-      (selectedTags.has(t) ? " checked" : "") + "> " + esc(t) +
-      ' <span class="tag-opt-cnt">' + byTag[t] + "</span></label>").join("");
-    const det = document.getElementById("tag");   // hide the whole sidebar section when there are no tags
-    if (det) det.hidden = tags.length === 0;
+    selectedTags.forEach((t) => { if (!tags.includes(t)) tags.push(t); });
+    const count = (t) => byTag[t] || 0;
+    list.innerHTML = tags.sort((a, b) => (count(b) - count(a)) || a.localeCompare(b)).map((t) =>
+      '<li data-tag="' + esc(t) + '" role="button" tabindex="0" class="' + (selectedTags.has(t) ? "active" : "") + '">' +
+      '<span class="nav-ico nav-ico-tag" aria-hidden="true">#</span><span>' + esc(t) + "</span>" +
+      ' <span class="cnt">' + count(t) + "</span></li>").join("");
+    list.hidden = tagsCollapsed;
+    const section = document.getElementById("tag-section");
+    if (section) section.hidden = tags.length === 0;
     updateTagSummary();
   };
   const updateTagSummary = () => {
     const s = document.getElementById("tag-summary");
     if (s) s.textContent = selectedTags.size ? "Tags (" + selectedTags.size + ")" : "Tags";
   };
+  const tagToggle = document.getElementById("tag-toggle");
+  const tagList = document.getElementById("tag-filter-list");
+  let tagsCollapsed = false;
+  const setTagsCollapsed = (collapsed) => {
+    tagsCollapsed = collapsed;
+    if (tagList) tagList.hidden = collapsed;
+    if (tagToggle) tagToggle.setAttribute("aria-expanded", String(!collapsed));
+    try { localStorage.setItem("ch-tags-collapsed", collapsed ? "1" : "0"); } catch (e) {}
+  };
+  if (tagToggle) {
+    let savedTagsCollapsed = null;
+    try { savedTagsCollapsed = localStorage.getItem("ch-tags-collapsed"); } catch (e) {}
+    setTagsCollapsed(savedTagsCollapsed === "1");
+    tagToggle.addEventListener("click", () => setTagsCollapsed(!tagsCollapsed));
+  }
 
   const PREVIEW_TYPES = { reddit_video: "▶ Play", reddit_media: "▶ Preview", gallery: "🖼 Gallery" };
   // When the archive captured the gallery images, carry them so the click opens an inline
   // lightbox instead of the Reddit embed. (No-op string for non-gallery items.)
   const galleryAttr = (m) => (Array.isArray(m.gallery) && m.gallery.length)
     ? ' data-gallery="' + esc(JSON.stringify(m.gallery)) + '"' : "";
+  const wrapMediaHtml = (item, inner) => {
+    if (!inner) return "";
+    if (!isNsfw(item) || revealedNsfw.has(item.fullname)) return inner;
+    return '<div class="item-media nsfw" data-nsfw-media="1">' + inner +
+      '<span class="nsfw-tag">NSFW</span></div>';
+  };
   // Right-hand media slot: a thumbnail when we have one, else a click-to-load
   // Reddit preview button for media posts whose media URL wasn't captured.
   const mediaSlotHtml = (item) => {
@@ -308,24 +371,32 @@
     if (t) {
       const full = imageUrl(item);
       if (full) {                                         // direct image → open in lightbox
-        return '<img class="item-thumb img-open" src="' + esc(t) +
-          '" data-img="' + esc(full) + '" alt="">';
+        return wrapMediaHtml(item, '<img class="item-thumb img-open" src="' + esc(t) +
+          '" data-img="' + esc(full) + '" alt="">');
       }
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
-        return '<img class="item-thumb rd-preview" src="' + esc(t) +
-          '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">';
+        return wrapMediaHtml(item, '<img class="item-thumb rd-preview" src="' + esc(t) +
+          '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">');
       }
-      return '<img class="item-thumb" src="' + esc(t) + '" alt="">';
+      return wrapMediaHtml(item, '<img class="item-thumb" src="' + esc(t) + '" alt="">');
     }
     const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
       const permalink = m.permalink || item.url || "";
       const label = /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : PREVIEW_TYPES[mt];
-      return '<button class="item-thumb rd-preview" type="button" data-permalink="' +
-        esc(permalink) + '"' + galleryAttr(m) + ">" + label + "</button>";
+      return wrapMediaHtml(item, '<button class="item-thumb rd-preview" type="button" data-permalink="' +
+        esc(permalink) + '"' + galleryAttr(m) + ">" + label + "</button>");
     }
     return "";
+  };
+  const revealNsfw = (fullname, row) => {
+    revealedNsfw.add(fullname);
+    if (!row) return;
+    row.dataset.revealed = "1";
+    row.querySelectorAll(".item-media.nsfw").forEach((el) => el.classList.remove("nsfw"));
+    const flag = row.querySelector(".media-flag .mf-play");
+    if (flag) flag.textContent = "â–¶";
   };
 
   // Posted/synced age, shown in the meta line so it stays visible at every density.
@@ -370,8 +441,9 @@
   // (card-head + hero thumb + body + card-tagrow); compact/comfortable share the
   // flat layout (avatar · body · thumb · media-pill · actions), CSS-differentiated.
   const itemHtml = (item) => {
-    const titleHtml = safeUrl(item.url)
-      ? '<a class="item-title" href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title || item.url) + "</a>"
+    const href = itemUrl(item);
+    const titleHtml = safeUrl(href)
+      ? '<a class="item-title" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(item.title || href) + "</a>"
       : '<span class="item-title">' + esc(item.title || item.fullname) + "</span>";
     const recoverBtn = isRemoved(item)
       ? '<div class="item-recover"><button class="recover-btn" data-recover type="button">↻ Recover</button></div>' : "";
@@ -386,9 +458,12 @@
       if (consume) bits.push(consume);
       return '<div class="item-meta">' + bits.join('<span class="sep">·</span>') + "</div>";
     };
-    const urlAttr = safeUrl(item.url) ? ' data-url="' + esc(item.url) + '"' : "";
+    const revealed = revealedNsfw.has(item.fullname);
+    const urlAttr = safeUrl(href) ? ' data-url="' + esc(href) + '"' : "";
     const head = '<div class="item" data-fullname="' + esc(item.fullname) + '" data-source="' + esc(item.source) +
-      '" data-status="' + esc(item.status || "inbox") + '"' + urlAttr +
+      '" data-status="' + esc(item.status || "inbox") + '"' +
+      (isNsfw(item) ? ' data-over18="1"' : "") +
+      (revealed ? ' data-revealed="1"' : "") + urlAttr +
       ' style="--src:' + srcAccent(item.source) + '">' + REVEAL_HTML;
 
     if (currentDensity === "card") {
@@ -413,6 +488,10 @@
     const pill = media
       ? '<button class="media-flag" type="button" title="Open media" aria-label="Open media"><span class="mf-play">▶</span></button>'
       : "";
+    const needsReveal = isNsfw(item) && !revealed;
+    const pillHtml = needsReveal && media
+      ? '<button class="media-flag" type="button" title="Reveal media" aria-label="Reveal media"><span class="mf-play">NSFW</span></button>'
+      : pill;
     return head +
       '<div class="item-fg">' +
         sourceAvatar(item) +
@@ -424,7 +503,7 @@
           recoverBtn +
         "</div>" +
         media +
-        pill +
+        pillHtml +
         ACTIONS_HTML +
       "</div></div>";
   };
@@ -438,8 +517,6 @@
     const sv = document.getElementById("sort").value.split(":");
     p.set("sort", sv[0]);
     p.set("order", sv[1] || "desc");
-    const cat = document.getElementById("category").value;
-    if (cat) p.set("category", cat);
     selectedTags.forEach((t) => p.append("tag", t));
     if (activeSource) p.set("source", activeSource);
     p.set("limit", String(BATCH));
@@ -535,32 +612,45 @@
         sources[s.id] = { label: s.label, badge_color: s.badge_color };
         mkTab(s.id, s.label, s.badge_color, s.count);
       });
+      syncHeaderHeight();
     }).catch(() => {});
   };
 
-  // Sidebar status counts come from /stats, cross-filtered by the active source.
-  const loadCounts = () => getJSON("/stats" + (activeSource ? "?source=" + encodeURIComponent(activeSource) : "")).then((d) => {
-    const bs = d.by_status || {};
-    const set = (k, v) => {
-      const el = document.querySelector('[data-cnt="' + k + '"]');
-      if (el) el.textContent = v || 0;
-    };
-    inboxCount = bs.inbox || 0;
-    set("inbox", bs.inbox);
-    set("keep", bs.keep);
-    set("archived", bs.archived);
-    set("done", bs.done);
-    set("all", d.total);
-    // category dropdown = "processing areas" with volume, e.g. "listenable (626)"
-    const bc = d.by_category || {};
-    document.querySelectorAll("#category option").forEach((o) => {
-      if (!o.value) return;
-      if (o.dataset.label == null) o.dataset.label = o.textContent;
-      o.textContent = bc[o.value] != null ? o.dataset.label + " (" + bc[o.value] + ")" : o.dataset.label;
-    });
-    renderTagFilter(d.by_tag || {});
-    updateProgress();
-  }).catch(() => {});
+  // Sidebar status counts come from /stats, cross-filtered by the active source. light=1 keeps
+  // this off the Stats-modal's full-table scans so it's cheap to call after every action.
+  const loadCounts = () => {
+    const p = new URLSearchParams();
+    p.set("light", "1");
+    if (activeSource) p.set("source", activeSource);
+    if (activeStatus) p.set("status", activeStatus);
+    const qs = p.toString();
+    return getJSON("/stats?" + qs).then((d) => {
+      const bs = d.by_status || {};
+      const set = (k, v) => {
+        const el = document.querySelector('[data-cnt="' + k + '"]');
+        if (el) el.textContent = v || 0;
+      };
+      inboxCount = bs.inbox || 0;
+      set("inbox", bs.inbox);
+      set("keep", bs.keep);
+      set("archived", bs.archived);
+      set("done", bs.done);
+      set("all", Object.values(bs).reduce((n, v) => n + (v || 0), 0));
+      updateProgress();
+    }).catch(() => {});
+  };
+  // Curated tag-rail counts come from a dedicated /tags endpoint, NOT /stats — the tag scan is
+  // expensive (json_each over every item), so we fetch it only on navigation (init / source /
+  // status change), not after each triage action. Cross-filtered by the active source+status.
+  const loadTags = () => {
+    const p = new URLSearchParams();
+    if (activeSource) p.set("source", activeSource);
+    if (activeStatus) p.set("status", activeStatus);
+    const qs = p.toString();
+    return getJSON("/tags" + (qs ? "?" + qs : "")).then((d) => {
+      renderTagFilter(d.tags || {});
+    }).catch(() => {});
+  };
   // An item changing status moves both axes (status counts by source, tab counts by
   // status), so refresh them together.
   const refreshNav = () => { loadCounts(); loadSources(); };
@@ -673,8 +763,8 @@
       const t = chip.textContent.trim();
       if (!selectedTags.has(t)) {
         selectedTags.add(t);
-        const cb = document.querySelector('#tag-filter-list input[value="' + t + '"]');
-        if (cb) cb.checked = true;
+        const tagRow = document.querySelector('#tag-filter-list [data-tag="' + CSS.escape(t) + '"]');
+        if (tagRow) tagRow.classList.add("active");
         updateTagSummary();
         load(true);
       }
@@ -684,6 +774,8 @@
     if (actBtn) { actOnItem(fullname, actBtn.dataset.act, row); return; }
     const recBtn = e.target.closest("[data-recover]");
     if (recBtn) { recoverItem(fullname, row, recBtn); return; }
+    const nsfwMedia = e.target.closest(".item-media.nsfw");
+    if (nsfwMedia) { revealNsfw(fullname, row); return; }
     const gal = e.target.closest("[data-gallery]");
     if (gal) {
       try { openGallery(JSON.parse(gal.dataset.gallery)); }
@@ -696,6 +788,7 @@
     if (imgEl) { openImage(imgEl.dataset.img); return; }
     const flag = e.target.closest(".media-flag");       // compact ▶ pill → open the (hidden) thumb's media
     if (flag) {
+      if (row.dataset.over18 === "1" && row.dataset.revealed !== "1") { revealNsfw(fullname, row); return; }
       const t = row.querySelector(".item-thumb");
       if (t) t.click(); else if (row.dataset.url) window.open(row.dataset.url, "_blank", "noopener");
       return;
@@ -746,6 +839,7 @@
     tab.classList.add("active");
     load(true);
     loadCounts();   // status counts reflect the newly active source
+    loadTags();     // tag-rail counts cross-filter by the active source
   });
 
   // status sidebar nav + mobile drawer
@@ -766,6 +860,36 @@
     (sidebar.classList.contains("open") ? closeDrawer() : openDrawer()));
   backdrop.addEventListener("click", closeDrawer);
 
+  const visualMenuBtn = document.getElementById("visual-menu-btn");
+  const visualMenuPop = document.getElementById("visual-menu-pop");
+  const closeVisualMenu = () => {
+    if (!visualMenuBtn || !visualMenuPop) return;
+    visualMenuPop.hidden = true;
+    visualMenuBtn.setAttribute("aria-expanded", "false");
+  };
+  if (visualMenuBtn && visualMenuPop) {
+    visualMenuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willOpen = visualMenuPop.hidden;
+      visualMenuPop.hidden = !willOpen;
+      visualMenuBtn.setAttribute("aria-expanded", String(willOpen));
+    });
+    visualMenuPop.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", (e) => {
+      if (!visualMenuPop.hidden && !e.target.closest(".visual-menu")) closeVisualMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !visualMenuPop.hidden) closeVisualMenu();
+    });
+  }
+  const themeMenuToggle = document.getElementById("theme-menu-toggle");
+  if (themeMenuToggle) {
+    themeMenuToggle.addEventListener("click", () => {
+      if (typeof window.toggleTheme === "function") window.toggleTheme();
+      closeVisualMenu();
+    });
+  }
+
   document.getElementById("status-nav").addEventListener("click", (e) => {
     const li = e.target.closest("li");
     if (!li) return;
@@ -775,11 +899,18 @@
     closeDrawer();
     load(true);
     loadSources();  // tab counts reflect the newly active status
+    loadCounts();
+    loadTags();     // tag-rail counts cross-filter by the active status
   });
 
   document.getElementById("btn-stats").addEventListener("click", () => {
     getJSON("/stats").then(renderStats).catch(() => {});
     document.getElementById("stats-modal").hidden = false;
+  });
+  document.getElementById("btn-stats").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.currentTarget.click();
   });
   document.getElementById("stats-close").addEventListener("click", () => {
     document.getElementById("stats-modal").hidden = true;
@@ -790,6 +921,10 @@
   document.getElementById("media-close").addEventListener("click", closeMedia);
   document.getElementById("media-modal").addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeMedia();
+  });
+  document.getElementById("shortcut-close").addEventListener("click", closeShortcuts);
+  document.getElementById("shortcut-modal").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeShortcuts();
   });
 
   // -- reddit unsave: cookie auth + on-demand queue drain --
@@ -815,6 +950,11 @@
     ruModal.hidden = false;
     closeDrawer();
     ruRefresh();
+  });
+  document.getElementById("btn-reddit").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.currentTarget.click();
   });
   document.getElementById("reddit-close").addEventListener("click", () => { ruModal.hidden = true; });
   ruModal.addEventListener("click", (e) => { if (e.target === ruModal) ruModal.hidden = true; });
@@ -887,6 +1027,11 @@
     impFile.value = "";
     importModal.hidden = false;
     closeDrawer();
+  });
+  document.getElementById("btn-import").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.currentTarget.click();
   });
   document.getElementById("import-close").addEventListener("click", closeImport);
   document.getElementById("import-cancel").addEventListener("click", closeImport);
@@ -966,13 +1111,22 @@
   }
   document.getElementById("fuzzy").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
-  document.getElementById("category").addEventListener("change", () => load(true));
-  document.getElementById("tag-filter-list").addEventListener("change", (e) => {
-    const cb = e.target.closest('input[type="checkbox"]');
-    if (!cb) return;
-    if (cb.checked) selectedTags.add(cb.value); else selectedTags.delete(cb.value);
+  const toggleTagFilter = (row) => {
+    if (!row) return;
+    const tag = row.dataset.tag || "";
+    if (!tag) return;
+    if (selectedTags.has(tag)) selectedTags.delete(tag); else selectedTags.add(tag);
+    row.classList.toggle("active", selectedTags.has(tag));
     updateTagSummary();
     load(true);
+  };
+  document.getElementById("tag-filter-list").addEventListener("click", (e) => {
+    toggleTagFilter(e.target.closest("[data-tag]"));
+  });
+  document.getElementById("tag-filter-list").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    toggleTagFilter(e.target.closest("[data-tag]"));
   });
   // Density toggle (compact / comfortable / card), persisted in localStorage.
   (function () {
@@ -993,7 +1147,10 @@
       if (changed && loadedItems.length) renderAll();   // card vs list markup differ → re-render
     }
     document.querySelectorAll("[data-density]").forEach(function (b) {
-      b.addEventListener("click", function () { applyDensity(b.dataset.density); });
+      b.addEventListener("click", function () {
+        applyDensity(b.dataset.density);
+        closeVisualMenu();
+      });
     });
     var saved; try { saved = localStorage.getItem("ch-density"); } catch (e) {}
     applyDensity(saved || "comfortable");
@@ -1013,8 +1170,11 @@
     }
     function cur() { var r = rows(); return fi >= 0 ? r[fi] : null; }
     document.addEventListener("keydown", function (e) {
-      if (/input|select|textarea/i.test(e.target.tagName || "") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape" && shortcutModal && !shortcutModal.hidden) { closeShortcuts(); return; }
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       var k = e.key.toLowerCase();
+      if (k === "?") { e.preventDefault(); toggleShortcuts(); return; }
+      if (shortcutModal && !shortcutModal.hidden) return;
       if (k === "j" || k === "arrowdown") { e.preventDefault(); focus(fi < 0 ? 0 : fi + 1); }
       else if (k === "k" || k === "arrowup") { e.preventDefault(); focus(fi < 0 ? 0 : fi - 1); }
       else if (k === "s" || k === "e" || k === "y") {
@@ -1041,8 +1201,12 @@
         fbtn.classList.toggle("active", on);
         fbtn.classList.toggle("on", on);
         try { localStorage.setItem("ch-focus", on ? "1" : "0"); } catch (e) {}
+        syncHeaderHeight();
       };
-      fbtn.addEventListener("click", function () { setFocus(!document.body.classList.contains("focus-mode")); });
+      fbtn.addEventListener("click", function () {
+        setFocus(!document.body.classList.contains("focus-mode"));
+        closeVisualMenu();
+      });
       var sf; try { sf = localStorage.getItem("ch-focus"); } catch (e) {}
       if (sf === "1") setFocus(true);
     }
@@ -1063,5 +1227,6 @@
 
   loadSources();
   loadCounts();
+  loadTags();
   load(true);
 })();

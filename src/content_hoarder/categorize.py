@@ -1,8 +1,9 @@
 """Heuristic content categorizer: tag items listenable / watch / wotagei / unknown.
 
 No LLM (validate heuristic accuracy first). The category is stored on
-``metadata.category`` non-destructively and is re-runnable. YouTube videos are the
-default target. An LLM auto-classifier is a separate backlog item.
+``metadata.category`` for compatibility and mirrored into ``metadata.tags`` for
+the browse filters. YouTube videos are the default target. An LLM auto-classifier
+is a separate backlog item.
 """
 from __future__ import annotations
 
@@ -58,7 +59,7 @@ def categorize_item(item: dict) -> str:
 
 
 def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool = False) -> dict:
-    """Categorize a source's items, storing ``metadata.category``. Returns counts."""
+    """Categorize a source's items, mirroring visible categories into tags."""
     where = ["source = ?"]
     params: list = [source]
     if not retry:
@@ -69,12 +70,10 @@ def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool 
         params.append(int(limit))
     rows = [db._row_to_public(r) for r in conn.execute(sql, params).fetchall()]
     counts = {c: 0 for c in VALID_CATEGORIES}
-    now = int(time.time())
     for it in rows:
         cat = categorize_item(it)
         counts[cat] = counts.get(cat, 0) + 1
-        db.merge_upsert(conn, {"fullname": it["fullname"],
-                               "metadata": {"category": cat}, "last_seen_utc": now})
+        db.set_category(conn, it["fullname"], cat)
     conn.commit()
     return {"selected": len(rows), "by_category": counts}
 
@@ -92,6 +91,13 @@ REDDIT_TAGS = (
     "nsfw_erotic", "nsfw_talk", "nsfw_other", "vtubers", "coding", "japan",
     "anime", "memes", "minecraft", "defense", "science", "tips",
 )
+
+# The curated vocabulary the browse tag-rail filters on: the reddit topic/NSFW tags plus the
+# YouTube processing-area tags (mirrored from metadata.category by db.set_category). Anything
+# ELSE that lands in metadata.tags — notably YouTube per-video keywords from the enrich pass —
+# is deliberately NOT a filter facet, so the rail stays a small, meaningful set (~15 tags)
+# instead of the tens of thousands of raw keywords. db.tag_counts restricts to this set.
+FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 
 # subreddit (lowercased) -> tags. Seeded from the corpus's top subreddits + well-known
 # communities; the long tail is caught by the keyword rules below. Multi-label by design

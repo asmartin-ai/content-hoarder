@@ -152,7 +152,15 @@ def test_set_category(tmp_db):
     r = cl.post("/items/youtube:v1/category", json={"category": "listenable"})
     assert r.status_code == 200 and r.get_json()["category"] == "listenable"
     assert cl.get("/items?category=listenable").get_json()["items"][0]["fullname"] == "youtube:v1"
-    assert cl.get("/stats").get_json()["by_category"]["listenable"] == 1
+    tagged = cl.get("/items?tag=listenable").get_json()["items"]
+    assert tagged[0]["fullname"] == "youtube:v1"
+    assert tagged[0]["metadata"]["tags"] == ["listenable"]
+    cats = {c["id"]: c["count"] for c in cl.get("/categories").get_json()["categories"]}
+    assert cats["listenable"] == 1
+    assert cl.get("/tags").get_json()["tags"]["listenable"] == 1
+    cl.post("/items/youtube:v1/category", json={"category": "unknown"})
+    assert cl.get("/items?tag=listenable").get_json()["items"] == []
+    assert cl.get("/items?category=unknown").get_json()["items"][0]["fullname"] == "youtube:v1"
     assert cl.post("/items/youtube:v1/category", json={"category": "bogus"}).status_code == 400
     assert cl.post("/items/youtube:nope/category", json={"category": "watch"}).status_code == 404
 
@@ -167,3 +175,19 @@ def test_cross_filtered_counts(tmp_db):
     # source counts cross-filtered by status; reddit still listed even at 0
     src = {x["id"]: x["count"] for x in cl.get("/sources?status=inbox").get_json()["sources"]}
     assert src.get("youtube") == 1 and src.get("reddit") == 0 and "reddit" in src
+    cl.post("/items/youtube:v1/category", json={"category": "watch"})
+    assert cl.get("/tags?source=youtube&status=inbox").get_json()["tags"] == {"watch": 1}
+    assert cl.get("/tags?source=youtube&status=keep").get_json()["tags"] == {}
+
+
+def test_categories_route_cross_filters_by_source_and_status(tmp_db):
+    cl = _client(tmp_db)
+    cl.post("/items/youtube:v1/category", json={"category": "listenable"})
+    cl.post("/items/reddit:t3_a/category", json={"category": "watch"})
+    cl.post("/items/reddit:t3_a/status", json={"status": "keep"})
+
+    cats = cl.get("/categories?source=reddit&status=keep").get_json()
+    counts = {x["id"]: x["count"] for x in cats["categories"]}
+
+    assert cats["total"] == 1
+    assert counts == {"listenable": 0, "watch": 1, "wotagei": 0, "unknown": 0}

@@ -20,6 +20,8 @@
   var ruPop = document.getElementById("ru-pop");
   var ruPopStatus = document.getElementById("ru-pop-status");
   var ruSyncBtn = document.getElementById("ru-sync-triage");
+  var shortcutModal = document.getElementById("shortcut-modal");
+  var shortcutClose = document.getElementById("shortcut-close");
 
   var queue = [];
   var reviewed = 0;
@@ -34,6 +36,7 @@
     });
   }
   function safeUrl(u) { return /^(https?:\/\/|\/)/i.test(u || "") ? u : ""; }
+  function isTypingTarget(el) { return /input|select|textarea/i.test((el && el.tagName) || ""); }
   function ago(ts) {
     if (!ts) return "";
     var d = Math.floor(Date.now() / 1000) - ts;
@@ -53,6 +56,24 @@
       .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
     return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   }
+  function closeShortcuts() { if (shortcutModal) shortcutModal.hidden = true; }
+  function toggleShortcuts() {
+    if (!shortcutModal) return;
+    shortcutModal.hidden = !shortcutModal.hidden;
+  }
+  function hnThreadUrl(item) {
+    var id = item && item.source === "hackernews" && item.source_id ? String(item.source_id).trim() : "";
+    return id ? "https://news.ycombinator.com/item?id=" + encodeURIComponent(id) : "";
+  }
+  function itemUrl(item) {
+    return item && item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "") : ((item && item.url) || "");
+  }
+  function metaAnchor(href, label) {
+    var url = safeUrl(href);
+    if (!url) return esc(label);
+    return '<a class="meta-link" href="' + esc(url) +
+      '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(label) + "</a>";
+  }
 
   function badge(item) {
     var s = sources[item.source] || { label: item.source, badge_color: "#888" };
@@ -61,8 +82,11 @@
   function metaLine(item) {
     var m = item.metadata || {};
     var bits = [];
-    if (item.author) bits.push("by " + esc(item.author));
-    if (m.subreddit) bits.push("r/" + esc(m.subreddit));
+    if (item.author) {
+      if (item.source === "reddit") bits.push("by " + metaAnchor("https://www.reddit.com/user/" + encodeURIComponent(item.author), item.author));
+      else bits.push("by " + esc(item.author));
+    }
+    if (m.subreddit) bits.push(metaAnchor("https://www.reddit.com/r/" + encodeURIComponent(m.subreddit), "r/" + m.subreddit));
     if (m.channel) bits.push(esc(m.channel));
     if (m.playlist) bits.push(esc(m.playlist));
     if (item.kind) bits.push(esc(item.kind));
@@ -145,9 +169,10 @@
       : "";
   }
   function cardHtml(item) {
-    var title = item.title || (item.url || item.fullname);
-    var titleHtml = safeUrl(item.url)
-      ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(title) + "</a>"
+    var href = itemUrl(item);
+    var title = item.title || (href || item.fullname);
+    var titleHtml = safeUrl(href)
+      ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(title) + "</a>"
       : esc(title);
     var snippet = (item.body || "").slice(0, 400);
     var m = item.metadata || {};
@@ -374,9 +399,12 @@
     if (b) commit(b.getAttribute("data-action"));
   });
   document.addEventListener("keydown", function (e) {
-    if (/input|select|textarea/i.test((e.target.tagName || ""))) return;
+    if (e.key === "Escape" && shortcutModal && !shortcutModal.hidden) { closeShortcuts(); return; }
+    if (isTypingTarget(e.target)) return;
     var k = e.key.toLowerCase();
-    if (k === "e" || k === "arrowright") commit("archived");
+    if (k === "?") { e.preventDefault(); toggleShortcuts(); }
+    else if (shortcutModal && !shortcutModal.hidden) return;
+    else if (k === "e" || k === "arrowright") commit("archived");
     else if (k === "y" || k === "arrowleft") commit("done");
     else if (k === "s") commit("keep");
     else if (k === "z" || k === "u") undo();
@@ -439,6 +467,10 @@
       menuPop.hidden = true;
       menuBtn.setAttribute("aria-expanded", "false");
     }
+  });
+  if (shortcutClose) shortcutClose.addEventListener("click", closeShortcuts);
+  if (shortcutModal) shortcutModal.addEventListener("click", function (e) {
+    if (e.target === shortcutModal) closeShortcuts();
   });
   updateUndoBtn();
 
