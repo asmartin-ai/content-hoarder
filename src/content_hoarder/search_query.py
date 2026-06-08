@@ -181,12 +181,15 @@ def parse(q: str) -> ParsedQuery:
             if not val:
                 text_terms.append(t)
                 continue
+            # source/kind/status are stored canonical-lowercase, so normalize the typed
+            # value (e.g. `source:YouTube` -> `youtube`) or it would silently match nothing.
+            # subreddit is left as-typed (search_items matches it COLLATE NOCASE).
             if key == "source":
-                source = val
+                source = val.lower()
             elif key == "kind":
-                kind = val
+                kind = val.lower()
             elif key == "status":
-                status = val
+                status = val.lower()
             elif key == "subreddit":
                 subreddit = val
             continue
