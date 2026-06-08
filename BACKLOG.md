@@ -93,8 +93,9 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   UI covers both. Touches `categorize.py` buckets + the rail + `search_items`.
 - [ ] **P3 — Zoom into the image / gallery modal.** Scroll/pinch-to-zoom (+ pan) in the media lightbox
   and gallery viewer (`openImage`/`openGallery` in `app.js`).
-- [ ] **P3 — More ergonomic keyboard controls.** Revisit the browse/triage key map (today
-  J/K · S/E/Y · X) for one-hand use; add a discoverable `?` cheatsheet.
+- [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
+  J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new
+  mapping for review. (The `?` cheatsheet already ships.)
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
@@ -122,6 +123,11 @@ false positives.*
   `migrate-firefox-tabs [--apply]` (dry-run default) re-keys rows imported before this and collapses
   duplicates. Of the 326-tab sample, **219 were YouTube** (2 already saved, 217 orphans); browse them
   via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
+- [ ] **P2 — Re-surface the Firefox-tabs filter (regression).** The **"📑 Firefox tabs"**
+  (`open_in_firefox=1`) filter referenced above has **no UI control** in the v2 layout — it was lost in
+  the redesign (no `open_in_firefox` toggle in `app.js`/`index.html`). Re-add a way to filter to
+  open-in-Firefox items (incl. the YouTube-promoted tabs); the Firefox **source tab** only filters by
+  source, not this finer flag.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 - [x] ~~**Differentiate posted / added-in-source / synced dates (UI).**~~ Shipped: the triage card and
@@ -206,6 +212,13 @@ false positives.*
 - [ ] **P2 — Extend tagging beyond Reddit (YouTube, etc.).** The multi-label tag system (this epic /
   `categorize.py`) is reddit-only today; apply tags to YouTube videos (channel/title heuristics) so the
   tag filter spans sources.
+- [ ] **P2 — Add incremental "Sync newest" to the main browse view.** *(User-requested 2026-06-08.)* The
+  working `POST /reddit/sync` button lives only in `/reddit` (`reddit.html` `#btn-sync`); surface it in the
+  main browse header/tools too.
+- [ ] **P2 — Disambiguate the "Sync now" label.** The browse/triage "Sync now" buttons (`#ru-sync`,
+  `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
+  grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
+  "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
@@ -276,33 +289,34 @@ to its companion discussion threads.*
 *Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
 need separate filter controls.*
 
-- [ ] **P2 — Parse `key:value` operators alongside free text.** e.g. `source:youtube`,
-  `subreddit:hololive`, `kind:post`, `tag:minecraft`, `status:inbox`, `is:saved`/`is:nsfw`,
-  `before:2024-01-01`/`after:…`, `score:>100`, quoted `"exact phrase"`, and negation `-term`.
-  Translate them into the existing `search_items` filters so the bar drives the same query layer the
-  dropdowns do today, keeping the FTS path for the remaining free text. Grammar modelled on
-  Gmail/Discord/Google; chips/autocomplete are a later polish.
-- [ ] **Tag operator semantics.** The tag checkbox filter is **OR-only** today (`tag=a&tag=b` →
-  has-any). Operators should let the user pick: repeated `tag:` as AND vs. `tag:a,b`/`tag:a|b` as OR
-  (per the user's request to specify multi-tag logic via search). `search_items` already takes a
-  `tags=[]` list — add an AND mode there.
-- [ ] **P2 — Fuzzy-by-default; `"quotes"` for exact.** Flip the search default so free-text queries
-  are **fuzzy** (typo-tolerant / loose match) without needing the `#fuzzy` checkbox, and treat a
-  `"quoted phrase"` as an opt-out → **exact** match. Removes a manual toggle for the common case and
-  aligns with the Gmail/Google mental model. Wire into `search_items`: default `fuzzy=True` for
-  bare terms, parse quoted spans as exact (folds into the quoted-phrase operator above), and either
-  drop the `#fuzzy` checkbox or repurpose it as an "exact" override. Note the FTS-vs-fuzzy path
-  interaction when both quoted and unquoted terms appear in one query.
+- [x] ~~**P2 — Parse `key:value` operators alongside free text.**~~ Shipped (`feat/search-operators`,
+  merged): `search_query.py` parses `source:`/`kind:`/`status:`/`subreddit:`/`tag:`/`is:saved`/`is:nsfw`/
+  `before:`/`after:`/`score:>N`, quoted `"exact"`, and `-negation` into `db.search_items` filters on both
+  `/items` and `/reddit`; unknown/malformed operators degrade to free text. Case-normalized values;
+  negation honored even with no positive term.
+- [x] ~~**Tag operator semantics.**~~ Shipped: repeated `tag:` = AND (`tags_all`), `tag:a,b`/`tag:a|b` =
+  OR; `search_items` gained the AND mode.
+- [ ] **P2 — Operator suggestions / autocomplete (Gmail/Discord-style).** *(User-requested.)* The
+  operators work but are invisible — add a discovery affordance: suggest keys + values as you type (e.g.
+  after `source:` list the sources), and render applied operators as chips. No surface today.
+- [ ] **P2 — Cross-source / boolean queries (research first).** `source:reddit AND source:youtube`
+  doesn't work — an item has one source, and bare `AND` is treated as free text. Decide the model:
+  multi-value `source:a,b` (OR) vs. a real boolean grammar (AND/OR/grouping). **User to research how
+  Gmail / Discord / GitHub-search handle multi-value + boolean before designing.**
+- [ ] **P2 — `has:` media-type operator.** `has:video` / `has:image` / `has:gallery` filtering on
+  `media_type`. Pairs with the media-handling pass (Epic 13).
+- [ ] **P2 — Fuzzy-by-default; `"quotes"` for exact.** *(User-requested — prioritize.)* Flip the default
+  so bare free-text is **fuzzy** without the `#fuzzy` checkbox, and a `"quoted phrase"` opts out →
+  **exact**. Wire into `search_items` (default `fuzzy=True` for bare terms; quoted spans = exact); drop or
+  repurpose `#fuzzy` as an "exact" override. Mind the FTS-vs-fuzzy path when both appear in one query.
 
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
-- [ ] **P2 — Rework the comfortable density layout.** The design-v2 round-2 pass made comfortable rows
-  fixed-height with edge-to-edge cropped thumbnails (`app.css` `.items.density-comfortable .item-thumb`),
-  but the result is unsatisfactory in practice. Revisit the row height / thumbnail crop / spacing so
-  comfortable reads well; compare against `design-ref/design_handoff_screens/01-inbox-comfortable-dark.png`
-  but treat it as a starting point, not gospel (the fixed-height was an intentional deviation). Capture
-  the specific gripes (thumbnail proportions? vertical rhythm? action-slot alignment?) before reworking.
+- [ ] **P2 — Rework the comfortable density layout.** **User spec (2026-06-08):** positioning is good,
+  but make **every comfortable row a uniform fixed height (~100px)** — adaptive/dynamic height should
+  apply to **cards density only**. Constrain the thumbnail within that fixed height (`object-fit: cover`)
+  and keep the action slot aligned. Touches `app.css` `.items.density-comfortable`.
 - [ ] **P2 — Tag-chip overload on enriched YouTube cards.** Enriched YouTube videos render a wall of
   tag chips (e.g. the "I made a Self-Soldering Circuit" card shows ~25: `arduino`, `atmega`, `avr`,
   `circuit design`, `diy reflow`, `high voltage`, …). **Root cause:** the per-item chip renderers
@@ -320,7 +334,50 @@ need separate filter controls.*
   action row). (Also noted in Epic 5.)
 - [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
   the inbox; audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
-  `openGallery`) against real Reddit data. Bigger than a quick fix — needs a media-handling pass.
+  `openGallery`) against real Reddit data. **Direction (2026-06-08): avoid the Reddit iframe** — render
+  galleries/video with native embeds from the archived `media`/`gallery` metadata instead. Study how
+  Reddit Enhancement Suite + old.reddit present media. Bigger than a quick fix — a media-handling pass.
+- [ ] **P2 — Card density visual rework.** The cards layout is structurally correct but reads poorly.
+  **Root cause (from screenshot, 2026-06-08):** many Reddit posts are **tall text-screenshots** (e.g.
+  r/BlueskySkeets) and the fixed **16:9 `object-fit:cover` hero crops the text off** — "image difficult
+  to look at." First-pass tweaks applied for review (hero `max-height` 280→200px, `object-position: top`,
+  trimmed head/main padding); if still bad, do a full rework — likely needs **per-aspect media handling**
+  (don't force 16:9 on portrait/text images) and overlaps the Epic 13 P1 Reddit-media pass. User may
+  provide a Figma layout. Touches `app.css` `.items.density-card` + `mediaSlotHtml` in `app.js`.
+- [ ] **P2 — Compact density visual cleanup.** Compact rows are mostly fine, but the **NSFW label
+  collides with the meta line** (screenshot): the "NSFW" text + teal pill overlap the byline so "posted …"
+  is truncated/clipped (looks like a doubled "NSFV/NSFW"). Fix the NSFW marker placement in compact +
+  general spacing polish.
+- [ ] **P2 — Three-dot ⋯ visual menu shouldn't auto-close on change.** Changing a setting
+  (density/theme/focus) closes `#visual-menu-pop`; keep it open so several can be toggled without
+  reopening.
+- [ ] **P2 — Tag chips only render in card view.** `tagChips` shows on cards but not on compact/
+  comfortable rows; render across all densities (subject to the tag-chip-overload fix above). `app.js`.
+- [ ] **P2 — NSFW blurred thumbnail renders too wide (comfortable/list).** The over-18 blurred thumb
+  expands to ~40% of the row width with a centered "NSFW" overlay (screenshot) instead of the normal
+  thumbnail box; constrain it to the standard thumb width/aspect. Likely shares a root with the
+  comfortable-density fixed-height/thumbnail sizing above.
+- [ ] **P2 — Bulk-action Undo missing.** Group-select → Keep/Archive/Done shows no Undo (the per-item
+  Undo toast doesn't fire for bulk), so a bulk action can't be reversed. Wire Undo for `/bulk/status`.
+- [ ] **P2 — Bulk bar shifts the list down when it appears.** Selecting a row makes the bulk bar push the
+  whole list down, so the cursor is no longer over the originally-selected row (bad on desktop). Overlay
+  the bulk bar or reserve its space so the list doesn't jump.
+- [ ] **P2 — Bulk Keep/Archive/Done buttons not color-coded.** Color-code them to match the triage/row
+  semantic colors.
+- [ ] **P2 — Move processed items back to Inbox.** Kept/Archived/Done items need a reversible action to
+  return them to `inbox` — per-item and as a bulk action.
+- [ ] **P2 — Row click should open only on the title/link, not the whole row body.** Refine the `#items`
+  delegated handler so a body click doesn't open the item — only the title/link does (avatar/checkbox
+  still toggles select).
+- [ ] **P2 — Esc doesn't close the Reddit video/thread modal.** `Esc` (and backdrop click) should close
+  it like the other modals.
+- [ ] **P3 — Reposition / iconify the Sort control.** Replace the sort dropdown with a sort icon or move
+  it out of the rail.
+- [ ] **P2 — Scroll the list from the side gutters too.** With the Gmail-style independent scroll, only
+  the content column captures the mouse wheel — hovering the blank space beside it does nothing. Make the
+  whole main pane (incl. side gutters) drive the content scroll (move `overflow-y` to a wider wrapper or
+  widen the scroll region) so the wheel works anywhere in the main area, not just over the list. *(User
+  note 2026-06-08.)*
 - [x] ~~**Reddit "Sync newest" button cut off.**~~ Fixed (v2 pass): the header now wraps. The reddit header crowds at some widths (the new
   theme toggle); fix `header-right` wrapping/spacing in `reddit.css`.
 - [x] ~~**Dropdowns clip into the search bar.**~~ Fixed (v2 pass): the tag filter moved to the sidebar and the topnav wraps. At some window widths the topbar selects overlap the
@@ -338,19 +395,30 @@ need separate filter controls.*
 - [ ] **P2 — Settings cog + panel.** A gear in the header opening a settings sheet.
 - [ ] **P2 — View density in settings** (compact / cozy / cards) — surface the existing density toggle.
 - [ ] **P2 — Light/dark theme toggle in settings** — surface the existing `theme.js` toggle.
-- [ ] **P3 — "Swipe only on mobile" toggle.** Enable swipe gestures on touch only (desktop uses
-  buttons/keyboard). Pairs with the Mobile UX epic.
-- [ ] **P3 — Batch vs. infinite-scroll toggle + batch size.** Choose "Show N more" vs. scroll-to-load,
-  and the batch size, in settings (today `BATCH = 25` is hard-coded).
+- [ ] **P2 — Infinite scroll by default; Focus mode batches.** *(User decision 2026-06-08.)* Make all
+  lists **load-on-scroll** (drop the "Show more" button) EXCEPT **Focus mode**, which restricts to
+  deliberate **batches** (the old `BATCH=25` becomes the Focus batch size). Supersedes the batch-vs-scroll
+  toggle.
+- [ ] **P3 — Focus mode wider on desktop.** Desktop Focus mode should use a wider content column.
+- [ ] **P3 — "Swipe only on mobile" → now a decision (see Epic 16).** Inbox swipe is mobile/touch-only by
+  default, not a toggle.
 - [ ] **P3 — Hide the Stats button under settings.** Move Stats into the settings menu to de-clutter.
 
 ## Epic 15 — Reddit / HN as-app navigation  (`enhancement`, `area:reddit`)
 *Make saved items behave like the native apps when tapped.*
 
-- [ ] **P2 — Tap subreddit → open the subreddit; tap user → open the user page.** Make the meta-line
-  subreddit/author tappable to the right Reddit destination.
-- [ ] **P2 — Reddit image-link → open the comments thread, not the raw image URL.**
-- [ ] **P2 — Hacker News item → open the HN discussion thread, not the linked article.**
+- [x] ~~**P2 — Tap subreddit → open the subreddit; tap user → open the user page.**~~ Shipped (design-v2
+  round 2; user-verified): meta-line `r/<sub>` / `by <author>` link to Reddit (new tab) without triggering
+  row open/select.
+- [ ] **P2 — Reddit image-link → open the comments thread, not the raw image URL.** (Open.)
+- [x] ~~**P2 — Hacker News item → open the HN discussion thread, not the linked article.**~~ Shipped
+  (user-verified).
+- [ ] **P2 — Hacker News author → open the HN user profile** (`news.ycombinator.com/user?id=<author>`),
+  mirroring the Reddit user link.
+- [ ] **P2 — HN: chip to open the linked article/story URL directly.** The item opens the discussion, so
+  add a separate chip for the external article link.
+- [ ] **P3 — (Optional) Fetch article thumbnails for HN items.** Show a preview image on HN rows/cards
+  via an OG-image fetch/enrich pass (gate like other enrich passes). *(User: "optional epic".)*
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
@@ -364,6 +432,8 @@ mobile-friendly".*
 - [ ] **P2 — Swipe physics feel.** The current swipe is a little stiff; add momentum/spring + better
   thresholds for a smoother feel.
 - [ ] **P3 — Mobile-friendly scrollbar** (Nova-Launcher-style fast-scroll handle).
+- [ ] **P2 — Inbox swipe = mobile/touch only.** *(User decision 2026-06-08.)* Disable row-swipe on the
+  inbox on desktop (desktop uses the action buttons/hover); keep swipe for touch only.
 - [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
   touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
 - [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
