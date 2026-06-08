@@ -41,11 +41,17 @@
 
   const thumb = (item) => {
     const m = item.metadata || {};
-    if (m.thumbnail) return m.thumbnail;
-    const url = item.url || "";
-    if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
-    const yt = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/);
-    return yt ? "https://i.ytimg.com/vi/" + yt[1] + "/hqdefault.jpg" : "";
+    let t = m.thumbnail || "";
+    if (!t) {
+      const url = item.url || "";
+      if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
+      const yt = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/);
+      t = yt ? "https://i.ytimg.com/vi/" + yt[1] + "/hqdefault.jpg" : "";
+    }
+    // YouTube hq/sd/default thumbs bake in 4:3 black bars; upgrade i.ytimg URLs to the 16:9
+    // maxres (the <img> onerror falls back to mqdefault when a video has no maxres).
+    if (/i\.ytimg\.com/.test(t)) t = t.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/maxresdefault.jpg");
+    return t;
   };
 
   let toastTimer = null;
@@ -251,6 +257,12 @@
     return '<a class="' + cls + '" href="' + esc(url) +
       '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(label) + "</a>";
   };
+  // YouTube channel link when enrich captured the channel id (else "" → metaAnchor renders plain text).
+  const channelHref = (item) => {
+    const m = item.metadata || {};
+    return (item.source === "youtube" && m.channel_id)
+      ? "https://www.youtube.com/channel/" + encodeURIComponent(m.channel_id) : "";
+  };
 
   // Full image URL to open in a lightbox (direct images / i.redd.it), else "".
   const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
@@ -278,6 +290,15 @@
     const s = sources[item.source];
     return s ? s.label : item.source;
   };
+  // Card-header origin label as HTML — links the YouTube channel when we have its id.
+  const subLabelHtml = (item) => {
+    const m = item.metadata || {};
+    if (m.subreddit) return esc("r/" + m.subreddit);
+    if (m.channel) return metaAnchor(channelHref(item), m.channel, "meta-link");
+    if (m.playlist) return esc(m.playlist);
+    const s = sources[item.source];
+    return esc(s ? s.label : item.source);
+  };
   // hideSub omits the origin (subreddit/channel/playlist) — the card shows it in its header.
   const metaLine = (item, hideSub) => {
     const m = item.metadata || {};
@@ -288,7 +309,7 @@
     }
     if (!hideSub) {
       if (m.subreddit) parts.push(metaAnchor("https://www.reddit.com/r/" + encodeURIComponent(m.subreddit), "r/" + m.subreddit, "meta-link"));
-      if (m.channel) parts.push(esc(m.channel));
+      if (m.channel) parts.push(metaAnchor(channelHref(item), m.channel, "meta-link"));
       if (m.playlist) parts.push(esc(m.playlist));
     }
     if (item.source === "youtube") { const ud = uploadDate(item); if (ud) parts.push("📅 " + ud); }
@@ -388,6 +409,10 @@
     return '<div class="item-media nsfw" data-nsfw-media="1">' + inner +
       '<span class="nsfw-tag">NSFW</span></div>';
   };
+  // YouTube maxres thumbs 404 on some videos → onerror-fall-back to the always-present mqdefault.
+  const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.test(t)
+    ? " onerror=\"this.onerror=null;this.src=this.src.replace('maxresdefault','mqdefault')\""
+    : "";
   // Right-hand media slot: a thumbnail when we have one, else a click-to-load
   // Reddit preview button for media posts whose media URL wasn't captured.
   const mediaSlotHtml = (item) => {
@@ -395,16 +420,17 @@
     const t = thumb(item);
     if (t) {
       const full = imageUrl(item);
+      const yterr = ytFallback(t);
       if (full) {                                         // direct image → open in lightbox
-        return wrapMediaHtml(item, '<img class="item-thumb img-open" src="' + esc(t) +
-          '" data-img="' + esc(full) + '" alt="">');
+        return wrapMediaHtml(item, '<img class="item-thumb img-open" src="' + esc(t) + '"' + yterr +
+          ' data-img="' + esc(full) + '" alt="">');
       }
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
-        return wrapMediaHtml(item, '<img class="item-thumb rd-preview" src="' + esc(t) +
-          '" data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">');
+        return wrapMediaHtml(item, '<img class="item-thumb rd-preview" src="' + esc(t) + '"' + yterr +
+          ' data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">');
       }
-      return wrapMediaHtml(item, '<img class="item-thumb" src="' + esc(t) + '" alt="">');
+      return wrapMediaHtml(item, '<img class="item-thumb" src="' + esc(t) + '"' + yterr + ' alt="">');
     }
     const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
@@ -495,7 +521,7 @@
       return head +
         '<div class="item-fg">' +
           '<div class="card-head">' + sourceAvatar(item) +
-            '<span class="ch-sub">' + esc(subLabel(item)) + "</span>" +
+            '<span class="ch-sub">' + subLabelHtml(item) + "</span>" +
             '<span class="item-time" title="' + esc(dateTitle(item)) + '">' + esc(ago(item.created_utc || item.first_seen_utc)) + "</span>" +
           "</div>" +
           media +
