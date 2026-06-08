@@ -48,9 +48,13 @@
       const yt = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/);
       t = yt ? "https://i.ytimg.com/vi/" + yt[1] + "/hqdefault.jpg" : "";
     }
-    // YouTube hq/sd/default thumbs bake in 4:3 black bars; upgrade i.ytimg URLs to the 16:9
-    // maxres (the <img> onerror falls back to mqdefault when a video has no maxres).
-    if (/i\.ytimg\.com/.test(t)) t = t.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/maxresdefault.jpg");
+    // YouTube hq/sd/default thumbs bake in 4:3 black bars. Use a bar-free 16:9 variant sized to the
+    // density: crisp maxres for the large card hero (the <img> onerror-falls-back to mqdefault), small
+    // mqdefault for the list rows (also bar-free, ~10KB vs ~100KB so list batches stay light).
+    if (/i\.ytimg\.com/.test(t)) {
+      const variant = currentDensity === "card" ? "maxresdefault" : "mqdefault";
+      t = t.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/" + variant + ".jpg");
+    }
     return t;
   };
 
@@ -281,15 +285,6 @@
     return "";
   };
 
-  // Short origin label (subreddit / channel / playlist / source) for the card header.
-  const subLabel = (item) => {
-    const m = item.metadata || {};
-    if (m.subreddit) return "r/" + m.subreddit;
-    if (m.channel) return m.channel;
-    if (m.playlist) return m.playlist;
-    const s = sources[item.source];
-    return s ? s.label : item.source;
-  };
   // Card-header origin label as HTML — links the YouTube channel when we have its id.
   const subLabelHtml = (item) => {
     const m = item.metadata || {};
@@ -422,15 +417,15 @@
       const full = imageUrl(item);
       const yterr = ytFallback(t);
       if (full) {                                         // direct image → open in lightbox
-        return wrapMediaHtml(item, '<img class="item-thumb img-open" src="' + esc(t) + '"' + yterr +
+        return wrapMediaHtml(item, '<img class="item-thumb img-open" loading="lazy" src="' + esc(t) + '"' + yterr +
           ' data-img="' + esc(full) + '" alt="">');
       }
       if (item.source === "reddit" && PREVIEW_TYPES[m.media_type]) {  // video/gallery → permalink embed
         const permalink = m.permalink || item.url || "";
-        return wrapMediaHtml(item, '<img class="item-thumb rd-preview" src="' + esc(t) + '"' + yterr +
+        return wrapMediaHtml(item, '<img class="item-thumb rd-preview" loading="lazy" src="' + esc(t) + '"' + yterr +
           ' data-permalink="' + esc(permalink) + '"' + galleryAttr(m) + ' alt="">');
       }
-      return wrapMediaHtml(item, '<img class="item-thumb" src="' + esc(t) + '"' + yterr + ' alt="">');
+      return wrapMediaHtml(item, '<img class="item-thumb" loading="lazy" src="' + esc(t) + '"' + yterr + ' alt="">');
     }
     const mt = m.media_type;
     if (item.source === "reddit" && PREVIEW_TYPES[mt]) {
