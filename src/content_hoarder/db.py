@@ -429,6 +429,7 @@ def search_items(
     subreddit: str | None = None,
     is_saved: int | None = None,
     open_in_firefox: bool = False,
+    include_consolidated: bool = False,
     fuzzy: bool = False,
     sort: str = "last_seen_utc",
     order: str = "desc",
@@ -475,6 +476,9 @@ def search_items(
             params.append(int(is_saved))
         if open_in_firefox:  # the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
             filters.append(f"json_extract({a}metadata, '$.open_in_firefox') = 1")
+        if not include_consolidated:
+            filters.append(
+                f"json_extract({a}metadata, '$.consolidated_into') IS NULL")
 
     q = (q or "").strip()
     match_expr = ""

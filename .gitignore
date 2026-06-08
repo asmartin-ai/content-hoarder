@@ -36,6 +36,7 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+.continue/
 
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json
