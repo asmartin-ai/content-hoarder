@@ -30,16 +30,25 @@ from content_hoarder.models import parse_metadata
 
 
 def _companion_record(row: dict, md: dict) -> dict:
-    """Build the per-companion record that is appended to the youtube row."""
+    """Build the per-companion record that is appended to the youtube row.
+
+    The stored link points at the companion's *discussion*, never back at the
+    video it was matched on: a reddit comments permalink, the Hacker News thread
+    (derived from the item id — the row URL IS the YouTube link, so it's useless
+    here), else the row URL as a last resort.
+    """
+    source = row.get("source") or ""
     rec = {
-        "source": row.get("source") or "",
+        "source": source,
         "kind": row.get("kind") or "item",
         "fullname": row.get("fullname") or "",
     }
-    # Prefer a reddit permalink when present; else fall back to the row URL.
     permalink = (md.get("permalink") or "").strip() if isinstance(md, dict) else ""
     if permalink:
         rec["permalink"] = permalink
+    elif source == "hackernews":
+        sid = str(row.get("source_id") or "").strip()
+        rec["url"] = f"https://news.ycombinator.com/item?id={sid}" if sid else (row.get("url") or "")
     else:
         rec["url"] = row.get("url") or ""
     return rec

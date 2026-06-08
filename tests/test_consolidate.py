@@ -134,9 +134,9 @@ def test_undo_round_trip(tmp_db):
     assert "consolidated_into" not in rd_md
 
 
-def test_url_fallback_for_non_reddit_companion(tmp_db):
-    """A non-reddit companion with no permalink falls back to its URL."""
-    vid = "Url00000001"  # 11 chars
+def test_hackernews_companion_links_to_thread(tmp_db):
+    """An HN companion links to the HN discussion thread, not the matched video URL."""
+    vid = "Hn000000001"  # 11 chars
     conn = db.connect(tmp_db)
     _seed(
         conn,
@@ -144,7 +144,7 @@ def test_url_fallback_for_non_reddit_companion(tmp_db):
             _youtube(vid),
             dict(
                 source="hackernews",
-                source_id="hn123",
+                source_id="28608860",
                 kind="story",
                 title="HN story",
                 url=f"https://www.youtube.com/watch?v={vid}",
@@ -158,7 +158,36 @@ def test_url_fallback_for_non_reddit_companion(tmp_db):
     yt = db.get_item(conn, f"youtube:{vid}")
     yt_md = json.loads(yt["metadata"])
     comp = yt_md["companions"][0]
-    assert comp["fullname"] == "hackernews:hn123"
+    assert comp["fullname"] == "hackernews:28608860"
+    assert comp["url"] == "https://news.ycombinator.com/item?id=28608860"
+    assert "permalink" not in comp
+
+
+def test_url_fallback_for_other_companion(tmp_db):
+    """A non-reddit, non-HN companion with no permalink falls back to its URL."""
+    vid = "Url00000001"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(
+        conn,
+        [
+            _youtube(vid),
+            dict(
+                source="obsidian",
+                source_id="note-1",
+                kind="note",
+                title="A note",
+                url=f"https://www.youtube.com/watch?v={vid}",
+                metadata={},
+            ),
+        ],
+    )
+
+    consolidate.migrate(conn, apply=True)
+
+    yt = db.get_item(conn, f"youtube:{vid}")
+    yt_md = json.loads(yt["metadata"])
+    comp = yt_md["companions"][0]
+    assert comp["fullname"] == "obsidian:note-1"
     assert comp["url"] == f"https://www.youtube.com/watch?v={vid}"
     assert "permalink" not in comp
 

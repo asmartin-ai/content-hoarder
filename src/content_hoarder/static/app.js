@@ -316,6 +316,31 @@
     return '<div class="tag-chips">' +
       tags.map((t) => '<span class="tag-chip">' + esc(t) + "</span>").join("") + "</div>";
   };
+
+  // Companion discussion threads folded onto a canonical YouTube item (Epic 11):
+  // a saved Reddit post / HN story that pointed at this video survives only as a
+  // link here. The 💬 lead doubles as the at-a-glance "discussion exists" badge.
+  const COMP_LABEL = { reddit: "Reddit", hackernews: "Hacker News", firefox: "Firefox" };
+  const companionHref = (c) => {
+    let u = ((c && (c.permalink || c.url)) || "").trim();
+    if (/^\/r\//i.test(u)) u = "https://www.reddit.com" + u;  // legacy relative reddit permalink
+    return safeUrl(u);
+  };
+  const companionList = (item) => {
+    const list = (item.metadata || {}).companions;
+    return Array.isArray(list) ? list.filter((c) => companionHref(c)) : [];
+  };
+  const companionsHtml = (item) => {
+    const cs = companionList(item);
+    if (!cs.length) return "";
+    const links = cs.map((c) => {
+      const label = COMP_LABEL[c.source] || (sources[c.source] || {}).label || c.source || "link";
+      return '<a class="comp-link" href="' + esc(companionHref(c)) +
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(label) + " ↗</a>";
+    }).join("");
+    return '<div class="companions" title="Saved discussion threads for this video">' +
+      '<span class="comp-lead" aria-hidden="true">💬</span>' + links + "</div>";
+  };
   // Data-driven tag checkboxes (volume-sorted, with counts); selection persists across rebuilds.
   const renderTagFilter = (byTag) => {
     const list = document.getElementById("tag-filter-list");
@@ -477,6 +502,7 @@
           '<div class="item-main">' +
             titleHtml +
             metaHtml(true, false) +
+            companionsHtml(item) +
             snippet +
             '<div class="card-tagrow">' + (tagChips(item) || '<div class="tag-chips"></div>') + ACTIONS_HTML + "</div>" +
             recoverBtn +
@@ -498,6 +524,7 @@
         '<div class="item-main">' +
           titleHtml +
           metaHtml(false, true) +
+          companionsHtml(item) +
           snippet +
           tagChips(item) +
           recoverBtn +
