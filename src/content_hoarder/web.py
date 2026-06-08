@@ -13,7 +13,7 @@ from contextlib import closing
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from content_hoarder import config, connectors, db, pipeline
+from content_hoarder import config, connectors, db, pipeline, search_query
 
 
 def _int(value, default: int = 0) -> int:
@@ -56,21 +56,47 @@ def create_app(db_path: str | None = None) -> Flask:
         a = request.args
         limit = min(max(_int(a.get("limit"), 50), 1), 500)
         offset = max(_int(a.get("offset"), 0), 0)
-        is_saved = a.get("is_saved")
+
+        # Search operators (docs/search-operators-spec.md): a typed operator wins over the
+        # dropdown param for that key; when the operator is absent (or malformed), the
+        # explicit query param (if any) remains authoritative.
+        parsed = search_query.parse(a.get("q", ""))
+
+        is_saved_param = a.get("is_saved")
+        is_saved = (
+            parsed.is_saved
+            if parsed.is_saved is not None
+            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+        )
+
+        tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
+        tags_all = parsed.tags_all if parsed.tags else False
+
         with conn() as c:
             rows = db.search_items(
-                c, a.get("q", ""),
-                source=a.get("source") or None,
-                kind=a.get("kind") or None,
-                status=a.get("status") or None,
+                c,
+                parsed.text,
+                source=parsed.source if parsed.source is not None else (a.get("source") or None),
+                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
+                status=parsed.status if parsed.status is not None else (a.get("status") or None),
                 category=a.get("category") or None,
-                tags=a.getlist("tag") or None,
-                is_saved=_int(is_saved) if is_saved not in (None, "") else None,
+                tags=tags,
+                tags_all=tags_all,
+                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
+                is_saved=is_saved,
+                nsfw=parsed.nsfw,
+                before=parsed.before,
+                after=parsed.after,
+                score_min=parsed.score_min,
+                score_max=parsed.score_max,
+                exact=parsed.exact,
+                exclude=parsed.exclude,
                 open_in_firefox=a.get("open_in_firefox") in ("1", "true"),
                 fuzzy=a.get("fuzzy") == "1",
                 sort=a.get("sort", "last_seen_utc"),
                 order=a.get("order", "desc"),
-                limit=limit + 1, offset=offset,
+                limit=limit + 1,
+                offset=offset,
             )
             has_more = len(rows) > limit
             return jsonify({"items": rows[:limit], "has_more": has_more})
@@ -242,23 +268,45 @@ def create_app(db_path: str | None = None) -> Flask:
         a = request.args
         limit = min(max(_int(a.get("limit"), 100), 1), 500)
         offset = max(_int(a.get("offset"), 0), 0)
-        is_saved = a.get("is_saved")
+
+        parsed = search_query.parse(a.get("q", ""))
+
+        is_saved_param = a.get("is_saved")
+        is_saved = (
+            parsed.is_saved
+            if parsed.is_saved is not None
+            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+        )
+
+        tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
+        tags_all = parsed.tags_all if parsed.tags else False
+
         with conn() as c:
             rows = db.search_items(
-                c, a.get("q", ""),
-                source="reddit",
-                kind=a.get("kind") or None,
-                status=a.get("status") or None,
-                subreddit=a.get("subreddit") or None,
-                tags=a.getlist("tag") or None,
-                is_saved=_int(is_saved) if is_saved not in (None, "") else None,
+                c,
+                parsed.text,
+                source="reddit",  # route is reddit-scoped regardless of source: operator
+                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
+                status=parsed.status if parsed.status is not None else (a.get("status") or None),
+                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
+                tags=tags,
+                tags_all=tags_all,
+                is_saved=is_saved,
+                nsfw=parsed.nsfw,
+                before=parsed.before,
+                after=parsed.after,
+                score_min=parsed.score_min,
+                score_max=parsed.score_max,
+                exact=parsed.exact,
+                exclude=parsed.exclude,
                 include_consolidated=True,
                 fuzzy=a.get("fuzzy") == "1",
                 # Default to newest-synced-first — the closest proxy to newest-saved-first, since
                 # Reddit exposes no save timestamp (see docs/reddit-management.md).
                 sort=a.get("sort", "first_seen_utc"),
                 order=a.get("order", "desc"),
-                limit=limit + 1, offset=offset,
+                limit=limit + 1,
+                offset=offset,
             )
         has_more = len(rows) > limit
         return jsonify({"items": [_reddit_view(r) for r in rows[:limit]], "has_more": has_more})
