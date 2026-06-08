@@ -252,6 +252,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 subreddit=a.get("subreddit") or None,
                 tags=a.getlist("tag") or None,
                 is_saved=_int(is_saved) if is_saved not in (None, "") else None,
+                include_consolidated=True,
                 fuzzy=a.get("fuzzy") == "1",
                 # Default to newest-synced-first — the closest proxy to newest-saved-first, since
                 # Reddit exposes no save timestamp (see docs/reddit-management.md).
