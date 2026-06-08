@@ -276,10 +276,23 @@ need separate filter controls.*
   has-any). Operators should let the user pick: repeated `tag:` as AND vs. `tag:a,b`/`tag:a|b` as OR
   (per the user's request to specify multi-tag logic via search). `search_items` already takes a
   `tags=[]` list — add an AND mode there.
+- [ ] **P2 — Fuzzy-by-default; `"quotes"` for exact.** Flip the search default so free-text queries
+  are **fuzzy** (typo-tolerant / loose match) without needing the `#fuzzy` checkbox, and treat a
+  `"quoted phrase"` as an opt-out → **exact** match. Removes a manual toggle for the common case and
+  aligns with the Gmail/Google mental model. Wire into `search_items`: default `fuzzy=True` for
+  bare terms, parse quoted spans as exact (folds into the quoted-phrase operator above), and either
+  drop the `#fuzzy` checkbox or repurpose it as an "exact" override. Note the FTS-vs-fuzzy path
+  interaction when both quoted and unquoted terms appear in one query.
 
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
+- [ ] **P2 — Rework the comfortable density layout.** The design-v2 round-2 pass made comfortable rows
+  fixed-height with edge-to-edge cropped thumbnails (`app.css` `.items.density-comfortable .item-thumb`),
+  but the result is unsatisfactory in practice. Revisit the row height / thumbnail crop / spacing so
+  comfortable reads well; compare against `design-ref/design_handoff_screens/01-inbox-comfortable-dark.png`
+  but treat it as a starting point, not gospel (the fixed-height was an intentional deviation). Capture
+  the specific gripes (thumbnail proportions? vertical rhythm? action-slot alignment?) before reworking.
 - [x] ~~**Card-view text clipping / title overlap.**~~ Fixed by the v2 card (adaptive hero + bottom
   action row). (Also noted in Epic 5.)
 - [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
