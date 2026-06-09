@@ -145,6 +145,23 @@ def _refresh_modhash(session_cookie: str, *, user_agent: str, getf=None) -> tupl
     return modhash, name
 
 
+def _retry_after_seconds(headers: dict | None) -> float | None:
+    """Numeric Retry-After value from a (case-insensitively searched) header dict.
+    None when absent or non-numeric (e.g. an RFC 7231 HTTP-date) — caller falls back
+    to its own backoff delay. Case-insensitive because the headers arrive as a plain
+    dict (``dict(resp.headers)``) with whatever casing the server sent."""
+    if not headers:
+        return None
+    ra = next((v for k, v in headers.items() if k.lower() == "retry-after"), None)
+    if not ra:
+        return None
+    try:
+        seconds = float(ra)
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
+
+
 def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, modhash: str,
                      user_agent: str, sleep, max_retries: int = 3) -> tuple[bool, str | None]:
     """POST one save/unsave with 429 backoff. Returns (ok, error); raises RedditAuthError on 403."""
@@ -159,8 +176,8 @@ def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, mod
         if status == 403:
             raise RedditAuthError("Reddit returned 403 — cookie/modhash likely expired")
         if status == 429 and attempt < max_retries:
-            ra = headers.get("Retry-After") if headers else None
-            sleep(float(ra) if ra else delay)
+            ra = _retry_after_seconds(headers)
+            sleep(ra if ra is not None else delay)
             delay *= 2
             continue
         return False, f"HTTP {status}"
