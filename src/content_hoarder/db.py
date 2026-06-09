@@ -368,6 +368,11 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
         merged["kind"] = item["kind"]
 
     # metadata: shallow-merge (incoming non-empty values win; keep prior keys).
+    # tags are UNION-merged only when the incoming item carries a category (the category
+    # mirror needs prior tags kept); otherwise incoming tags REPLACE existing ones
+    # wholesale — re-tag passes recompute from scratch and rely on this. A future
+    # partial-tags caller would clobber e.g. NSFW tags: change deliberately (with tests)
+    # or send category alongside. Pinned by test_merge_upsert_tags_semantics.
     emd = parse_metadata(existing.get("metadata"))
     for k, v in incoming_md.items():
         if k == "tags" and incoming_category:
