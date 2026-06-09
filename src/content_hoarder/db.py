@@ -199,15 +199,31 @@ def init_db(conn: sqlite3.Connection) -> None:
     # CLI command; going forward set_category()/merge_upsert() keep the tag mirror in sync.
 
 
+# Bump when an FTS table is added/changed so upgraded DBs rebuild once — a boolean
+# marker could never re-trigger (items_trgm arrived after some DBs set it, silently
+# leaving their fuzzy index empty).
+_FTS_VERSION = 2
+
+
 def _ensure_fts_built(conn: sqlite3.Connection) -> None:
-    """One-time rebuild of the external-content FTS indexes, gated by a marker."""
-    if conn.execute("SELECT 1 FROM settings WHERE key='fts_built'").fetchone():
+    """One-time rebuild of the external-content FTS indexes, gated by a version marker.
+
+    The marker stores the version last built; legacy boolean-'1' DBs rebuild exactly
+    once after upgrade (populating any FTS table added since), then store _FTS_VERSION.
+    """
+    try:  # missing row -> fetchone() is None -> TypeError -> treat as version 0
+        marker = int(conn.execute(
+            "SELECT value FROM settings WHERE key='fts_built'").fetchone()[0])
+    except (TypeError, ValueError):
+        marker = 0
+    if marker >= _FTS_VERSION:
         return
     has_rows = conn.execute("SELECT EXISTS(SELECT 1 FROM items)").fetchone()[0]
     if has_rows:
         conn.execute("INSERT INTO items_fts(items_fts) VALUES('rebuild')")
         conn.execute("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')")
-    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', '1')")
+    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', ?)",
+                 (str(_FTS_VERSION),))
 
 
 # ---------------------------------------------------------------------------
