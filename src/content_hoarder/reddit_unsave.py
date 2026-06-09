@@ -30,12 +30,21 @@ class RedditAuthError(Exception):
     """Cookie expired / logged out / 403 — halts the drain; surfaced loudly to the user."""
 
 
+class RedditNetworkError(Exception):
+    """Transient transport/server failure — NOT an auth problem; retry later. Kept distinct
+    so a network blip never tells the user to re-paste a perfectly good cookie."""
+
+
 # ---------------------------------------------------------------------------
 # Live HTTP helpers (the defaults for the injectable post=/getf= params)
 # ---------------------------------------------------------------------------
 
 def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
-    """GET `url` with the reddit_session cookie; parse JSON. Returns {} on any failure."""
+    """GET `url` with the reddit_session cookie; parse JSON.
+
+    Returns {} only for a genuine logged-out response (401/403) — the shape
+    `_refresh_modhash` maps to RedditAuthError. Anything transient (timeouts, DNS,
+    429/5xx, an unparseable CDN error page) raises RedditNetworkError instead."""
     req = urllib.request.Request(
         url,
         headers={
@@ -47,9 +56,17 @@ def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception:  # noqa: BLE001 - any failure means "no usable session"
-        return {}
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return {}
+        raise RedditNetworkError(f"HTTP {e.code}") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RedditNetworkError(str(e)) from e
+    try:
+        return json.loads(body)
+    except ValueError as e:
+        raise RedditNetworkError("unparseable response") from e
 
 
 def _http_post(url: str, fields: dict, *, session_cookie: str, modhash: str,
@@ -206,7 +223,7 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
     getf = getf or _http_get
     user_agent = user_agent or config.get("USER_AGENT")
     result = {"selected": 0, "unsaved": 0, "failed": 0, "auth_error": False,
-              "remaining": count_pending(conn)}
+              "network_error": False, "remaining": count_pending(conn)}
 
     auth = get_auth(conn)
     if not auth:
@@ -218,6 +235,9 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
         )
     except RedditAuthError:
         result["auth_error"] = True
+        return result
+    except RedditNetworkError:
+        result["network_error"] = True  # Reddit unreachable — queue intact, retry later
         return result
     set_auth(conn, session_cookie=auth["session_cookie"], modhash=modhash, username=username)
 
@@ -286,7 +306,7 @@ def resave(conn, fullname: str, *, post=None, getf=None, user_agent: str | None 
         modhash, username = _refresh_modhash(
             auth["session_cookie"], user_agent=user_agent, getf=getf
         )
-    except RedditAuthError:
+    except (RedditAuthError, RedditNetworkError):
         return False
     try:
         ok, _err = _send_with_retry(

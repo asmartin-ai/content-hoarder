@@ -25,6 +25,7 @@ import urllib.parse
 from content_hoarder import config, db
 from content_hoarder.reddit_unsave import (
     RedditAuthError,
+    RedditNetworkError,
     _http_get,
     _refresh_modhash,
     get_auth,
@@ -74,7 +75,8 @@ def sync_saved_cookie(
     sleep = sleep or time.sleep
     user_agent = user_agent or config.get("USER_AGENT")
     result = {"fetched": 0, "new": 0, "updated": 0, "pages": 0,
-              "stopped": None, "auth_error": False, "username": None}
+              "stopped": None, "auth_error": False, "network_error": False,
+              "username": None}
 
     auth = get_auth(conn)
     if not auth:
@@ -91,6 +93,10 @@ def sync_saved_cookie(
         except RedditAuthError:
             result["auth_error"] = True
             result["stopped"] = "auth_error"
+            return result
+        except RedditNetworkError:
+            result["network_error"] = True
+            result["stopped"] = "network_error"
             return result
     result["username"] = username
 
@@ -109,8 +115,14 @@ def sync_saved_cookie(
         params = {"limit": per_page, "raw_json": 1}
         if after:
             params["after"] = after
-        body = getf(base + "?" + urllib.parse.urlencode(params),
-                    session_cookie=auth["session_cookie"], user_agent=user_agent) or {}
+        try:
+            body = getf(base + "?" + urllib.parse.urlencode(params),
+                        session_cookie=auth["session_cookie"], user_agent=user_agent) or {}
+        except RedditNetworkError:
+            # Not a real boundary — never advances the mark (unlike empty/exhausted).
+            result["network_error"] = True
+            result["stopped"] = "network_error"
+            break
         data = body.get("data") or {}
         children = data.get("children") or []
         if not children:

@@ -122,3 +122,17 @@ def test_sync_learns_username_from_me(conn):
     getf = make_getf([([child("t3_z")], None)], me={"data": {"name": "bob", "modhash": "mh"}})
     res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua")
     assert res["username"] == "bob" and res["new"] == 1
+
+
+def test_sync_network_error_keeps_mark(conn):
+    """A transport failure must not read as 'cookie expired' and must not move the mark."""
+    _auth(conn)
+    db.set_setting(conn, "reddit_sync_newest", json.dumps(["t3_b"]))
+
+    def getf(url, *, session_cookie, user_agent):
+        raise reddit_unsave.RedditNetworkError("connection refused")
+
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", sleep=NOSLEEP)
+    assert res["stopped"] == "network_error" and res["network_error"] is True
+    assert res["auth_error"] is False
+    assert json.loads(db.get_setting(conn, "reddit_sync_newest")) == ["t3_b"]
