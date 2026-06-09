@@ -353,3 +353,15 @@ def test_items_search_operators(tmp_db):
 
     # malformed operators degrade to free text and must not 500
     assert cl.get("/items?q=before:notadate").status_code == 200
+
+
+# --- malformed numeric params (delegation/05+06) ------------------------------
+
+def test_drain_malformed_max_no_500(tmp_db):
+    cl = _client(tmp_db)
+    assert cl.post("/reddit/unsave/drain", json={"max": "garbage"}).status_code == 200
+    assert cl.post("/reddit/unsave/drain").status_code == 200  # no body at all
+
+
+def test_sync_malformed_max_pages_no_500(tmp_db):
+    assert _client(tmp_db).post("/reddit/sync", json={"max_pages": "garbage"}).status_code == 200

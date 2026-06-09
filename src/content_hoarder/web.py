@@ -287,9 +287,12 @@ def create_app(db_path: str | None = None) -> Flask:
     def reddit_unsave_drain():
         from content_hoarder import reddit_unsave as ru
         body = request.get_json(silent=True) or {}
-        mx = body.get("max")
+        # Cap per request (~50s at the 1 req/s throttle) — an unbounded drain of a big
+        # queue is a 30+ minute HTTP request. The response's `remaining` lets the UI
+        # loop; the CLI/scheduled job is the right tool for bulk drains.
+        limit = min(max(_int(body.get("max"), 50), 1), 500)
         with conn() as c:
-            res = ru.drain(c, limit=int(mx) if mx else None)
+            res = ru.drain(c, limit=limit)
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/resave")
@@ -440,9 +443,11 @@ def create_app(db_path: str | None = None) -> Flask:
     def reddit_sync_route():
         from content_hoarder import reddit_sync
         body = request.get_json(silent=True) or {}
-        mp = body.get("max_pages")
         full = bool(body.get("full"))
-        max_pages = int(mp) if mp else (50 if full else 3)
+        max_pages = _int(body.get("max_pages"), 0)
+        if max_pages <= 0:
+            max_pages = 50 if full else 3
+        max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
             res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
