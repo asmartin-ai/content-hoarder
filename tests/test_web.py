@@ -58,6 +58,94 @@ def test_malformed_params_dont_500(tmp_db):
     assert cl.get("/random?n=notanumber").status_code == 200
 
 
+# -- CSRF / DNS-rebinding guard ----------------------------------------------
+
+def test_cross_origin_post_rejected(tmp_db):
+    """A malicious page's no-cors POST carries its own Origin — must be refused."""
+    r = _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "keep"},
+                             headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+
+
+def test_same_origin_post_allowed(tmp_db):
+    r = _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "keep"},
+                             headers={"Origin": "http://localhost"})
+    assert r.status_code == 200 and r.get_json()["status"] == "keep"
+
+
+def test_no_origin_post_allowed(tmp_db):
+    """curl/CLI posts carry no Origin; they must keep working."""
+    r = _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "keep"})
+    assert r.status_code == 200
+
+
+def test_rebound_host_rejected(tmp_db):
+    """DNS rebinding presents a public hostname in Host — refuse even GETs."""
+    cl = _client(tmp_db)
+    assert cl.get("/items", headers={"Host": "evil.example.com"}).status_code == 403
+    assert cl.post("/items/reddit:t3_a/status", json={"status": "keep"},
+                   headers={"Host": "evil.example.com"}).status_code == 403
+
+
+def test_tailscale_and_lan_hosts_allowed(tmp_db):
+    cl = _client(tmp_db)
+    assert cl.get("/items", headers={"Host": "100.101.102.103:8788"}).status_code == 200
+    assert cl.get("/items", headers={"Host": "192.168.1.20:8788"}).status_code == 200
+
+
+# -- undo of a drained Done (live re-save / divergence warning) ---------------
+
+def _drain_done(tmp_db):
+    """Mark t3_a Done with unsave-on-done enabled, then simulate a completed drain
+    (queue row 'done' + is_saved flipped) exactly as reddit_unsave.drain() leaves it."""
+    conn = db.connect(tmp_db)
+    db.set_setting(conn, "reddit_unsave_on_done", "1")
+    db.set_status(conn, "reddit:t3_a", "done")
+    conn.execute("UPDATE reddit_unsave SET state='done' WHERE fullname='reddit:t3_a'")
+    conn.execute("UPDATE items SET is_saved=0 WHERE fullname='reddit:t3_a'")
+    conn.commit()
+    conn.close()
+
+
+def test_undo_drained_done_warns_when_resave_fails(tmp_db):
+    cl = _client(tmp_db)
+    _drain_done(tmp_db)
+    r = cl.post("/items/reddit:t3_a/undo").get_json()
+    assert r["status"] == "inbox"
+    assert "warning" in r          # no cookie configured -> live re-save impossible
+    assert r["is_saved"] == 0      # still divergent, and the response says so
+
+
+def test_undo_drained_done_resaves(tmp_db, monkeypatch):
+    from content_hoarder import reddit_unsave as ru
+    cl = _client(tmp_db)
+    _drain_done(tmp_db)
+
+    def fake_resave(c, fullname, **kw):  # what ru.resave does on success, sans network
+        c.execute("UPDATE items SET is_saved=1 WHERE fullname=?", (fullname,))
+        c.execute("DELETE FROM reddit_unsave WHERE fullname=?", (fullname,))
+        c.commit()
+        return True
+
+    monkeypatch.setattr(ru, "resave", fake_resave)
+    r = cl.post("/items/reddit:t3_a/undo").get_json()
+    assert r["status"] == "inbox" and r["is_saved"] == 1 and "warning" not in r
+
+
+def test_undo_pending_done_needs_no_resave(tmp_db):
+    """A Done undone before any drain ran just cancels the queued row locally."""
+    cl = _client(tmp_db)
+    conn = db.connect(tmp_db)
+    db.set_setting(conn, "reddit_unsave_on_done", "1")
+    db.set_status(conn, "reddit:t3_a", "done")   # queued as 'pending'
+    conn.close()
+    r = cl.post("/items/reddit:t3_a/undo").get_json()
+    assert r["status"] == "inbox" and "warning" not in r
+    conn = db.connect(tmp_db)
+    assert conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] == 0
+    conn.close()
+
+
 def test_suggest_unconfigured_503(tmp_db, monkeypatch):
     monkeypatch.setenv("LLM_BASE_URL", "")
     assert _client(tmp_db).post("/items/reddit:t3_a/suggest").status_code == 503
@@ -127,7 +215,8 @@ def test_recover_route_non_reddit_400(tmp_db):
 def test_reddit_unsave_status_and_enable(tmp_db):
     cl = _client(tmp_db)
     s = cl.get("/reddit/unsave/status").get_json()
-    assert s == {"configured": False, "username": None, "enabled": False, "pending": 0}
+    assert s == {"configured": False, "username": None, "enabled": False,
+                 "pending": 0, "failed": 0}
     assert cl.post("/reddit/unsave/enable", json={"enabled": True}).get_json()["enabled"] is True
     assert cl.get("/reddit/unsave/status").get_json()["enabled"] is True
 
@@ -264,3 +353,15 @@ def test_items_search_operators(tmp_db):
 
     # malformed operators degrade to free text and must not 500
     assert cl.get("/items?q=before:notadate").status_code == 200
+
+
+# --- malformed numeric params (delegation/05+06) ------------------------------
+
+def test_drain_malformed_max_no_500(tmp_db):
+    cl = _client(tmp_db)
+    assert cl.post("/reddit/unsave/drain", json={"max": "garbage"}).status_code == 200
+    assert cl.post("/reddit/unsave/drain").status_code == 200  # no body at all
+
+
+def test_sync_malformed_max_pages_no_500(tmp_db):
+    assert _client(tmp_db).post("/reddit/sync", json={"max_pages": "garbage"}).status_code == 200

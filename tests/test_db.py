@@ -235,3 +235,38 @@ def test_search_exact_and_exclude(conn):
     # Exclude-only (no positive term) still filters via search_text, not just "doesn't crash".
     r = db.search_items(conn, "", exclude=["removed"], sort="title", order="asc")
     assert [x["source_id"] for x in r] == ["2"]
+
+
+# --- versioned FTS build marker (delegation/04) -------------------------------
+
+def test_fts_marker_version_triggers_rebuild(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(source="x", source_id="1", title="hello fuzzy world"))
+    conn.commit()
+    # Simulate a legacy DB: trgm index gone + old boolean marker.
+    conn.execute("DROP TABLE items_trgm")
+    conn.execute("UPDATE settings SET value='1' WHERE key='fts_built'")
+    conn.commit()
+    conn.close()
+    conn = db.connect(tmp_db)   # recreates items_trgm empty; version bump must rebuild it
+    hits = db.search_items(conn, "helo fuzy", fuzzy=True)
+    assert any(r["fullname"] == "x:1" for r in hits)
+    assert db.get_setting(conn, "fts_built") == "2"  # marker upgraded
+    conn.close()
+
+
+def test_merge_upsert_tags_semantics(conn):
+    """Characterization (delegation/09): tags REPLACE without a category, UNION with one.
+    Guards the asymmetry documented in merge_upsert -- change it deliberately."""
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_t1",
+                                          metadata={"tags": ["nsfw_erotic", "memes"]}))
+    db.merge_upsert(conn, {"fullname": "reddit:t3_t1", "metadata": {"tags": ["kw1"]}})
+    md = json.loads(db.get_item(conn, "reddit:t3_t1")["metadata"])
+    assert md["tags"] == ["kw1"]  # no category -> wholesale replace (prior tags gone)
+
+    db.merge_upsert(conn, models.new_item(source="youtube", source_id="v_t2",
+                                          metadata={"tags": ["memes"]}))
+    db.merge_upsert(conn, {"fullname": "youtube:v_t2",
+                           "metadata": {"tags": ["kw1"], "category": "listenable"}})
+    md = json.loads(db.get_item(conn, "youtube:v_t2")["metadata"])
+    assert {"memes", "kw1", "listenable"} <= set(md["tags"])  # union + category mirror

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import secrets
@@ -10,6 +11,7 @@ import subprocess
 import tempfile
 import time
 from contextlib import closing
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
@@ -23,6 +25,29 @@ def _int(value, default: int = 0) -> int:
         return default
 
 
+# Tailscale hands out CGNAT-range addresses; ipaddress doesn't class them as private.
+_TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _local_host(host: str) -> bool:
+    """True when ``host`` (name/IP, no port) is this machine, a private/LAN address, a
+    tailnet peer, or an explicitly allowed extra host (``CONTENT_HOARDER_ALLOWED_HOSTS``,
+    comma-separated). Everything else is a DNS-rebinding suspect."""
+    h = (host or "").strip("[]").lower()
+    if not h:
+        return False
+    if h == "localhost" or h.endswith(".localhost") or h.endswith(".ts.net"):
+        return True
+    extra = {x.strip().lower() for x in config.get("CONTENT_HOARDER_ALLOWED_HOSTS").split(",") if x.strip()}
+    if h in extra:
+        return True
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        return False  # a public DNS name — not how this app is served
+    return ip.is_loopback or ip.is_private or ip in _TAILSCALE_NET
+
+
 def create_app(db_path: str | None = None) -> Flask:
     config.load_env()
     app = Flask(__name__)
@@ -31,6 +56,30 @@ def create_app(db_path: str | None = None) -> Flask:
 
     def conn():
         return closing(db.connect(app.config["DB_PATH"]))
+
+    @app.before_request
+    def _same_origin_guard():
+        # CSRF / DNS-rebinding guard. The app holds a live reddit_session cookie and some
+        # POSTs are destructive against the real Reddit account (mass-unsave drain), so a
+        # malicious page must not be able to drive it: (1) reject ANY request whose Host
+        # isn't local/private/tailnet — a rebound public DNS name fails this; (2) browsers
+        # attach Origin to every cross-origin POST (no-cors fetch + form posts included),
+        # so reject state-changing requests whose Origin doesn't match our Host. Requests
+        # without an Origin (curl, CLI, same-origin GETs) pass untouched.
+        try:  # a malformed (e.g. bad-IPv6) Host header must reject, not 500
+            host = urlsplit("//" + (request.host or "")).hostname or ""
+        except ValueError:
+            host = ""
+        if not _local_host(host):
+            return jsonify({"error": "forbidden host"}), 403
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            origin = request.headers.get("Origin", "")
+            try:
+                origin_loc = urlsplit(origin).netloc.lower() if origin else ""
+            except ValueError:
+                origin_loc = "\x00invalid"  # never matches -> rejected below
+            if origin and origin_loc != (request.host or "").lower():
+                return jsonify({"error": "cross-origin request rejected"}), 403
 
     # -- pages -------------------------------------------------------------
 
@@ -127,10 +176,28 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.post("/items/<path:fullname>/undo")
     def undo(fullname):
+        from content_hoarder import reddit_unsave as ru
         with conn() as c:
+            # A Done whose unsave already drained was *actually removed from Reddit Saved*;
+            # undoing only the local status would leave the two sides silently divergent
+            # (is_saved=0, gone on Reddit). Mirror the Reddit-view undo: attempt a live
+            # re-save, and surface a warning when it can't be done (dead cookie / offline).
+            prior = c.execute(
+                "SELECT i.status AS status, q.state AS state FROM items i "
+                "LEFT JOIN reddit_unsave q ON q.fullname = i.fullname WHERE i.fullname=?",
+                (fullname,),
+            ).fetchone()
             item = db.undo_status(c, fullname)
-        if item is None:
-            return jsonify({"error": "not found"}), 404
+            if item is None:
+                return jsonify({"error": "not found"}), 404
+            if (prior and prior["status"] == "done" and prior["state"] == "done"
+                    and item["status"] != "done"):
+                if ru.resave(c, fullname):
+                    item = db._public_by_fullname(c, fullname)  # is_saved restored to 1
+                else:
+                    item = dict(item)
+                    item["warning"] = ("restored locally, but still unsaved on Reddit "
+                                       "(re-save failed — check the session cookie)")
         return jsonify(item)
 
     @app.post("/items/<path:fullname>/suggest")
@@ -191,6 +258,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 "username": auth.get("username") if auth else None,
                 "enabled": db.get_setting(c, "reddit_unsave_on_done", "0") == "1",
                 "pending": ru.count_pending(c),
+                "failed": ru.count_failed(c),
             })
 
     @app.post("/reddit/unsave/auth")
@@ -219,9 +287,12 @@ def create_app(db_path: str | None = None) -> Flask:
     def reddit_unsave_drain():
         from content_hoarder import reddit_unsave as ru
         body = request.get_json(silent=True) or {}
-        mx = body.get("max")
+        # Cap per request (~50s at the 1 req/s throttle) — an unbounded drain of a big
+        # queue is a 30+ minute HTTP request. The response's `remaining` lets the UI
+        # loop; the CLI/scheduled job is the right tool for bulk drains.
+        limit = min(max(_int(body.get("max"), 50), 1), 500)
         with conn() as c:
-            res = ru.drain(c, limit=int(mx) if mx else None)
+            res = ru.drain(c, limit=limit)
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/resave")
@@ -372,9 +443,11 @@ def create_app(db_path: str | None = None) -> Flask:
     def reddit_sync_route():
         from content_hoarder import reddit_sync
         body = request.get_json(silent=True) or {}
-        mp = body.get("max_pages")
         full = bool(body.get("full"))
-        max_pages = int(mp) if mp else (50 if full else 3)
+        max_pages = _int(body.get("max_pages"), 0)
+        if max_pages <= 0:
+            max_pages = 50 if full else 3
+        max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
             res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)

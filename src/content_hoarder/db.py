@@ -199,15 +199,31 @@ def init_db(conn: sqlite3.Connection) -> None:
     # CLI command; going forward set_category()/merge_upsert() keep the tag mirror in sync.
 
 
+# Bump when an FTS table is added/changed so upgraded DBs rebuild once — a boolean
+# marker could never re-trigger (items_trgm arrived after some DBs set it, silently
+# leaving their fuzzy index empty).
+_FTS_VERSION = 2
+
+
 def _ensure_fts_built(conn: sqlite3.Connection) -> None:
-    """One-time rebuild of the external-content FTS indexes, gated by a marker."""
-    if conn.execute("SELECT 1 FROM settings WHERE key='fts_built'").fetchone():
+    """One-time rebuild of the external-content FTS indexes, gated by a version marker.
+
+    The marker stores the version last built; legacy boolean-'1' DBs rebuild exactly
+    once after upgrade (populating any FTS table added since), then store _FTS_VERSION.
+    """
+    try:  # missing row -> fetchone() is None -> TypeError -> treat as version 0
+        marker = int(conn.execute(
+            "SELECT value FROM settings WHERE key='fts_built'").fetchone()[0])
+    except (TypeError, ValueError):
+        marker = 0
+    if marker >= _FTS_VERSION:
         return
     has_rows = conn.execute("SELECT EXISTS(SELECT 1 FROM items)").fetchone()[0]
     if has_rows:
         conn.execute("INSERT INTO items_fts(items_fts) VALUES('rebuild')")
         conn.execute("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')")
-    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', '1')")
+    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', ?)",
+                 (str(_FTS_VERSION),))
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +368,11 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
         merged["kind"] = item["kind"]
 
     # metadata: shallow-merge (incoming non-empty values win; keep prior keys).
+    # tags are UNION-merged only when the incoming item carries a category (the category
+    # mirror needs prior tags kept); otherwise incoming tags REPLACE existing ones
+    # wholesale — re-tag passes recompute from scratch and rely on this. A future
+    # partial-tags caller would clobber e.g. NSFW tags: change deliberately (with tests)
+    # or send category alongside. Pinned by test_merge_upsert_tags_semantics.
     emd = parse_metadata(existing.get("metadata"))
     for k, v in incoming_md.items():
         if k == "tags" and incoming_category:
@@ -652,7 +673,10 @@ def enqueue_unsave(conn: sqlite3.Connection, fullname: str) -> None:
     conn.execute(
         "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) "
         "VALUES(?, ?, 'pending', ?) "
-        "ON CONFLICT(fullname) DO UPDATE SET state='pending', updated_utc=excluded.enqueued_utc",
+        # attempts/last_error reset: a re-Done item gets a fresh chance even if a prior
+        # run exhausted its MAX_ATTEMPTS and parked it as 'failed'.
+        "ON CONFLICT(fullname) DO UPDATE SET state='pending', attempts=0, last_error=NULL, "
+        "updated_utc=excluded.enqueued_utc",
         (fullname, sid, now),
     )
 
@@ -727,6 +751,9 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     )
     if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
         dequeue_unsave(conn, fullname)
+        # NOTE: if the unsave already drained (queue state 'done'), the item is genuinely
+        # gone from Reddit Saved — this layer stays offline; the web /undo route attempts
+        # the live re-save (reddit_unsave.resave) and surfaces a warning when it fails.
     conn.commit()
     return _public_by_fullname(conn, fullname)
 

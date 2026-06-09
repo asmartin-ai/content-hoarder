@@ -212,3 +212,103 @@ def test_schema_idempotent(tmp_db):
     db.set_status(c, "reddit:t3_a", "done")
     assert ru.count_pending(c) == 1
     c.close()
+
+
+# --- Retry-After parsing (delegation/01) ------------------------------------
+
+def _send_once_429(headers):
+    """post stub: 429 with `headers` on the first call, 200 after."""
+    state = {"n": 0}
+
+    def post(url, fields, **kw):
+        state["n"] += 1
+        return (429, headers) if state["n"] == 1 else (200, {})
+
+    return post
+
+
+def test_retry_after_lowercase_header_honored():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"retry-after": "7"}), ru.UNSAVE_URL, "t3_x",
+                                  session_cookie="ck", modhash="mh", user_agent="ua",
+                                  sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [7.0]
+
+
+def test_retry_after_http_date_falls_back_to_delay():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"Retry-After": "Fri, 31 Dec 1999 23:59:59 GMT"}),
+                                  ru.UNSAVE_URL, "t3_x", session_cookie="ck", modhash="mh",
+                                  user_agent="ua", sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [2.0]
+
+
+def test_retry_after_negative_falls_back_to_delay():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"Retry-After": "-5"}), ru.UNSAVE_URL, "t3_x",
+                                  session_cookie="ck", modhash="mh", user_agent="ua",
+                                  sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [2.0]
+
+
+# --- attempts cap -> state='failed' (delegation/02) --------------------------
+
+def test_drain_caps_attempts_then_parks_as_failed(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    always_500 = _Post(lambda fields: (500, {}))
+    for _ in range(ru.MAX_ATTEMPTS):
+        ru.drain(conn, post=always_500, getf=_ok_me, sleep=lambda s: None)
+    row = conn.execute(
+        "SELECT state, attempts FROM reddit_unsave WHERE fullname='reddit:t3_a'"
+    ).fetchone()
+    assert (row["state"], row["attempts"]) == ("failed", ru.MAX_ATTEMPTS)
+    res = ru.drain(conn, post=always_500, getf=_ok_me, sleep=lambda s: None)
+    assert res["selected"] == 0  # retired rows stop consuming the throttle
+
+
+def test_re_enqueue_resets_failed_row(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    always_500 = _Post(lambda fields: (500, {}))
+    for _ in range(ru.MAX_ATTEMPTS):
+        ru.drain(conn, post=always_500, getf=_ok_me, sleep=lambda s: None)
+    db.enqueue_unsave(conn, "reddit:t3_a")  # fresh chance
+    conn.commit()
+    row = conn.execute(
+        "SELECT state, attempts, last_error FROM reddit_unsave WHERE fullname='reddit:t3_a'"
+    ).fetchone()
+    assert (row["state"], row["attempts"], row["last_error"]) == ("pending", 0, None)
+    res = ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
+    assert res["unsaved"] == 1
+
+
+# --- network error vs auth error (delegation/03) -----------------------------
+
+def _raise_network(url, **kw):
+    raise ru.RedditNetworkError("boom")
+
+
+def test_drain_network_error_not_auth_error(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post()
+    res = ru.drain(conn, post=post, getf=_raise_network, sleep=lambda s: None)
+    assert res["network_error"] is True and res["auth_error"] is False
+    assert post.calls == []                            # nothing sent
+    assert _queue(conn) == {"reddit:t3_a": "pending"}  # queue intact for retry
+
+
+def test_resave_network_error_returns_false(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
+    assert ru.resave(conn, "reddit:t3_a", post=_Post(), getf=_raise_network) is False
