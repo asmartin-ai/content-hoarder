@@ -258,6 +258,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 "username": auth.get("username") if auth else None,
                 "enabled": db.get_setting(c, "reddit_unsave_on_done", "0") == "1",
                 "pending": ru.count_pending(c),
+                "failed": ru.count_failed(c),
             })
 
     @app.post("/reddit/unsave/auth")

@@ -254,6 +254,7 @@ def cmd_reddit_unsave(args) -> int:
             "username": auth.get("username") if auth else None,
             "enabled": db.get_setting(conn, "reddit_unsave_on_done", "0") == "1",
             "pending": ru.count_pending(conn),
+            "failed": ru.count_failed(conn),
         }, indent=2))
     return 0
 

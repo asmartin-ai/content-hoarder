@@ -652,7 +652,10 @@ def enqueue_unsave(conn: sqlite3.Connection, fullname: str) -> None:
     conn.execute(
         "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) "
         "VALUES(?, ?, 'pending', ?) "
-        "ON CONFLICT(fullname) DO UPDATE SET state='pending', updated_utc=excluded.enqueued_utc",
+        # attempts/last_error reset: a re-Done item gets a fresh chance even if a prior
+        # run exhausted its MAX_ATTEMPTS and parked it as 'failed'.
+        "ON CONFLICT(fullname) DO UPDATE SET state='pending', attempts=0, last_error=NULL, "
+        "updated_utc=excluded.enqueued_utc",
         (fullname, sid, now),
     )
 
