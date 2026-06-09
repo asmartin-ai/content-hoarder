@@ -253,3 +253,20 @@ def test_fts_marker_version_triggers_rebuild(tmp_db):
     assert any(r["fullname"] == "x:1" for r in hits)
     assert db.get_setting(conn, "fts_built") == "2"  # marker upgraded
     conn.close()
+
+
+def test_merge_upsert_tags_semantics(conn):
+    """Characterization (delegation/09): tags REPLACE without a category, UNION with one.
+    Guards the asymmetry documented in merge_upsert -- change it deliberately."""
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_t1",
+                                          metadata={"tags": ["nsfw_erotic", "memes"]}))
+    db.merge_upsert(conn, {"fullname": "reddit:t3_t1", "metadata": {"tags": ["kw1"]}})
+    md = json.loads(db.get_item(conn, "reddit:t3_t1")["metadata"])
+    assert md["tags"] == ["kw1"]  # no category -> wholesale replace (prior tags gone)
+
+    db.merge_upsert(conn, models.new_item(source="youtube", source_id="v_t2",
+                                          metadata={"tags": ["memes"]}))
+    db.merge_upsert(conn, {"fullname": "youtube:v_t2",
+                           "metadata": {"tags": ["kw1"], "category": "listenable"}})
+    md = json.loads(db.get_item(conn, "youtube:v_t2")["metadata"])
+    assert {"memes", "kw1", "listenable"} <= set(md["tags"])  # union + category mirror
