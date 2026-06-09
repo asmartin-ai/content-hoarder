@@ -457,42 +457,40 @@ mobile-friendly".*
   watch/listen processing-areas, playlist order), analogous to the `/reddit` view.
 
 ## Epic 19 — Backend hardening  (`bug`, `area:backend`)
-*From the comprehensive review (2026-06-09). Detailed specs live in `delegation/` (self-contained
-prompts for the local-LLM workflow); design-sensitive items are Claude-owned. Branch:
-`fix/unsave-hardening`.*
+*From the comprehensive review (2026-06-09). **Shipped 2026-06-09** (merge `b2dc1d9`,
+`fix/unsave-hardening`, suite 202 green): Claude-owned fixes + local-LLM delegation via the
+`delegation/` prompt pack (Devstral/Qwen drafts, Claude review+repair).*
 
-- [ ] **P0 — `Retry-After` handling** (`reddit_unsave.py:162`): case-sensitive plain-dict header
-  lookup misses lowercase `retry-after`; unguarded `float(ra)` crashes the drain on an HTTP-date
-  value. *(delegation/01)*
-- [ ] **P0 — Unsave drain breaks the sync high-water mark** (`reddit_sync.py`): a drained
-  newest-saved item vanishes from the listing → the single-fullname mark is never re-found → every
-  sync degrades to `max_pages` forever. Store the newest K=25 fullnames; caught-up on any match.
-  *(Claude)*
-- [ ] **P0 — Unsave queue retries failures forever** (`reddit_unsave.py`, `db.py`): `state='failed'`
-  is documented but never set; cap attempts (5) → `failed`, exclude from drain selection, surface a
-  `failed` count in status. *(delegation/02)*
-- [ ] **P0 — Transient network failure reported as "cookie expired"** (`reddit_unsave.py:_http_get`):
-  any error → `{}` → `RedditAuthError`. Distinguish `network_error` from `auth_error` in drain/sync
-  results. *(delegation/03)*
-- [ ] **P0 — CSRF/DNS-rebinding guard** (`web.py`): no Origin/Host checks on state-changing routes;
-  `/reddit/unsave/drain` accepts an empty no-cors POST from any website — destructive against the
-  live Reddit account. `before_request` guard. *(Claude)*
-- [ ] **P1 — Undo asymmetry for a drained Done** (`db.undo_status`): triage undo silently leaves the
-  item unsaved on Reddit (`is_saved=0`); the Reddit-view undo live-resaves. Make triage undo attempt
-  the resave too, with a surfaced warning on failure. *(Claude)*
-- [ ] **P1 — Version the FTS build marker** (`db.py:_ensure_fts_built`): boolean `fts_built` means a
-  future FTS schema addition never backfills upgraded DBs. *(delegation/04)*
-- [ ] **P1 — Cap the web drain route** (`web.py`): unbounded drain in one HTTP request (2k items ≈
-  30+ min); default per-request cap + `remaining` for a UI loop. *(delegation/05)*
-- [ ] **P1 — Unhandled `int()` 500s** (`web.py:224,377`) on malformed JSON numbers. *(delegation/06)*
-- [ ] **P1 — `.env` read crashes on non-UTF-8/BOM** (`config.py:35`, Windows). *(delegation/07)*
-- [ ] **P1 — Consolidate undo→re-migrate round-trip** (`consolidate.py`): suspected dupe creation via
-  promoted rows; write the round-trip test first, fix only if red. *(delegation/08)*
-- [ ] **P2 — `merge_upsert` tags replace-vs-union asymmetry** (`db.py:357`): union only when incoming
-  carries a category; a future partial-tags caller would clobber existing tags. Guard comment +
+- [x] ~~**P0 — `Retry-After` handling.**~~ Shipped: case-insensitive header lookup; HTTP-date /
+  negative values fall back to the exponential delay instead of crashing the drain. *(delegation/01)*
+- [x] ~~**P0 — Unsave drain breaks the sync high-water mark.**~~ Shipped: the mark is the newest
+  K=25 fullnames (JSON list, legacy single-string still read); any survivor matching = caught-up,
+  so a drained newest item no longer freezes the mark. *(Claude)*
+- [x] ~~**P0 — Unsave queue retries failures forever.**~~ Shipped: attempts cap 5 → `state='failed'`
+  (CASE flip in the failure UPDATE); re-enqueue resets attempts; `failed` count surfaced in CLI +
+  `/reddit/unsave/status`. *(delegation/02)*
+- [x] ~~**P0 — Transient network failure reported as "cookie expired".**~~ Shipped:
+  `RedditNetworkError` for transport/5xx/unparseable; `{}` now means only 401/403. drain/sync report
+  `network_error` separately (mark never advances on it); CLI exits non-zero for both. *(delegation/03)*
+- [x] ~~**P0 — CSRF/DNS-rebinding guard.**~~ Shipped: `before_request` rejects non-local/private/
+  tailnet Hosts and mismatched-Origin state-changing requests; `CONTENT_HOARDER_ALLOWED_HOSTS`
+  extends the allowlist. *(Claude)*
+- [x] ~~**P1 — Undo asymmetry for a drained Done.**~~ Shipped: the browse `/undo` route attempts the
+  live re-save and returns a `warning` when it can't (dead cookie / offline). *(Claude)*
+- [x] ~~**P1 — Version the FTS build marker.**~~ Shipped: `_FTS_VERSION=2`; legacy boolean-'1' DBs
+  rebuild exactly once on next connect. *(delegation/04)*
+- [x] ~~**P1 — Cap the web drain route.**~~ Shipped: default 50/request (clamped 1..500); the
+  response's `remaining` lets the UI loop. *(delegation/05)*
+- [x] ~~**P1 — Unhandled `int()` 500s.**~~ Shipped via `_int` + max_pages ceiling 200. *(delegation/06)*
+- [x] ~~**P1 — `.env` read crashes on non-UTF-8/BOM.**~~ Shipped: `utf-8-sig` + `errors="replace"` +
+  OSError guard. *(delegation/07)*
+- [x] ~~**P1 — Consolidate undo→re-migrate round-trip.**~~ **Suspected bug NOT real** — three new
+  round-trip tests pass against the existing implementation; behavior pinned. *(delegation/08)*
+- [x] ~~**P2 — `merge_upsert` tags replace-vs-union asymmetry.**~~ Shipped: guard comment +
   characterization test. *(delegation/09)*
-- [ ] **P2 — Test-gap fills:** `rsm_threads` direct test; `youtube_recover` timeout/malformed-HTML;
-  categorize with missing `nsfw_rules.json`. *(delegation/10)*
+- [x] ~~**P2 — Test-gap fills.**~~ Shipped: `test_rsm_threads.py` (5 tests) + 5 youtube_recover
+  failure-path tests. The categorize/missing-rules case was already covered by
+  `test_nsfw_disabled_without_rules_file`. *(delegation/10)*
 - [ ] **P3 — Unify the 4 divergent HTTP timeout/retry helpers** (`archival/_http.py`,
   `reddit_unsave`, `youtube_recover`, `karakeep`). Refactor risk > current pain; do opportunistically.
 
