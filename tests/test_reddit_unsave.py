@@ -285,3 +285,30 @@ def test_re_enqueue_resets_failed_row(conn):
     assert (row["state"], row["attempts"], row["last_error"]) == ("pending", 0, None)
     res = ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
     assert res["unsaved"] == 1
+
+
+# --- network error vs auth error (delegation/03) -----------------------------
+
+def _raise_network(url, **kw):
+    raise ru.RedditNetworkError("boom")
+
+
+def test_drain_network_error_not_auth_error(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post()
+    res = ru.drain(conn, post=post, getf=_raise_network, sleep=lambda s: None)
+    assert res["network_error"] is True and res["auth_error"] is False
+    assert post.calls == []                            # nothing sent
+    assert _queue(conn) == {"reddit:t3_a": "pending"}  # queue intact for retry
+
+
+def test_resave_network_error_returns_false(conn):
+    _seed(conn, ("reddit", "t3_a"))
+    _enable(conn)
+    db.set_status(conn, "reddit:t3_a", "done")
+    ru.set_auth(conn, session_cookie="ck")
+    ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
+    assert ru.resave(conn, "reddit:t3_a", post=_Post(), getf=_raise_network) is False

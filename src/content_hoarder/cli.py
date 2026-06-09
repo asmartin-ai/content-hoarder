@@ -217,7 +217,9 @@ def cmd_reddit_sync(args) -> int:
             progress=lambda m: print(m, file=sys.stderr),
         )
     print(json.dumps(res, indent=2))
-    return 1 if res.get("auth_error") else 0
+    # Non-zero for network errors too, so a scheduled run is visibly unhealthy; the
+    # printed JSON distinguishes auth_error (re-paste cookie) from network_error (retry).
+    return 1 if (res.get("auth_error") or res.get("network_error")) else 0
 
 
 def cmd_reddit_unsave(args) -> int:
@@ -246,7 +248,9 @@ def cmd_reddit_unsave(args) -> int:
             res = ru.drain(conn, limit=args.limit, throttle=args.throttle,
                            progress=lambda m: print(m, file=sys.stderr))
             print(json.dumps(res, indent=2))
-            return 1 if res.get("auth_error") else 0
+            # Non-zero for network errors too (scheduled-run visibility); the printed JSON
+            # distinguishes auth_error (re-paste cookie) from network_error (retry later).
+            return 1 if (res.get("auth_error") or res.get("network_error")) else 0
         # default: status
         auth = ru.get_auth(conn)
         print(json.dumps({
