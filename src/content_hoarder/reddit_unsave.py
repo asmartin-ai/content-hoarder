@@ -21,6 +21,10 @@ UNSAVE_URL = "https://www.reddit.com/api/unsave"
 SAVE_URL = "https://www.reddit.com/api/save"
 ME_URL = "https://www.reddit.com/api/me.json"
 
+# Per-row drain-failure cap: a permanently-erroring item (e.g. Reddit answers 400 for it
+# forever) flips to state='failed' instead of re-consuming the ~1 req/s throttle every run.
+MAX_ATTEMPTS = 5
+
 
 class RedditAuthError(Exception):
     """Cookie expired / logged out / 403 — halts the drain; surfaced loudly to the user."""
@@ -123,6 +127,12 @@ def login(conn, session_cookie: str, *, getf=None, user_agent: str | None = None
 def count_pending(conn) -> int:
     return conn.execute(
         "SELECT COUNT(*) FROM reddit_unsave WHERE state='pending'"
+    ).fetchone()[0]
+
+
+def count_failed(conn) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) FROM reddit_unsave WHERE state='failed'"
     ).fetchone()[0]
 
 
@@ -237,9 +247,10 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
             if progress:
                 progress(f"unsaved {reddit_id}")
         else:
-            conn.execute(
-                "UPDATE reddit_unsave SET attempts=attempts+1, last_error=?, updated_utc=? "
-                "WHERE fullname=?", (err, now, fullname))
+            conn.execute(  # the CASE flip retires exhausted rows from future drains
+                "UPDATE reddit_unsave SET attempts=attempts+1, last_error=?, updated_utc=?, "
+                "state=CASE WHEN attempts+1 >= ? THEN 'failed' ELSE state END "
+                "WHERE fullname=?", (err, now, MAX_ATTEMPTS, fullname))
             conn.commit()
             result["failed"] += 1
             if progress:

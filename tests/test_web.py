@@ -215,7 +215,8 @@ def test_recover_route_non_reddit_400(tmp_db):
 def test_reddit_unsave_status_and_enable(tmp_db):
     cl = _client(tmp_db)
     s = cl.get("/reddit/unsave/status").get_json()
-    assert s == {"configured": False, "username": None, "enabled": False, "pending": 0}
+    assert s == {"configured": False, "username": None, "enabled": False,
+                 "pending": 0, "failed": 0}
     assert cl.post("/reddit/unsave/enable", json={"enabled": True}).get_json()["enabled"] is True
     assert cl.get("/reddit/unsave/status").get_json()["enabled"] is True
 
