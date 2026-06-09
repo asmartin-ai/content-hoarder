@@ -727,6 +727,9 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     )
     if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
         dequeue_unsave(conn, fullname)
+        # NOTE: if the unsave already drained (queue state 'done'), the item is genuinely
+        # gone from Reddit Saved — this layer stays offline; the web /undo route attempts
+        # the live re-save (reddit_unsave.resave) and surfaces a warning when it fails.
     conn.commit()
     return _public_by_fullname(conn, fullname)
 

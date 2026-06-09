@@ -14,6 +14,9 @@ _DEFAULTS = {
     "CONTENT_HOARDER_NSFW_RULES": "nsfw_rules.json",  # gitignored; see nsfw_rules.example.json
     "CONTENT_HOARDER_HOST": "127.0.0.1",
     "CONTENT_HOARDER_PORT": "8788",
+    # Extra hostnames the web guard accepts (comma-separated). Local/private/tailnet
+    # addresses are always allowed; set this only when serving behind a real DNS name.
+    "CONTENT_HOARDER_ALLOWED_HOSTS": "",
     "FLASK_SECRET_KEY": "dev-insecure-change-me",
     "USER_AGENT": "content-hoarder/0.1 (local personal use)",
     "KARAKEEP_BASE_URL": "",
