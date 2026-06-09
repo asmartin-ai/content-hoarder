@@ -235,3 +235,21 @@ def test_search_exact_and_exclude(conn):
     # Exclude-only (no positive term) still filters via search_text, not just "doesn't crash".
     r = db.search_items(conn, "", exclude=["removed"], sort="title", order="asc")
     assert [x["source_id"] for x in r] == ["2"]
+
+
+# --- versioned FTS build marker (delegation/04) -------------------------------
+
+def test_fts_marker_version_triggers_rebuild(tmp_db):
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(source="x", source_id="1", title="hello fuzzy world"))
+    conn.commit()
+    # Simulate a legacy DB: trgm index gone + old boolean marker.
+    conn.execute("DROP TABLE items_trgm")
+    conn.execute("UPDATE settings SET value='1' WHERE key='fts_built'")
+    conn.commit()
+    conn.close()
+    conn = db.connect(tmp_db)   # recreates items_trgm empty; version bump must rebuild it
+    hits = db.search_items(conn, "helo fuzy", fuzzy=True)
+    assert any(r["fullname"] == "x:1" for r in hits)
+    assert db.get_setting(conn, "fts_built") == "2"  # marker upgraded
+    conn.close()
