@@ -22,6 +22,11 @@ area. Goal: tag videos so they can be filtered into dedicated "processing areas"
   + `/items?category=` + the `#category` selector in the browse topbar.
 - [ ] **P2 — Local-LLM auto-classify (`assist/llm.py`).** Classify from title + channel
   (listenable/watch/wotagei) with a manual override per item. Only after heuristics are validated.
+  *(WIP exists on the unmerged `feat/llm-auto-classify` branch — review + merge or rebase.)*
+- [ ] **P3 — Widen wotagei detection vocabulary.** Current rules are deliberately tight (3/4998 WL2
+  matches: ヲタ芸/wotagei/wota only). Needs user-supplied terms (idol-event names, performers,
+  サイリウム/cyalume, specific channels) → widen `_WOTAGEI_RE` in `categorize.py`. *(Salvaged from
+  DEFERRED_QUESTIONS.md before deletion.)*
 - [x] ~~**Manual re-tagging UI.**~~ Shipped: a category chip-row on the triage card (youtube items)
   + `POST /items/<fn>/category` (validated, non-destructive). List-row picker left out to avoid
   clutter — triage is the focused single-item view.
@@ -123,6 +128,10 @@ false positives.*
   `migrate-firefox-tabs [--apply]` (dry-run default) re-keys rows imported before this and collapses
   duplicates. Of the 326-tab sample, **219 were YouTube** (2 already saved, 217 orphans); browse them
   via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
+- [ ] **P3 — Import the remaining Firefox TabExports (data job).** Only 1 of ~17 daily TabExports
+  files was imported as the sample (326 tabs). Import the rest with
+  `python -m content_hoarder import "<Downloads>\TabExports\<file>.txt" --source firefox` — they
+  overlap heavily and de-dup by URL. *(Salvaged from DEFERRED_QUESTIONS.md before deletion.)*
 - [ ] **P2 — Re-surface the Firefox-tabs filter (regression).** The **"📑 Firefox tabs"**
   (`open_in_firefox=1`) filter referenced above has **no UI control** in the v2 layout — it was lost in
   the redesign (no `open_in_firefox` toggle in `app.js`/`index.html`). Re-add a way to filter to
@@ -446,3 +455,53 @@ mobile-friendly".*
 ## Epic 18 — Custom YouTube view  (`enhancement`, `area:youtube`)
 - [ ] **P3 — A YouTube-specific surface.** A view tuned for video triage (duration, channel grouping,
   watch/listen processing-areas, playlist order), analogous to the `/reddit` view.
+
+## Epic 19 — Backend hardening  (`bug`, `area:backend`)
+*From the comprehensive review (2026-06-09). Detailed specs live in `delegation/` (self-contained
+prompts for the local-LLM workflow); design-sensitive items are Claude-owned. Branch:
+`fix/unsave-hardening`.*
+
+- [ ] **P0 — `Retry-After` handling** (`reddit_unsave.py:162`): case-sensitive plain-dict header
+  lookup misses lowercase `retry-after`; unguarded `float(ra)` crashes the drain on an HTTP-date
+  value. *(delegation/01)*
+- [ ] **P0 — Unsave drain breaks the sync high-water mark** (`reddit_sync.py`): a drained
+  newest-saved item vanishes from the listing → the single-fullname mark is never re-found → every
+  sync degrades to `max_pages` forever. Store the newest K=25 fullnames; caught-up on any match.
+  *(Claude)*
+- [ ] **P0 — Unsave queue retries failures forever** (`reddit_unsave.py`, `db.py`): `state='failed'`
+  is documented but never set; cap attempts (5) → `failed`, exclude from drain selection, surface a
+  `failed` count in status. *(delegation/02)*
+- [ ] **P0 — Transient network failure reported as "cookie expired"** (`reddit_unsave.py:_http_get`):
+  any error → `{}` → `RedditAuthError`. Distinguish `network_error` from `auth_error` in drain/sync
+  results. *(delegation/03)*
+- [ ] **P0 — CSRF/DNS-rebinding guard** (`web.py`): no Origin/Host checks on state-changing routes;
+  `/reddit/unsave/drain` accepts an empty no-cors POST from any website — destructive against the
+  live Reddit account. `before_request` guard. *(Claude)*
+- [ ] **P1 — Undo asymmetry for a drained Done** (`db.undo_status`): triage undo silently leaves the
+  item unsaved on Reddit (`is_saved=0`); the Reddit-view undo live-resaves. Make triage undo attempt
+  the resave too, with a surfaced warning on failure. *(Claude)*
+- [ ] **P1 — Version the FTS build marker** (`db.py:_ensure_fts_built`): boolean `fts_built` means a
+  future FTS schema addition never backfills upgraded DBs. *(delegation/04)*
+- [ ] **P1 — Cap the web drain route** (`web.py`): unbounded drain in one HTTP request (2k items ≈
+  30+ min); default per-request cap + `remaining` for a UI loop. *(delegation/05)*
+- [ ] **P1 — Unhandled `int()` 500s** (`web.py:224,377`) on malformed JSON numbers. *(delegation/06)*
+- [ ] **P1 — `.env` read crashes on non-UTF-8/BOM** (`config.py:35`, Windows). *(delegation/07)*
+- [ ] **P1 — Consolidate undo→re-migrate round-trip** (`consolidate.py`): suspected dupe creation via
+  promoted rows; write the round-trip test first, fix only if red. *(delegation/08)*
+- [ ] **P2 — `merge_upsert` tags replace-vs-union asymmetry** (`db.py:357`): union only when incoming
+  carries a category; a future partial-tags caller would clobber existing tags. Guard comment +
+  characterization test. *(delegation/09)*
+- [ ] **P2 — Test-gap fills:** `rsm_threads` direct test; `youtube_recover` timeout/malformed-HTML;
+  categorize with missing `nsfw_rules.json`. *(delegation/10)*
+- [ ] **P3 — Unify the 4 divergent HTTP timeout/retry helpers** (`archival/_http.py`,
+  `reddit_unsave`, `youtube_recover`, `karakeep`). Refactor risk > current pain; do opportunistically.
+
+## Epic 20 — Frontend v3 overhaul  (`enhancement`, `area:ui`)
+*Decision (2026-06-09): full overhaul on `feat/frontend-v3` — vanilla JS, no build step, mobile
+fluidity first-class. Plan: shared `static/core/` layer (util/api/toast/render/media — kills the
+~250-line helper triplication across app.js/reddit.js/triage.js), tokens v3 seeded from
+`design-ref/`, page-by-page rewrite (browse → triage → reddit) behind a design-approval gate.
+**Absorbs** (don't fix twice): the Epic 13 density/NSFW/bulk-bar/Esc/tag-chip items, Epic 14
+infinite-scroll/focus-batches, Epic 16 swipe items, Epic 5 keyboard rework, the toast undo-button
+listener leak (app.js:75, triage.js:413), reddit.css hardcoded colors → tokens, dead CSS
+(`.item-age`, `.source-badge`), sw.js versioned cache + `/reddit` added to the PWA shell.*
