@@ -1,3 +1,5 @@
+import json
+
 from content_hoarder import db, reddit_sync, reddit_unsave
 
 
@@ -67,14 +69,32 @@ def test_sync_respects_max_pages(conn):
 
 def test_sync_stops_at_high_water_mark(conn):
     _auth(conn)
-    db.set_setting(conn, "reddit_sync_newest", "t3_b")  # newest from a prior sync
+    # Legacy single-string mark from a pre-list DB — must still be honored, and the next
+    # successful sync upgrades it to the JSON-list form.
+    db.set_setting(conn, "reddit_sync_newest", "t3_b")
     getf = make_getf([([child("t3_a"), child("t3_b"), child("t3_c")], "p2")])
     res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", sleep=NOSLEEP)
     # t3_a is new; t3_b is the mark -> stop before processing t3_b / t3_c
     assert res["new"] == 1 and res["stopped"] == "caught_up"
     assert db.get_item(conn, "reddit:t3_a") is not None
     assert db.get_item(conn, "reddit:t3_c") is None
-    assert db.get_setting(conn, "reddit_sync_newest") == "t3_a"  # advanced to new top
+    # Advanced to the new top-of-listing (incl. the still-listed old mark item), JSON form.
+    assert json.loads(db.get_setting(conn, "reddit_sync_newest")) == ["t3_a", "t3_b"]
+
+
+def test_sync_mark_survives_drained_newest(conn):
+    """Regression: the unsave drain removes items from the saved listing. If the single
+    newest-marked item is unsaved, a one-name mark would never be re-found and every sync
+    would degrade to a max_pages walk forever. The K-deep mark matches any survivor."""
+    _auth(conn)
+    # Prior sync recorded these as the top of the listing; t3_gone has since been unsaved.
+    db.set_setting(conn, "reddit_sync_newest", json.dumps(["t3_gone", "t3_b"]))
+    getf = make_getf([([child("t3_new"), child("t3_b"), child("t3_c")], "p2")])
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", sleep=NOSLEEP)
+    assert res["stopped"] == "caught_up" and res["new"] == 1  # t3_b still matches
+    assert db.get_item(conn, "reddit:t3_new") is not None
+    assert db.get_item(conn, "reddit:t3_c") is None  # below the boundary — untouched
+    assert json.loads(db.get_setting(conn, "reddit_sync_newest")) == ["t3_new", "t3_b"]
 
 
 def test_sync_keeps_mark_on_max_pages_truncation(conn):
@@ -102,3 +122,17 @@ def test_sync_learns_username_from_me(conn):
     getf = make_getf([([child("t3_z")], None)], me={"data": {"name": "bob", "modhash": "mh"}})
     res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua")
     assert res["username"] == "bob" and res["new"] == 1
+
+
+def test_sync_network_error_keeps_mark(conn):
+    """A transport failure must not read as 'cookie expired' and must not move the mark."""
+    _auth(conn)
+    db.set_setting(conn, "reddit_sync_newest", json.dumps(["t3_b"]))
+
+    def getf(url, *, session_cookie, user_agent):
+        raise reddit_unsave.RedditNetworkError("connection refused")
+
+    res = reddit_sync.sync_saved_cookie(conn, getf=getf, user_agent="ua", sleep=NOSLEEP)
+    assert res["stopped"] == "network_error" and res["network_error"] is True
+    assert res["auth_error"] is False
+    assert json.loads(db.get_setting(conn, "reddit_sync_newest")) == ["t3_b"]

@@ -21,9 +21,18 @@ UNSAVE_URL = "https://www.reddit.com/api/unsave"
 SAVE_URL = "https://www.reddit.com/api/save"
 ME_URL = "https://www.reddit.com/api/me.json"
 
+# Per-row drain-failure cap: a permanently-erroring item (e.g. Reddit answers 400 for it
+# forever) flips to state='failed' instead of re-consuming the ~1 req/s throttle every run.
+MAX_ATTEMPTS = 5
+
 
 class RedditAuthError(Exception):
     """Cookie expired / logged out / 403 — halts the drain; surfaced loudly to the user."""
+
+
+class RedditNetworkError(Exception):
+    """Transient transport/server failure — NOT an auth problem; retry later. Kept distinct
+    so a network blip never tells the user to re-paste a perfectly good cookie."""
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +40,11 @@ class RedditAuthError(Exception):
 # ---------------------------------------------------------------------------
 
 def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
-    """GET `url` with the reddit_session cookie; parse JSON. Returns {} on any failure."""
+    """GET `url` with the reddit_session cookie; parse JSON.
+
+    Returns {} only for a genuine logged-out response (401/403) — the shape
+    `_refresh_modhash` maps to RedditAuthError. Anything transient (timeouts, DNS,
+    429/5xx, an unparseable CDN error page) raises RedditNetworkError instead."""
     req = urllib.request.Request(
         url,
         headers={
@@ -43,9 +56,17 @@ def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception:  # noqa: BLE001 - any failure means "no usable session"
-        return {}
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return {}
+        raise RedditNetworkError(f"HTTP {e.code}") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RedditNetworkError(str(e)) from e
+    try:
+        return json.loads(body)
+    except ValueError as e:
+        raise RedditNetworkError("unparseable response") from e
 
 
 def _http_post(url: str, fields: dict, *, session_cookie: str, modhash: str,
@@ -126,6 +147,12 @@ def count_pending(conn) -> int:
     ).fetchone()[0]
 
 
+def count_failed(conn) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) FROM reddit_unsave WHERE state='failed'"
+    ).fetchone()[0]
+
+
 # ---------------------------------------------------------------------------
 # Reddit web-session protocol
 # ---------------------------------------------------------------------------
@@ -145,6 +172,23 @@ def _refresh_modhash(session_cookie: str, *, user_agent: str, getf=None) -> tupl
     return modhash, name
 
 
+def _retry_after_seconds(headers: dict | None) -> float | None:
+    """Numeric Retry-After value from a (case-insensitively searched) header dict.
+    None when absent or non-numeric (e.g. an RFC 7231 HTTP-date) — caller falls back
+    to its own backoff delay. Case-insensitive because the headers arrive as a plain
+    dict (``dict(resp.headers)``) with whatever casing the server sent."""
+    if not headers:
+        return None
+    ra = next((v for k, v in headers.items() if k.lower() == "retry-after"), None)
+    if not ra:
+        return None
+    try:
+        seconds = float(ra)
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
+
+
 def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, modhash: str,
                      user_agent: str, sleep, max_retries: int = 3) -> tuple[bool, str | None]:
     """POST one save/unsave with 429 backoff. Returns (ok, error); raises RedditAuthError on 403."""
@@ -159,8 +203,8 @@ def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, mod
         if status == 403:
             raise RedditAuthError("Reddit returned 403 — cookie/modhash likely expired")
         if status == 429 and attempt < max_retries:
-            ra = headers.get("Retry-After") if headers else None
-            sleep(float(ra) if ra else delay)
+            ra = _retry_after_seconds(headers)
+            sleep(ra if ra is not None else delay)
             delay *= 2
             continue
         return False, f"HTTP {status}"
@@ -179,7 +223,7 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
     getf = getf or _http_get
     user_agent = user_agent or config.get("USER_AGENT")
     result = {"selected": 0, "unsaved": 0, "failed": 0, "auth_error": False,
-              "remaining": count_pending(conn)}
+              "network_error": False, "remaining": count_pending(conn)}
 
     auth = get_auth(conn)
     if not auth:
@@ -191,6 +235,9 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
         )
     except RedditAuthError:
         result["auth_error"] = True
+        return result
+    except RedditNetworkError:
+        result["network_error"] = True  # Reddit unreachable — queue intact, retry later
         return result
     set_auth(conn, session_cookie=auth["session_cookie"], modhash=modhash, username=username)
 
@@ -220,9 +267,10 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
             if progress:
                 progress(f"unsaved {reddit_id}")
         else:
-            conn.execute(
-                "UPDATE reddit_unsave SET attempts=attempts+1, last_error=?, updated_utc=? "
-                "WHERE fullname=?", (err, now, fullname))
+            conn.execute(  # the CASE flip retires exhausted rows from future drains
+                "UPDATE reddit_unsave SET attempts=attempts+1, last_error=?, updated_utc=?, "
+                "state=CASE WHEN attempts+1 >= ? THEN 'failed' ELSE state END "
+                "WHERE fullname=?", (err, now, MAX_ATTEMPTS, fullname))
             conn.commit()
             result["failed"] += 1
             if progress:
@@ -258,7 +306,7 @@ def resave(conn, fullname: str, *, post=None, getf=None, user_agent: str | None 
         modhash, username = _refresh_modhash(
             auth["session_cookie"], user_agent=user_agent, getf=getf
         )
-    except RedditAuthError:
+    except (RedditAuthError, RedditNetworkError):
         return False
     try:
         ok, _err = _send_with_retry(

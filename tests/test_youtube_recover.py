@@ -59,3 +59,48 @@ def test_recover_titles_marks_tried_when_none(tmp_db):
     assert res["selected"] == 1 and res["recovered"] == 0
     # marked tried, so a re-run skips it
     assert recover_titles(conn, get=_fake_get(), sleep=lambda s: None, throttle=0)["selected"] == 0
+
+
+# --- failure/edge paths (delegation/10) ---------------------------------------
+
+def _seq_get(*responses):
+    """get stub: serve `responses` in order; an Exception instance is raised instead."""
+    it = iter(responses)
+
+    def get(url):
+        r = next(it)
+        if isinstance(r, BaseException):
+            raise r
+        return r
+
+    return get
+
+
+_AVAIL_OK = json.dumps({"archived_snapshots": {"closest": {
+    "available": True, "url": "http://web.archive.org/snap"}}})
+
+
+def test_recover_title_timeout_on_availability():
+    # TimeoutError is an OSError subclass -> swallowed, never crashes an enrich run
+    assert recover_title("vid123", get=_seq_get(TimeoutError("timed out"))) == ""
+
+
+def test_recover_title_snapshot_fetch_fails():
+    import urllib.error
+    get = _seq_get(_AVAIL_OK, urllib.error.URLError("snapshot down"))
+    assert recover_title("vid123", get=get) == ""
+
+
+def test_recover_title_no_title_in_html():
+    get = _seq_get(_AVAIL_OK, "<html><body>nothing</body></html>")
+    assert recover_title("vid123", get=get) == ""
+
+
+def test_recover_title_entities_and_single_quotes():
+    get = _seq_get(_AVAIL_OK, "<meta property='og:title' content='It&#39;s a title'/>")
+    assert recover_title("vid123", get=get) == "It's a title"
+
+
+def test_recover_title_placeholder_rejected():
+    get = _seq_get(_AVAIL_OK, "<title>[Deleted video] - YouTube</title>")
+    assert recover_title("vid123", get=get) == ""
