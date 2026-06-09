@@ -35,7 +35,14 @@ def load_env(path: str | os.PathLike | None = None) -> None:
     env_path = Path(path) if path else Path(".env")
     if not env_path.is_file():
         return
-    for raw in env_path.read_text(encoding="utf-8").splitlines():
+    try:
+        # utf-8-sig strips the BOM Notepad prepends (else the first key never matches);
+        # errors="replace" degrades a stray bad byte to U+FFFD instead of crashing startup
+        # — the shell environment is the authoritative source anyway.
+        content = env_path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return
+    for raw in content.splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
