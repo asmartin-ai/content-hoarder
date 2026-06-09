@@ -327,3 +327,58 @@ def test_search_items_hides_consolidated_companions(tmp_db):
 
     fns2 = {r["fullname"] for r in db.search_items(conn, include_consolidated=True)}
     assert "reddit:t3_s" in fns2
+
+
+# --- undo -> re-migrate round-trips (delegation/08) ---------------------------
+
+def test_undo_then_remigrate_promoted_round_trip(tmp_db):
+    vid = "Remig00001x"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(conn, [_reddit("t3_rm", f"https://youtu.be/{vid}",
+                         permalink="https://www.reddit.com/r/x/comments/rm/y/")])
+
+    assert consolidate.migrate(conn, apply=True)["youtube_created"] == 1
+    res = consolidate.unconsolidate(conn, apply=True)
+    assert res["promoted_rows_deleted"] == 1
+    assert db.get_item(conn, f"youtube:{vid}") is None
+
+    assert consolidate.migrate(conn, apply=True)["youtube_created"] == 1  # re-promotes cleanly
+    count = conn.execute("SELECT COUNT(*) FROM items WHERE fullname=?",
+                         (f"youtube:{vid}",)).fetchone()[0]
+    assert count == 1
+    yt_md = json.loads(db.get_item(conn, f"youtube:{vid}")["metadata"])
+    assert [c["fullname"] for c in yt_md["companions"]] == ["reddit:t3_rm"]
+    rd_md = json.loads(db.get_item(conn, "reddit:t3_rm")["metadata"])
+    assert rd_md["consolidated_into"] == f"youtube:{vid}"
+
+
+def test_undo_then_remigrate_fold_round_trip(tmp_db):
+    vid = "Refold0001x"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(conn, [_youtube(vid), _reddit("t3_rf", f"https://youtu.be/{vid}")])
+
+    assert consolidate.migrate(conn, apply=True)["youtube_created"] == 0
+    consolidate.unconsolidate(conn, apply=True)
+    assert consolidate.migrate(conn, apply=True)["youtube_created"] == 0
+
+    yt_md = json.loads(db.get_item(conn, f"youtube:{vid}")["metadata"])
+    assert len(yt_md.get("companions") or []) == 1  # no duplicate companion records
+    count = conn.execute("SELECT COUNT(*) FROM items WHERE fullname=?",
+                         (f"youtube:{vid}",)).fetchone()[0]
+    assert count == 1
+
+
+def test_remigrate_without_undo_after_partial_state(tmp_db):
+    """Promoted-case idempotency (the fold case has its own test above)."""
+    vid = "Repart0001x"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(conn, [_reddit("t3_rp", f"https://youtu.be/{vid}")])
+
+    consolidate.migrate(conn, apply=True)
+    consolidate.migrate(conn, apply=True)  # again, WITHOUT undo
+
+    yt_md = json.loads(db.get_item(conn, f"youtube:{vid}")["metadata"])
+    assert len(yt_md.get("companions") or []) == 1
+    count = conn.execute("SELECT COUNT(*) FROM items WHERE fullname=?",
+                         (f"youtube:{vid}",)).fetchone()[0]
+    assert count == 1
