@@ -212,3 +212,40 @@ def test_schema_idempotent(tmp_db):
     db.set_status(c, "reddit:t3_a", "done")
     assert ru.count_pending(c) == 1
     c.close()
+
+
+# --- Retry-After parsing (delegation/01) ------------------------------------
+
+def _send_once_429(headers):
+    """post stub: 429 with `headers` on the first call, 200 after."""
+    state = {"n": 0}
+
+    def post(url, fields, **kw):
+        state["n"] += 1
+        return (429, headers) if state["n"] == 1 else (200, {})
+
+    return post
+
+
+def test_retry_after_lowercase_header_honored():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"retry-after": "7"}), ru.UNSAVE_URL, "t3_x",
+                                  session_cookie="ck", modhash="mh", user_agent="ua",
+                                  sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [7.0]
+
+
+def test_retry_after_http_date_falls_back_to_delay():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"Retry-After": "Fri, 31 Dec 1999 23:59:59 GMT"}),
+                                  ru.UNSAVE_URL, "t3_x", session_cookie="ck", modhash="mh",
+                                  user_agent="ua", sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [2.0]
+
+
+def test_retry_after_negative_falls_back_to_delay():
+    slept = []
+    ok, err = ru._send_with_retry(_send_once_429({"Retry-After": "-5"}), ru.UNSAVE_URL, "t3_x",
+                                  session_cookie="ck", modhash="mh", user_agent="ua",
+                                  sleep=slept.append)
+    assert (ok, err) == (True, None) and slept == [2.0]
