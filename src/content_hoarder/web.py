@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import mimetypes
 import os
 import re
 import secrets
@@ -50,6 +51,10 @@ def _local_host(host: str) -> bool:
 
 def create_app(db_path: str | None = None) -> Flask:
     config.load_env()
+    # Windows reads MIME types from the registry, which can map .js to text/plain —
+    # that hard-fails <script type="module">. Pin the correct type before any static
+    # file is served (v3 pages load ES modules from /static/core and /static/browse).
+    mimetypes.add_type("text/javascript", ".js")
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or config.db_path()
     app.config["SECRET_KEY"] = config.get("FLASK_SECRET_KEY")
