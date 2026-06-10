@@ -503,3 +503,90 @@ fluidity first-class. Plan: shared `static/core/` layer (util/api/toast/render/m
 infinite-scroll/focus-batches, Epic 16 swipe items, Epic 5 keyboard rework, the toast undo-button
 listener leak (app.js:75, triage.js:413), reddit.css hardcoded colors → tokens, dead CSS
 (`.item-age`, `.source-badge`), sw.js versioned cache + `/reddit` added to the PWA shell.*
+
+*Gate-1 outcome (2026-06-09): "Log Book II" locked — `design-ref/v3-explorations/05-log-book-2.html`
+is the Stage C spec; tokens v3 + `static/core/` shipped (commit b20e977). Design-discussion items:*
+
+- [ ] **P2 — Two-stage swipe actions (mobile).** Sync-style short/long thresholds per direction.
+  Proposed: short → = Archive, **long → = Keep** (the extra travel is deliberate friction — a
+  "hoarder tax" that fits the reduce-the-backlog thesis), short ← = Done, long ← = TBD
+  (→ Inbox? skip?). Underlay color+icon swap at the second threshold + a haptic pulse
+  (`navigator.vibrate`); long-press stays = select. **Controls need a design discussion before
+  build** (thresholds, cancel affordance, what long-left does).
+- [ ] **P2 — Command palette v1.** `/` focuses search; `>` flips to command mode (set status
+  view, density, theme, sort, go to triage/reddit, bulk ops on selection). Fuzzy match + arrows
+  + Enter. Until it ships, the search placeholder must not advertise `>`.
+- [ ] **P2 — Filter-state visibility (simple now).** Active source/tag chips with ✕ + "clear
+  all" rendered in the sheet shelf next to the result count; define the algebra (single-select
+  source, multi-select tags) and keep it visible. **P3 — advanced later:** palette-driven
+  filter builder, saved filters, tag search inside the rail.
+
+*PKMS-research additions (2026-06-10 handoff; see Epic 21 for context). These ride the same
+Stage C design gate:*
+
+- [ ] **P2 — No backlog counts in v3 (research-mandated).** No raw inbox/All totals anywhere —
+  backlog counts read as failure and drive abandonment (97.55% of items never leave inbox; the
+  number can only be demoralizing). Sidebar shows curated slices instead; audit the Stats modal
+  + progress copy for guilt framing (never re-open/read-% as health, no "you haven't…");
+  finishable batch progress only ("3 of 7"), never streaks/points/leaderboards.
+- [ ] **P2 — Resurfacing card: "Still interested in X?".** Machine-initiated, phrased as a
+  curious question, never a count badge or red dot (recognition beats recall for ADHD). v1
+  candidates need no LLM: cluster = curated knowledge tag (`tips`/`coding`/`science`) × old
+  saves; never `memes`/`vtubers` (identity content isn't a task). Dismiss = silent decay + a
+  no-renag window. Design one-pager before build.
+- [ ] **P2 — "Surprise me" card.** One bounded random old save on demand — converts the
+  rediscovery-joy that sustains the save habit into a deliberate retention loop. Rides
+  `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
+
+## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
+*From the PKMS research handoff (2026-06-10; evidence in
+`K:\Projects\PKMS\vault\resources\research\`, esp. `17-hoarder-mining.md`): 97.55% of 84,250
+items never left `inbox` in the app's lifetime; ~80% of the hoard is entertainment; saving is
+the only proven-durable behavior. Direction: promote-on-demand (search/All/Archived already
+reach every status — nothing is ever lost) + guilt-free bulk decay; per-item review of the
+backlog will never happen and the design stops pretending it will. **Decisions locked
+2026-06-10:** decay = auto-archive + `metadata.decayed_at` stamp (no schema change); one-shot
+supervised backfill, rolling automation iceboxed; gaming buckets added, subdivided.
+**Guardrails:** zero new capture friction; no guilt mechanics anywhere (no streaks / overdue
+counters / red badges / "you haven't…" copy); everything reversible behind dry-run + backup;
+the word "bankruptcy" stays CLI-only, never UI copy.*
+
+- [ ] **P1 — Tag/subreddit-aware decay (extend `bankruptcy`).** ⏱ 2–4h. Extend
+  `db.bankruptcy` (db.py:792) + the CLI with tag/subreddit filters (crib the tag SQL from
+  `search_items`); stamp `metadata.decayed_at` (same pattern as `promoted_by`/`dedup_of`) so
+  un-decay targets exactly the decayed set and deliberate archives stay distinguishable
+  (`status_prev` alone is single-step + ambiguous); add a bulk `un-decay` reversal. Reddit-only
+  v1 (77% of the corpus). ✓ pytest green incl. a decay→un-decay round-trip; dry-run against a
+  live-DB copy prints a per-bucket count table.
+- [ ] **P1 — Gaming buckets in `categorize.py`, subdivided.** *(User spec 2026-06-10.)*
+  Esports titles (`leagueoflegends`, `VALORANT`, `GlobalOffensive`, …) → `esports`; modded
+  Minecraft (`feedthebeast`, …) joins the existing `minecraft` bucket; a generic/casual
+  `gaming` bucket for the rest. Visible tags (rail + chips), decay-eligible.
+  ✓ `categorize --source reddit --dry-run` shows sensible per-bucket counts.
+- [ ] **P1 — `ephemeral` bucket: time-limited promos/sales/events.** *(User request 2026-06-10.)*
+  Saved posts about limited-time promotions, sales, giveaways, and events are "likely easy to
+  let go" — expired by definition once old. Detect via (a) deal subreddits (gamedeals,
+  buildapcsales, freegamefindings, … — whole-sub precision) and (b) a conservative
+  title-keyword fallback (`giveaway`, `% off`, `sale ends`, `limited time`, `humble bundle`, …;
+  never bare `free`/`sale`/`event`). Decays as its own wave with a `--before` age cutoff
+  (~60 days) so still-live promos survive. ✓ rehearsal report shows precision samples split by
+  detection path.
+- [ ] **P1 — One-shot supervised entertainment backfill.** ⏱ ~30 min supervised. ▶ WAL
+  checkpoint + dated `.bak` of `data/app.db`; dry-run; user signs off on the per-bucket table
+  before `--apply`. ✓ applied; 10 decayed items spot-checked in the Archived view; a 5-item
+  un-decay round-trip is clean. Note: "age" = `created_utc` (content age) — Reddit exposes no
+  save timestamps, so a cutoff means "old content," not "saved long ago."
+- [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
+  ~a month of new saves accumulates.
+- [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
+  (`db.get_reddit_thread`, db.py:834; 672 threads cached); build the thread-JSON→markdown
+  export only when PKMS Phase 3 starts. Don't build capture/promote here before then.
+  Related open question (PKMS side, Kenja decides later): whether the PKMS mobile `/capture`
+  endpoint lives inside this Flask app (same tailnet host) or as a sibling service.
+- [ ] **P3 — LLM identity-vs-actionable classifier (Icebox).** v1 approximates it with tag
+  buckets (memes/vtubers = identity; tips/coding/science = actionable); reactivate when the
+  resurfacing card (Epic 20) needs better candidates. Reuses the Epic 1/10 local-LLM lane.
+- [ ] **P3 — Content-based ephemeral detection (Icebox).** Event posts whose time-limited
+  nature isn't visible from subreddit/title (announcement bodies, "ends Sunday" buried in
+  text) need body analysis — local-LLM lane once the GPU is back in service. The subreddit +
+  title-keyword v1 above covers the high-precision bulk first.
