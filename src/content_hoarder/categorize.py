@@ -208,6 +208,42 @@ _SUBREDDIT_TAGS.update({
     "freebies": ["ephemeral"],
 })
 
+# Untagged-tail coverage expansion (Epic 21 rehearsal, 2026-06-10): conservative mappings
+# into EXISTING buckets only, from the post-retag top-200 untagged inbox inventory. Skipped
+# on purpose: discussion subs (askreddit, bestof, iama, ...), fiction (scp, writingprompts,
+# humansarespaceorcs), streaming (livestreamfail, offlinetv — no bucket), knowledge/identity
+# (adhd, adhdwomen — future resurfacing material, never decay), personal (iastate).
+_SUBREDDIT_TAGS.update({
+    # anime (series / fandom / gif subs)
+    "animegifs": ["anime"], "animenocontext": ["anime", "memes"],
+    "animememes": ["anime", "memes"], "historyanimemes": ["anime", "memes"],
+    "spyxfamily": ["anime"], "kiminonawa": ["anime"], "evangelion": ["anime"],
+    "domesticgirlfriend": ["anime"], "kanojookarishimasu": ["anime"],
+    "wholesomeyuri": ["anime"], "nagatoro": ["anime"], "seishunbutayarou": ["anime"],
+    # memes / humor (incl. screenshot-humor subs; tinder + comics are judgment calls —
+    # both are entertainment humor content, flagged in the rehearsal report)
+    "whenthe": ["memes"], "bi_irl": ["memes"], "newgreentexts": ["memes"],
+    "anarchychess": ["memes"], "cursedcomments": ["memes"], "unexpected": ["memes"],
+    "brandnewsentence": ["memes"], "murderedbywords": ["memes"],
+    "nonpoliticaltwitter": ["memes"], "blursedimages": ["memes"], "tihi": ["memes"],
+    "suspiciouslyspecific": ["memes"], "hopeposting": ["memes"], "discord_irl": ["memes"],
+    "youtubehaiku": ["memes"], "perfectlycutscreams": ["memes"],
+    "maybemaybemaybe": ["memes"], "hmmm": ["memes"], "meme": ["memes"],
+    "chadtopia": ["memes"], "extrafabulouscomics": ["memes"], "comics": ["memes"],
+    "politicalcompassmemes": ["memes"], "politicalhumor": ["memes"],
+    "dndmemes": ["memes"], "roughromanmemes": ["memes"], "oddlyspecific": ["memes"],
+    "tinder": ["memes"],
+    "physicsmemes": ["science", "memes"], "mathmemes": ["science", "memes"],
+    "shermanposting": ["defense", "memes"],
+    # defense / military
+    "military": ["defense"],
+    # science / engineering
+    "spacex": ["science"], "engineeringporn": ["science"],
+    # coding / computing
+    "learnpython": ["coding"], "learnmachinelearning": ["coding"],
+    "linux": ["coding"], "hacking": ["coding"], "howtohack": ["coding"],
+})
+
 # Keyword fallback for items whose subreddit isn't mapped — applied to the subreddit name +
 # title ONLY (never body: incidental body mentions, e.g. an AskReddit answer that says "Japan",
 # caused false positives) and only when the subreddit map produced no topic tag. Word-bounded.
@@ -220,8 +256,9 @@ _KEYWORD_TAGS = [
     # Ephemeral promo/sale/event vocabulary — deliberately specific phrases only (never bare
     # "free"/"sale"/"deal"/"event": false-positive magnets). The decay wave for this tag is
     # age-gated, so a rare false positive is recoverable and a true-but-recent promo survives.
+    # (?<!dead ) guards the idiom "a dead giveaway" — a real corpus false positive.
     ("ephemeral", re.compile(
-        r"\bgiveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
+        r"\b(?<!dead )giveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
         r"|\blimited[- ]time\b|\bfree\s+until\b|\bfree\s+weekend\b|\bfree\s+to\s+keep\b"
         r"|\bhumble\s+bundle\b|\bpromo\s+code\b|\bcoupon\b|\bexpires\b|\bflash\s+sale\b",
         re.IGNORECASE)),
