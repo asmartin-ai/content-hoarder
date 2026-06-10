@@ -789,6 +789,11 @@ def bulk_set_status(
     return count
 
 
+# Item age: content creation time when known, else when we first synced it. (Reddit/YouTube
+# expose no save timestamps, so this is a content-age proxy — see the decay docstring.)
+_AGE_EXPR = "(CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END)"
+
+
 def bankruptcy(
     conn: sqlite3.Connection,
     before_utc: int,
@@ -801,8 +806,7 @@ def bankruptcy(
     Age uses ``created_utc`` when known, else ``first_seen_utc``. Returns the count
     affected (or that *would* be affected when ``dry_run``).
     """
-    age_expr = "(CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END)"
-    where = f"status='inbox' AND {age_expr} < ?"
+    where = f"status='inbox' AND {_AGE_EXPR} < ?"
     params: list = [int(before_utc)]
     if source:
         where += " AND source = ?"
@@ -819,6 +823,162 @@ def bankruptcy(
     )
     conn.commit()
     return n
+
+
+def _decay_where(tags, subreddits, before_utc, source) -> tuple[str, list]:
+    """WHERE clause + params for a decay selection: tag/subreddit selectors UNION,
+    age cutoff and source AND. Tag SQL mirrors search_items' json_each filter."""
+    clauses = ["status='inbox'", "source=?"]
+    params: list = [source]
+    sel = []
+    if tags:
+        ph = ",".join("?" for _ in tags)
+        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        params.extend(tags)
+    if subreddits:
+        ph = ",".join("?" for _ in subreddits)
+        sel.append(f"lower(json_extract(metadata, '$.subreddit')) IN ({ph})")
+        params.extend(s.lower() for s in subreddits)
+    if sel:
+        clauses.append("(" + " OR ".join(sel) + ")")
+    if before_utc is not None:
+        clauses.append(f"{_AGE_EXPR} < ?")
+        params.append(int(before_utc))
+    return " AND ".join(clauses), params
+
+
+def decay(
+    conn: sqlite3.Connection,
+    *,
+    tags: list[str] | None = None,
+    subreddits: list[str] | None = None,
+    before_utc: int | None = None,
+    source: str = "reddit",
+    apply: bool = False,
+    samples: int = 5,
+    top_subs: int = 50,
+) -> dict:
+    """Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped for reversal.
+
+    The tag-aware successor to ``bankruptcy`` (PKMS-research adoption, Epic 21): selects
+    ``status='inbox'`` items of ``source`` matching ANY of ``tags``/``subreddits`` (union),
+    optionally older than ``before_utc`` (content age — Reddit exposes no save timestamps),
+    and archives them stamping ``metadata.decayed_at``. One stamp value per call = one
+    independently reversible "wave" (see ``undecay``). Refuses an unselected decay.
+
+    Deliberately a direct UPDATE like ``bankruptcy`` — never routed through
+    ``bulk_set_status`` — so a mass decay can never enqueue live Reddit unsaves.
+    Dry-run (default) and apply return the same shape; breakdowns are computed before
+    the UPDATE. ``by_tag`` counts membership per selected tag and overlaps by design
+    (an anime+memes item counts under both) — ``total`` is the authoritative
+    distinct-row count, never ``sum(by_tag)``.
+    """
+    if not (tags or subreddits or before_utc):
+        raise ValueError("decay needs at least one selector (tags/subreddits/before_utc)")
+    where, params = _decay_where(tags, subreddits, before_utc, source)
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+
+    by_tag: dict = {}
+    for t in tags or []:
+        n = conn.execute(
+            f"SELECT COUNT(*) FROM items WHERE {where} AND EXISTS "
+            "(SELECT 1 FROM json_each(metadata, '$.tags') WHERE value = ?)",
+            params + [t],
+        ).fetchone()[0]
+        if n:
+            by_tag[t] = n
+
+    by_subreddit = {
+        r[0]: r[1]
+        for r in conn.execute(
+            f"SELECT COALESCE(lower(json_extract(metadata, '$.subreddit')), '(none)') s, "
+            f"COUNT(*) n FROM items WHERE {where} GROUP BY s ORDER BY n DESC LIMIT ?",
+            params + [int(top_subs)],
+        ).fetchall()
+    }
+
+    now = int(time.time())
+    yr = 365 * 24 * 3600
+    b = conn.execute(
+        f"SELECT SUM(CASE WHEN {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? THEN 1 ELSE 0 END) FROM items WHERE {where}",
+        [now - yr, now - yr, now - 2 * yr, now - 2 * yr, now - 4 * yr, now - 4 * yr] + params,
+    ).fetchone()
+    age_bands = {"<1y": b[0] or 0, "1-2y": b[1] or 0, "2-4y": b[2] or 0, ">=4y": b[3] or 0}
+
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?",
+            params + [int(samples)],
+        ).fetchall()
+    ]
+
+    res = {"total": total, "applied": False, "decayed_at": None, "by_tag": by_tag,
+           "by_subreddit": by_subreddit, "age_bands": age_bands, "sample": sample}
+    if apply:
+        res["applied"] = True
+        if total:
+            cur = conn.execute(
+                f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
+                f"metadata=json_set(metadata, '$.decayed_at', ?) WHERE {where}",
+                [now, now] + params,
+            )
+            conn.commit()
+            res.update(total=cur.rowcount, decayed_at=now)
+    return res
+
+
+def undecay(
+    conn: sqlite3.Connection,
+    *,
+    decayed_after: int | None = None,
+    decayed_before: int | None = None,
+    apply: bool = False,
+    samples: int = 5,
+) -> dict:
+    """Reverse ``decay``: return stamped-archived items to the inbox.
+
+    Selects by the ``metadata.decayed_at`` stamp (the wave id) — NOT ``status_prev``,
+    which is single-step and may have been clobbered since. Items manually re-statused
+    after a decay (e.g. to keep) are skipped by the ``status='archived'`` guard; their
+    stale stamp is harmless (undecay never touches non-archived rows, and a later decay
+    re-stamps). The stamp is REMOVED on restore so the invariant "stamped == currently
+    decayed" holds; ``processed_utc`` returns to NULL (inbox semantics, as set_status).
+    """
+    clauses = ["status='archived'", "json_extract(metadata, '$.decayed_at') IS NOT NULL"]
+    params: list = []
+    if decayed_after is not None:
+        clauses.append("json_extract(metadata, '$.decayed_at') >= ?")
+        params.append(int(decayed_after))
+    if decayed_before is not None:
+        clauses.append("json_extract(metadata, '$.decayed_at') < ?")
+        params.append(int(decayed_before))
+    where = " AND ".join(clauses)
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?",
+            params + [int(samples)],
+        ).fetchall()
+    ]
+    res = {"total": total, "applied": False, "sample": sample}
+    if apply:
+        res["applied"] = True
+        if total:
+            cur = conn.execute(
+                f"UPDATE items SET status='inbox', status_prev='archived', processed_utc=NULL, "
+                f"metadata=json_remove(metadata, '$.decayed_at') WHERE {where}",
+                params,
+            )
+            conn.commit()
+            res["total"] = cur.rowcount
+    return res
 
 
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
