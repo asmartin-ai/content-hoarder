@@ -1,4 +1,4 @@
-"""Command-line interface: init-db, import, enrich, serve, stats, sources, bankruptcy, promote."""
+"""Command-line interface: init-db, import, enrich, serve, stats, sources, bankruptcy, decay, promote."""
 
 from __future__ import annotations
 
@@ -178,6 +178,62 @@ def cmd_bankruptcy(args) -> int:
     return 0
 
 
+def _parse_date(value: str | None, flag: str) -> tuple[int | None, int]:
+    """YYYY-MM-DD (or full ISO) -> epoch seconds; (None, 0) when the flag is unset.
+    Returns (value, exit_code) — exit_code 2 means the caller should bail."""
+    if value is None:
+        return None, 0
+    try:
+        return int(datetime.datetime.fromisoformat(value).timestamp()), 0
+    except ValueError:
+        print(f"error: {flag} must be YYYY-MM-DD (got {value!r})", file=sys.stderr)
+        return None, 2
+
+
+def cmd_decay(args) -> int:
+    from content_hoarder import db
+    if args.undo:
+        if args.tag or args.subreddit or args.before:
+            print("error: --tag/--subreddit/--before don't apply to --undo; "
+                  "select a wave with --decayed-after/--decayed-before", file=sys.stderr)
+            return 2
+        after_utc, rc = _parse_date(args.decayed_after, "--decayed-after")
+        if rc:
+            return rc
+        before_utc, rc = _parse_date(args.decayed_before, "--decayed-before")
+        if rc:
+            return rc
+        with _connect() as conn:
+            res = db.undecay(conn, decayed_after=after_utc, decayed_before=before_utc,
+                             apply=args.apply)
+        print(json.dumps(res, indent=2))
+        if not args.apply:
+            print(f"(dry run — {res['total']} decayed item(s) would return to inbox; "
+                  f"re-run with --apply to commit.)", file=sys.stderr)
+        return 0
+
+    if not (args.tag or args.subreddit or args.before):
+        print("error: decay needs at least one selector: --tag, --subreddit, or --before",
+              file=sys.stderr)
+        return 2
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
+    from content_hoarder.categorize import FILTER_TAGS
+    unknown = [t for t in (args.tag or []) if t not in FILTER_TAGS]
+    if unknown:
+        print(f"warning: tag(s) not in the curated vocabulary (typo?): {', '.join(unknown)}",
+              file=sys.stderr)
+    with _connect() as conn:
+        res = db.decay(conn, tags=args.tag, subreddits=args.subreddit,
+                       before_utc=before_utc, source=args.source, apply=args.apply)
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(f"(dry run — {res['total']} inbox item(s) would decay to archived; re-run with "
+              f"--apply to commit. Run against a COPY of the DB first.)", file=sys.stderr)
+    return 0
+
+
 def cmd_promote(args) -> int:
     from content_hoarder.bridge import karakeep
     with _connect() as conn:
@@ -345,6 +401,27 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--source", help="Only this source.")
     pb.add_argument("--dry-run", action="store_true")
     pb.set_defaults(func=cmd_bankruptcy)
+
+    pdc = sub.add_parser(
+        "decay",
+        help="Guilt-free bulk decay: archive inbox items by tag/subreddit/age "
+             "(stamped per wave + reversible via --undo).",
+    )
+    pdc.add_argument("--tag", action="append",
+                     help="Decay items carrying this metadata tag (repeatable; union with --subreddit).")
+    pdc.add_argument("--subreddit", action="append",
+                     help="Decay items from this subreddit (repeatable; case-insensitive).")
+    pdc.add_argument("--before", help="Only items older than YYYY-MM-DD (content age).")
+    pdc.add_argument("--source", default="reddit", help="Source to decay (default: reddit).")
+    pdc.add_argument("--apply", action="store_true",
+                     help="Commit changes (default: dry run). Run against a DB copy first.")
+    pdc.add_argument("--undo", action="store_true",
+                     help="Restore decayed items to inbox (select a wave with "
+                          "--decayed-after/--decayed-before).")
+    pdc.add_argument("--decayed-after", help="--undo: only waves stamped on/after this YYYY-MM-DD "
+                                             "(full ISO datetime also accepted).")
+    pdc.add_argument("--decayed-before", help="--undo: only waves stamped before this YYYY-MM-DD.")
+    pdc.set_defaults(func=cmd_decay)
 
     pp = sub.add_parser("promote", help="Push 'keep' items to a stock Karakeep (opt-in).")
     pp.add_argument("--status", default="keep")
