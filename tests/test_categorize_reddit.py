@@ -141,6 +141,19 @@ def test_ephemeral_keywords_conservative():
     assert rt(_item(sub="randomsub", title="the sale of the century, a memoir")) == []
     assert rt(_item(sub="randomsub", title="main event recap thread")) == []
     assert rt(_item(sub="randomsub", title="turned off my phone for a week")) == []
+    # the idiom "a dead giveaway" is NOT a promo (real corpus false positive, fixed)
+    assert rt(_item(sub="randomsub", title="whats a dead giveaway that someone is lying")) == []
+    # ...but a genuine giveaway still tags
+    assert rt(_item(sub="randomsub", title="keycap giveaway inside")) == ["ephemeral"]
+
+
+def test_untagged_tail_coverage_expansion():
+    rt = categorize.reddit_tags
+    assert rt(_item(sub="Tinder")) == ["memes"]
+    assert rt(_item(sub="engineeringporn")) == ["science"]
+    assert rt(_item(sub="learnpython")) == ["coding"]
+    assert rt(_item(sub="physicsmemes")) == ["science", "memes"]
+    assert rt(_item(sub="shermanposting")) == ["defense", "memes"]
 
 
 def test_new_tags_in_filter_vocab(conn):
