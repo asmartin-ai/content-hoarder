@@ -551,31 +551,35 @@ supervised backfill, rolling automation iceboxed; gaming buckets added, subdivid
 counters / red badges / "you haven't…" copy); everything reversible behind dry-run + backup;
 the word "bankruptcy" stays CLI-only, never UI copy.*
 
-- [ ] **P1 — Tag/subreddit-aware decay (extend `bankruptcy`).** ⏱ 2–4h. Extend
-  `db.bankruptcy` (db.py:792) + the CLI with tag/subreddit filters (crib the tag SQL from
-  `search_items`); stamp `metadata.decayed_at` (same pattern as `promoted_by`/`dedup_of`) so
-  un-decay targets exactly the decayed set and deliberate archives stay distinguishable
-  (`status_prev` alone is single-step + ambiguous); add a bulk `un-decay` reversal. Reddit-only
-  v1 (77% of the corpus). ✓ pytest green incl. a decay→un-decay round-trip; dry-run against a
-  live-DB copy prints a per-bucket count table.
-- [ ] **P1 — Gaming buckets in `categorize.py`, subdivided.** *(User spec 2026-06-10.)*
-  Esports titles (`leagueoflegends`, `VALORANT`, `GlobalOffensive`, …) → `esports`; modded
-  Minecraft (`feedthebeast`, …) joins the existing `minecraft` bucket; a generic/casual
-  `gaming` bucket for the rest. Visible tags (rail + chips), decay-eligible.
-  ✓ `categorize --source reddit --dry-run` shows sensible per-bucket counts.
-- [ ] **P1 — `ephemeral` bucket: time-limited promos/sales/events.** *(User request 2026-06-10.)*
-  Saved posts about limited-time promotions, sales, giveaways, and events are "likely easy to
-  let go" — expired by definition once old. Detect via (a) deal subreddits (gamedeals,
-  buildapcsales, freegamefindings, … — whole-sub precision) and (b) a conservative
-  title-keyword fallback (`giveaway`, `% off`, `sale ends`, `limited time`, `humble bundle`, …;
-  never bare `free`/`sale`/`event`). Decays as its own wave with a `--before` age cutoff
-  (~60 days) so still-live promos survive. ✓ rehearsal report shows precision samples split by
-  detection path.
-- [ ] **P1 — One-shot supervised entertainment backfill.** ⏱ ~30 min supervised. ▶ WAL
-  checkpoint + dated `.bak` of `data/app.db`; dry-run; user signs off on the per-bucket table
-  before `--apply`. ✓ applied; 10 decayed items spot-checked in the Archived view; a 5-item
-  un-decay round-trip is clean. Note: "age" = `created_utc` (content age) — Reddit exposes no
-  save timestamps, so a cutoff means "old content," not "saved long ago."
+- [x] ~~**P1 — Tag/subreddit-aware decay (extend `bankruptcy`).**~~ Shipped (2026-06-10,
+  `feat/inbox-decay`): `db.decay`/`db.undecay` + the `decay` CLI (dry-run default, `--apply`,
+  `--undo` with `--decayed-after/--decayed-before` wave windows). Stamps
+  `metadata.decayed_at` (one stamp per call = one reversible wave); direct UPDATE like
+  bankruptcy — never `bulk_set_status`, so a mass decay can never enqueue live Reddit
+  unsaves (pinned by test). 14 new tests incl. merge_upsert stamp survival.
+- [x] ~~**P1 — Gaming buckets in `categorize.py`, subdivided.**~~ Shipped (2026-06-10):
+  `esports` (LoL/OW/CS/R6/Valorant subs, 2,116 items on the live corpus) + casual `gaming`
+  (2,239) + modded-MC subs joined `minecraft` per user decision; `gamedev` → `coding`.
+  Plus an untagged-tail coverage expansion (~45 conservative mappings: anime fandoms,
+  screenshot-humor subs, military, spacex/engineeringporn, learnpython/linux/hacking).
+  All corpus-confirmed via read-only inventory; rail/chips pick the tags up automatically.
+- [x] ~~**P1 — `ephemeral` bucket: time-limited promos/sales/events.**~~ Shipped
+  (2026-06-10): deal subreddits (gamedeals, buildapcsales, freegamefindings,
+  frugalmalefashion, freebies — ephemeral-ONLY, no gaming co-tag, so only the age-gated
+  wave touches them) + conservative title keywords (`giveaway` with a dead-giveaway idiom
+  guard, `N% off`, `humble bundle`, …; never bare `free`/`sale`/`event`). 203 items on the
+  live corpus (197 subreddit-path, 6 keyword-path); precision samples in the rehearsal report.
+- [ ] **P1 — One-shot supervised entertainment backfill — REHEARSED, awaiting sign-off.**
+  Full dress rehearsal passed on a live-DB copy (2026-06-10, `scripts/rehearse_decay.py`):
+  **29,740 items would decay (45.9% of reddit inbox)** — wave 1 entertainment 29,539 +
+  wave 2 ephemeral 201 (age-gated 60d); NSFW counts preserved exactly through the retag;
+  apply==dry; full undecay round-trip clean; whole run ~30s. ⏱ ~15 min supervised. ▶ read
+  `data\rehearsal-decay\DECAY-REHEARSAL-REPORT.md` (per-bucket/per-sub/age-band tables,
+  ephemeral precision samples, the exact live command block incl. `--backup-live`). ✓ live
+  block executed; 10 decayed items spot-checked in the Archived view; the freebies round-trip
+  recipe is clean. Note: "age" = `created_utc` (content age) — Reddit exposes no save
+  timestamps. Judgment calls to review in the report: `tinder`/`comics` → memes; `defense`
+  includes `aviation` + Ukraine-war subs (visible in the per-sub table).
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.
 - [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
