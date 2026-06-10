@@ -90,12 +90,13 @@ def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool 
 REDDIT_TAGS = (
     "nsfw_erotic", "nsfw_talk", "nsfw_other", "vtubers", "coding", "japan",
     "anime", "memes", "minecraft", "defense", "science", "tips",
+    "esports", "gaming", "ephemeral",
 )
 
 # The curated vocabulary the browse tag-rail filters on: the reddit topic/NSFW tags plus the
 # YouTube processing-area tags (mirrored from metadata.category by db.set_category). Anything
 # ELSE that lands in metadata.tags — notably YouTube per-video keywords from the enrich pass —
-# is deliberately NOT a filter facet, so the rail stays a small, meaningful set (~15 tags)
+# is deliberately NOT a filter facet, so the rail stays a small, meaningful set (~18 tags)
 # instead of the tens of thousands of raw keywords. db.tag_counts restricts to this set.
 FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 
@@ -171,6 +172,42 @@ _SUBREDDIT_TAGS.update({
     "196": ["memes"], "okbuddyvicodin": ["memes"], "bookscirclejerk": ["memes"],
 })
 
+# Epic 21 (2026-06-10): gaming/esports/ephemeral buckets for the decay backfill.
+# Subdivision per user spec: esports titles separate from casual/general gaming; modded-MC
+# subs join the existing minecraft bucket (feedthebeast precedent). All entries
+# corpus-confirmed against the live inbox (read-only inventory, 2026-06-10).
+# NOTE: deal subs are ephemeral-ONLY (no gaming co-tag) — the ephemeral decay wave is
+# age-gated so still-live promos survive; a gaming co-tag would sweep them ungated.
+_SUBREDDIT_TAGS.update({
+    # esports titles (LoL / OW / CS / R6 / Valorant)
+    "leagueoflegends": ["esports"], "leagueofmemes": ["esports", "memes"],
+    "summonerschool": ["esports"], "valorant": ["esports"],
+    "globaloffensive": ["esports"], "csgo": ["esports"],
+    "overwatch": ["esports"], "competitiveoverwatch": ["esports"],
+    "overwatchuniversity": ["esports"], "overwatch_memes": ["esports", "memes"],
+    "rainbow6": ["esports"], "shittyrainbow6": ["esports", "memes"],
+    "r6proleague": ["esports"], "esports": ["esports"],
+    # casual / general gaming
+    "gaming": ["gaming"], "games": ["gaming"], "truegaming": ["gaming"],
+    "pcgaming": ["gaming"], "pcmasterrace": ["gaming"], "patientgamers": ["gaming"],
+    "steam": ["gaming"], "gamingcirclejerk": ["gaming", "memes"], "girlgamers": ["gaming"],
+    "projectzomboid": ["gaming"], "stellaris": ["gaming"], "hoi4": ["gaming"],
+    "kaiserreich": ["gaming"], "civ": ["gaming"], "rimworld": ["gaming"],
+    "aoe2": ["gaming"], "battlefield_one": ["gaming"], "cyberpunkgame": ["gaming"],
+    "darkestdungeon": ["gaming"], "hadesthegame": ["gaming"], "satisfactorygame": ["gaming"],
+    "osugame": ["gaming"], "ddlc": ["gaming"], "katawashoujo": ["gaming"],
+    "coffinofandyandleyley": ["gaming"], "girlsfrontline": ["gaming"], "azurelane": ["gaming"],
+    # modded-MC joiners (user decision: modded goes with feedthebeast = minecraft)
+    "createmod": ["minecraft"], "minecraftmemes": ["minecraft", "memes"],
+    "minecraftbuilds": ["minecraft"],
+    # game development is coding, not gaming
+    "gamedev": ["coding"],
+    # ephemeral: deal/promo subs — time-limited by nature ("likely easy to let go")
+    "gamedeals": ["ephemeral"], "buildapcsales": ["ephemeral"],
+    "freegamefindings": ["ephemeral"], "frugalmalefashion": ["ephemeral"],
+    "freebies": ["ephemeral"],
+})
+
 # Keyword fallback for items whose subreddit isn't mapped — applied to the subreddit name +
 # title ONLY (never body: incidental body mentions, e.g. an AskReddit answer that says "Japan",
 # caused false positives) and only when the subreddit map produced no topic tag. Word-bounded.
@@ -180,6 +217,14 @@ _KEYWORD_TAGS = [
     ("vtubers", re.compile(r"\bvtuber\b|hololive|nijisanji", re.IGNORECASE)),
     ("defense", re.compile(r"\bnon[- ]?credible\b", re.IGNORECASE)),
     ("japan", re.compile(r"\bjapan(ese)?\b", re.IGNORECASE)),
+    # Ephemeral promo/sale/event vocabulary — deliberately specific phrases only (never bare
+    # "free"/"sale"/"deal"/"event": false-positive magnets). The decay wave for this tag is
+    # age-gated, so a rare false positive is recoverable and a true-but-recent promo survives.
+    ("ephemeral", re.compile(
+        r"\bgiveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
+        r"|\blimited[- ]time\b|\bfree\s+until\b|\bfree\s+weekend\b|\bfree\s+to\s+keep\b"
+        r"|\bhumble\s+bundle\b|\bpromo\s+code\b|\bcoupon\b|\bexpires\b|\bflash\s+sale\b",
+        re.IGNORECASE)),
 ]
 
 # NSFW classification is subreddit-driven (the over_18 flag is too sparse to rely on). The rule

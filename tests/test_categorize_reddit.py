@@ -98,3 +98,55 @@ def test_tag_reddit_source_dry_run_then_write(conn):
     import json
     md_a = json.loads(db.get_item(conn, "reddit:t3_a")["metadata"])
     assert md_a["tags"] == ["minecraft"]
+
+
+# --- Epic 21: gaming / esports / ephemeral buckets ---------------------------------
+
+
+def test_gaming_and_esports_bucket_mapping():
+    rt = categorize.reddit_tags
+    assert rt(_item(sub="leagueoflegends")) == ["esports"]
+    assert rt(_item(sub="Overwatch")) == ["esports"]
+    assert rt(_item(sub="shittyrainbow6")) == ["esports", "memes"]
+    assert rt(_item(sub="pcmasterrace")) == ["gaming"]
+    assert rt(_item(sub="GamingCircleJerk")) == ["gaming", "memes"]
+    # modded-MC joins minecraft (user decision: modded goes with feedthebeast)
+    assert rt(_item(sub="CreateMod")) == ["minecraft"]
+    assert rt(_item(sub="minecraftmemes")) == ["minecraft", "memes"]
+    # game development is coding, not gaming
+    assert rt(_item(sub="gamedev")) == ["coding"]
+
+
+def test_ephemeral_subreddit_map():
+    # Deal subs are ephemeral-ONLY — no gaming co-tag. The ephemeral decay wave is
+    # age-gated; a gaming co-tag would let the ungated gaming wave sweep live promos.
+    assert categorize.reddit_tags(_item(sub="GameDeals")) == ["ephemeral"]
+    assert categorize.reddit_tags(_item(sub="buildapcsales")) == ["ephemeral"]
+
+
+def test_ephemeral_keyword_fallback_unmapped_only():
+    rt = categorize.reddit_tags
+    # unmapped sub + distinctive promo phrasing -> ephemeral
+    assert rt(_item(sub="randomsub", title="Steam summer giveaway for charity")) == ["ephemeral"]
+    assert rt(_item(sub="randomsub", title="RTX 5080 30% off today")) == ["ephemeral"]
+    assert rt(_item(sub="randomsub", title="Humble Bundle has a new pack")) == ["ephemeral"]
+    # mapped sub already carries a topic -> keyword fallback never fires
+    assert rt(_item(sub="leagueoflegends", title="skin giveaway")) == ["esports"]
+
+
+def test_ephemeral_keywords_conservative():
+    rt = categorize.reddit_tags
+    # bare "free" / "sale" / "event" / " off" must NOT tag (false-positive magnets)
+    assert rt(_item(sub="randomsub", title="free will is an illusion")) == []
+    assert rt(_item(sub="randomsub", title="the sale of the century, a memoir")) == []
+    assert rt(_item(sub="randomsub", title="main event recap thread")) == []
+    assert rt(_item(sub="randomsub", title="turned off my phone for a week")) == []
+
+
+def test_new_tags_in_filter_vocab(conn):
+    for t in ("esports", "gaming", "ephemeral"):
+        assert t in categorize.REDDIT_TAGS and t in categorize.FILTER_TAGS
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_g", kind="post",
+                    title="g", metadata={"subreddit": "gamedeals", "tags": ["ephemeral"]}))
+    conn.commit()
+    assert db.tag_counts(conn)["ephemeral"] == 1
