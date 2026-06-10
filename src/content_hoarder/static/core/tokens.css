@@ -1,0 +1,135 @@
+/* ============================================================
+   content-hoarder · design tokens v3 — "Log Book"
+   Source of truth: design-ref/v3-explorations/05-log-book-2.html
+   (Gate-1 approved 2026-06-09). Single entry point for v3 pages.
+   Legacy pages keep static/tokens.css until their own rewrite.
+
+   Theming: data-theme="light"|"dark" on <html>; no attribute =
+   dark, the native identity ("night ops"). Light = "daylight ops".
+   v3 rule: components consume the SEMANTIC ALIASES, not raw tokens.
+   ============================================================ */
+
+/* ---- vendored fonts (local-first: no runtime CDN) ----
+   Lexend: chosen for legibility (no peer-reviewed "ADHD font"
+   exists; Lexend has directional reading-fluency evidence and a
+   big x-height / open spacing / distinct letterforms). OFL.
+   JetBrains Mono: instrument data (counts, gauges, keys). OFL. */
+@font-face{
+  font-family:"Lexend";
+  src:url("/static/fonts/Lexend-var.woff2") format("woff2");
+  font-weight:100 900;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:"JetBrains Mono";
+  src:url("/static/fonts/JetBrainsMono-var.woff2") format("woff2");
+  font-weight:100 800;
+  font-style:normal;
+  font-display:swap;
+}
+
+/* ============ theme blocks (raw palette) ============ */
+:root, :root[data-theme="dark"]{
+  /* night ops — neutral charcoal cockpit, apricot phosphor */
+  --bg:#101216; --panel:#171a21; --panel2:#20242d; --row-hover:#1b1f27;
+  --border:#2a2f3a; --border-strong:#3d4452;
+  --text:#e0e5ec; --muted:#98a2b3; --dim:#636e7e;
+
+  --accent:#f2a97e; --accent-strong:#ffc29d; --accent-ink:#2e1605;
+  --accent-tint:rgba(242,169,126,.11);
+
+  --keep:#7da4f5;   --keep-ink:#0a1a38;   --keep-tint:rgba(125,164,245,.13);
+  --archive:#54c794;--archive-ink:#05281b;--archive-tint:rgba(84,199,148,.13);
+  --done:#ef7568;   --done-ink:#310c07;   --done-tint:rgba(239,117,104,.13);
+
+  --tile-fill:#0c0e12;            /* letterboxed media backdrop */
+  --glowsky:radial-gradient(ellipse 80% 55% at 60% -10%,rgba(242,169,126,.05),transparent);
+  --led-glow:0 0 8px var(--accent);
+
+  --shadow-row:0 1px 0 rgba(0,0,0,.22);
+  --shadow-pop:0 14px 44px rgba(0,0,0,.5);
+}
+:root[data-theme="light"]{
+  /* daylight ops — Flight Deck light, dimmed for the eyes */
+  --bg:#e1e5ea; --panel:#edf0f3; --panel2:#d6dce3; --row-hover:#e5e9ee;
+  --border:#c4cdd6; --border-strong:#a2afbb;
+  --text:#17222d; --muted:#4f616c; --dim:#788794;
+
+  --accent:#a96a05; --accent-strong:#7e4f04; --accent-ink:#fff;
+  --accent-tint:rgba(169,106,5,.10);
+
+  --keep:#1e62c9;   --keep-ink:#fff;   --keep-tint:rgba(30,98,201,.10);
+  --archive:#13845a;--archive-ink:#fff;--archive-tint:rgba(19,132,90,.10);
+  --done:#c8392c;   --done-ink:#fff;   --done-tint:rgba(200,57,44,.10);
+
+  --tile-fill:#c8d0d8;
+  --glowsky:none;
+  --led-glow:none;
+
+  --shadow-row:0 1px 0 rgba(30,40,50,.07);
+  --shadow-pop:0 12px 32px rgba(30,40,50,.25);
+}
+
+/* ============ theme-independent brand ============ */
+:root{
+  /* source identity (softened v3 set; canonical connector hues
+     in design-ref readme — softened per the approved mockup) */
+  --source-reddit:#ff5722;
+  --source-youtube:#ff3b30;
+  --source-hackernews:#ff8a3d;
+  --source-obsidian:#a78bfa;
+  --source-keep:#fbbc04;
+  --source-firefox:#4a9df8;
+}
+
+/* ============ semantic aliases (components consume THESE) ============ */
+:root{
+  --surface-app:var(--bg);
+  --surface-card:var(--panel);
+  --surface-inset:var(--panel2);
+  --surface-hover:var(--row-hover);
+
+  --text-body:var(--text);
+  --text-muted:var(--muted);
+  --text-dim:var(--dim);
+
+  --border-hairline:var(--border);
+  --border-control:var(--border-strong);
+  --focus-ring:var(--accent);
+
+  --status-inbox:var(--accent);
+  --status-keep:var(--keep);
+  --status-archive:var(--archive);
+  --status-done:var(--done);
+}
+
+/* ============ scale tokens ============ */
+:root{
+  /* type — Lexend for humans, JetBrains Mono for instruments */
+  --font-sans:"Lexend",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-disp:var(--font-sans);
+  --font-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+
+  --fs-xs:.73rem; --fs-sm:.85rem; --fs-md:.97rem; --fs-lg:1.18rem; --fs-xl:1.45rem;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+  --lh-tight:1.26; --lh-snug:1.32; --lh-normal:1.55;
+
+  /* spacing rhythm */
+  --sp-1:.25rem; --sp-2:.5rem; --sp-3:.75rem; --sp-4:1rem; --sp-5:1.5rem;
+
+  /* radius — soft (Pebble DNA) */
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+
+  /* motion — one house easing, short and purposeful */
+  --ease:cubic-bezier(.25,.9,.35,1);
+  --dur-fast:120ms; --dur:150ms; --dur-slow:200ms;
+
+  /* interaction */
+  --touch-min:44px;
+}
+
+/* reduced motion is global, not per-component */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}

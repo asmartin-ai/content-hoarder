@@ -15,7 +15,14 @@
   function current() {
     return document.documentElement.getAttribute("data-theme") || "dark";
   }
-  function metaColor(theme) { return theme === "light" ? "#f5f6f8" : "#0f1115"; }
+  function metaColor(theme) {
+    // Read the live --bg token so the browser chrome tracks whichever tokens file
+    // the page loaded (legacy tokens.css or v3 core/tokens.css). data-theme must be
+    // set before reading; apply() does that. Fallbacks match the legacy palette.
+    var bg = "";
+    try { bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); } catch (e) {}
+    return bg || (theme === "light" ? "#f5f6f8" : "#0f1115");
+  }
 
   function syncButtons(theme) {
     var light = theme === "light";
