@@ -144,7 +144,10 @@ def create_app(db_path: str | None = None) -> Flask:
                 exact=parsed.exact,
                 exclude=parsed.exclude,
                 open_in_firefox=a.get("open_in_firefox") in ("1", "true"),
-                fuzzy=a.get("fuzzy") == "1",
+                # Fuzzy by default (Epic 12, user decision): bare terms are typo-tolerant;
+                # "quoted phrases" are always exact (parser routes them to exact=);
+                # ?exact=1 (the repurposed checkbox) forces the exact FTS path.
+                fuzzy=a.get("exact") != "1",
                 sort=a.get("sort", "last_seen_utc"),
                 order=a.get("order", "desc"),
                 limit=limit + 1,
@@ -377,7 +380,10 @@ def create_app(db_path: str | None = None) -> Flask:
                 exact=parsed.exact,
                 exclude=parsed.exclude,
                 include_consolidated=True,
-                fuzzy=a.get("fuzzy") == "1",
+                # Fuzzy by default (Epic 12, user decision): bare terms are typo-tolerant;
+                # "quoted phrases" are always exact (parser routes them to exact=);
+                # ?exact=1 (the repurposed checkbox) forces the exact FTS path.
+                fuzzy=a.get("exact") != "1",
                 # Default to newest-synced-first — the closest proxy to newest-saved-first, since
                 # Reddit exposes no save timestamp (see docs/reddit-management.md).
                 sort=a.get("sort", "first_seen_utc"),
