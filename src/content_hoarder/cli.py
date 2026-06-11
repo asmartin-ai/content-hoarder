@@ -249,21 +249,6 @@ def cmd_promote(args) -> int:
     return 0
 
 
-def cmd_learn_triage(args) -> int:
-    from content_hoarder import triage_score
-    with _connect() as conn:
-        res = triage_score.learn(conn, apply=args.apply,
-                                 min_support=args.min_support, alpha=args.alpha,
-                                 limit=args.limit)
-    print(json.dumps(res, indent=2))
-    if not args.apply:
-        print(f"(dry run — model fitted on {res['trained_on']} rows "
-              f"({res['processed']} human-processed, prior {res['prior']}); "
-              f"{res['scored']} inbox item(s) would get triage_score; re-run with "
-              f"--apply to write. Run against a COPY of the DB first.)", file=sys.stderr)
-    return 0
-
-
 def cmd_delete(args) -> int:
     """PERMANENT delete with the money-action safety shape: dry-run is the default and
     the confirmation surface; --apply alone refuses (exit 3); --apply --yes executes
@@ -520,20 +505,6 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--limit", type=int)
     pp.add_argument("--dry-run", action="store_true")
     pp.set_defaults(func=cmd_promote)
-
-    plt = sub.add_parser(
-        "learn-triage",
-        help="Fit the transparent likely-to-process model from triage history and "
-             "score inbox items (metadata.triage_score + why; smart batches use it).",
-    )
-    plt.add_argument("--min-support", type=int, default=20,
-                     help="Drop features seen fewer times than this (default 20).")
-    plt.add_argument("--alpha", type=float, default=50.0,
-                     help="Smoothing weight toward the global prior (default 50).")
-    plt.add_argument("--limit", type=int, help="Score at most N inbox items (testing).")
-    plt.add_argument("--apply", action="store_true",
-                     help="Write scores + persist the model (default: dry run).")
-    plt.set_defaults(func=cmd_learn_triage)
 
     pdel = sub.add_parser(
         "delete",
