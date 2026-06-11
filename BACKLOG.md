@@ -167,8 +167,9 @@ false positives.*
   `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.
 - [ ] **P3 — 60fps UI.** Audit list/scroll/swipe for jank (avoid layout thrash, prefer transforms /
   `will-change`, throttle handlers); target smooth 60fps on the Pixel-6 target.
-- [ ] **P3 — README mobile quickstart.** Document running the PWA on a phone over Tailscale
-  (`serve --host <tailscale-ip>`, install-to-home-screen, safe-area / edge-gesture notes).
+- [x] ~~**P3 — README mobile quickstart.**~~ Shipped (overnight 2026-06-10): step-by-step
+  Tailscale quickstart in README "Mobile access"; CLI table updated with decay / delete /
+  export / learn-triage.
 
 ## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
@@ -191,10 +192,11 @@ false positives.*
   Reddit view **and** the browse view, plus tag chips rendered on Reddit rows/cards, browse rows, and
   the triage card.
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
-- [ ] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
-  Saved list (to migrate to a separate account). (a) **Export by tag** — dump `nsfw_erotic` items
-  (permalink/url/title → CSV/JSON) so they can be re-saved elsewhere; generalize the existing
-  `/export` + `export` CLI with a `tag=` filter (the `tag=` search filter already exists). (b)
+- [~] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
+  Saved list (to migrate to a separate account). (a) ~~**Export by tag**~~ **done** (overnight
+  2026-06-10): `GET /export` (CSV/JSON, same q/operator filters as `/items` — the old reddit-view
+  export link pointed at a route that never survived the RSM merge; it now carries the view's
+  live filters) + `export --tag X --out file` CLI; permalink-oriented records. (b)
   **Bulk-unsave by tag** — enqueue every `nsfw_erotic` item into the existing `reddit_unsave` queue
   (`db.enqueue_unsave`) and drain it (cookie path) to remove them from Reddit Saved. Reversible until
   drained; surface a count + confirm step before draining. Consider `nsfw_talk` as a separate optional
@@ -234,19 +236,19 @@ false positives.*
 subreddit/channel, kind, age, media type, title keywords). The app should learn from my own history
 and surface what I'm most likely to act on, instead of a flat random batch.*
 
-- [ ] **P2 — Learn a "likely-done" score from triage history.** Train a lightweight, local,
-  explainable model on each item's features (`source`, `metadata.subreddit`/`channel`, `kind`,
-  `media_type`, `category`, age buckets, title tokens) against the outcome (`status`:
-  done/keep/archived vs still inbox). Start with a transparent baseline — per-feature done-rate
-  (naive-Bayes / logistic regression over hashed tokens) computed from existing `items` rows — so it
-  needs **no new data**, just `processed_utc IS NOT NULL` history. Store the score on
-  `metadata.triage_score` (recompute via a `learn-triage` CLI command); fully offline (no API).
-  Surface a "why" (top contributing features) so suggestions stay trustworthy.
-- [ ] **P2 — "Smart triage" mode that mixes recency + likely-done.** A new triage batch mode that
-  interleaves **recent** items (newest `created_utc`/`first_seen_utc`) with **high likely-done-score**
-  items, instead of pure `ORDER BY RANDOM()`. Expose as `/random?mode=smart` (+ a toggle on the triage
-  card menu); e.g. take top-K by score, top-K by recency, shuffle the union, with a configurable mix
-  ratio. Reuses `db.get_random_batch` (extend with a `mode=` param).
+- [x] ~~**P2 — Learn a "likely-done" score from triage history.**~~ Shipped (overnight
+  2026-06-10): `triage_score.py` — transparent per-feature processed-rate model (composite
+  source/kind, subreddit, channel, media type, category, age buckets; Laplace-smoothed,
+  min-support 20; **decay-stamped rows excluded from training** so bulk sweeps can't poison
+  the signal; title tokens deferred). `learn-triage` CLI (dry-run default) writes
+  `metadata.triage_score` + top-3 `triage_why`, persists the model to settings. Rehearsed on
+  the live-corpus copy: 82k scored in 23s; the first rehearsal caught source/kind
+  double-counting (HN inflated to 0.96) — fixed via the composite `sk:` feature. Honest
+  caveats documented: PU-learning bias + age/time-to-process confound.
+- [x] ~~**P2 — "Smart triage" mode that mixes recency + likely-done.**~~ Backend shipped
+  (overnight 2026-06-10): `get_random_batch(mode="smart")` pool-samples top-score + newest
+  (5x oversample for variety, random top-up, falls back to random without scores) +
+  `/random?mode=smart`. **The triage-card UI toggle is an Epic 20 Stage-C item.**
 - [ ] **P3 — Feedback loop.** Re-fit the score periodically (or after every N triage actions) so it
   tracks drift in what I care about; optionally fold in the local-LLM keep/skip suggestion
   (`assist/llm.py`) and the heuristic category (`categorize.py`) as additional features.
@@ -312,12 +314,13 @@ need separate filter controls.*
   doesn't work — an item has one source, and bare `AND` is treated as free text. Decide the model:
   multi-value `source:a,b` (OR) vs. a real boolean grammar (AND/OR/grouping). **User to research how
   Gmail / Discord / GitHub-search handle multi-value + boolean before designing.**
-- [ ] **P2 — `has:` media-type operator.** `has:video` / `has:image` / `has:gallery` filtering on
-  `media_type`. Pairs with the media-handling pass (Epic 13).
-- [ ] **P2 — Fuzzy-by-default; `"quotes"` for exact.** *(User-requested — prioritize.)* Flip the default
-  so bare free-text is **fuzzy** without the `#fuzzy` checkbox, and a `"quoted phrase"` opts out →
-  **exact**. Wire into `search_items` (default `fuzzy=True` for bare terms; quoted spans = exact); drop or
-  repurpose `#fuzzy` as an "exact" override. Mind the FTS-vs-fuzzy path when both appear in one query.
+- [x] ~~**P2 — `has:` media-type operator.**~~ Shipped (overnight 2026-06-10): `has:video`
+  (= `reddit_video`) / `has:image` / `has:gallery` on browse + `/reddit`; unknown values
+  degrade to free text.
+- [x] ~~**P2 — Fuzzy-by-default; `"quotes"` for exact.**~~ Shipped (overnight 2026-06-10,
+  user-approved): bare terms fuzzy (trgm), quoted phrases exact (FTS), checkbox repurposed
+  to **Exact** (`?exact=1`) on both views; sw.js shell cache v13. Caveat kept: a query
+  mixing bare + quoted terms takes the exact path entirely (documented degrade).
 
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
@@ -533,7 +536,9 @@ Stage C design gate:*
   curious question, never a count badge or red dot (recognition beats recall for ADHD). v1
   candidates need no LLM: cluster = curated knowledge tag (`tips`/`coding`/`science`) × old
   saves; never `memes`/`vtubers` (identity content isn't a task). Dismiss = silent decay + a
-  no-renag window. Design one-pager before build.
+  no-renag window. Design one-pager before build. **One-pager drafted (overnight
+  2026-06-10): [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md) —
+  4 open questions for Kenja inside, incl. the japan resurface-vs-decay conflict.**
 - [ ] **P2 — "Surprise me" card.** One bounded random old save on demand — converts the
   rediscovery-joy that sustains the save habit into a deliberate retention loop. Rides
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
@@ -589,11 +594,13 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   `vtubers` (2.8k), `minecraft` (2.2k), `defense` (5.8k — includes aviation + Ukraine-war
   subs; review before sweeping), `japan` stay tagged in the inbox. Each is one command when
   ready: `decay --tag <bucket> --before <date> --label swept [--apply]`.
-- [ ] **P3 — Hard-delete pathway for triaged ephemeral items.** *(User intent 2026-06-10:
-  pull `is:swept tag:ephemeral`, triage, "move them to delete as I see fit".)* No delete
-  exists today (statuses only). Needs a deliberate destructive op: bulk-delete a selection
-  (or the ephemeral set) with a dry-run + backup convention like the other destructive ops;
-  decide whether deletion also unsaves on Reddit (`reddit_unsave` queue) or is local-only.
+- [x] ~~**P3 — Hard-delete pathway for triaged ephemeral items.**~~ Shipped (overnight
+  2026-06-10, user-approved with unsave coupling): `delete` CLI — dry-run is the
+  confirmation surface; execution needs BOTH `--apply` and `--yes`; automatic timestamped
+  pre-delete backup + `data/delete-audit.jsonl`; `--max` blast-radius cap (default 5000);
+  `--also-unsave` enqueues into the unsave queue BEFORE rows vanish, and without it stale
+  pending queue rows are purged so a later drain can't unsave a local-only delete. Deletes
+  the `reddit_threads` cache rows too. 8 tests.
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.
 - [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
