@@ -55,7 +55,6 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | `decay --tag T... [--subreddit S...] [--before DATE] [--label swept] [--apply] [--undo]` | Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped per wave + reversible (`--undo` selects a wave by `--decayed-after/--decayed-before`). Pull decayed items with the `is:decayed` / `is:swept` search operators. |
 | `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
 | `export --out FILE [--format csv\|json] [--tag T...] [--status S]` | Dump matching items to CSV/JSON (permalink-oriented, for re-saving elsewhere). Same filters live at `GET /export`. |
-| `learn-triage [--apply]` | Fit the transparent likely-to-process model from your own triage history and score inbox items (`metadata.triage_score` + a why breakdown); smart triage batches (`/random?mode=smart`) draw on it. |
 | `promote [--status keep] [--dry-run]` | (Opt-in) push items you've marked **keep** to a stock Karakeep instance via its API. |
 
 ## Mobile access

@@ -236,19 +236,21 @@ false positives.*
 subreddit/channel, kind, age, media type, title keywords). The app should learn from my own history
 and surface what I'm most likely to act on, instead of a flat random batch.*
 
-- [x] ~~**P2 — Learn a "likely-done" score from triage history.**~~ Shipped (overnight
-  2026-06-10): `triage_score.py` — transparent per-feature processed-rate model (composite
+- [~] **P2 — Learn a "likely-done" score from triage history — BUILT, parked on
+  `feat/triage-score` (user decision 2026-06-11: integrate + test after the Epic 20 UI
+  work).** `triage_score.py` — transparent per-feature processed-rate model (composite
   source/kind, subreddit, channel, media type, category, age buckets; Laplace-smoothed,
-  min-support 20; **decay-stamped rows excluded from training** so bulk sweeps can't poison
-  the signal; title tokens deferred). `learn-triage` CLI (dry-run default) writes
-  `metadata.triage_score` + top-3 `triage_why`, persists the model to settings. Rehearsed on
-  the live-corpus copy: 82k scored in 23s; the first rehearsal caught source/kind
-  double-counting (HN inflated to 0.96) — fixed via the composite `sk:` feature. Honest
-  caveats documented: PU-learning bias + age/time-to-process confound.
-- [x] ~~**P2 — "Smart triage" mode that mixes recency + likely-done.**~~ Backend shipped
-  (overnight 2026-06-10): `get_random_batch(mode="smart")` pool-samples top-score + newest
-  (5x oversample for variety, random top-up, falls back to random without scores) +
-  `/random?mode=smart`. **The triage-card UI toggle is an Epic 20 Stage-C item.**
+  min-support 20; **decay-stamped rows excluded from training**; title tokens deferred).
+  `learn-triage` CLI (dry-run default) writes `metadata.triage_score` + top-3 `triage_why`.
+  Rehearsed on the live-corpus copy (82k scored in 23s; model card at
+  `data\rehearsal-decay\TRIAGE-SCORE-REPORT.md`); the first rehearsal caught source/kind
+  double-counting — fixed via the composite `sk:` feature. The work was reverted off
+  `feat/inbox-decay` (revert `9e2604f`) so this branch merges without it; **to integrate
+  later: revert the revert on a fresh branch off main** (or merge `feat/triage-score`,
+  which snapshots the pre-revert state).
+- [~] **P2 — "Smart triage" mode (recency + likely-done interleave)** — same status:
+  built (`get_random_batch(mode="smart")` + `/random?mode=smart`), parked on
+  `feat/triage-score`. The triage-card UI toggle is an Epic 20 Stage-C item.
 - [ ] **P3 — Feedback loop.** Re-fit the score periodically (or after every N triage actions) so it
   tracks drift in what I care about; optionally fold in the local-LLM keep/skip suggestion
   (`assist/llm.py`) and the heuristic category (`categorize.py`) as additional features.
@@ -592,8 +594,10 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   = `created_utc` (content age) — Reddit exposes no save timestamps.
 - [ ] **P2 — Future decay waves for the remaining entertainment buckets.** `anime` (5.9k),
   `vtubers` (2.8k), `minecraft` (2.2k), `defense` (5.8k — includes aviation + Ukraine-war
-  subs; review before sweeping), `japan` stay tagged in the inbox. Each is one command when
-  ready: `decay --tag <bucket> --before <date> --label swept [--apply]`.
+  subs; review before sweeping) stay tagged in the inbox. Each is one command when ready:
+  `decay --tag <bucket> --before <date> --label swept [--apply]`. **`japan` is excluded** —
+  user decision 2026-06-11: it's a resurfacing cluster (see
+  [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md)), not decay material.
 - [x] ~~**P3 — Hard-delete pathway for triaged ephemeral items.**~~ Shipped (overnight
   2026-06-10, user-approved with unsave coupling): `delete` CLI — dry-run is the
   confirmation surface; execution needs BOTH `--apply` and `--yes`; automatic timestamped

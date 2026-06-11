@@ -1,7 +1,8 @@
 # Resurfacing card — design one-pager ("Still interested in X?")
 
-*Epic 20 Stage-C design input (PKMS research adoption, 2026-06-10). Status: DRAFT for
-Kenja's review — nothing here is built. Research constraints baked in from
+*Epic 20 Stage-C design input (PKMS research adoption, 2026-06-10). Status: **DESIGN
+LOCKED 2026-06-11** (all four open questions decided by Kenja — see Decisions at the
+bottom); build waits for the Stage-C shell. Research constraints baked in from
 `K:\Projects\PKMS\vault\resources\research\32-theme-retrieval.md`.*
 
 ## What it is
@@ -59,13 +60,17 @@ When no cluster qualifies, the slot MAY show one bounded random old save
 ("From your 2021 saves:") — converts the rediscovery-joy that sustains the save habit
 into a deliberate loop. Never both cards at once.
 
-## Open questions for Kenja
+## Decisions (Kenja, 2026-06-11)
 
-1. Knowledge-subreddit list: seed with `adhd`, `adhdwomen`, `askhistorians`,
-   `personalfinance`, `philosophy`, `history`? (All currently untagged on purpose.)
-2. Is `japan` a knowledge cluster (resurface) — it's also in the decay set; pick one.
-3. no_renag window: 30 days right? ("Let it go" should probably renag never.)
-4. Does "Let it go" need its own confirmation, or is the undo toast enough?
+1. **Knowledge-subreddit seed approved:** `adhd`, `adhdwomen`, `askhistorians`,
+   `personalfinance`, `philosophy`, `history` (all deliberately untagged — cluster by
+   subreddit, not tag).
+2. **`japan` is a resurface cluster, NOT a decay bucket.** It already sat outside the
+   swept waves; it is now also removed from the future-waves list in BACKLOG Epic 21 —
+   a cluster can't be both "ask me about it later" and "let it go silently."
+3. **No-renag window: 30 days** for "Not now"; "Let it go" never re-asks.
+4. **"Let it go" needs no extra confirmation** — the standard undo toast suffices
+   (it's a reversible decay; extra confirms are exactly the friction to avoid).
 
 ## Build sketch (after design sign-off; ~0.5–1d)
 
