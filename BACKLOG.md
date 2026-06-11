@@ -557,6 +557,12 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   `metadata.decayed_at` (one stamp per call = one reversible wave); direct UPDATE like
   bankruptcy — never `bulk_set_status`, so a mass decay can never enqueue live Reddit
   unsaves (pinned by test). 14 new tests incl. merge_upsert stamp survival.
+  **Round 2 (user review):** `--label swept` writes `metadata.decay_label` so the initial
+  pass stays distinguishable from deliberate archives AND future rolling decay; new search
+  operators `is:decayed` (any wave) + `is:swept` (the labeled pass) on browse + `/reddit`;
+  any manual status transition (per-item ↩, set_status, bulk) strips the decay marks, so a
+  rescued item never reappears in `is:swept`. A label is a metadata key, NOT a tag —
+  tags get wholesale-replaced by categorize retags.
 - [x] ~~**P1 — Gaming buckets in `categorize.py`, subdivided.**~~ Shipped (2026-06-10):
   `esports` (LoL/OW/CS/R6/Valorant subs, 2,116 items on the live corpus) + casual `gaming`
   (2,239) + modded-MC subs joined `minecraft` per user decision; `gamedev` → `coding`.
@@ -569,17 +575,25 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   wave touches them) + conservative title keywords (`giveaway` with a dead-giveaway idiom
   guard, `N% off`, `humble bundle`, …; never bare `free`/`sale`/`event`). 203 items on the
   live corpus (197 subreddit-path, 6 keyword-path); precision samples in the rehearsal report.
-- [ ] **P1 — One-shot supervised entertainment backfill — REHEARSED, awaiting sign-off.**
-  Full dress rehearsal passed on a live-DB copy (2026-06-10, `scripts/rehearse_decay.py`):
-  **29,740 items would decay (45.9% of reddit inbox)** — wave 1 entertainment 29,539 +
-  wave 2 ephemeral 201 (age-gated 60d); NSFW counts preserved exactly through the retag;
-  apply==dry; full undecay round-trip clean; whole run ~30s. ⏱ ~15 min supervised. ▶ read
-  `data\rehearsal-decay\DECAY-REHEARSAL-REPORT.md` (per-bucket/per-sub/age-band tables,
-  ephemeral precision samples, the exact live command block incl. `--backup-live`). ✓ live
-  block executed; 10 decayed items spot-checked in the Archived view; the freebies round-trip
-  recipe is clean. Note: "age" = `created_utc` (content age) — Reddit exposes no save
-  timestamps. Judgment calls to review in the report: `tinder`/`comics` → memes; `defense`
-  includes `aviation` + Ukraine-war subs (visible in the per-sub table).
+- [ ] **P1 — One-shot supervised "swept" backfill — REHEARSED (round 2), awaiting sign-off.**
+  Policy per user review 2026-06-10: wave 1 = `memes/gaming/esports` older than ~90 days;
+  wave 2 = `ephemeral` older than ~60 days; both labeled `swept`. Rehearsal passed on a
+  live-DB copy: **21,615 items would decay (33.3% of reddit inbox)** — wave 1 21,414 +
+  wave 2 201; every item carries `decay_label='swept'`; NSFW preserved; apply==dry; full
+  undecay round trip clean. `tinder`/`comics` removed from memes per user decision.
+  ⏱ ~15 min supervised. ▶ read `data\rehearsal-decay\DECAY-REHEARSAL-REPORT.md` (tables,
+  ephemeral precision samples, exact live command block incl. `--backup-live`). ✓ live block
+  executed; `is:swept` pulls the pass; the freebies round-trip recipe is clean. Note: "age"
+  = `created_utc` (content age) — Reddit exposes no save timestamps.
+- [ ] **P2 — Future decay waves for the remaining entertainment buckets.** `anime` (5.9k),
+  `vtubers` (2.8k), `minecraft` (2.2k), `defense` (5.8k — includes aviation + Ukraine-war
+  subs; review before sweeping), `japan` stay tagged in the inbox. Each is one command when
+  ready: `decay --tag <bucket> --before <date> --label swept [--apply]`.
+- [ ] **P3 — Hard-delete pathway for triaged ephemeral items.** *(User intent 2026-06-10:
+  pull `is:swept tag:ephemeral`, triage, "move them to delete as I see fit".)* No delete
+  exists today (statuses only). Needs a deliberate destructive op: bulk-delete a selection
+  (or the ephemeral set) with a dry-run + backup convention like the other destructive ops;
+  decide whether deletion also unsaves on Reddit (`reddit_unsave` queue) or is local-only.
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.
 - [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
