@@ -270,3 +270,18 @@ def test_merge_upsert_tags_semantics(conn):
                            "metadata": {"tags": ["kw1"], "category": "listenable"}})
     md = json.loads(db.get_item(conn, "youtube:v_t2")["metadata"])
     assert {"memes", "kw1", "listenable"} <= set(md["tags"])  # union + category mirror
+
+
+def test_search_items_has_media_facet(conn):
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_v", title="v",
+                    metadata={"media_type": "reddit_video"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_i", title="i",
+                    metadata={"media_type": "image"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_g", title="g",
+                    metadata={"media_type": "gallery"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_l", title="l",
+                    metadata={"media_type": "link"}))
+    # has:video means reddit-hosted video (media_type='reddit_video')
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="video")] == ["t3_v"]
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="image")] == ["t3_i"]
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="gallery")] == ["t3_g"]

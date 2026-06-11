@@ -37,6 +37,7 @@ class ParsedQuery:
     nsfw: bool = False
     decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
     swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
+    has: str | None = None  # has:video|image|gallery — metadata.media_type facet
 
     before: int | None = None  # unix seconds (UTC)
     after: int | None = None
@@ -148,6 +149,7 @@ def parse(q: str) -> ParsedQuery:
     is_saved: int | None = None
     nsfw = False
     decayed = swept = False
+    has: str | None = None
     before = after = None
     score_min = score_max = None
 
@@ -224,6 +226,16 @@ def parse(q: str) -> ParsedQuery:
             text_terms.append(t)
             continue
 
+        if key == "has":
+            # Media facet over metadata.media_type (populated by the reddit connector +
+            # archive refinement). Unknown values degrade to free text like any operator.
+            v = val.lower()
+            if v in {"video", "image", "gallery"}:
+                has = v
+                continue
+            text_terms.append(t)
+            continue
+
         if key in {"before", "after"}:
             ts = _parse_yyyymmdd(val)
             if ts is None:
@@ -277,6 +289,7 @@ def parse(q: str) -> ParsedQuery:
         nsfw=nsfw,
         decayed=decayed,
         swept=swept,
+        has=has,
         before=before,
         after=after,
         score_min=score_min,
