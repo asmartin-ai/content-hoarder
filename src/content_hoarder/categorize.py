@@ -100,6 +100,16 @@ REDDIT_TAGS = (
 # instead of the tens of thousands of raw keywords. db.tag_counts restricts to this set.
 FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 
+# Resurfacing-card clusters (Epic 20; docs/resurfacing-card-design.md — DESIGN LOCKED
+# 2026-06-11). Knowledge buckets only: identity/meme content never resurfaces (CH3).
+# The subreddit clusters are deliberately untagged communities — they cluster by
+# subreddit, not tag. `japan` is a resurface cluster and NOT a decay bucket (user
+# decision: a cluster can't be both "ask me later" and "let it go silently").
+RESURFACE_TAGS = ("tips", "coding", "science", "japan")
+RESURFACE_SUBREDDITS = (
+    "adhd", "adhdwomen", "askhistorians", "personalfinance", "philosophy", "history",
+)
+
 # subreddit (lowercased) -> tags. Seeded from the corpus's top subreddits + well-known
 # communities; the long tail is caught by the keyword rules below. Multi-label by design
 # (e.g. feedthememes = minecraft + memes; programmerhumor = coding + memes).
