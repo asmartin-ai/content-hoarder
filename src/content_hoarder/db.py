@@ -1209,6 +1209,32 @@ def reddit_subreddit_counts(conn: sqlite3.Connection, status: str | None = None)
     return [{"subreddit": r["subreddit"], "count": r["c"]} for r in rows]
 
 
+def pulse(conn: sqlite3.Connection, *, now: int | None = None) -> dict:
+    """Tiny ambient counts for the v3 console (Epic 20: win pebbles, the "· N new"
+    tab slice, the quiet decay line). Deliberately guilt-free: arrivals and clears
+    today, never backlog totals. ``cleared_today`` counts manual triage only —
+    decay-stamped rows are excluded so a bulk decay can never masquerade as a
+    day's worth of cleared items."""
+    now = int(now or time.time())
+    lt = time.localtime(now)
+    midnight = int(time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0,
+                                lt.tm_wday, lt.tm_yday, -1)))
+    new_today = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE first_seen_utc >= ?", (midnight,)
+    ).fetchone()[0]
+    cleared_today = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE processed_utc >= ? AND status != 'inbox' "
+        "AND json_extract(metadata, '$.decayed_at') IS NULL",
+        (midnight,),
+    ).fetchone()[0]
+    swept_recent = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE json_extract(metadata, '$.decayed_at') >= ?",
+        (now - 30 * 86400,),
+    ).fetchone()[0]
+    return {"new_today": new_today, "cleared_today": cleared_today,
+            "swept_recent": swept_recent}
+
+
 def tag_counts(
     conn: sqlite3.Connection,
     *,

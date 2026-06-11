@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from content_hoarder import config, connectors, db, pipeline, search_query
+from content_hoarder import config, connectors, db, pipeline, resurface, search_query
 
 
 def _int(value, default: int = 0) -> int:
@@ -580,6 +580,56 @@ def create_app(db_path: str | None = None) -> Flask:
         light = request.args.get("light") == "1"
         with conn() as c:
             return jsonify(db.get_counts(c, source=source, status=status, light=light))
+
+    @app.get("/pulse")
+    def pulse():
+        # Ambient console counts (win pebbles / "· N new" / decay line). Guilt-free by
+        # contract: arrivals + manual clears today and the recent swept count — never a
+        # backlog total (Epic 20 research mandate).
+        with conn() as c:
+            return jsonify(db.pulse(c))
+
+    @app.get("/resurface")
+    def resurface_card():
+        # The ONE ambient slot: today's resurfacing question, or 204 when no cluster
+        # qualifies (rationed to one card per day inside resurface.candidate).
+        with conn() as c:
+            card = resurface.candidate(c)
+        return (jsonify(card), 200) if card else ("", 204)
+
+    @app.post("/resurface/dismiss")
+    def resurface_dismiss():
+        # "Not now" — silent 30-day no-renag. Empty 204 by design: never mentioned again.
+        cluster = (request.get_json(silent=True) or {}).get("cluster") or ""
+        try:
+            with conn() as c:
+                resurface.dismiss(c, cluster)
+        except ValueError:
+            return jsonify({"error": "unknown cluster"}), 400
+        return ("", 204)
+
+    @app.post("/resurface/letgo")
+    def resurface_letgo():
+        # One-tap reversible cluster decay; the undo toast calls /resurface/letgo/undo.
+        cluster = (request.get_json(silent=True) or {}).get("cluster") or ""
+        try:
+            with conn() as c:
+                return jsonify(resurface.letgo(c, cluster))
+        except ValueError:
+            return jsonify({"error": "unknown cluster"}), 400
+
+    @app.post("/resurface/letgo/undo")
+    def resurface_letgo_undo():
+        body = request.get_json(silent=True) or {}
+        cluster = body.get("cluster") or ""
+        decayed_at = body.get("decayed_at")
+        if not isinstance(decayed_at, int):
+            return jsonify({"error": "decayed_at required"}), 400
+        try:
+            with conn() as c:
+                return jsonify(resurface.undo_letgo(c, cluster, decayed_at))
+        except ValueError:
+            return jsonify({"error": "unknown cluster"}), 400
 
     @app.post("/import")
     def do_import():
