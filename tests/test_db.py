@@ -102,6 +102,32 @@ def test_fuzzy_rescue_ranks_best_overlap_first(conn):
     assert r and r[0]["source_id"] == "1"
 
 
+def test_fuzzy_rescue_never_fires_past_page_one(conn):
+    # Code-review finding: with tight matches exhausted, a deeper page used to fall
+    # into the rescue pass and append one-gram noise after the genuine results.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="a big surprise for trainer"))
+    assert [x["source_id"] for x in db.search_items(conn, "minecraft", fuzzy=True)] == ["1"]
+    # page two of a one-row tight result is the END of the list, not junk
+    assert db.search_items(conn, "minecraft", fuzzy=True, offset=1) == []
+
+
+def test_malformed_metadata_cannot_enter_the_db(conn):
+    # Code-review follow-up: json_remove (now in every status writer) raises
+    # OperationalError on malformed JSON — but the functional index on
+    # json_extract(metadata,'$.duration') makes SQLite validate metadata on EVERY
+    # write, so a malformed row is structurally impossible. Pin that invariant:
+    # if this test ever fails (index dropped/renamed), the status writers need a
+    # json_valid guard.
+    import sqlite3
+
+    import pytest
+
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
+    with pytest.raises(sqlite3.OperationalError):
+        conn.execute("UPDATE items SET metadata='{broken' WHERE fullname='r:1'")
+
+
 def test_status_and_undo(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     db.set_status(conn, "r:1", "keep")

@@ -165,12 +165,9 @@ def cmd_sources(args) -> int:
 
 def cmd_bankruptcy(args) -> int:
     from content_hoarder import db
-    try:
-        dt = datetime.datetime.fromisoformat(args.before)
-    except ValueError:
-        print(f"error: --before must be YYYY-MM-DD (got {args.before!r})", file=sys.stderr)
-        return 2
-    before_utc = int(dt.timestamp())
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
     with _connect() as conn:
         n = db.bankruptcy(conn, before_utc, source=args.source, dry_run=args.dry_run)
     verb = "would archive" if args.dry_run else "archived"
