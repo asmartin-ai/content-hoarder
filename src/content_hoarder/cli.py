@@ -1,4 +1,4 @@
-"""Command-line interface: init-db, import, enrich, serve, stats, sources, bankruptcy, promote."""
+"""Command-line interface: init-db, import, enrich, serve, stats, sources, bankruptcy, decay, promote."""
 
 from __future__ import annotations
 
@@ -165,16 +165,70 @@ def cmd_sources(args) -> int:
 
 def cmd_bankruptcy(args) -> int:
     from content_hoarder import db
-    try:
-        dt = datetime.datetime.fromisoformat(args.before)
-    except ValueError:
-        print(f"error: --before must be YYYY-MM-DD (got {args.before!r})", file=sys.stderr)
-        return 2
-    before_utc = int(dt.timestamp())
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
     with _connect() as conn:
         n = db.bankruptcy(conn, before_utc, source=args.source, dry_run=args.dry_run)
     verb = "would archive" if args.dry_run else "archived"
     print(f"{verb} {n} inbox item(s) older than {args.before}")
+    return 0
+
+
+def _parse_date(value: str | None, flag: str) -> tuple[int | None, int]:
+    """YYYY-MM-DD (or full ISO) -> epoch seconds; (None, 0) when the flag is unset.
+    Returns (value, exit_code) — exit_code 2 means the caller should bail."""
+    if value is None:
+        return None, 0
+    try:
+        return int(datetime.datetime.fromisoformat(value).timestamp()), 0
+    except ValueError:
+        print(f"error: {flag} must be YYYY-MM-DD (got {value!r})", file=sys.stderr)
+        return None, 2
+
+
+def cmd_decay(args) -> int:
+    from content_hoarder import db
+    if args.undo:
+        if args.tag or args.subreddit or args.before:
+            print("error: --tag/--subreddit/--before don't apply to --undo; "
+                  "select a wave with --decayed-after/--decayed-before", file=sys.stderr)
+            return 2
+        after_utc, rc = _parse_date(args.decayed_after, "--decayed-after")
+        if rc:
+            return rc
+        before_utc, rc = _parse_date(args.decayed_before, "--decayed-before")
+        if rc:
+            return rc
+        with _connect() as conn:
+            res = db.undecay(conn, decayed_after=after_utc, decayed_before=before_utc,
+                             apply=args.apply)
+        print(json.dumps(res, indent=2))
+        if not args.apply:
+            print(f"(dry run — {res['total']} decayed item(s) would return to inbox; "
+                  f"re-run with --apply to commit.)", file=sys.stderr)
+        return 0
+
+    if not (args.tag or args.subreddit or args.before):
+        print("error: decay needs at least one selector: --tag, --subreddit, or --before",
+              file=sys.stderr)
+        return 2
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
+    from content_hoarder.categorize import FILTER_TAGS
+    unknown = [t for t in (args.tag or []) if t not in FILTER_TAGS]
+    if unknown:
+        print(f"warning: tag(s) not in the curated vocabulary (typo?): {', '.join(unknown)}",
+              file=sys.stderr)
+    with _connect() as conn:
+        res = db.decay(conn, tags=args.tag, subreddits=args.subreddit,
+                       before_utc=before_utc, source=args.source, label=args.label,
+                       apply=args.apply)
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(f"(dry run — {res['total']} inbox item(s) would decay to archived; re-run with "
+              f"--apply to commit. Run against a COPY of the DB first.)", file=sys.stderr)
     return 0
 
 
@@ -189,6 +243,79 @@ def cmd_promote(args) -> int:
               f"{res['candidates']} item(s) with status={args.status} are ready to push.")
         return 0
     print(json.dumps(res, indent=2))
+    return 0
+
+
+def cmd_delete(args) -> int:
+    """PERMANENT delete with the money-action safety shape: dry-run is the default and
+    the confirmation surface; --apply alone refuses (exit 3); --apply --yes executes
+    after an automatic timestamped backup, then appends to the audit log."""
+    import datetime as _dt
+    import sqlite3 as _sqlite3
+    import time as _time
+    from pathlib import Path
+
+    from content_hoarder import config, db
+    if not (args.tag or args.subreddit or args.before or args.fullname
+            or args.swept or args.status):
+        print("error: delete needs at least one selector "
+              "(--tag/--subreddit/--before/--fullname/--swept/--status)", file=sys.stderr)
+        return 2
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
+
+    selectors = dict(tags=args.tag, subreddits=args.subreddit, before_utc=before_utc,
+                     source=args.source, status=args.status, swept=args.swept,
+                     fullnames=args.fullname, also_unsave=args.also_unsave)
+    with _connect() as conn:
+        plan = db.delete_items(conn, **selectors, apply=False)
+        if not args.apply:
+            print(json.dumps(plan, indent=2))
+            print(f"(dry run — {plan['total']} item(s) would be PERMANENTLY deleted; "
+                  f"re-run with --apply --yes to commit. Irreversible except via the "
+                  f"automatic backup.)", file=sys.stderr)
+            return 0
+        if not args.yes:
+            print(json.dumps(plan, indent=2))
+            print("refusing: a hard delete needs BOTH --apply and --yes.", file=sys.stderr)
+            return 3
+
+        stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        bak = Path(config.db_path()).with_name(f"app.backup-pre-delete-{stamp}.db")
+        dst = _sqlite3.connect(str(bak))
+        with dst:
+            conn.backup(dst)
+        dst.close()
+
+        res = db.delete_items(conn, **selectors, apply=True, max_rows=args.max)
+        res["backup"] = str(bak)
+
+        audit_path = Path(config.db_path()).with_name("delete-audit.jsonl")
+        audit = {"ts": int(_time.time()), "selectors": {k: v for k, v in selectors.items()
+                                                        if v not in (None, False)},
+                 "total": res["total"], "threads_deleted": res["threads_deleted"],
+                 "unsave_enqueued": res["unsave_enqueued"], "backup": str(bak),
+                 "sample": res["sample"]}
+        with audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+    print(json.dumps(res, indent=2))
+    return 0
+
+
+def cmd_export(args) -> int:
+    from pathlib import Path
+
+    from content_hoarder import db, export
+    with _connect() as conn:
+        rows = db.search_items(conn, "", source=args.source, status=args.status,
+                               tags=args.tag or None, subreddit=args.subreddit,
+                               limit=1_000_000)
+    recs = export.export_records(rows)
+    text = (json.dumps(recs, ensure_ascii=False, indent=2)
+            if args.format == "json" else export.to_csv(recs))
+    Path(args.out).write_text(text, encoding="utf-8")
+    print(f"exported {len(recs)} item(s) -> {args.out}")
     return 0
 
 
@@ -346,11 +473,74 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--dry-run", action="store_true")
     pb.set_defaults(func=cmd_bankruptcy)
 
+    pdc = sub.add_parser(
+        "decay",
+        help="Guilt-free bulk decay: archive inbox items by tag/subreddit/age "
+             "(stamped per wave + reversible via --undo).",
+    )
+    pdc.add_argument("--tag", action="append",
+                     help="Decay items carrying this metadata tag (repeatable; union with --subreddit).")
+    pdc.add_argument("--subreddit", action="append",
+                     help="Decay items from this subreddit (repeatable; case-insensitive).")
+    pdc.add_argument("--before", help="Only items older than YYYY-MM-DD (content age).")
+    pdc.add_argument("--source", default="reddit", help="Source to decay (default: reddit).")
+    pdc.add_argument("--label",
+                     help="Mark the wave with metadata.decay_label (e.g. swept for the "
+                          "supervised initial backfill; pull via the is:swept search operator).")
+    pdc.add_argument("--apply", action="store_true",
+                     help="Commit changes (default: dry run). Run against a DB copy first.")
+    pdc.add_argument("--undo", action="store_true",
+                     help="Restore decayed items to inbox (select a wave with "
+                          "--decayed-after/--decayed-before).")
+    pdc.add_argument("--decayed-after", help="--undo: only waves stamped on/after this YYYY-MM-DD "
+                                             "(full ISO datetime also accepted).")
+    pdc.add_argument("--decayed-before", help="--undo: only waves stamped before this YYYY-MM-DD.")
+    pdc.set_defaults(func=cmd_decay)
+
     pp = sub.add_parser("promote", help="Push 'keep' items to a stock Karakeep (opt-in).")
     pp.add_argument("--status", default="keep")
     pp.add_argument("--limit", type=int)
     pp.add_argument("--dry-run", action="store_true")
     pp.set_defaults(func=cmd_promote)
+
+    pdel = sub.add_parser(
+        "delete",
+        help="PERMANENTLY delete matching items (dry-run default; execution needs "
+             "--apply AND --yes; automatic pre-delete backup + audit log).",
+    )
+    pdel.add_argument("--tag", action="append",
+                      help="Items carrying this tag (repeatable; union with --subreddit).")
+    pdel.add_argument("--subreddit", action="append",
+                      help="Items from this subreddit (repeatable; case-insensitive).")
+    pdel.add_argument("--before", help="Only items older than YYYY-MM-DD (content age).")
+    pdel.add_argument("--fullname", action="append", help="Exact item(s) by fullname.")
+    pdel.add_argument("--status", help="Only items in this status.")
+    pdel.add_argument("--swept", action="store_true",
+                      help="Only items from the labeled initial decay pass (is:swept).")
+    pdel.add_argument("--source", default="reddit", help="Source (default: reddit).")
+    pdel.add_argument("--also-unsave", action="store_true", dest="also_unsave",
+                      help="Also enqueue deleted reddit items into the unsave queue "
+                           "(drained later via the cookie path).")
+    pdel.add_argument("--max", type=int, default=5000,
+                      help="Refuse to delete more rows than this (blast-radius cap).")
+    pdel.add_argument("--apply", action="store_true",
+                      help="Execute (with --yes). Default: dry run.")
+    pdel.add_argument("--yes", action="store_true",
+                      help="Second confirmation; --apply alone shows the plan and refuses.")
+    pdel.set_defaults(func=cmd_delete)
+
+    pex = sub.add_parser(
+        "export",
+        help="Dump matching items to CSV/JSON (re-save-elsewhere oriented; "
+             "e.g. --tag nsfw_erotic --out erotic.csv).",
+    )
+    pex.add_argument("--out", required=True, help="Output file path.")
+    pex.add_argument("--format", choices=("csv", "json"), default="csv")
+    pex.add_argument("--tag", action="append", help="Filter by tag (repeatable = OR).")
+    pex.add_argument("--status", help="Filter by status.")
+    pex.add_argument("--source", help="Filter by source.")
+    pex.add_argument("--subreddit", help="Filter by subreddit.")
+    pex.set_defaults(func=cmd_export)
 
     px = sub.add_parser("export-obsidian", help="Write items to an Obsidian vault as Markdown.")
     px.add_argument("--vault", required=True)

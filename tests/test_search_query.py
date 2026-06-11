@@ -63,6 +63,23 @@ def test_parse_is_saved_and_nsfw():
     assert p.nsfw is True
 
 
+def test_parse_is_decayed_and_swept():
+    p = search_query.parse("is:decayed tag:ephemeral")
+    assert p.decayed is True and p.swept is False and p.tags == ["ephemeral"]
+    p = search_query.parse("is:swept status:archived")
+    assert p.swept is True and p.decayed is False and p.status == "archived"
+    # unknown is:-value still degrades to free text
+    assert search_query.parse("is:sweeped").text == "is:sweeped"
+
+
+def test_parse_has_media():
+    p = search_query.parse("has:video cats")
+    assert p.has == "video" and p.text == "cats"
+    assert search_query.parse("has:GALLERY").has == "gallery"
+    # unknown has:-value degrades to free text
+    assert search_query.parse("has:podcast").text == "has:podcast"
+
+
 def test_parse_before_after_score_bounds():
     p = search_query.parse("before:2023-01-01 after:2022-12-31 score:>100")
     assert p.before == 1672531200
