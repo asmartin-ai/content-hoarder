@@ -37,6 +37,11 @@
   <div id="toolbar">
     <input type="text" id="search-input" placeholder="Search…" autocomplete="off">
     <label class="chk" title="Force exact matching (typo-tolerant fuzzy is the default; &quot;quoted phrases&quot; are always exact)"><input type="checkbox" id="filter-exact"> Exact</label>
+    <select id="export-format" title="Export format for the current view">
+      <option value="csv">CSV</option>
+      <option value="json">JSON</option>
+    </select>
+    <a id="export-link" href="/export?format=csv&amp;source=reddit" download title="Download the current view (filters applied)">Export</a>
     <select id="filter-kind">
       <option value="">All types</option>
       <option value="post">Posts</option>
