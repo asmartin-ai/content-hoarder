@@ -450,13 +450,20 @@ def _fts_query(
     return out
 
 
-def _trigram_match(q: str) -> str:
-    """OR of the query's overlapping 3-grams (typo-tolerant). '' if < 3 chars."""
+def _trigram_exprs(q: str) -> tuple[str, str]:
+    """(AND, OR) expressions over the query's overlapping 3-grams; ('', '') if < 3 chars.
+
+    AND ≈ "contains the typed string" — the tight default for fuzzy search (partial
+    words and trailing typos still match via substring). OR matches ANY single gram and
+    is junk unless rank-ordered — it exists only as the typo-rescue fallback when the
+    tight pass finds nothing (became user-visible when fuzzy went default-on: an OR-only
+    match made every bare search return one-gram noise in recency order)."""
     s = (q or "").strip().lower()
     if len(s) < 3:
-        return ""
-    grams = {s[i : i + 3] for i in range(len(s) - 2)}
-    return " OR ".join('"' + g.replace('"', '""') + '"' for g in sorted(grams))
+        return "", ""
+    grams = sorted({s[i : i + 3] for i in range(len(s) - 2)})
+    quoted = ['"' + g.replace('"', '""') + '"' for g in grams]
+    return " AND ".join(quoted), " OR ".join(quoted)
 
 
 def _order_clause(sort: str, order: str, alias: str = "") -> str:
@@ -599,6 +606,7 @@ def search_items(
 
     match_expr = ""
     fts_table = ""
+    fuzzy_rescue = ""  # OR-of-trigrams typo fallback; only ever run rank-ordered
 
     # FTS5 requires at least one positive term; if the query is only operators/negations,
     # fall back to the plain filtered SELECT path.
@@ -606,8 +614,12 @@ def search_items(
 
     if has_positive:
         if fuzzy and q and not exact and not exclude:
-            match_expr = _trigram_match(q)
-            fts_table = "items_trgm"
+            and_expr, or_expr = _trigram_exprs(q)
+            if and_expr:
+                match_expr = and_expr
+                fts_table = "items_trgm"
+                if or_expr != and_expr:  # >1 gram, a rescue pass is meaningful
+                    fuzzy_rescue = or_expr
         if not match_expr:  # exact (or fuzzy fell back for short queries)
             match_expr = _fts_query(q, exact=exact, exclude=exclude)
             fts_table = "items_fts"
@@ -615,11 +627,22 @@ def search_items(
     if match_expr and fts_table:
         add_filters("i")
         where = " AND ".join([f"{fts_table} MATCH ?"] + filters)
-        sql = (
+        sql_base = (
             f"SELECT i.* FROM items i JOIN {fts_table} ON {fts_table}.rowid = i.rowid "
-            f"WHERE {where} {_order_clause(sort, order, 'i')} LIMIT ? OFFSET ?"
+            f"WHERE {where} {{order}} LIMIT ? OFFSET ?"
         )
         bind = [match_expr] + params + [int(limit), int(offset)]
+        rows = conn.execute(
+            sql_base.format(order=_order_clause(sort, order, "i")), bind
+        ).fetchall()
+        if not rows and fuzzy_rescue:
+            # Tight pass empty -> genuine typo territory: match any gram, best trigram
+            # overlap first (bm25 rank), so near-misses surface and junk sinks.
+            bind[0] = fuzzy_rescue
+            rows = conn.execute(
+                sql_base.format(order="ORDER BY rank, i.last_seen_utc DESC"), bind
+            ).fetchall()
+        return [_row_to_public(r) for r in rows]
     else:
         add_filters("")
         # No positive FTS term to hang a NOT off of (e.g. a `-term`-only query), so apply

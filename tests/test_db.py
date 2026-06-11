@@ -81,6 +81,27 @@ def test_fuzzy_typo(conn):
     assert db.search_items(conn, "hedgmog", fuzzy=True)
 
 
+def test_fuzzy_default_is_tight_not_one_gram_noise(conn):
+    # Regression for the fuzzy-by-default flip: OR-of-trigrams matched ANY shared
+    # 3-gram ("minecraft" pulled in "trainer" via 'ine'), flooding bare searches.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="a big surprise for trainer"))
+    r = db.search_items(conn, "minecraft", fuzzy=True)
+    assert [x["source_id"] for x in r] == ["1"]
+    # partial word still substring-matches on the tight path
+    r = db.search_items(conn, "minecra", fuzzy=True)
+    assert [x["source_id"] for x in r] == ["1"]
+
+
+def test_fuzzy_rescue_ranks_best_overlap_first(conn):
+    # 'minekraft' breaks the AND pass (nek/ekr/kra exist nowhere) -> rescue pass
+    # must put the heavy-overlap row first (bm25), not recency.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase", now=1000))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="engine trainer guide", now=2000))
+    r = db.search_items(conn, "minekraft", fuzzy=True)
+    assert r and r[0]["source_id"] == "1"
+
+
 def test_status_and_undo(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     db.set_status(conn, "r:1", "keep")
