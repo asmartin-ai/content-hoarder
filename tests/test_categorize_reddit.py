@@ -149,11 +149,14 @@ def test_ephemeral_keywords_conservative():
 
 def test_untagged_tail_coverage_expansion():
     rt = categorize.reddit_tags
-    assert rt(_item(sub="Tinder")) == ["memes"]
+    assert rt(_item(sub="whenthe")) == ["memes"]
     assert rt(_item(sub="engineeringporn")) == ["science"]
     assert rt(_item(sub="learnpython")) == ["coding"]
     assert rt(_item(sub="physicsmemes")) == ["science", "memes"]
     assert rt(_item(sub="shermanposting")) == ["defense", "memes"]
+    # user decision: r/tinder and r/comics stay OUT of the memes bucket
+    assert rt(_item(sub="Tinder")) == []
+    assert rt(_item(sub="comics")) == []
 
 
 def test_new_tags_in_filter_vocab(conn):

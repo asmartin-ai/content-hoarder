@@ -32,11 +32,16 @@ OUT = ROOT / "data" / "rehearsal-decay"
 COPY = OUT / "app.copy.db"
 REPORT = OUT / "DECAY-REHEARSAL-REPORT.md"
 
-# The proposed backfill policy (user-confirmed 2026-06-10). Wave 2 is age-gated so
-# still-live promos survive; wave 1 is the entertainment bulk, no cutoff.
-WAVE1_TAGS = ["anime", "memes", "vtubers", "minecraft", "gaming", "esports",
-              "defense", "japan"]
+# The proposed backfill policy (user-confirmed 2026-06-10, narrowed at review):
+# wave 1 = memes/gaming/esports older than ~3 months; wave 2 = ephemeral older than
+# ~60 days. Both waves labeled 'swept' (metadata.decay_label) so the initial pass stays
+# distinguishable from deliberate archives AND from any future rolling decay — pull via
+# the is:swept search operator (is:decayed matches any wave). anime/vtubers/minecraft/
+# defense/japan stay tagged in the inbox, each decayable later as its own wave.
+WAVE1_TAGS = ["memes", "gaming", "esports"]
+WAVE1_CUTOFF_DAYS = 90
 EPHEMERAL_CUTOFF_DAYS = 60
+WAVE_LABEL = "swept"
 
 NSFW_TAGS = ("nsfw_erotic", "nsfw_talk", "nsfw_other")
 
@@ -164,11 +169,14 @@ def main() -> int:
 
     # ---------------- decay dry runs ----------------
     now = int(time.time())
+    w1_cutoff = now - WAVE1_CUTOFF_DAYS * 86400
+    w1_cutoff_date = datetime.date.fromtimestamp(w1_cutoff).isoformat()
     eph_cutoff = now - EPHEMERAL_CUTOFF_DAYS * 86400
     eph_cutoff_date = datetime.date.fromtimestamp(eph_cutoff).isoformat()
 
-    dry1 = timed("decay wave 1 DRY (entertainment tags)",
-                 lambda: db.decay(conn, tags=WAVE1_TAGS, samples=8, top_subs=25))
+    dry1 = timed("decay wave 1 DRY (memes/gaming/esports, age-gated)",
+                 lambda: db.decay(conn, tags=WAVE1_TAGS, before_utc=w1_cutoff,
+                                  samples=8, top_subs=25))
     dry2 = timed("decay wave 2 DRY (ephemeral, age-gated)",
                  lambda: db.decay(conn, tags=["ephemeral"], before_utc=eph_cutoff, samples=8))
 
@@ -199,19 +207,23 @@ def main() -> int:
         eph_subs).fetchone()[0]
     eph_sub_total = tag_count(conn, "ephemeral", inbox_only=True) - eph_kw_total
 
-    # capture spot-check fullnames before the apply
+    # capture spot-check fullnames before the apply (respecting the wave-1 age gate so
+    # every spot item genuinely round-trips)
     spot = [r[0] for r in conn.execute(
         "SELECT fullname FROM items WHERE source='reddit' AND status='inbox' "
+        "AND (CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END) < ? "
         "AND EXISTS (SELECT 1 FROM json_each(metadata,'$.tags') WHERE value IN ("
         + ",".join("?" for _ in WAVE1_TAGS) + ")) ORDER BY RANDOM() LIMIT 10",
-        WAVE1_TAGS).fetchall()]
+        [w1_cutoff] + WAVE1_TAGS).fetchall()]
 
     # ---------------- apply + round trip (on the copy) ----------------
     ap1 = timed("decay wave 1 APPLY",
-                lambda: db.decay(conn, tags=WAVE1_TAGS, apply=True))
+                lambda: db.decay(conn, tags=WAVE1_TAGS, before_utc=w1_cutoff,
+                                 label=WAVE_LABEL, apply=True))
     time.sleep(1.5)  # distinct wave stamps (second resolution)
     ap2 = timed("decay wave 2 APPLY",
-                lambda: db.decay(conn, tags=["ephemeral"], before_utc=eph_cutoff, apply=True))
+                lambda: db.decay(conn, tags=["ephemeral"], before_utc=eph_cutoff,
+                                 label=WAVE_LABEL, apply=True))
     wal_after_decay = wal_size()
 
     if ap1["total"] != dry1["total"]:
@@ -226,6 +238,11 @@ def main() -> int:
     ).fetchone()[0]
     if stamped != ap1["total"] + ap2["total"]:
         problems.append(f"stamped {stamped} != applied {ap1['total'] + ap2['total']}")
+    labeled = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE json_extract(metadata,'$.decay_label') = ?",
+        (WAVE_LABEL,)).fetchone()[0]
+    if labeled != stamped:
+        problems.append(f"swept-labeled {labeled} != stamped {stamped}")
 
     und = timed("undecay APPLY (full restore)", lambda: db.undecay(conn, apply=True))
     if und["total"] != stamped:
@@ -234,10 +251,11 @@ def main() -> int:
     if hist_final != hist_post_categorize:
         problems.append(f"round-trip histogram drift: {hist_post_categorize} -> {hist_final}")
     left = conn.execute(
-        "SELECT COUNT(*) FROM items WHERE json_extract(metadata,'$.decayed_at') IS NOT NULL"
+        "SELECT COUNT(*) FROM items WHERE json_extract(metadata,'$.decayed_at') IS NOT NULL "
+        "OR json_extract(metadata,'$.decay_label') IS NOT NULL"
     ).fetchone()[0]
     if left:
-        problems.append(f"{left} stamps left after full undecay")
+        problems.append(f"{left} stamps/labels left after full undecay")
     for fn in spot:
         st = conn.execute("SELECT status FROM items WHERE fullname=?", (fn,)).fetchone()[0]
         if st != "inbox":
@@ -281,14 +299,16 @@ def main() -> int:
     r.append(f"\nTop-30 still-untagged inbox subs (full top-200 in `untagged-subs.txt`):\n")
     r.append(md_table([(n, s) for s, n in untagged_subs[:30]], ["items", "subreddit"]))
 
-    r.append("\n## Wave 1 — entertainment tags (no age cutoff)\n")
-    r.append(f"tags: `{', '.join(WAVE1_TAGS)}` → **{dry1['total']:,} items**")
+    r.append(f"\n## Wave 1 — {'/'.join(WAVE1_TAGS)}, older than {w1_cutoff_date} "
+             f"(~{WAVE1_CUTOFF_DAYS}d)\n")
+    r.append(f"tags: `{', '.join(WAVE1_TAGS)}` + age gate → **{dry1['total']:,} items**, "
+             f"labeled `{WAVE_LABEL}`")
     r.append("\nPer-tag membership (overlapping by design — total above is the "
              "distinct-row count, never this column's sum):\n")
     r.append(md_table(sorted(dry1["by_tag"].items(), key=lambda kv: -kv[1]), ["tag", "items"]))
     r.append("\nTop subreddits in the wave:\n")
     r.append(md_table(list(dry1["by_subreddit"].items()), ["subreddit", "items"]))
-    r.append("\nAge bands (content age — add `--before` to wave 1 at sign-off if desired):\n")
+    r.append("\nAge bands within the wave (content age; the gate already applied):\n")
     r.append(md_table(dry1["age_bands"].items(), ["band", "items"]))
     r.append("\nSamples:\n")
     r += [f"- {s}" for s in dry1["sample"]]
@@ -307,7 +327,11 @@ def main() -> int:
 
     r.append("\n## Round-trip verification (on the copy)\n")
     r.append(f"- apply == dry: wave1 {ap1['total']:,} / wave2 {ap2['total']:,} ✓")
-    r.append(f"- stamped {stamped:,} → undecayed {und['total']:,}; residual stamps {left}")
+    r.append(f"- every decayed item also carries `decay_label='{WAVE_LABEL}'`: "
+             f"{labeled:,} == {stamped:,} ✓ — pullable via `is:swept` "
+             f"(`is:decayed` matches any wave; `is:swept tag:ephemeral` = the wave-2 set "
+             f"for your triage-then-delete pass)")
+    r.append(f"- stamped {stamped:,} → undecayed {und['total']:,}; residual stamps/labels {left}")
     r.append(f"- status histogram after round trip identical: "
              f"{'✓' if hist_final == hist_post_categorize else '⚠ DRIFT'}")
     r.append(f"- 10-item spot check restored to inbox: "
@@ -325,13 +349,14 @@ def main() -> int:
     r.append("# 1) retag all reddit items with the new buckets (dry first, then apply):")
     r.append(".\\.venv\\Scripts\\python.exe -m content_hoarder categorize --source reddit --dry-run")
     r.append(".\\.venv\\Scripts\\python.exe -m content_hoarder categorize --source reddit --all")
-    r.append("# 2) wave 1 — entertainment (append e.g. --before 2025-06-10 for an age cutoff):")
-    w1 = " ".join(f"--tag {t}" for t in WAVE1_TAGS)
+    r.append(f"# 2) wave 1 — {'/'.join(WAVE1_TAGS)} older than ~{WAVE1_CUTOFF_DAYS}d, labeled {WAVE_LABEL}:")
+    w1 = " ".join(f"--tag {t}" for t in WAVE1_TAGS) + f" --before {w1_cutoff_date} --label {WAVE_LABEL}"
     r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay {w1}")
     r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay {w1} --apply")
-    r.append("# 3) wave 2 — ephemeral, age-gated:")
-    r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay --tag ephemeral --before {eph_cutoff_date}")
-    r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay --tag ephemeral --before {eph_cutoff_date} --apply")
+    r.append(f"# 3) wave 2 — ephemeral older than ~{EPHEMERAL_CUTOFF_DAYS}d, labeled {WAVE_LABEL}:")
+    w2 = f"--tag ephemeral --before {eph_cutoff_date} --label {WAVE_LABEL}"
+    r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay {w2}")
+    r.append(f".\\.venv\\Scripts\\python.exe -m content_hoarder decay {w2} --apply")
     r.append("# 4) live round-trip confidence check on a tiny sub (8 items), then restore it:")
     today = datetime.date.today().isoformat()
     r.append(".\\.venv\\Scripts\\python.exe -m content_hoarder decay --subreddit freebies --apply")
@@ -341,6 +366,10 @@ def main() -> int:
     r.append("\nUndo at any time: `decay --undo --decayed-after/--decayed-before <date>` "
              "selects a wave by its stamp; `decay --undo --apply` with no window restores "
              "every decayed item.")
+    r.append("\nPulling swept items afterwards (search bar, browse or /reddit): "
+             "`is:swept` = everything from this pass · `is:swept tag:ephemeral` = the "
+             "expired-promo set to triage toward deletion · `is:decayed` = any decay wave, "
+             "labeled or not.")
 
     REPORT.write_text("\n".join(r) + "\n", encoding="utf-8")
     log(f"report written: {REPORT}")

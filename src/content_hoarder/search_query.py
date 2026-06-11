@@ -35,6 +35,8 @@ class ParsedQuery:
 
     is_saved: int | None = None  # 1/0 (SQLite-friendly)
     nsfw: bool = False
+    decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
+    swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
 
     before: int | None = None  # unix seconds (UTC)
     after: int | None = None
@@ -145,6 +147,7 @@ def parse(q: str) -> ParsedQuery:
     tags_groups: list[list[str]] = []  # each token's group; later collapsed to tags/tags_all
     is_saved: int | None = None
     nsfw = False
+    decayed = swept = False
     before = after = None
     score_min = score_max = None
 
@@ -212,6 +215,12 @@ def parse(q: str) -> ParsedQuery:
             if v == "nsfw":
                 nsfw = True
                 continue
+            if v == "decayed":
+                decayed = True
+                continue
+            if v == "swept":
+                swept = True
+                continue
             text_terms.append(t)
             continue
 
@@ -266,6 +275,8 @@ def parse(q: str) -> ParsedQuery:
         tags_all=tags_all,
         is_saved=is_saved,
         nsfw=nsfw,
+        decayed=decayed,
+        swept=swept,
         before=before,
         after=after,
         score_min=score_min,
