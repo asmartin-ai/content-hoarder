@@ -3,247 +3,212 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f1115">
+  <meta name="theme-color" content="#101216">
   <title>content-hoarder</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/tokens.css">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/core/tokens.css">
+  <link rel="stylesheet" href="/static/browse/browse.css">
   <script src="/static/theme.js"></script>
 </head>
 <body data-page="browse">
-  <div class="header-stack">
-    <header class="topbar">
-      <button id="nav-toggle" class="icon-btn nav-toggle" aria-label="Menu" aria-expanded="false">&#9776;</button>
-      <h1 class="brand">content&#8209;hoarder</h1>
-      <div class="search">
-        <span class="mag" aria-hidden="true">&#128269;</span>
-        <input id="q" type="search" placeholder="Search everything..." autocomplete="off">
-        <button type="button" id="q-clear" class="clear" aria-label="Clear search" hidden>&times;</button>
-        <label class="chk search-fuzzy" title="Force exact matching (typo-tolerant fuzzy is the default; &quot;quoted phrases&quot; are always exact)"><input type="checkbox" id="exact"> exact</label>
+
+  <header class="console">
+    <div class="con-row">
+      <h1 class="brand"><span class="led"></span>content&#8209;hoarder</h1>
+      <div class="cmd">
+        <span class="prompt">/</span>
+        <input id="q" type="search" placeholder="search &middot; fuzzy by default" autocomplete="off"
+               aria-label="Search">
+        <kbd>/</kbd>
+        <div class="oppop" id="oppop">
+          <div class="ops">
+            <button type="button" class="opchip" data-ins="tag:">tag:</button>
+            <button type="button" class="opchip" data-ins="subreddit:">subreddit:</button>
+            <button type="button" class="opchip" data-ins="has:video">has:video</button>
+            <button type="button" class="opchip" data-ins="is:swept">is:swept</button>
+            <button type="button" class="opchip" data-ins="before:2024">before:2024</button>
+            <button type="button" class="opchip" data-ins="-term">-exclude</button>
+            <button type="button" class="opchip" data-ins="&quot;exact phrase&quot;">"exact phrase"</button>
+          </div>
+          <div class="hint">
+            <span><b>Fuzzy by default</b> &mdash; close-enough spelling still hits. Quotes lock a phrase.</span>
+            <label><input type="checkbox" id="exact"> exact only</label>
+          </div>
+        </div>
       </div>
-      <nav class="topnav">
-        <label class="sort-tool">
-          <span>Sort</span>
-          <select id="sort" title="Sort">
-            <option value="first_seen_utc:desc">recently added</option>
-            <option value="created_utc:asc">oldest first</option>
-            <option value="created_utc:desc">newest first</option>
-            <option value="title:asc">title (A&ndash;Z)</option>
-            <option value="duration:asc">shortest first</option>
-            <option value="duration:desc">longest first</option>
-            <option value="position:asc">playlist order (YouTube)</option>
+      <div class="wins" id="wins"
+           title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over.">
+        <span class="wlab">TODAY</span><span class="dots" id="windots"></span><span class="wnum" id="winnum"></span>
+      </div>
+      <button type="button" class="icon-btn" id="dice" title="Surprise me — one old save, no strings"
+              aria-label="Surprise me">&#9860;</button>
+      <button type="button" class="icon-btn" id="open-settings" title="Settings" aria-label="Settings">&#9881;</button>
+      <a class="btn-triage" href="/triage">TRIAGE &rarr;</a>
+    </div>
+  </header>
+
+  <nav class="folders" role="tablist" aria-label="Status">
+    <span class="leadgap"></span>
+    <button class="folder" role="tab" data-status="inbox" aria-selected="true">Inbox
+      <span class="n new" id="inbox-new"></span></button>
+    <button class="folder" role="tab" data-status="keep" aria-selected="false">Keep
+      <span class="n" data-count="keep"></span></button>
+    <button class="folder" role="tab" data-status="archived" aria-selected="false">Archived</button>
+    <button class="folder" role="tab" data-status="done" aria-selected="false">Done
+      <span class="n" data-count="done"></span></button>
+    <button class="folder" role="tab" data-status="" aria-selected="false">All</button>
+  </nav>
+  <nav class="statuspills" role="tablist" aria-label="Status">
+    <button class="spill" role="tab" data-status="inbox" aria-selected="true">Inbox
+      <span class="n new" id="inbox-new-m"></span></button>
+    <button class="spill" role="tab" data-status="keep" aria-selected="false">Keep
+      <span class="n" data-count="keep"></span></button>
+    <button class="spill" role="tab" data-status="archived" aria-selected="false">Archived</button>
+    <button class="spill" role="tab" data-status="done" aria-selected="false">Done
+      <span class="n" data-count="done"></span></button>
+    <button class="spill" role="tab" data-status="" aria-selected="false">All</button>
+    <button class="spill tagsbtn" id="open-tags-phone" type="button"># tags</button>
+  </nav>
+
+  <main class="desk">
+    <nav class="rail" aria-label="Filters">
+      <div class="lab">SOURCES</div>
+      <div id="rail-sources"></div>
+      <div class="lab">TAGS</div>
+      <div id="rail-tags"></div>
+    </nav>
+    <div class="sheet">
+      <div class="shelf">
+        <span class="dateline" id="dateline"></span>
+        <div class="right">
+          <div class="fchips" id="fchips"></div>
+          <select id="sort" title="Sort" aria-label="Sort">
+            <option value="first_seen_utc:desc">SORT: NEWEST</option>
+            <option value="created_utc:asc">SORT: OLDEST POST</option>
+            <option value="created_utc:desc">SORT: NEWEST POST</option>
+            <option value="title:asc">SORT: TITLE A&ndash;Z</option>
+            <option value="duration:asc">SORT: SHORTEST</option>
+            <option value="duration:desc">SORT: LONGEST</option>
+            <option value="last_seen_utc:desc">SORT: LAST TOUCHED</option>
           </select>
-        </label>
-        <div class="menu visual-menu">
-          <button id="visual-menu-btn" class="icon-btn" type="button" aria-label="Visual settings"
-                  aria-haspopup="true" aria-expanded="false">&#8942;</button>
-          <div id="visual-menu-pop" class="menu-pop visual-menu-pop" hidden role="menu">
-            <span class="menu-label">View</span>
-            <button type="button" class="menu-row" data-density="compact" role="menuitem" aria-pressed="false">
-              <span class="density-mark compact" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span>Compact</span>
-            </button>
-            <button type="button" class="menu-row" data-density="comfortable" role="menuitem" aria-pressed="false">
-              <span class="density-mark comfy" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span>Comfortable</span>
-            </button>
-            <button type="button" class="menu-row" data-density="card" role="menuitem" aria-pressed="false">
-              <span class="density-mark card" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span>Card view</span>
-            </button>
-            <span class="menu-label menu-label-spaced">Display</span>
-            <button type="button" id="theme-menu-toggle" class="menu-row" role="menuitem">
-              <span class="nav-ico nav-ico-all" aria-hidden="true">&#9789;</span>
-              <span>Light/dark theme</span>
-            </button>
-            <button type="button" id="focus-toggle" class="menu-row" role="menuitem" aria-pressed="false">
-              <span class="nav-ico nav-ico-all" aria-hidden="true">&#9680;</span>
-              <span>Focus mode</span>
-            </button>
-          </div>
         </div>
-        <a class="btn primary" href="/triage">Triage&nbsp;&rarr;</a>
-      </nav>
-    </header>
-    <nav id="source-tabs" class="tabs" aria-label="Sources"></nav>
-  </div>
-
-  <div id="nav-backdrop" class="nav-backdrop" hidden></div>
-  <main class="layout">
-    <aside id="sidebar">
-      <ul id="status-nav" class="status-nav">
-        <li data-status="inbox" class="active"><span class="nav-ico nav-ico-dot" aria-hidden="true">&#9679;</span><span>Inbox</span><span class="cnt" data-cnt="inbox">0</span></li>
-        <li data-status="keep"><span class="nav-ico" data-ico="keep" aria-hidden="true"></span><span>Keep</span><span class="cnt" data-cnt="keep">0</span></li>
-        <li data-status="archived"><span class="nav-ico" data-ico="archive" aria-hidden="true"></span><span>Archived</span><span class="cnt" data-cnt="archived">0</span></li>
-        <li data-status="done"><span class="nav-ico" data-ico="done" aria-hidden="true"></span><span>Done</span><span class="cnt" data-cnt="done">0</span></li>
-        <li data-status=""><span class="nav-ico nav-ico-all" aria-hidden="true">&#8801;</span><span>All</span><span class="cnt" data-cnt="all">0</span></li>
-      </ul>
-
-      <section class="side-section side-tags" id="tag-section">
-        <button type="button" class="side-title side-title-toggle" id="tag-toggle"
-                aria-expanded="true" aria-controls="tag-filter-list">
-          <span id="tag-summary">Tags</span>
-        </button>
-        <ul id="tag-filter-list" class="status-nav tag-nav"></ul>
-      </section>
-
-      <section class="side-section side-tools">
-        <h2 class="side-title">Tools</h2>
-        <ul class="status-nav utility-nav">
-          <li id="btn-import" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#43;</span><span>Import</span></li>
-          <li id="btn-stats" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#9635;</span><span>Stats</span></li>
-          <li id="btn-reddit" role="button" tabindex="0"><span class="nav-ico nav-ico-all" aria-hidden="true">&#8635;</span><span>Reddit sync</span></li>
-          <li><a href="/reddit" title="Reddit management view"><span class="nav-ico nav-ico-all" aria-hidden="true">r/</span><span>Reddit</span></a></li>
-        </ul>
-      </section>
-
-      <details class="side-foot legend-foot">
-        <summary>What they mean</summary>
-        <ul>
-          <li><b class="lg-inbox">Inbox</b> &mdash; not sorted yet</li>
-          <li><b class="lg-keep">Keep</b> &mdash; worth revisiting</li>
-          <li><b class="lg-arch">Archived</b> &mdash; set aside, out of the way</li>
-          <li><b class="lg-done">Done</b> &mdash; finished with it</li>
-        </ul>
-      </details>
-
-      <div id="install-hint" class="install-hint" hidden>
-        Add to your phone: <b>Firefox menu &rarr; Install</b>
       </div>
-    </aside>
-
-    <section id="content">
-      <div id="bulkbar" class="bulkbar" hidden>
-        <span id="sel-count">0 selected</span>
-        <button class="btn" data-bulk="keep">Keep</button>
-        <button class="btn" data-bulk="archived">Archive</button>
-        <button class="btn" data-bulk="done">Done</button>
-        <button class="btn ghost" id="sel-clear">Clear</button>
+      <div class="swipehint">
+        <span style="color:var(--status-archive)">swipe &rarr; archive</span>
+        <span style="color:var(--status-keep)">&rarr;&rarr; keep</span>
+        <span style="color:var(--status-done)">&larr; done</span>
+        <span>hold to select</span>
       </div>
 
-      <div id="progress-strip" class="progress-strip" hidden>
-        <div class="pulse-main">
-          <div class="pulse-top">
-            <span class="pulse-label"><b id="ps-left">0</b> left in Inbox</span>
-            <span class="pulse-count"><b id="ps-done">0</b> triaged today</span>
-          </div>
-          <div class="ps-bar"><div id="ps-fill" class="ps-fill"></div></div>
-        </div>
-        <span id="ps-streak" class="streak" title="Items processed in a row" hidden>&#128293; <b id="ps-streak-n">0</b></span>
+      <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->
+      <div class="ambient" id="ambient" hidden></div>
+
+      <div class="batchstrip" id="batchstrip">
+        <span>FOCUS BATCH</span>
+        <div class="segs" id="segs"></div>
+        <span id="batchn"></span>
       </div>
 
-      <div class="focus-cue"><span aria-hidden="true">&#9680;</span> Focus mode &mdash; one thing at a time. Press S keep &middot; E archive</div>
+      <div class="items density-comfortable" id="items"></div>
+      <div id="sentinel" aria-hidden="true"></div>
 
-      <div id="items" class="items"></div>
-      <p id="empty" class="empty" hidden>Nothing here yet &mdash; import a source to begin.</p>
-      <div class="loadmore-wrap"><button id="loadmore" class="btn" hidden>Load more</button></div>
-
-      <div class="kbar">
-        <span class="k"><kbd>J</kbd> move</span>
-        <span class="k"><kbd>K</kbd> move</span>
-        <span class="k"><kbd>S</kbd> keep</span>
-        <span class="k"><kbd>E</kbd> archive</span>
-        <span class="k"><kbd>Y</kbd> done</span>
-        <span class="k"><kbd>X</kbd> select</span>
-        <span class="k">or swipe / hover a row</span>
+      <div class="decayline" id="decayline" hidden>
+        &#9790; <span id="decay-n"></span> older saves rested quietly last month &mdash;
+        nothing needed from you.
+        <button type="button" class="linkbtn" id="peekswept">have a look</button>
       </div>
-    </section>
+    </div>
   </main>
 
-  <div id="stats-modal" class="modal" hidden>
-    <div class="modal-box">
-      <button class="modal-close" id="stats-close">&times;</button>
-      <h2>Stats</h2>
-      <div id="stats-body"></div>
+  <div class="opsbar" id="bulktray">
+    <span class="cnt" id="bulkcnt">00</span>
+    <button type="button" class="opbtn k" data-bulk="keep"><kbd>F</kbd> KEEP</button>
+    <button type="button" class="opbtn a" data-bulk="archived"><kbd>A</kbd> ARCHIVE</button>
+    <button type="button" class="opbtn d" data-bulk="done"><kbd>D</kbd> DONE</button>
+    <button type="button" class="opbtn ghost" data-bulk="inbox"><kbd>X</kbd> &rarr; INBOX</button>
+    <button type="button" class="opbtn ghost" id="bulkclear" aria-label="Clear selection">&#10005;</button>
+  </div>
+
+  <nav class="dock" aria-label="Navigation">
+    <button type="button" aria-pressed="true"><span class="g">&#9636;</span>INBOX</button>
+    <button type="button" aria-pressed="false" id="dock-focus"><span class="g">&#9678;</span>FOCUS</button>
+    <a class="fab" href="/triage">TRIAGE &rarr;</a>
+    <button type="button" aria-pressed="false" id="dock-search"><span class="g">&#8981;</span>SEARCH</button>
+    <button type="button" aria-pressed="false" id="dock-settings"><span class="g">&#9881;</span>MORE</button>
+  </nav>
+
+  <div id="toast" hidden aria-live="polite"></div>
+
+  <div class="stampwrap" id="stamp">
+    <div class="stamp">PAGE CLEARED<small id="stampsub"></small></div>
+    <div class="stamp-acts">
+      <button type="button" class="ambbtn primary" id="drawagain">Draw another batch</button>
+      <button type="button" class="ambbtn" id="enough">That's enough for today</button>
     </div>
   </div>
 
-  <div id="reddit-modal" class="modal" hidden>
-    <div class="modal-box">
-      <button class="modal-close" id="reddit-close">&times;</button>
-      <h2>Reddit sync</h2>
-      <p class="ru-help">When you mark a Reddit item <b>Done</b>, it's queued to be unsaved from
-        your Reddit <b>Saved</b> list. A scheduled job (or the button below) does the unsaving, so
-        triage stays instant and nothing is lost if your cookie expires.</p>
-      <div id="ru-banner" class="ru-banner" hidden></div>
-      <p id="ru-status" class="ru-status">Checking...</p>
-      <label class="chk ru-toggle"><input type="checkbox" id="ru-enable">
-        Unsave items when I mark them Done</label>
-      <label class="import-field">
-        <span>reddit_session cookie</span>
-        <input type="password" id="ru-cookie" autocomplete="off"
-               placeholder="paste your reddit_session cookie value">
-      </label>
-      <p class="ru-hint">Get it in your browser: DevTools &rarr; Application &rarr; Cookies &rarr;
-        <code>reddit.com</code> &rarr; <code>reddit_session</code>. It expires every few days &mdash; re-paste
-        it when sync reports the session expired.</p>
-      <div class="import-actions">
-        <button class="btn" id="ru-save-cookie">Save cookie</button>
-        <button class="btn primary" id="ru-sync">Sync now</button>
+  <div class="scrim" id="scrim"></div>
+
+  <aside class="sheetpanel" id="settings" aria-label="Settings">
+    <h2>Settings</h2>
+    <div class="set-group"><div class="lab">THEME</div>
+      <div class="seg" id="set-theme">
+        <button type="button" data-theme="light" aria-pressed="false">Day log</button>
+        <button type="button" data-theme="dark" aria-pressed="true">Night ops</button>
       </div>
     </div>
-  </div>
+    <div class="set-group"><div class="lab">DENSITY</div>
+      <div class="seg" id="set-density">
+        <button type="button" data-d="compact" aria-pressed="false">Ledger</button>
+        <button type="button" data-d="comfortable" aria-pressed="true">Log</button>
+        <button type="button" data-d="card" aria-pressed="false">Pinboard</button>
+      </div>
+    </div>
+    <div class="set-group"><div class="lab">LOADING</div>
+      <div class="seg" id="set-loading">
+        <button type="button" data-focus="0" aria-pressed="true">Infinite scroll</button>
+        <button type="button" data-focus="1" aria-pressed="false">Focus batches</button>
+      </div>
+      <p class="set-note">Focus deals you 25 at a time &mdash; clear the page, take the stamp, draw again.</p>
+    </div>
+    <div class="set-group"><div class="lab">DAILY GOAL</div>
+      <div class="seg" id="set-goal">
+        <button type="button" data-g="4" aria-pressed="false">4</button>
+        <button type="button" data-g="8" aria-pressed="true">8</button>
+        <button type="button" data-g="12" aria-pressed="false">12</button>
+        <button type="button" data-g="0" aria-pressed="false">no goal</button>
+      </div>
+      <p class="set-note">Pebbles in the top bar. Resets quietly each day &mdash; nothing carries over,
+        nothing is owed.</p>
+    </div>
+    <p class="set-note">The panel stays put while you fiddle. Esc closes.</p>
+  </aside>
 
-  <div id="import-modal" class="modal" hidden>
-    <div class="modal-box">
-      <button class="modal-close" id="import-close">&times;</button>
-      <h2>Import content</h2>
-      <div class="import-help">
-        <p>Add saved content from a file, or paste a YouTube playlist/video URL. Re-importing is
-          non-destructive &mdash; your triage progress is never overwritten.</p>
-        <ul>
-          <li><b>Reddit</b> &mdash; reddit-saved-manager <code>app.db</code>, or a <code>.csv</code>/<code>.json</code> export</li>
-          <li><b>YouTube</b> &mdash; a playlist/video <b>URL</b> below, or a <code>yt-dlp --flat-playlist</code> JSON file</li>
-          <li><b>Hacker News</b> &mdash; Materialistic <code>.db</code>, or a <code>.txt</code> list of story IDs</li>
-          <li><b>Obsidian / Keep</b> &mdash; whole folders: use the <code>import</code> CLI (browsers can't upload folders)</li>
-        </ul>
-      </div>
-      <label class="import-field">
-        <span>YouTube playlist / video URL</span>
-        <input type="url" id="import-url" placeholder="https://www.youtube.com/playlist?list=..." autocomplete="off">
-      </label>
-      <div class="import-or">&mdash; or &mdash;</div>
-      <label class="import-field">
-        <span>Choose a file</span>
-        <input type="file" id="import-file" accept=".db,.sqlite,.sqlite3,.csv,.json,.txt">
-      </label>
-      <div id="import-preview" class="import-preview" hidden></div>
-      <div class="import-actions">
-        <button class="btn" id="import-cancel">Cancel</button>
-        <button class="btn primary" id="import-prepare">Preview</button>
-        <button class="btn primary" id="import-confirm" hidden>Confirm import</button>
-      </div>
-      <div id="import-status" class="import-status"></div>
+  <aside class="sheetpanel" id="tagsheet" aria-label="Tags">
+    <h2>Tags</h2>
+    <div class="tagsheet-list" id="tagsheet-list"></div>
+  </aside>
+
+  <div class="kbd-sheet" id="kbd" role="dialog" aria-label="Keyboard shortcuts">
+    <h2>One hand on the keys</h2>
+    <p class="sub">Left-hand cluster &mdash; coffee stays in the right.</p>
+    <div class="kgrid">
+      <span><kbd>W</kbd> <kbd>S</kbd></span><span class="what"><b>Move</b> up / down the log</span>
+      <span><kbd>F</kbd></span><span class="what"><b>Keep</b> &mdash; worth revisiting</span>
+      <span><kbd>A</kbd></span><span class="what"><b>Archive</b> &mdash; set aside, out of the way</span>
+      <span><kbd>D</kbd></span><span class="what"><b>Done</b> &mdash; finished with it</span>
+      <span><kbd>E</kbd></span><span class="what"><b>Open</b> the item</span>
+      <span><kbd>Q</kbd></span><span class="what"><b>Select</b> for a bulk entry</span>
+      <span><kbd>Z</kbd></span><span class="what"><b>Undo</b> &mdash; every entry is erasable</span>
+      <span><kbd>X</kbd></span><span class="what"><b>Back to Inbox</b></span>
+      <span><kbd>Space</kbd></span><span class="what"><b>Preview</b> media</span>
+      <span><kbd>/</kbd></span><span class="what"><b>Search</b></span>
     </div>
   </div>
 
-  <div id="media-modal" class="modal" hidden>
-    <div class="modal-box media-box">
-      <button class="modal-close" id="media-close">&times;</button>
-      <div id="media-body"></div>
-    </div>
-  </div>
+  <div id="media-modal" hidden><div id="media-body"></div></div>
 
-  <div id="shortcut-modal" class="modal" hidden>
-    <div class="modal-box shortcut-box">
-      <button class="modal-close" id="shortcut-close" type="button">&times;</button>
-      <h2>Keyboard shortcuts</h2>
-      <div class="shortcut-list">
-        <div class="shortcut-row"><span><kbd>J</kbd> / <kbd>K</kbd></span><span>Move focus</span></div>
-        <div class="shortcut-row"><span><kbd>S</kbd></span><span>Keep</span></div>
-        <div class="shortcut-row"><span><kbd>E</kbd></span><span>Archive</span></div>
-        <div class="shortcut-row"><span><kbd>Y</kbd></span><span>Done</span></div>
-        <div class="shortcut-row"><span><kbd>X</kbd></span><span>Select row</span></div>
-        <div class="shortcut-row"><span><kbd>?</kbd></span><span>Toggle this sheet</span></div>
-      </div>
-      <p class="shortcut-note">Rows also support swipe and hover actions.</p>
-    </div>
-  </div>
-
-  <div id="toast" class="toast" hidden></div>
-  <script src="/static/icons.js"></script>
-  <script src="/static/swipe.js"></script>
-  <script src="/static/app.js"></script>
+  <script type="module" src="/static/browse/main.js"></script>
 </body>
 </html>
