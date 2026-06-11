@@ -510,21 +510,33 @@ listener leak (app.js:75, triage.js:413), reddit.css hardcoded colors → tokens
 (`.item-age`, `.source-badge`), sw.js versioned cache + `/reddit` added to the PWA shell.*
 
 *Gate-1 outcome (2026-06-09): "Log Book II" locked — `design-ref/v3-explorations/05-log-book-2.html`
-is the Stage C spec; tokens v3 + `static/core/` shipped (commit b20e977). Design-discussion items:*
+is the Stage C spec; tokens v3 + `static/core/` shipped (commit b20e977).*
 
-- [ ] **P2 — Two-stage swipe actions (mobile).** Sync-style short/long thresholds per direction.
-  Proposed: short → = Archive, **long → = Keep** (the extra travel is deliberate friction — a
-  "hoarder tax" that fits the reduce-the-backlog thesis), short ← = Done, long ← = TBD
-  (→ Inbox? skip?). Underlay color+icon swap at the second threshold + a haptic pulse
-  (`navigator.vibrate`); long-press stays = select. **Controls need a design discussion before
-  build** (thresholds, cancel affordance, what long-left does).
+*ADHD round LOCKED (2026-06-11): the Stage C spec is now **05 + `06-adhd-round.html`** — twelve
+approved additions (win pebbles w/ optional daily goal, no raw backlog counts → "· N new" slice,
+dateline greeting, resurfacing card per the locked one-pager, surprise-me + dice, operator-discovery
+popover, active-filter chips, consume-cost pills, smart sort w/ "why" [build waits on
+feat/triage-score], Focus batch strip → PAGE CLEARED stamp → empty state, live row-clear + undo +
+two-stage Keep swipe ≈90/170px, quiet decay line; ☾ resting-soon markers deferred — need a
+server-side flag). Mockups are gitignored; the additions list also lives in the explorations
+README + plan file. New backend in scope: `GET /pulse` (new_today/cleared_today/swept_recent) and
+`GET /resurface` + dismiss/letgo POSTs per `docs/resurfacing-card-design.md`. Items below are
+build-tracking now, not open design questions:*
+
+- [ ] **P2 — Two-stage swipe actions (mobile).** Sync-style short/long thresholds per direction:
+  short → = Archive, **long → = Keep** (the extra travel is deliberate friction — a "hoarder
+  tax" that fits the reduce-the-backlog thesis), short ← = Done, long-left unassigned. Underlay
+  color+icon swap at the second threshold + a haptic pulse (`navigator.vibrate`); long-press
+  stays = select. **Design locked 2026-06-11** (06-adhd-round.html, thresholds ≈90px/≈170px,
+  demoed working); build in Stage C.
 - [ ] **P2 — Command palette v1.** `/` focuses search; `>` flips to command mode (set status
   view, density, theme, sort, go to triage/reddit, bulk ops on selection). Fuzzy match + arrows
   + Enter. Until it ships, the search placeholder must not advertise `>`.
 - [ ] **P2 — Filter-state visibility (simple now).** Active source/tag chips with ✕ + "clear
   all" rendered in the sheet shelf next to the result count; define the algebra (single-select
-  source, multi-select tags) and keep it visible. **P3 — advanced later:** palette-driven
-  filter builder, saved filters, tag search inside the rail.
+  source, multi-select tags) and keep it visible. **Design locked 2026-06-11** (06, demoed);
+  build in Stage C. **P3 — advanced later:** palette-driven filter builder, saved filters,
+  tag search inside the rail.
 
 *PKMS-research additions (2026-06-10 handoff; see Epic 21 for context). These ride the same
 Stage C design gate:*
@@ -534,16 +546,22 @@ Stage C design gate:*
   number can only be demoralizing). Sidebar shows curated slices instead; audit the Stats modal
   + progress copy for guilt framing (never re-open/read-% as health, no "you haven't…");
   finishable batch progress only ("3 of 7"), never streaks/points/leaderboards.
+  **Design locked 2026-06-11** (06: `Inbox · N new` slice, Archived count dropped, win
+  pebbles w/ optional goal); build in Stage C via `GET /pulse`.
 - [ ] **P2 — Resurfacing card: "Still interested in X?".** Machine-initiated, phrased as a
   curious question, never a count badge or red dot (recognition beats recall for ADHD). v1
   candidates need no LLM: cluster = curated knowledge tag (`tips`/`coding`/`science`) × old
   saves; never `memes`/`vtubers` (identity content isn't a task). Dismiss = silent decay + a
-  no-renag window. Design one-pager before build. **One-pager drafted (overnight
-  2026-06-10): [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md) —
-  4 open questions for Kenja inside, incl. the japan resurface-vs-decay conflict.**
+  no-renag window. **Design LOCKED 2026-06-11** — one-pager
+  [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md) (all 4 questions
+  decided) + card rendered verbatim in 06; build = `resurface.py` + `GET /resurface` +
+  dismiss/letgo POSTs in Stage C (triage_score ranking term degrades to dormancy-only
+  until feat/triage-score integrates).
 - [ ] **P2 — "Surprise me" card.** One bounded random old save on demand — converts the
   rediscovery-joy that sustains the save habit into a deliberate retention loop. Rides
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
+  **Design locked 2026-06-11** (06: same ambient slot, never both cards, + ⚄ dice for
+  user-pulled); build in Stage C.
 
 ## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
 *From the PKMS research handoff (2026-06-10; evidence in
