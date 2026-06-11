@@ -1015,6 +1015,116 @@ def undecay(
     return res
 
 
+def delete_items(
+    conn: sqlite3.Connection,
+    *,
+    tags: list[str] | None = None,
+    subreddits: list[str] | None = None,
+    before_utc: int | None = None,
+    source: str = "reddit",
+    status: str | None = None,
+    swept: bool = False,
+    decayed: bool = False,
+    fullnames: list[str] | None = None,
+    also_unsave: bool = False,
+    apply: bool = False,
+    samples: int = 8,
+    max_rows: int = 5000,
+) -> dict:
+    """PERMANENTLY delete matching items (and their cached reddit_threads rows).
+
+    The destructive endpoint of the triage-then-delete flow (Epic 21): e.g. after the
+    swept/ephemeral pass is triaged, ``swept=True, tags=['ephemeral']`` removes the
+    rest for good. Unlike decay this is IRREVERSIBLE at the DB layer — the CLI wraps it
+    in a dry-run-default + double-confirmation + auto-backup + audit-log gate; this
+    function additionally refuses to apply above ``max_rows`` (blast-radius cap).
+
+    Selector semantics: ``tags``/``subreddits`` union with each other and AND with
+    every other selector (status/swept/decayed/age/fullnames). At least one selector
+    is required — a bare source-wide delete is refused.
+
+    ``also_unsave=True`` enqueues each deleted reddit item into the existing
+    ``reddit_unsave`` queue BEFORE the row vanishes (the queue stores reddit_id, so
+    draining works without the item). Without it, PENDING queue rows for deleted items
+    are removed so a later drain can't unsave something the user only deleted locally;
+    drained history rows are kept as audit.
+    """
+    if not (tags or subreddits or before_utc or fullnames or swept or decayed or status):
+        raise ValueError("delete_items needs at least one selector")
+    clauses = ["source=?"]
+    params: list = [source]
+    if fullnames:
+        ph = ",".join("?" for _ in fullnames)
+        clauses.append(f"fullname IN ({ph})")
+        params.extend(fullnames)
+    if status:
+        clauses.append("status=?")
+        params.append(status)
+    if swept:
+        clauses.append("json_extract(metadata, '$.decay_label') = 'swept'")
+    if decayed:
+        clauses.append("json_extract(metadata, '$.decayed_at') IS NOT NULL")
+    sel = []
+    if tags:
+        ph = ",".join("?" for _ in tags)
+        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        params.extend(tags)
+    if subreddits:
+        ph = ",".join("?" for _ in subreddits)
+        sel.append(f"lower(json_extract(metadata, '$.subreddit')) IN ({ph})")
+        params.extend(s.lower() for s in subreddits)
+    if sel:
+        clauses.append("(" + " OR ".join(sel) + ")")
+    if before_utc is not None:
+        clauses.append(f"{_AGE_EXPR} < ?")
+        params.append(int(before_utc))
+    where = " AND ".join(clauses)
+
+    victims = [r[0] for r in conn.execute(
+        f"SELECT fullname FROM items WHERE {where}", params).fetchall()]
+    total = len(victims)
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?", params + [int(samples)],
+        ).fetchall()
+    ]
+    res = {"total": total, "applied": False, "threads_deleted": 0,
+           "unsave_enqueued": 0, "sample": sample}
+    if not apply:
+        return res
+    if total > max_rows:
+        raise ValueError(
+            f"refusing to delete {total} rows (> max_rows={max_rows}); "
+            f"raise max_rows deliberately if this is intended")
+    res["applied"] = True
+    if not total:
+        return res
+
+    enqueued = 0
+    if also_unsave:
+        before_q = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+        for fn in victims:  # must happen while the item rows still exist
+            enqueue_unsave(conn, fn)
+        enqueued = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] - before_q
+
+    threads = 0
+    for i in range(0, total, 500):  # chunk IN lists well under SQLite's variable cap
+        chunk = victims[i:i + 500]
+        ph = ",".join("?" for _ in chunk)
+        cur = conn.execute(f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk)
+        threads += cur.rowcount
+        if not also_unsave:
+            conn.execute(
+                f"DELETE FROM reddit_unsave WHERE fullname IN ({ph}) AND state='pending'",
+                chunk)
+        conn.execute(f"DELETE FROM items WHERE fullname IN ({ph})", chunk)
+    conn.commit()
+    res.update(threads_deleted=threads, unsave_enqueued=enqueued)
+    return res
+
+
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
     row = conn.execute("SELECT * FROM items WHERE fullname=?", (fullname,)).fetchone()
     return _row_to_public(row) if row else None
