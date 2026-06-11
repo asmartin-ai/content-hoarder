@@ -635,9 +635,12 @@ def search_items(
         rows = conn.execute(
             sql_base.format(order=_order_clause(sort, order, "i")), bind
         ).fetchall()
-        if not rows and fuzzy_rescue:
-            # Tight pass empty -> genuine typo territory: match any gram, best trigram
-            # overlap first (bm25 rank), so near-misses surface and junk sinks.
+        if not rows and fuzzy_rescue and not offset:
+            # Tight pass empty ON PAGE ONE -> genuine typo territory: match any gram,
+            # best trigram overlap first (bm25 rank), so near-misses surface and junk
+            # sinks. Gated to offset 0: on deeper pages an empty tight result means the
+            # real matches are simply exhausted — rescuing there would append unrelated
+            # one-gram noise after the genuine results (pagination/infinite-scroll bug).
             bind[0] = fuzzy_rescue
             rows = conn.execute(
                 sql_base.format(order="ORDER BY rank, i.last_seen_utc DESC"), bind
@@ -746,6 +749,15 @@ def enqueue_existing_done(conn: sqlite3.Connection) -> int:
     return after - before
 
 
+# Any MANUAL status transition exits the decayed state (see decay/undecay): strip the
+# wave marks so "stamped == currently decayed" holds and is:swept never matches a rescued
+# item. One definition for every status writer — a future writer that forgets this breaks
+# the invariant silently. No json_valid guard needed: the functional duration index makes
+# SQLite validate metadata JSON on every write, so a malformed row can never exist here
+# (pinned by test_malformed_metadata_cannot_enter_the_db).
+_STRIP_DECAY_SQL = "json_remove(metadata, '$.decayed_at', '$.decay_label')"
+
+
 def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | None:
     """Set an item's triage status; record the previous one for undo."""
     if status not in VALID_STATUSES:
@@ -760,12 +772,9 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
         return _public_by_fullname(conn, fullname)  # idempotent; don't clobber status_prev
     now = int(time.time())
     processed = None if status == "inbox" else now
-    # Any manual transition exits the decayed state — strip the decay marks (no-op when
-    # absent) so "stamped == currently decayed" stays true and is:swept/is:decayed never
-    # match a rescued item. Only db.decay writes these keys.
     conn.execute(
-        "UPDATE items SET status=?, status_prev=?, processed_utc=?, "
-        "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE fullname=?",
+        f"UPDATE items SET status=?, status_prev=?, processed_utc=?, "
+        f"metadata={_STRIP_DECAY_SQL} WHERE fullname=?",
         (status, old, processed, fullname),
     )
     if status == "done" and _unsave_enabled(conn):
@@ -788,8 +797,8 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     now = int(time.time())
     processed = None if prev == "inbox" else now
     conn.execute(
-        "UPDATE items SET status=?, status_prev=NULL, processed_utc=?, "
-        "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE fullname=?",
+        f"UPDATE items SET status=?, status_prev=NULL, processed_utc=?, "
+        f"metadata={_STRIP_DECAY_SQL} WHERE fullname=?",
         (prev, processed, fullname),
     )
     if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
@@ -816,9 +825,8 @@ def bulk_set_status(
         # `AND status<>?` skips no-op updates so status_prev (single-step undo) is
         # never clobbered by re-applying the same status.
         cur = conn.execute(
-            "UPDATE items SET status_prev=status, status=?, processed_utc=?, "
-            "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') "
-            "WHERE fullname=? AND status<>?",
+            f"UPDATE items SET status_prev=status, status=?, processed_utc=?, "
+            f"metadata={_STRIP_DECAY_SQL} WHERE fullname=? AND status<>?",
             (status, processed, fn, status),
         )
         count += cur.rowcount
