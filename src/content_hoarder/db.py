@@ -486,6 +486,7 @@ def search_items(
     nsfw: bool = False,
     decayed: bool = False,
     swept: bool = False,
+    has_media: str | None = None,
     before: int | None = None,
     after: int | None = None,
     score_min: int | None = None,
@@ -548,6 +549,12 @@ def search_items(
                 f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
             )
             params.extend(NSFW_TAGS)
+        if has_media:
+            # has:video|image|gallery — facet over metadata.media_type. "video" means
+            # reddit-hosted video ('reddit_video'); external embeds keep media_type='link'.
+            mt = {"video": "reddit_video"}.get(has_media, has_media)
+            filters.append(f"json_extract({a}metadata, '$.media_type') = ?")
+            params.append(mt)
         if decayed:
             # decayed (is:decayed): the item carries a decay-wave stamp (see db.decay).
             filters.append(f"json_extract({a}metadata, '$.decayed_at') IS NOT NULL")
