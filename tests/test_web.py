@@ -25,8 +25,16 @@ def test_items_search(tmp_db):
     assert r["items"][0]["fullname"] == "reddit:t3_a"
 
 
-def test_items_fuzzy(tmp_db):
-    r = _client(tmp_db).get("/items?fuzzy=1&q=hedgmog").get_json()
+def test_items_fuzzy_default_and_exact_override(tmp_db):
+    cl = _client(tmp_db)
+    # fuzzy is the DEFAULT: a bare typo'd term matches (Epic 12 flip)
+    r = cl.get("/items?q=hedgmog").get_json()
+    assert any(i["fullname"] == "reddit:t3_a" for i in r["items"])
+    # ?exact=1 (the repurposed checkbox) forces the exact path -> typo misses
+    r = cl.get("/items?exact=1&q=hedgmog").get_json()
+    assert not any(i["fullname"] == "reddit:t3_a" for i in r["items"])
+    # quoted phrases are exact even in fuzzy default mode
+    r = cl.get('/items?q="Hedgehog"').get_json()
     assert any(i["fullname"] == "reddit:t3_a" for i in r["items"])
 
 

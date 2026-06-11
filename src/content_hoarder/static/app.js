@@ -560,7 +560,7 @@
     const p = new URLSearchParams();
     const q = document.getElementById("q").value.trim();
     if (q) p.set("q", q);
-    if (document.getElementById("fuzzy").checked) p.set("fuzzy", "1");
+    if (document.getElementById("exact").checked) p.set("exact", "1");
     if (activeStatus) p.set("status", activeStatus);
     const sv = document.getElementById("sort").value.split(":");
     p.set("sort", sv[0]);
@@ -1157,7 +1157,7 @@
       load(true);
     });
   }
-  document.getElementById("fuzzy").addEventListener("change", () => load(true));
+  document.getElementById("exact").addEventListener("change", () => load(true));
   document.getElementById("sort").addEventListener("change", () => load(true));
   const toggleTagFilter = (row) => {
     if (!row) return;
