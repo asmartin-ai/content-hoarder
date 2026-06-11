@@ -249,6 +249,63 @@ def cmd_promote(args) -> int:
     return 0
 
 
+def cmd_delete(args) -> int:
+    """PERMANENT delete with the money-action safety shape: dry-run is the default and
+    the confirmation surface; --apply alone refuses (exit 3); --apply --yes executes
+    after an automatic timestamped backup, then appends to the audit log."""
+    import datetime as _dt
+    import sqlite3 as _sqlite3
+    import time as _time
+    from pathlib import Path
+
+    from content_hoarder import config, db
+    if not (args.tag or args.subreddit or args.before or args.fullname
+            or args.swept or args.status):
+        print("error: delete needs at least one selector "
+              "(--tag/--subreddit/--before/--fullname/--swept/--status)", file=sys.stderr)
+        return 2
+    before_utc, rc = _parse_date(args.before, "--before")
+    if rc:
+        return rc
+
+    selectors = dict(tags=args.tag, subreddits=args.subreddit, before_utc=before_utc,
+                     source=args.source, status=args.status, swept=args.swept,
+                     fullnames=args.fullname, also_unsave=args.also_unsave)
+    with _connect() as conn:
+        plan = db.delete_items(conn, **selectors, apply=False)
+        if not args.apply:
+            print(json.dumps(plan, indent=2))
+            print(f"(dry run — {plan['total']} item(s) would be PERMANENTLY deleted; "
+                  f"re-run with --apply --yes to commit. Irreversible except via the "
+                  f"automatic backup.)", file=sys.stderr)
+            return 0
+        if not args.yes:
+            print(json.dumps(plan, indent=2))
+            print("refusing: a hard delete needs BOTH --apply and --yes.", file=sys.stderr)
+            return 3
+
+        stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        bak = Path(config.db_path()).with_name(f"app.backup-pre-delete-{stamp}.db")
+        dst = _sqlite3.connect(str(bak))
+        with dst:
+            conn.backup(dst)
+        dst.close()
+
+        res = db.delete_items(conn, **selectors, apply=True, max_rows=args.max)
+        res["backup"] = str(bak)
+
+        audit_path = Path(config.db_path()).with_name("delete-audit.jsonl")
+        audit = {"ts": int(_time.time()), "selectors": {k: v for k, v in selectors.items()
+                                                        if v not in (None, False)},
+                 "total": res["total"], "threads_deleted": res["threads_deleted"],
+                 "unsave_enqueued": res["unsave_enqueued"], "backup": str(bak),
+                 "sample": res["sample"]}
+        with audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def cmd_export(args) -> int:
     from pathlib import Path
 
@@ -448,6 +505,32 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--limit", type=int)
     pp.add_argument("--dry-run", action="store_true")
     pp.set_defaults(func=cmd_promote)
+
+    pdel = sub.add_parser(
+        "delete",
+        help="PERMANENTLY delete matching items (dry-run default; execution needs "
+             "--apply AND --yes; automatic pre-delete backup + audit log).",
+    )
+    pdel.add_argument("--tag", action="append",
+                      help="Items carrying this tag (repeatable; union with --subreddit).")
+    pdel.add_argument("--subreddit", action="append",
+                      help="Items from this subreddit (repeatable; case-insensitive).")
+    pdel.add_argument("--before", help="Only items older than YYYY-MM-DD (content age).")
+    pdel.add_argument("--fullname", action="append", help="Exact item(s) by fullname.")
+    pdel.add_argument("--status", help="Only items in this status.")
+    pdel.add_argument("--swept", action="store_true",
+                      help="Only items from the labeled initial decay pass (is:swept).")
+    pdel.add_argument("--source", default="reddit", help="Source (default: reddit).")
+    pdel.add_argument("--also-unsave", action="store_true", dest="also_unsave",
+                      help="Also enqueue deleted reddit items into the unsave queue "
+                           "(drained later via the cookie path).")
+    pdel.add_argument("--max", type=int, default=5000,
+                      help="Refuse to delete more rows than this (blast-radius cap).")
+    pdel.add_argument("--apply", action="store_true",
+                      help="Execute (with --yes). Default: dry run.")
+    pdel.add_argument("--yes", action="store_true",
+                      help="Second confirmation; --apply alone shows the plan and refuses.")
+    pdel.set_defaults(func=cmd_delete)
 
     pex = sub.add_parser(
         "export",
