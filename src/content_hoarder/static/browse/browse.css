@@ -510,3 +510,20 @@ kbd{font:var(--fw-bold) .7rem/1 var(--font-mono);background:var(--surface-inset)
   .sheetpanel::before{content:"";display:block;width:42px;height:5px;border-radius:3px;
     background:var(--border-control);margin:0 auto 14px}
 }
+
+/* command palette (locked Epic 20: ">" flips search to command mode) */
+.palette{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface-card);
+  border:1px solid var(--border-control);border-radius:var(--r-md);box-shadow:var(--shadow-pop);
+  padding:4px 0;display:none;z-index:40}
+.palette.show{display:block}
+.pal-row{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:8px 12px;border:none;background:transparent;color:var(--text);
+  font:var(--fw-regular) var(--fs-sm)/1.4 var(--font-mono);cursor:pointer;text-align:left;
+  outline:none}
+.pal-row:hover{background:var(--accent-tint)}
+.pal-row.sel{background:var(--accent-tint);color:var(--accent-strong)}
+.pal-label{flex:1;min-width:0}
+.pal-hint{font:var(--fw-semibold) .68rem/1 var(--font-mono);color:var(--text-muted);
+  border:1px solid var(--border-control);border-radius:var(--r-sm);padding:2px 6px;
+  margin-left:12px;flex-shrink:0}
+.pal-row.sel .pal-hint{color:var(--accent);border-color:var(--accent)}

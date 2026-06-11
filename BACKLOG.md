@@ -529,9 +529,12 @@ build-tracking now, not open design questions:*
   color+icon swap at the second threshold + a haptic pulse (`navigator.vibrate`); long-press
   stays = select. **Design locked 2026-06-11** (06-adhd-round.html, thresholds ≈90px/≈170px,
   demoed working); build in Stage C.
-- [ ] **P2 — Command palette v1.** `/` focuses search; `>` flips to command mode (set status
-  view, density, theme, sort, go to triage/reddit, bulk ops on selection). Fuzzy match + arrows
-  + Enter. Until it ships, the search placeholder must not advertise `>`.
+- [x] ~~**P2 — Command palette v1.**~~ Shipped (2026-06-11, the bakeoff's T3 winner —
+  GLM-5.1's sample + review fixes): `static/browse/palette.js` (ES module, fuzzy
+  subsequence match with strict-prefix > word-boundary > scattered tiers, arrows wrap,
+  Enter runs, Escape exits, listbox/option ARIA), commands for pages/theme/density/sort.
+  `>` flips the search bar to command mode; placeholder now advertises it. Deferred to a
+  v2: status-view switching, bulk ops on selection (need the selection model exposed).
 - [ ] **P2 — Filter-state visibility (simple now).** Active source/tag chips with ✕ + "clear
   all" rendered in the sheet shelf next to the result count; define the algebra (single-select
   source, multi-select tags) and keep it visible. **Design locked 2026-06-11** (06, demoed);

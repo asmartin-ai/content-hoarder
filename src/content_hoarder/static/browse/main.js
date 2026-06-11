@@ -10,6 +10,7 @@ import { createLightbox, imageUrl, mediaType, redditUrl } from "../core/media.js
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
+import { initPalette } from "./palette.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -466,11 +467,14 @@ $("#peekswept").addEventListener("click", () => {
 /* ---- search + operator popover (locked #6) ---- */
 const qInput = $("#q");
 const runSearch = debounce(() => {
+  if (qInput.value.startsWith(">")) return;  // command mode — palette.js owns the input
   state.q = qInput.value.trim();
   loadItems(true);
 }, 300);
 qInput.addEventListener("input", runSearch);
-qInput.addEventListener("focus", () => $("#oppop").classList.add("show"));
+qInput.addEventListener("focus", () => {
+  if (!qInput.value.startsWith(">")) $("#oppop").classList.add("show");
+});
 qInput.addEventListener("blur", () => setTimeout(() => $("#oppop").classList.remove("show"), 160));
 $$(".opchip").forEach((c) => c.addEventListener("pointerdown", (e) => {
   e.preventDefault();
@@ -594,3 +598,17 @@ loadItems(true);
 
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+
+/* ---- command palette (locked Epic 20: ">" flips search to command mode) ---- */
+initPalette(qInput, [
+  { label: "Go to Triage", hint: "page", run: () => location.assign("/triage") },
+  { label: "Go to Reddit saved", hint: "page", run: () => location.assign("/reddit") },
+  { label: "Theme: dark", hint: "view", run: () => { const b = $('#set-theme [data-theme="dark"]'); if (b) b.click(); } },
+  { label: "Theme: light", hint: "view", run: () => { const b = $('#set-theme [data-theme="light"]'); if (b) b.click(); } },
+  { label: "Density: comfortable", hint: "view", run: () => { const b = $('#set-density [data-d="comfortable"]'); if (b) b.click(); } },
+  { label: "Density: compact", hint: "view", run: () => { const b = $('#set-density [data-d="compact"]'); if (b) b.click(); } },
+  { label: "Density: card", hint: "view", run: () => { const b = $('#set-density [data-d="card"]'); if (b) b.click(); } },
+  { label: "Sort: newest saved", hint: "sort", run: () => { sortSel.value = "first_seen_utc:desc"; sortSel.dispatchEvent(new Event("change")); } },
+  { label: "Sort: oldest post", hint: "sort", run: () => { sortSel.value = "created_utc:asc"; sortSel.dispatchEvent(new Event("change")); } },
+  { label: "Sort: shortest", hint: "sort", run: () => { sortSel.value = "duration:asc"; sortSel.dispatchEvent(new Event("change")); } },
+]);
