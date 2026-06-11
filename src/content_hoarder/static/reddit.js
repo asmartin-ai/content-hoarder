@@ -422,10 +422,20 @@
   }
 
   // ── Export link ──────────────────────────────────────────────────────────────
+  // The link carries the view's CURRENT filters (minus paging) so "export" means
+  // "export what I'm looking at". Refreshed on format change and at click time.
   if (exportFormat && exportLink) {
-    exportFormat.addEventListener('change', () => {
-      exportLink.href = '/export?format=' + exportFormat.value;
-    });
+    const syncExport = () => {
+      const p = buildParams();
+      p.delete('limit'); p.delete('offset');
+      p.set('source', 'reddit');  // this view is reddit-scoped
+      p.set('format', exportFormat.value);
+      exportLink.href = '/export?' + p.toString();
+    };
+    exportFormat.addEventListener('change', syncExport);
+    exportLink.addEventListener('mousedown', syncExport);
+    exportLink.addEventListener('keydown', syncExport);
+    syncExport();
   }
 
   // ── Filter/search events ───────────────────────────────────────────────────

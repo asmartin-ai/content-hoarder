@@ -38,6 +38,35 @@ def test_items_fuzzy_default_and_exact_override(tmp_db):
     assert any(i["fullname"] == "reddit:t3_a" for i in r["items"])
 
 
+def test_export_csv_json_and_tag_filter(tmp_db):
+    cl = _client(tmp_db)
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(
+        source="reddit", source_id="t3_x", kind="post", title="X",
+        metadata={"subreddit": "hh", "tags": ["nsfw_erotic"],
+                  "permalink": "https://www.reddit.com/r/hh/comments/x/"}))
+    conn.commit()
+    conn.close()
+
+    r = cl.get("/export?format=json&tag=nsfw_erotic").get_json()
+    assert r["count"] == 1
+    assert r["items"][0]["fullname"] == "reddit:t3_x"
+    assert r["items"][0]["permalink"].endswith("/x/")
+
+    # operator form is equivalent to the param form
+    r2 = cl.get("/export?format=json&q=tag:nsfw_erotic").get_json()
+    assert r2["count"] == 1
+
+    body = cl.get("/export?format=csv&tag=nsfw_erotic")
+    assert body.mimetype == "text/csv"
+    text = body.data.decode("utf-8")
+    assert text.splitlines()[0].startswith("fullname,source,")
+    assert "reddit:t3_x" in text
+
+    # unfiltered export returns everything (the 2 seeds + t3_x)
+    assert cl.get("/export?format=json").get_json()["count"] == 3
+
+
 def test_sources_and_stats(tmp_db):
     cl = _client(tmp_db)
     ids = {s["id"] for s in cl.get("/sources").get_json()["sources"]}

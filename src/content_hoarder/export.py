@@ -1,13 +1,50 @@
-"""Export items out to other tools (Obsidian vault as Markdown)."""
+"""Export items out to other tools (Obsidian vault as Markdown; CSV/JSON lists)."""
 
 from __future__ import annotations
 
+import csv
 import datetime
+import io
 import re
 from pathlib import Path
 
 from content_hoarder import db
 from content_hoarder.models import parse_metadata
+
+# Flat-record vocabulary for the CSV/JSON list exports. Re-save-elsewhere oriented:
+# permalink is the key field for migrating reddit saves to another account.
+EXPORT_FIELDS = ("fullname", "source", "kind", "status", "title", "url", "permalink",
+                 "subreddit", "tags", "score", "created_utc")
+
+
+def export_records(rows: list[dict]) -> list[dict]:
+    """Flatten search_items/public rows into stable EXPORT_FIELDS records."""
+    out = []
+    for it in rows:
+        md = it.get("metadata")
+        md = md if isinstance(md, dict) else parse_metadata(md)
+        out.append({
+            "fullname": it.get("fullname", ""),
+            "source": it.get("source", ""),
+            "kind": it.get("kind", ""),
+            "status": it.get("status", ""),
+            "title": it.get("title") or "",
+            "url": it.get("url") or "",
+            "permalink": md.get("permalink") or "",
+            "subreddit": md.get("subreddit") or "",
+            "tags": "|".join(md.get("tags") or []),
+            "score": md.get("score"),
+            "created_utc": int(it.get("created_utc") or 0),
+        })
+    return out
+
+
+def to_csv(records: list[dict]) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=EXPORT_FIELDS, lineterminator="\n")
+    w.writeheader()
+    w.writerows(records)
+    return buf.getvalue()
 
 
 def _slug(text: str) -> str:

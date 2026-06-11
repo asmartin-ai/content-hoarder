@@ -249,6 +249,22 @@ def cmd_promote(args) -> int:
     return 0
 
 
+def cmd_export(args) -> int:
+    from pathlib import Path
+
+    from content_hoarder import db, export
+    with _connect() as conn:
+        rows = db.search_items(conn, "", source=args.source, status=args.status,
+                               tags=args.tag or None, subreddit=args.subreddit,
+                               limit=1_000_000)
+    recs = export.export_records(rows)
+    text = (json.dumps(recs, ensure_ascii=False, indent=2)
+            if args.format == "json" else export.to_csv(recs))
+    Path(args.out).write_text(text, encoding="utf-8")
+    print(f"exported {len(recs)} item(s) -> {args.out}")
+    return 0
+
+
 def cmd_export_obsidian(args) -> int:
     from content_hoarder import export
     with _connect() as conn:
@@ -432,6 +448,19 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--limit", type=int)
     pp.add_argument("--dry-run", action="store_true")
     pp.set_defaults(func=cmd_promote)
+
+    pex = sub.add_parser(
+        "export",
+        help="Dump matching items to CSV/JSON (re-save-elsewhere oriented; "
+             "e.g. --tag nsfw_erotic --out erotic.csv).",
+    )
+    pex.add_argument("--out", required=True, help="Output file path.")
+    pex.add_argument("--format", choices=("csv", "json"), default="csv")
+    pex.add_argument("--tag", action="append", help="Filter by tag (repeatable = OR).")
+    pex.add_argument("--status", help="Filter by status.")
+    pex.add_argument("--source", help="Filter by source.")
+    pex.add_argument("--subreddit", help="Filter by subreddit.")
+    pex.set_defaults(func=cmd_export)
 
     px = sub.add_parser("export-obsidian", help="Write items to an Obsidian vault as Markdown.")
     px.add_argument("--vault", required=True)
