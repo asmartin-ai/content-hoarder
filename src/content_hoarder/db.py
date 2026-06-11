@@ -450,13 +450,20 @@ def _fts_query(
     return out
 
 
-def _trigram_match(q: str) -> str:
-    """OR of the query's overlapping 3-grams (typo-tolerant). '' if < 3 chars."""
+def _trigram_exprs(q: str) -> tuple[str, str]:
+    """(AND, OR) expressions over the query's overlapping 3-grams; ('', '') if < 3 chars.
+
+    AND ≈ "contains the typed string" — the tight default for fuzzy search (partial
+    words and trailing typos still match via substring). OR matches ANY single gram and
+    is junk unless rank-ordered — it exists only as the typo-rescue fallback when the
+    tight pass finds nothing (became user-visible when fuzzy went default-on: an OR-only
+    match made every bare search return one-gram noise in recency order)."""
     s = (q or "").strip().lower()
     if len(s) < 3:
-        return ""
-    grams = {s[i : i + 3] for i in range(len(s) - 2)}
-    return " OR ".join('"' + g.replace('"', '""') + '"' for g in sorted(grams))
+        return "", ""
+    grams = sorted({s[i : i + 3] for i in range(len(s) - 2)})
+    quoted = ['"' + g.replace('"', '""') + '"' for g in grams]
+    return " AND ".join(quoted), " OR ".join(quoted)
 
 
 def _order_clause(sort: str, order: str, alias: str = "") -> str:
@@ -484,6 +491,9 @@ def search_items(
     subreddit: str | None = None,
     is_saved: int | None = None,
     nsfw: bool = False,
+    decayed: bool = False,
+    swept: bool = False,
+    has_media: str | None = None,
     before: int | None = None,
     after: int | None = None,
     score_min: int | None = None,
@@ -546,6 +556,18 @@ def search_items(
                 f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
             )
             params.extend(NSFW_TAGS)
+        if has_media:
+            # has:video|image|gallery — facet over metadata.media_type. "video" means
+            # reddit-hosted video ('reddit_video'); external embeds keep media_type='link'.
+            mt = {"video": "reddit_video"}.get(has_media, has_media)
+            filters.append(f"json_extract({a}metadata, '$.media_type') = ?")
+            params.append(mt)
+        if decayed:
+            # decayed (is:decayed): the item carries a decay-wave stamp (see db.decay).
+            filters.append(f"json_extract({a}metadata, '$.decayed_at') IS NOT NULL")
+        if swept:
+            # swept (is:swept): decayed in the labeled initial backfill pass specifically.
+            filters.append(f"json_extract({a}metadata, '$.decay_label') = 'swept'")
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)
@@ -584,6 +606,7 @@ def search_items(
 
     match_expr = ""
     fts_table = ""
+    fuzzy_rescue = ""  # OR-of-trigrams typo fallback; only ever run rank-ordered
 
     # FTS5 requires at least one positive term; if the query is only operators/negations,
     # fall back to the plain filtered SELECT path.
@@ -591,8 +614,12 @@ def search_items(
 
     if has_positive:
         if fuzzy and q and not exact and not exclude:
-            match_expr = _trigram_match(q)
-            fts_table = "items_trgm"
+            and_expr, or_expr = _trigram_exprs(q)
+            if and_expr:
+                match_expr = and_expr
+                fts_table = "items_trgm"
+                if or_expr != and_expr:  # >1 gram, a rescue pass is meaningful
+                    fuzzy_rescue = or_expr
         if not match_expr:  # exact (or fuzzy fell back for short queries)
             match_expr = _fts_query(q, exact=exact, exclude=exclude)
             fts_table = "items_fts"
@@ -600,11 +627,25 @@ def search_items(
     if match_expr and fts_table:
         add_filters("i")
         where = " AND ".join([f"{fts_table} MATCH ?"] + filters)
-        sql = (
+        sql_base = (
             f"SELECT i.* FROM items i JOIN {fts_table} ON {fts_table}.rowid = i.rowid "
-            f"WHERE {where} {_order_clause(sort, order, 'i')} LIMIT ? OFFSET ?"
+            f"WHERE {where} {{order}} LIMIT ? OFFSET ?"
         )
         bind = [match_expr] + params + [int(limit), int(offset)]
+        rows = conn.execute(
+            sql_base.format(order=_order_clause(sort, order, "i")), bind
+        ).fetchall()
+        if not rows and fuzzy_rescue and not offset:
+            # Tight pass empty ON PAGE ONE -> genuine typo territory: match any gram,
+            # best trigram overlap first (bm25 rank), so near-misses surface and junk
+            # sinks. Gated to offset 0: on deeper pages an empty tight result means the
+            # real matches are simply exhausted — rescuing there would append unrelated
+            # one-gram noise after the genuine results (pagination/infinite-scroll bug).
+            bind[0] = fuzzy_rescue
+            rows = conn.execute(
+                sql_base.format(order="ORDER BY rank, i.last_seen_utc DESC"), bind
+            ).fetchall()
+        return [_row_to_public(r) for r in rows]
     else:
         add_filters("")
         # No positive FTS term to hang a NOT off of (e.g. a `-term`-only query), so apply
@@ -708,6 +749,15 @@ def enqueue_existing_done(conn: sqlite3.Connection) -> int:
     return after - before
 
 
+# Any MANUAL status transition exits the decayed state (see decay/undecay): strip the
+# wave marks so "stamped == currently decayed" holds and is:swept never matches a rescued
+# item. One definition for every status writer — a future writer that forgets this breaks
+# the invariant silently. No json_valid guard needed: the functional duration index makes
+# SQLite validate metadata JSON on every write, so a malformed row can never exist here
+# (pinned by test_malformed_metadata_cannot_enter_the_db).
+_STRIP_DECAY_SQL = "json_remove(metadata, '$.decayed_at', '$.decay_label')"
+
+
 def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | None:
     """Set an item's triage status; record the previous one for undo."""
     if status not in VALID_STATUSES:
@@ -723,7 +773,8 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
     now = int(time.time())
     processed = None if status == "inbox" else now
     conn.execute(
-        "UPDATE items SET status=?, status_prev=?, processed_utc=? WHERE fullname=?",
+        f"UPDATE items SET status=?, status_prev=?, processed_utc=?, "
+        f"metadata={_STRIP_DECAY_SQL} WHERE fullname=?",
         (status, old, processed, fullname),
     )
     if status == "done" and _unsave_enabled(conn):
@@ -746,7 +797,8 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     now = int(time.time())
     processed = None if prev == "inbox" else now
     conn.execute(
-        "UPDATE items SET status=?, status_prev=NULL, processed_utc=? WHERE fullname=?",
+        f"UPDATE items SET status=?, status_prev=NULL, processed_utc=?, "
+        f"metadata={_STRIP_DECAY_SQL} WHERE fullname=?",
         (prev, processed, fullname),
     )
     if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
@@ -773,8 +825,8 @@ def bulk_set_status(
         # `AND status<>?` skips no-op updates so status_prev (single-step undo) is
         # never clobbered by re-applying the same status.
         cur = conn.execute(
-            "UPDATE items SET status_prev=status, status=?, processed_utc=? "
-            "WHERE fullname=? AND status<>?",
+            f"UPDATE items SET status_prev=status, status=?, processed_utc=?, "
+            f"metadata={_STRIP_DECAY_SQL} WHERE fullname=? AND status<>?",
             (status, processed, fn, status),
         )
         count += cur.rowcount
@@ -789,6 +841,11 @@ def bulk_set_status(
     return count
 
 
+# Item age: content creation time when known, else when we first synced it. (Reddit/YouTube
+# expose no save timestamps, so this is a content-age proxy — see the decay docstring.)
+_AGE_EXPR = "(CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END)"
+
+
 def bankruptcy(
     conn: sqlite3.Connection,
     before_utc: int,
@@ -801,8 +858,7 @@ def bankruptcy(
     Age uses ``created_utc`` when known, else ``first_seen_utc``. Returns the count
     affected (or that *would* be affected when ``dry_run``).
     """
-    age_expr = "(CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END)"
-    where = f"status='inbox' AND {age_expr} < ?"
+    where = f"status='inbox' AND {_AGE_EXPR} < ?"
     params: list = [int(before_utc)]
     if source:
         where += " AND source = ?"
@@ -819,6 +875,285 @@ def bankruptcy(
     )
     conn.commit()
     return n
+
+
+def _decay_where(tags, subreddits, before_utc, source) -> tuple[str, list]:
+    """WHERE clause + params for a decay selection: tag/subreddit selectors UNION,
+    age cutoff and source AND. Tag SQL mirrors search_items' json_each filter."""
+    clauses = ["status='inbox'", "source=?"]
+    params: list = [source]
+    sel = []
+    if tags:
+        ph = ",".join("?" for _ in tags)
+        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        params.extend(tags)
+    if subreddits:
+        ph = ",".join("?" for _ in subreddits)
+        sel.append(f"lower(json_extract(metadata, '$.subreddit')) IN ({ph})")
+        params.extend(s.lower() for s in subreddits)
+    if sel:
+        clauses.append("(" + " OR ".join(sel) + ")")
+    if before_utc is not None:
+        clauses.append(f"{_AGE_EXPR} < ?")
+        params.append(int(before_utc))
+    return " AND ".join(clauses), params
+
+
+def decay(
+    conn: sqlite3.Connection,
+    *,
+    tags: list[str] | None = None,
+    subreddits: list[str] | None = None,
+    before_utc: int | None = None,
+    source: str = "reddit",
+    label: str | None = None,
+    apply: bool = False,
+    samples: int = 5,
+    top_subs: int = 50,
+) -> dict:
+    """Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped for reversal.
+
+    The tag-aware successor to ``bankruptcy`` (PKMS-research adoption, Epic 21): selects
+    ``status='inbox'`` items of ``source`` matching ANY of ``tags``/``subreddits`` (union),
+    optionally older than ``before_utc`` (content age — Reddit exposes no save timestamps),
+    and archives them stamping ``metadata.decayed_at``. One stamp value per call = one
+    independently reversible "wave" (see ``undecay``). Refuses an unselected decay.
+    ``label`` additionally writes ``metadata.decay_label`` — e.g. the supervised initial
+    backfill uses ``label='swept'`` so its items stay distinguishable from any future
+    rolling decay (queryable via the ``is:swept`` search operator; ``is:decayed`` matches
+    any wave). A label is a marker, NOT a tag: tags get wholesale-replaced by categorize
+    retags, while metadata keys survive both retags and syncs.
+
+    Deliberately a direct UPDATE like ``bankruptcy`` — never routed through
+    ``bulk_set_status`` — so a mass decay can never enqueue live Reddit unsaves.
+    Dry-run (default) and apply return the same shape; breakdowns are computed before
+    the UPDATE. ``by_tag`` counts membership per selected tag and overlaps by design
+    (an anime+memes item counts under both) — ``total`` is the authoritative
+    distinct-row count, never ``sum(by_tag)``.
+    """
+    if not (tags or subreddits or before_utc):
+        raise ValueError("decay needs at least one selector (tags/subreddits/before_utc)")
+    where, params = _decay_where(tags, subreddits, before_utc, source)
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+
+    by_tag: dict = {}
+    for t in tags or []:
+        n = conn.execute(
+            f"SELECT COUNT(*) FROM items WHERE {where} AND EXISTS "
+            "(SELECT 1 FROM json_each(metadata, '$.tags') WHERE value = ?)",
+            params + [t],
+        ).fetchone()[0]
+        if n:
+            by_tag[t] = n
+
+    by_subreddit = {
+        r[0]: r[1]
+        for r in conn.execute(
+            f"SELECT COALESCE(lower(json_extract(metadata, '$.subreddit')), '(none)') s, "
+            f"COUNT(*) n FROM items WHERE {where} GROUP BY s ORDER BY n DESC LIMIT ?",
+            params + [int(top_subs)],
+        ).fetchall()
+    }
+
+    now = int(time.time())
+    yr = 365 * 24 * 3600
+    b = conn.execute(
+        f"SELECT SUM(CASE WHEN {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN {_AGE_EXPR} < ? THEN 1 ELSE 0 END) FROM items WHERE {where}",
+        [now - yr, now - yr, now - 2 * yr, now - 2 * yr, now - 4 * yr, now - 4 * yr] + params,
+    ).fetchone()
+    age_bands = {"<1y": b[0] or 0, "1-2y": b[1] or 0, "2-4y": b[2] or 0, ">=4y": b[3] or 0}
+
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?",
+            params + [int(samples)],
+        ).fetchall()
+    ]
+
+    res = {"total": total, "applied": False, "decayed_at": None, "label": label,
+           "by_tag": by_tag, "by_subreddit": by_subreddit, "age_bands": age_bands,
+           "sample": sample}
+    if apply:
+        res["applied"] = True
+        if total:
+            set_md = "json_set(metadata, '$.decayed_at', ?)"
+            md_params = [now]
+            if label:
+                set_md = "json_set(metadata, '$.decayed_at', ?, '$.decay_label', ?)"
+                md_params = [now, label]
+            cur = conn.execute(
+                f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
+                f"metadata={set_md} WHERE {where}",
+                [now] + md_params + params,
+            )
+            conn.commit()
+            res.update(total=cur.rowcount, decayed_at=now)
+    return res
+
+
+def undecay(
+    conn: sqlite3.Connection,
+    *,
+    decayed_after: int | None = None,
+    decayed_before: int | None = None,
+    apply: bool = False,
+    samples: int = 5,
+) -> dict:
+    """Reverse ``decay``: return stamped-archived items to the inbox.
+
+    Selects by the ``metadata.decayed_at`` stamp (the wave id) — NOT ``status_prev``,
+    which is single-step and may have been clobbered since. Items manually re-statused
+    after a decay (e.g. to keep) are skipped by the ``status='archived'`` guard; their
+    stale stamp is harmless (undecay never touches non-archived rows, and a later decay
+    re-stamps). The stamp AND the decay label are REMOVED on restore so the invariant
+    "stamped == currently decayed" holds; ``processed_utc`` returns to NULL (inbox
+    semantics, as set_status).
+    """
+    clauses = ["status='archived'", "json_extract(metadata, '$.decayed_at') IS NOT NULL"]
+    params: list = []
+    if decayed_after is not None:
+        clauses.append("json_extract(metadata, '$.decayed_at') >= ?")
+        params.append(int(decayed_after))
+    if decayed_before is not None:
+        clauses.append("json_extract(metadata, '$.decayed_at') < ?")
+        params.append(int(decayed_before))
+    where = " AND ".join(clauses)
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?",
+            params + [int(samples)],
+        ).fetchall()
+    ]
+    res = {"total": total, "applied": False, "sample": sample}
+    if apply:
+        res["applied"] = True
+        if total:
+            cur = conn.execute(
+                f"UPDATE items SET status='inbox', status_prev='archived', processed_utc=NULL, "
+                f"metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE {where}",
+                params,
+            )
+            conn.commit()
+            res["total"] = cur.rowcount
+    return res
+
+
+def delete_items(
+    conn: sqlite3.Connection,
+    *,
+    tags: list[str] | None = None,
+    subreddits: list[str] | None = None,
+    before_utc: int | None = None,
+    source: str = "reddit",
+    status: str | None = None,
+    swept: bool = False,
+    decayed: bool = False,
+    fullnames: list[str] | None = None,
+    also_unsave: bool = False,
+    apply: bool = False,
+    samples: int = 8,
+    max_rows: int = 5000,
+) -> dict:
+    """PERMANENTLY delete matching items (and their cached reddit_threads rows).
+
+    The destructive endpoint of the triage-then-delete flow (Epic 21): e.g. after the
+    swept/ephemeral pass is triaged, ``swept=True, tags=['ephemeral']`` removes the
+    rest for good. Unlike decay this is IRREVERSIBLE at the DB layer — the CLI wraps it
+    in a dry-run-default + double-confirmation + auto-backup + audit-log gate; this
+    function additionally refuses to apply above ``max_rows`` (blast-radius cap).
+
+    Selector semantics: ``tags``/``subreddits`` union with each other and AND with
+    every other selector (status/swept/decayed/age/fullnames). At least one selector
+    is required — a bare source-wide delete is refused.
+
+    ``also_unsave=True`` enqueues each deleted reddit item into the existing
+    ``reddit_unsave`` queue BEFORE the row vanishes (the queue stores reddit_id, so
+    draining works without the item). Without it, PENDING queue rows for deleted items
+    are removed so a later drain can't unsave something the user only deleted locally;
+    drained history rows are kept as audit.
+    """
+    if not (tags or subreddits or before_utc or fullnames or swept or decayed or status):
+        raise ValueError("delete_items needs at least one selector")
+    clauses = ["source=?"]
+    params: list = [source]
+    if fullnames:
+        ph = ",".join("?" for _ in fullnames)
+        clauses.append(f"fullname IN ({ph})")
+        params.extend(fullnames)
+    if status:
+        clauses.append("status=?")
+        params.append(status)
+    if swept:
+        clauses.append("json_extract(metadata, '$.decay_label') = 'swept'")
+    if decayed:
+        clauses.append("json_extract(metadata, '$.decayed_at') IS NOT NULL")
+    sel = []
+    if tags:
+        ph = ",".join("?" for _ in tags)
+        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        params.extend(tags)
+    if subreddits:
+        ph = ",".join("?" for _ in subreddits)
+        sel.append(f"lower(json_extract(metadata, '$.subreddit')) IN ({ph})")
+        params.extend(s.lower() for s in subreddits)
+    if sel:
+        clauses.append("(" + " OR ".join(sel) + ")")
+    if before_utc is not None:
+        clauses.append(f"{_AGE_EXPR} < ?")
+        params.append(int(before_utc))
+    where = " AND ".join(clauses)
+
+    victims = [r[0] for r in conn.execute(
+        f"SELECT fullname FROM items WHERE {where}", params).fetchall()]
+    total = len(victims)
+    sample = [
+        f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?", params + [int(samples)],
+        ).fetchall()
+    ]
+    res = {"total": total, "applied": False, "threads_deleted": 0,
+           "unsave_enqueued": 0, "sample": sample}
+    if not apply:
+        return res
+    if total > max_rows:
+        raise ValueError(
+            f"refusing to delete {total} rows (> max_rows={max_rows}); "
+            f"raise max_rows deliberately if this is intended")
+    res["applied"] = True
+    if not total:
+        return res
+
+    enqueued = 0
+    if also_unsave:
+        before_q = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+        for fn in victims:  # must happen while the item rows still exist
+            enqueue_unsave(conn, fn)
+        enqueued = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] - before_q
+
+    threads = 0
+    for i in range(0, total, 500):  # chunk IN lists well under SQLite's variable cap
+        chunk = victims[i:i + 500]
+        ph = ",".join("?" for _ in chunk)
+        cur = conn.execute(f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk)
+        threads += cur.rowcount
+        if not also_unsave:
+            conn.execute(
+                f"DELETE FROM reddit_unsave WHERE fullname IN ({ph}) AND state='pending'",
+                chunk)
+        conn.execute(f"DELETE FROM items WHERE fullname IN ({ph})", chunk)
+    conn.commit()
+    res.update(threads_deleted=threads, unsave_enqueued=enqueued)
+    return res
 
 
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:

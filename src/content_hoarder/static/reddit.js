@@ -22,7 +22,7 @@
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
   const searchInput    = $('search-input');
-  const filterFuzzy    = $('filter-fuzzy');
+  const filterExact    = $('filter-exact');
   const filterKind     = $('filter-kind');
   const filterSaved    = $('filter-saved');
   const filterTag      = $('filter-tag');        // <details> wrapper
@@ -94,7 +94,7 @@
     const params = new URLSearchParams();
     const q = searchInput.value.trim();
     if (q) params.set('q', q);
-    if (filterFuzzy && filterFuzzy.checked) params.set('fuzzy', '1');
+    if (filterExact && filterExact.checked) params.set('exact', '1');
     if (filterKind.value)   params.set('kind', filterKind.value);
     if (filterSaved.value !== '') params.set('is_saved', filterSaved.value);
     selectedTags.forEach(t => params.append('tag', t));
@@ -422,15 +422,25 @@
   }
 
   // ── Export link ──────────────────────────────────────────────────────────────
+  // The link carries the view's CURRENT filters (minus paging) so "export" means
+  // "export what I'm looking at". Refreshed on format change and at click time.
   if (exportFormat && exportLink) {
-    exportFormat.addEventListener('change', () => {
-      exportLink.href = '/export?format=' + exportFormat.value;
-    });
+    const syncExport = () => {
+      const p = buildParams();
+      p.delete('limit'); p.delete('offset');
+      p.set('source', 'reddit');  // this view is reddit-scoped
+      p.set('format', exportFormat.value);
+      exportLink.href = '/export?' + p.toString();
+    };
+    exportFormat.addEventListener('change', syncExport);
+    exportLink.addEventListener('mousedown', syncExport);
+    exportLink.addEventListener('keydown', syncExport);
+    syncExport();
   }
 
   // ── Filter/search events ───────────────────────────────────────────────────
   searchInput.addEventListener('input', debounceLoad);
-  if (filterFuzzy) filterFuzzy.addEventListener('change', loadItems);
+  if (filterExact) filterExact.addEventListener('change', loadItems);
   filterKind.addEventListener('change', loadItems);
   filterSaved.addEventListener('change', () => { loadItems(); loadSubreddits(); });
   if (tagFilterList) tagFilterList.addEventListener('change', e => {

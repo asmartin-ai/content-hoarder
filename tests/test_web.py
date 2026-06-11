@@ -25,9 +25,46 @@ def test_items_search(tmp_db):
     assert r["items"][0]["fullname"] == "reddit:t3_a"
 
 
-def test_items_fuzzy(tmp_db):
-    r = _client(tmp_db).get("/items?fuzzy=1&q=hedgmog").get_json()
+def test_items_fuzzy_default_and_exact_override(tmp_db):
+    cl = _client(tmp_db)
+    # fuzzy is the DEFAULT: a bare typo'd term matches (Epic 12 flip)
+    r = cl.get("/items?q=hedgmog").get_json()
     assert any(i["fullname"] == "reddit:t3_a" for i in r["items"])
+    # ?exact=1 (the repurposed checkbox) forces the exact path -> typo misses
+    r = cl.get("/items?exact=1&q=hedgmog").get_json()
+    assert not any(i["fullname"] == "reddit:t3_a" for i in r["items"])
+    # quoted phrases are exact even in fuzzy default mode
+    r = cl.get('/items?q="Hedgehog"').get_json()
+    assert any(i["fullname"] == "reddit:t3_a" for i in r["items"])
+
+
+def test_export_csv_json_and_tag_filter(tmp_db):
+    cl = _client(tmp_db)
+    conn = db.connect(tmp_db)
+    db.merge_upsert(conn, models.new_item(
+        source="reddit", source_id="t3_x", kind="post", title="X",
+        metadata={"subreddit": "hh", "tags": ["nsfw_erotic"],
+                  "permalink": "https://www.reddit.com/r/hh/comments/x/"}))
+    conn.commit()
+    conn.close()
+
+    r = cl.get("/export?format=json&tag=nsfw_erotic").get_json()
+    assert r["count"] == 1
+    assert r["items"][0]["fullname"] == "reddit:t3_x"
+    assert r["items"][0]["permalink"].endswith("/x/")
+
+    # operator form is equivalent to the param form
+    r2 = cl.get("/export?format=json&q=tag:nsfw_erotic").get_json()
+    assert r2["count"] == 1
+
+    body = cl.get("/export?format=csv&tag=nsfw_erotic")
+    assert body.mimetype == "text/csv"
+    text = body.data.decode("utf-8")
+    assert text.splitlines()[0].startswith("fullname,source,")
+    assert "reddit:t3_x" in text
+
+    # unfiltered export returns everything (the 2 seeds + t3_x)
+    assert cl.get("/export?format=json").get_json()["count"] == 3
 
 
 def test_sources_and_stats(tmp_db):

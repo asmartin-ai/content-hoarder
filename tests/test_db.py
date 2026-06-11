@@ -81,6 +81,53 @@ def test_fuzzy_typo(conn):
     assert db.search_items(conn, "hedgmog", fuzzy=True)
 
 
+def test_fuzzy_default_is_tight_not_one_gram_noise(conn):
+    # Regression for the fuzzy-by-default flip: OR-of-trigrams matched ANY shared
+    # 3-gram ("minecraft" pulled in "trainer" via 'ine'), flooding bare searches.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="a big surprise for trainer"))
+    r = db.search_items(conn, "minecraft", fuzzy=True)
+    assert [x["source_id"] for x in r] == ["1"]
+    # partial word still substring-matches on the tight path
+    r = db.search_items(conn, "minecra", fuzzy=True)
+    assert [x["source_id"] for x in r] == ["1"]
+
+
+def test_fuzzy_rescue_ranks_best_overlap_first(conn):
+    # 'minekraft' breaks the AND pass (nek/ekr/kra exist nowhere) -> rescue pass
+    # must put the heavy-overlap row first (bm25), not recency.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase", now=1000))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="engine trainer guide", now=2000))
+    r = db.search_items(conn, "minekraft", fuzzy=True)
+    assert r and r[0]["source_id"] == "1"
+
+
+def test_fuzzy_rescue_never_fires_past_page_one(conn):
+    # Code-review finding: with tight matches exhausted, a deeper page used to fall
+    # into the rescue pass and append one-gram noise after the genuine results.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="minecraft mod showcase"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="a big surprise for trainer"))
+    assert [x["source_id"] for x in db.search_items(conn, "minecraft", fuzzy=True)] == ["1"]
+    # page two of a one-row tight result is the END of the list, not junk
+    assert db.search_items(conn, "minecraft", fuzzy=True, offset=1) == []
+
+
+def test_malformed_metadata_cannot_enter_the_db(conn):
+    # Code-review follow-up: json_remove (now in every status writer) raises
+    # OperationalError on malformed JSON — but the functional index on
+    # json_extract(metadata,'$.duration') makes SQLite validate metadata on EVERY
+    # write, so a malformed row is structurally impossible. Pin that invariant:
+    # if this test ever fails (index dropped/renamed), the status writers need a
+    # json_valid guard.
+    import sqlite3
+
+    import pytest
+
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
+    with pytest.raises(sqlite3.OperationalError):
+        conn.execute("UPDATE items SET metadata='{broken' WHERE fullname='r:1'")
+
+
 def test_status_and_undo(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     db.set_status(conn, "r:1", "keep")
@@ -270,3 +317,18 @@ def test_merge_upsert_tags_semantics(conn):
                            "metadata": {"tags": ["kw1"], "category": "listenable"}})
     md = json.loads(db.get_item(conn, "youtube:v_t2")["metadata"])
     assert {"memes", "kw1", "listenable"} <= set(md["tags"])  # union + category mirror
+
+
+def test_search_items_has_media_facet(conn):
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_v", title="v",
+                    metadata={"media_type": "reddit_video"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_i", title="i",
+                    metadata={"media_type": "image"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_g", title="g",
+                    metadata={"media_type": "gallery"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_l", title="l",
+                    metadata={"media_type": "link"}))
+    # has:video means reddit-hosted video (media_type='reddit_video')
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="video")] == ["t3_v"]
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="image")] == ["t3_i"]
+    assert [x["source_id"] for x in db.search_items(conn, "", has_media="gallery")] == ["t3_g"]
