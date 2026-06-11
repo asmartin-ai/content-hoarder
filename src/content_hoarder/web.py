@@ -100,6 +100,59 @@ def create_app(db_path: str | None = None) -> Flask:
 
     # -- data --------------------------------------------------------------
 
+    @app.get("/export")
+    def export_list():
+        """CSV/JSON list export of whatever the filters match (Epic 9a — e.g.
+        ?tag=nsfw_erotic for the migrate-elsewhere set). Accepts the same q/operator
+        and param filters as /items; no pagination — the whole match is returned."""
+        from content_hoarder import export as export_mod
+        a = request.args
+        parsed = search_query.parse(a.get("q", ""))
+        is_saved_param = a.get("is_saved")
+        is_saved = (
+            parsed.is_saved
+            if parsed.is_saved is not None
+            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+        )
+        tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
+        tags_all = parsed.tags_all if parsed.tags else False
+        with conn() as c:
+            rows = db.search_items(
+                c,
+                parsed.text,
+                source=parsed.source if parsed.source is not None else (a.get("source") or None),
+                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
+                status=parsed.status if parsed.status is not None else (a.get("status") or None),
+                tags=tags,
+                tags_all=tags_all,
+                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
+                is_saved=is_saved,
+                nsfw=parsed.nsfw,
+                decayed=parsed.decayed,
+                swept=parsed.swept,
+                has_media=parsed.has,
+                before=parsed.before,
+                after=parsed.after,
+                score_min=parsed.score_min,
+                score_max=parsed.score_max,
+                exact=parsed.exact,
+                exclude=parsed.exclude,
+                include_consolidated=True,
+                fuzzy=a.get("exact") != "1",
+                sort=a.get("sort", "created_utc"),
+                order=a.get("order", "desc"),
+                limit=1_000_000,
+                offset=0,
+            )
+        recs = export_mod.export_records(rows)
+        if (a.get("format") or "csv").lower() == "json":
+            return {"count": len(recs), "items": recs}
+        return app.response_class(
+            export_mod.to_csv(recs),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=content-hoarder-export.csv"},
+        )
+
     @app.get("/items")
     def items():
         a = request.args
