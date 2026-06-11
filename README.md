@@ -52,6 +52,9 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |
 | `bankruptcy --before YYYY-MM-DD [--source ID] [--dry-run]` | Reversibly bulk-archive inbox items older than a date. |
+| `decay --tag T... [--subreddit S...] [--before DATE] [--label swept] [--apply] [--undo]` | Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped per wave + reversible (`--undo` selects a wave by `--decayed-after/--decayed-before`). Pull decayed items with the `is:decayed` / `is:swept` search operators. |
+| `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
+| `export --out FILE [--format csv\|json] [--tag T...] [--status S]` | Dump matching items to CSV/JSON (permalink-oriented, for re-saving elsewhere). Same filters live at `GET /export`. |
 | `promote [--status keep] [--dry-run]` | (Opt-in) push items you've marked **keep** to a stock Karakeep instance via its API. |
 
 ## Mobile access
@@ -59,6 +62,16 @@ The app is a responsive PWA you can install via **Add to Home Screen** (on Firef
 the browser menu → *Install*). Reach it from your phone over a private **Tailscale** tunnel or your
 LAN. **Security warning: never expose this personal-data app to the public internet** — no port
 forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
+
+### Phone quickstart (Tailscale)
+1. On the PC, find your Tailscale IP (`tailscale ip -4`, a `100.x.y.z` address) and start the app
+   bound to it: `python -m content_hoarder serve --host 100.x.y.z` (the web guard already accepts
+   tailnet addresses; add real DNS names via `CONTENT_HOARDER_ALLOWED_HOSTS`).
+2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Firefox.
+3. Install it: browser menu → **Install** (Add to Home Screen). The PWA opens fullscreen with the
+   app icon; the service worker caches the shell, so cold opens are instant.
+4. Notes for gesture navigation: row swipe is touch-only by design; if a fresh deploy looks stale,
+   the shell cache updates on the next reload (the SW takes one visit to swap versions).
 
 ## Source notes & caveats
 - **YouTube "Watch Later" cannot be exported** via the API or Google Takeout. Regular playlists
