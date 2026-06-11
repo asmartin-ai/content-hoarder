@@ -35,6 +35,9 @@ class ParsedQuery:
 
     is_saved: int | None = None  # 1/0 (SQLite-friendly)
     nsfw: bool = False
+    decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
+    swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
+    has: str | None = None  # has:video|image|gallery — metadata.media_type facet
 
     before: int | None = None  # unix seconds (UTC)
     after: int | None = None
@@ -145,6 +148,8 @@ def parse(q: str) -> ParsedQuery:
     tags_groups: list[list[str]] = []  # each token's group; later collapsed to tags/tags_all
     is_saved: int | None = None
     nsfw = False
+    decayed = swept = False
+    has: str | None = None
     before = after = None
     score_min = score_max = None
 
@@ -212,6 +217,22 @@ def parse(q: str) -> ParsedQuery:
             if v == "nsfw":
                 nsfw = True
                 continue
+            if v == "decayed":
+                decayed = True
+                continue
+            if v == "swept":
+                swept = True
+                continue
+            text_terms.append(t)
+            continue
+
+        if key == "has":
+            # Media facet over metadata.media_type (populated by the reddit connector +
+            # archive refinement). Unknown values degrade to free text like any operator.
+            v = val.lower()
+            if v in {"video", "image", "gallery"}:
+                has = v
+                continue
             text_terms.append(t)
             continue
 
@@ -266,6 +287,9 @@ def parse(q: str) -> ParsedQuery:
         tags_all=tags_all,
         is_saved=is_saved,
         nsfw=nsfw,
+        decayed=decayed,
+        swept=swept,
+        has=has,
         before=before,
         after=after,
         score_min=score_min,
