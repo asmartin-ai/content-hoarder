@@ -126,14 +126,30 @@ def test_undecay_round_trip(conn):
 
 def test_undecay_skips_manually_restatused(conn):
     a = _seed(conn, "1", sub="s", tags=["memes"])
-    db.decay(conn, tags=["memes"], apply=True)
+    db.decay(conn, tags=["memes"], label="swept", apply=True)
     db.set_status(conn, a, "keep")  # user rescued it after the decay
     res = db.undecay(conn, apply=True)
     assert res["total"] == 0
     it = db.get_item(conn, a)
     assert it["status"] == "keep"
-    # the stale stamp stays (documented edge): harmless, undecay's archived guard skips it
-    assert "decayed_at" in _md(conn, a)
+    # the manual transition stripped the decay marks — a rescued item never shows
+    # up in is:swept/is:decayed again
+    md = _md(conn, a)
+    assert "decayed_at" not in md and "decay_label" not in md
+
+
+def test_manual_status_changes_clear_decay_marks(conn):
+    a = _seed(conn, "1", sub="s", tags=["memes"])
+    b = _seed(conn, "2", sub="s", tags=["memes"])
+    db.decay(conn, tags=["memes"], label="swept", apply=True)
+    # per-item web ↩ undo (archived -> inbox) acts as a mini-undecay
+    db.undo_status(conn, a)
+    it = db.get_item(conn, a)
+    assert it["status"] == "inbox" and "decayed_at" not in _md(conn, a)
+    # bulk action on a decayed item strips the marks too
+    db.bulk_set_status(conn, [b], "done")
+    assert "decay_label" not in _md(conn, b)
+    assert db.search_items(conn, swept=True) == []
 
 
 def test_undecay_stamp_window_selects_one_wave(conn, monkeypatch):
@@ -173,6 +189,29 @@ def test_decay_rerun_idempotent(conn):
     _seed(conn, "1", sub="s", tags=["memes"])
     assert db.decay(conn, tags=["memes"], apply=True)["total"] == 1
     assert db.decay(conn, tags=["memes"], apply=True)["total"] == 0
+
+
+def test_decay_label_written_queryable_and_removed(conn):
+    a = _seed(conn, "1", sub="s", tags=["memes"])
+    res = db.decay(conn, tags=["memes"], label="swept", apply=True)
+    assert res["label"] == "swept"
+    md = _md(conn, a)
+    assert md["decay_label"] == "swept" and md["decayed_at"] == res["decayed_at"]
+    # the search filters behind is:decayed / is:swept both find it
+    assert {r["fullname"] for r in db.search_items(conn, decayed=True)} == {a}
+    assert {r["fullname"] for r in db.search_items(conn, swept=True)} == {a}
+    db.undecay(conn, apply=True)
+    md = _md(conn, a)
+    assert "decayed_at" not in md and "decay_label" not in md
+    assert db.search_items(conn, decayed=True) == []
+
+
+def test_decay_unlabeled_wave_not_swept(conn):
+    a = _seed(conn, "1", sub="s", tags=["memes"])
+    db.decay(conn, tags=["memes"], apply=True)  # rolling-style wave, no label
+    assert "decay_label" not in _md(conn, a)
+    assert {r["fullname"] for r in db.search_items(conn, decayed=True)} == {a}
+    assert db.search_items(conn, swept=True) == []
 
 
 def test_decay_other_source_untouched(conn):

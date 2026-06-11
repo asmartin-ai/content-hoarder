@@ -226,7 +226,8 @@ def cmd_decay(args) -> int:
               file=sys.stderr)
     with _connect() as conn:
         res = db.decay(conn, tags=args.tag, subreddits=args.subreddit,
-                       before_utc=before_utc, source=args.source, apply=args.apply)
+                       before_utc=before_utc, source=args.source, label=args.label,
+                       apply=args.apply)
     print(json.dumps(res, indent=2))
     if not args.apply:
         print(f"(dry run — {res['total']} inbox item(s) would decay to archived; re-run with "
@@ -413,6 +414,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Decay items from this subreddit (repeatable; case-insensitive).")
     pdc.add_argument("--before", help="Only items older than YYYY-MM-DD (content age).")
     pdc.add_argument("--source", default="reddit", help="Source to decay (default: reddit).")
+    pdc.add_argument("--label",
+                     help="Mark the wave with metadata.decay_label (e.g. swept for the "
+                          "supervised initial backfill; pull via the is:swept search operator).")
     pdc.add_argument("--apply", action="store_true",
                      help="Commit changes (default: dry run). Run against a DB copy first.")
     pdc.add_argument("--undo", action="store_true",

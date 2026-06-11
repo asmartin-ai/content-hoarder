@@ -484,6 +484,8 @@ def search_items(
     subreddit: str | None = None,
     is_saved: int | None = None,
     nsfw: bool = False,
+    decayed: bool = False,
+    swept: bool = False,
     before: int | None = None,
     after: int | None = None,
     score_min: int | None = None,
@@ -546,6 +548,12 @@ def search_items(
                 f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
             )
             params.extend(NSFW_TAGS)
+        if decayed:
+            # decayed (is:decayed): the item carries a decay-wave stamp (see db.decay).
+            filters.append(f"json_extract({a}metadata, '$.decayed_at') IS NOT NULL")
+        if swept:
+            # swept (is:swept): decayed in the labeled initial backfill pass specifically.
+            filters.append(f"json_extract({a}metadata, '$.decay_label') = 'swept'")
         if subreddit:
             filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
             params.append(subreddit)
@@ -722,8 +730,12 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
         return _public_by_fullname(conn, fullname)  # idempotent; don't clobber status_prev
     now = int(time.time())
     processed = None if status == "inbox" else now
+    # Any manual transition exits the decayed state — strip the decay marks (no-op when
+    # absent) so "stamped == currently decayed" stays true and is:swept/is:decayed never
+    # match a rescued item. Only db.decay writes these keys.
     conn.execute(
-        "UPDATE items SET status=?, status_prev=?, processed_utc=? WHERE fullname=?",
+        "UPDATE items SET status=?, status_prev=?, processed_utc=?, "
+        "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE fullname=?",
         (status, old, processed, fullname),
     )
     if status == "done" and _unsave_enabled(conn):
@@ -746,7 +758,8 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     now = int(time.time())
     processed = None if prev == "inbox" else now
     conn.execute(
-        "UPDATE items SET status=?, status_prev=NULL, processed_utc=? WHERE fullname=?",
+        "UPDATE items SET status=?, status_prev=NULL, processed_utc=?, "
+        "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE fullname=?",
         (prev, processed, fullname),
     )
     if row[1] == "done":  # a Done undone before the drain ran is never sent to Reddit
@@ -773,7 +786,8 @@ def bulk_set_status(
         # `AND status<>?` skips no-op updates so status_prev (single-step undo) is
         # never clobbered by re-applying the same status.
         cur = conn.execute(
-            "UPDATE items SET status_prev=status, status=?, processed_utc=? "
+            "UPDATE items SET status_prev=status, status=?, processed_utc=?, "
+            "metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') "
             "WHERE fullname=? AND status<>?",
             (status, processed, fn, status),
         )
@@ -854,6 +868,7 @@ def decay(
     subreddits: list[str] | None = None,
     before_utc: int | None = None,
     source: str = "reddit",
+    label: str | None = None,
     apply: bool = False,
     samples: int = 5,
     top_subs: int = 50,
@@ -865,6 +880,11 @@ def decay(
     optionally older than ``before_utc`` (content age — Reddit exposes no save timestamps),
     and archives them stamping ``metadata.decayed_at``. One stamp value per call = one
     independently reversible "wave" (see ``undecay``). Refuses an unselected decay.
+    ``label`` additionally writes ``metadata.decay_label`` — e.g. the supervised initial
+    backfill uses ``label='swept'`` so its items stay distinguishable from any future
+    rolling decay (queryable via the ``is:swept`` search operator; ``is:decayed`` matches
+    any wave). A label is a marker, NOT a tag: tags get wholesale-replaced by categorize
+    retags, while metadata keys survive both retags and syncs.
 
     Deliberately a direct UPDATE like ``bankruptcy`` — never routed through
     ``bulk_set_status`` — so a mass decay can never enqueue live Reddit unsaves.
@@ -917,15 +937,21 @@ def decay(
         ).fetchall()
     ]
 
-    res = {"total": total, "applied": False, "decayed_at": None, "by_tag": by_tag,
-           "by_subreddit": by_subreddit, "age_bands": age_bands, "sample": sample}
+    res = {"total": total, "applied": False, "decayed_at": None, "label": label,
+           "by_tag": by_tag, "by_subreddit": by_subreddit, "age_bands": age_bands,
+           "sample": sample}
     if apply:
         res["applied"] = True
         if total:
+            set_md = "json_set(metadata, '$.decayed_at', ?)"
+            md_params = [now]
+            if label:
+                set_md = "json_set(metadata, '$.decayed_at', ?, '$.decay_label', ?)"
+                md_params = [now, label]
             cur = conn.execute(
                 f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
-                f"metadata=json_set(metadata, '$.decayed_at', ?) WHERE {where}",
-                [now, now] + params,
+                f"metadata={set_md} WHERE {where}",
+                [now] + md_params + params,
             )
             conn.commit()
             res.update(total=cur.rowcount, decayed_at=now)
@@ -946,8 +972,9 @@ def undecay(
     which is single-step and may have been clobbered since. Items manually re-statused
     after a decay (e.g. to keep) are skipped by the ``status='archived'`` guard; their
     stale stamp is harmless (undecay never touches non-archived rows, and a later decay
-    re-stamps). The stamp is REMOVED on restore so the invariant "stamped == currently
-    decayed" holds; ``processed_utc`` returns to NULL (inbox semantics, as set_status).
+    re-stamps). The stamp AND the decay label are REMOVED on restore so the invariant
+    "stamped == currently decayed" holds; ``processed_utc`` returns to NULL (inbox
+    semantics, as set_status).
     """
     clauses = ["status='archived'", "json_extract(metadata, '$.decayed_at') IS NOT NULL"]
     params: list = []
@@ -973,7 +1000,7 @@ def undecay(
         if total:
             cur = conn.execute(
                 f"UPDATE items SET status='inbox', status_prev='archived', processed_utc=NULL, "
-                f"metadata=json_remove(metadata, '$.decayed_at') WHERE {where}",
+                f"metadata=json_remove(metadata, '$.decayed_at', '$.decay_label') WHERE {where}",
                 params,
             )
             conn.commit()

@@ -220,8 +220,8 @@ _SUBREDDIT_TAGS.update({
     "spyxfamily": ["anime"], "kiminonawa": ["anime"], "evangelion": ["anime"],
     "domesticgirlfriend": ["anime"], "kanojookarishimasu": ["anime"],
     "wholesomeyuri": ["anime"], "nagatoro": ["anime"], "seishunbutayarou": ["anime"],
-    # memes / humor (incl. screenshot-humor subs; tinder + comics are judgment calls —
-    # both are entertainment humor content, flagged in the rehearsal report)
+    # memes / humor (screenshot-humor subs; r/tinder + r/comics deliberately NOT mapped —
+    # user decision 2026-06-10: they don't belong in the memes decay bucket)
     "whenthe": ["memes"], "bi_irl": ["memes"], "newgreentexts": ["memes"],
     "anarchychess": ["memes"], "cursedcomments": ["memes"], "unexpected": ["memes"],
     "brandnewsentence": ["memes"], "murderedbywords": ["memes"],
@@ -229,10 +229,9 @@ _SUBREDDIT_TAGS.update({
     "suspiciouslyspecific": ["memes"], "hopeposting": ["memes"], "discord_irl": ["memes"],
     "youtubehaiku": ["memes"], "perfectlycutscreams": ["memes"],
     "maybemaybemaybe": ["memes"], "hmmm": ["memes"], "meme": ["memes"],
-    "chadtopia": ["memes"], "extrafabulouscomics": ["memes"], "comics": ["memes"],
+    "chadtopia": ["memes"], "extrafabulouscomics": ["memes"],
     "politicalcompassmemes": ["memes"], "politicalhumor": ["memes"],
     "dndmemes": ["memes"], "roughromanmemes": ["memes"], "oddlyspecific": ["memes"],
-    "tinder": ["memes"],
     "physicsmemes": ["science", "memes"], "mathmemes": ["science", "memes"],
     "shermanposting": ["defense", "memes"],
     # defense / military
