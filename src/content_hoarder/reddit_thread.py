@@ -17,12 +17,15 @@ def _abs_permalink(p: str) -> str:
     return ("https://www.reddit.com" + p) if p.startswith("/") else p
 
 
-def _extract_comments(children: list, depth: int = 0) -> list:
+def _extract_comments(children: list, depth: int = 0, sort: str = "best") -> list:
     """Flatten the nested comment tree to a list with a ``depth`` for CSS indentation."""
+    filtered = [c for c in children if isinstance(c, dict) and c.get("kind") != "more"]
+    if sort == "top":
+        filtered.sort(key=lambda c: (c.get("data", {}) or {}).get("score", 0), reverse=True)
+    elif sort == "new":
+        filtered.sort(key=lambda c: int((c.get("data", {}) or {}).get("created_utc") or 0), reverse=True)
     out: list = []
-    for child in children:
-        if not isinstance(child, dict) or child.get("kind") == "more":
-            continue
+    for child in filtered:
         d = child.get("data", {}) or {}
         out.append({
             "author": d.get("author", ""),
@@ -30,14 +33,15 @@ def _extract_comments(children: list, depth: int = 0) -> list:
             "score": d.get("score", 0),
             "depth": depth,
             "permalink": _abs_permalink(d.get("permalink", "")),
+            "created_utc": int(d.get("created_utc") or 0),
         })
         replies = d.get("replies")
         if isinstance(replies, dict):
-            out.extend(_extract_comments(replies.get("data", {}).get("children", []), depth + 1))
+            out.extend(_extract_comments(replies.get("data", {}).get("children", []), depth + 1, sort))
     return out
 
 
-def parse_thread(raw_json: str, item: dict) -> dict:
+def parse_thread(raw_json: str, item: dict, sort: str = "best") -> dict:
     """Turn a raw ``<permalink>.json`` blob into ``{post, comments, …}``."""
     try:
         data = json.loads(raw_json)
@@ -61,7 +65,7 @@ def parse_thread(raw_json: str, item: dict) -> dict:
                 "created_utc": pd.get("created_utc", 0),
             }
         if len(data) >= 2:
-            comments = _extract_comments(data[1].get("data", {}).get("children", []))
+            comments = _extract_comments(data[1].get("data", {}).get("children", []), sort=sort)
 
     return {
         "post": post,
@@ -69,10 +73,11 @@ def parse_thread(raw_json: str, item: dict) -> dict:
         "cached": True,
         "item_fullname": item.get("fullname"),
         "item_kind": item.get("kind"),
+        "sort": sort,
     }
 
 
-def get_thread(conn, fullname: str) -> dict | None:
+def get_thread(conn, fullname: str, sort: str = "best") -> dict | None:
     """Return the parsed thread from the local cache.
 
     Returns ``None`` if the item doesn't exist, or ``{cached: False, …}`` if the item
@@ -84,11 +89,12 @@ def get_thread(conn, fullname: str) -> dict | None:
         return None
     cached = db.get_reddit_thread(conn, fullname)
     if cached and cached.get("thread_json"):
-        return parse_thread(cached["thread_json"], item)
+        return parse_thread(cached["thread_json"], item, sort)
     return {
         "post": {},
         "comments": [],
         "cached": False,
         "item_fullname": fullname,
         "item_kind": item.get("kind"),
+        "sort": sort,
     }

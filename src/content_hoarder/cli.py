@@ -67,6 +67,9 @@ def cmd_categorize(args) -> int:
             # Reddit gets multi-label tags (metadata.tags); --dry-run previews accuracy.
             res = cat_mod.tag_reddit_source(conn, limit=args.limit, retry=args.all,
                                             dry_run=args.dry_run)
+        elif args.topics:
+            res = cat_mod.tag_youtube_source(conn, limit=args.limit, retry=args.all,
+                                             dry_run=args.dry_run)
         else:
             res = cat_mod.categorize_source(conn, args.source or "youtube",
                                             limit=args.limit, retry=args.all)
@@ -423,6 +426,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--limit", type=int, default=None, help="Max items to categorize.")
     pc.add_argument("--dry-run", action="store_true",
                     help="Preview tag assignment without writing (reddit multi-label tagging).")
+    pc.add_argument("--topics", action="store_true", help="YouTube: multi-label topic tags instead of processing areas.")
     pc.set_defaults(func=cmd_categorize)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
