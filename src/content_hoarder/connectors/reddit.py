@@ -8,9 +8,11 @@ into the generic ``metadata`` blob; the new fullname is ``reddit:<t3_/t1_id>``.
 from __future__ import annotations
 
 import csv
+import io
 import json
 import re
 import sqlite3
+import zipfile
 from html import unescape
 from pathlib import Path
 
@@ -176,6 +178,19 @@ _HREF_A = re.compile(r"<a\s+[^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", re.S 
 _HTML_TAG = re.compile(r"<[^>]+>")
 
 
+def _is_gdpr_zip(p: Path) -> bool:
+    try:
+        if not zipfile.is_zipfile(p):
+            return False
+        with zipfile.ZipFile(p) as zf:
+            for info in zf.infolist():
+                if Path(info.filename).name in ("saved_posts.csv", "saved_comments.csv"):
+                    return True
+        return False
+    except Exception:
+        return False
+
+
 class RedditConnector(BaseConnector):
     id = "reddit"
     label = "Reddit"
@@ -183,6 +198,8 @@ class RedditConnector(BaseConnector):
 
     def can_import(self, path: Path) -> bool:
         p = Path(path)
+        if p.is_dir():
+            return self._can_import_dir(p)
         if not p.is_file():
             return False
         suf = p.suffix.lower()
@@ -194,6 +211,8 @@ class RedditConnector(BaseConnector):
             return self._looks_reddit(p)
         if suf in (".html", ".htm"):
             return self._looks_reddit_html(p)
+        if suf == ".zip":
+            return _is_gdpr_zip(p)
         return False
 
     def _looks_reddit(self, p: Path) -> bool:
@@ -203,6 +222,20 @@ class RedditConnector(BaseConnector):
         except OSError:
             return False
         return any(s in head for s in ('"permalink"', '"subreddit"', '"kind": "t3', '"kind":"t3'))
+
+    def _can_import_dir(self, p: Path) -> bool:
+        try:
+            files = sorted(p.rglob("*.json"))
+        except OSError:
+            return False
+        count = 0
+        for f in files:
+            if count >= 50:
+                break
+            count += 1
+            if self._looks_reddit(f):
+                return True
+        return False
 
     def _looks_reddit_html(self, p: Path) -> bool:
         try:
@@ -215,6 +248,10 @@ class RedditConnector(BaseConnector):
 
     def import_file(self, path: Path):
         p = Path(path)
+        if p.is_dir():
+            for json_file in sorted(p.rglob("*.json")):
+                yield from self._from_json(json_file)
+            return
         suf = p.suffix.lower()
         if suf in (".db", ".sqlite", ".sqlite3"):
             yield from self._from_db(p)
@@ -224,6 +261,8 @@ class RedditConnector(BaseConnector):
             yield from self._from_json(p)
         elif suf in (".html", ".htm"):
             yield from self._from_html(p)
+        elif suf == ".zip":
+            yield from self._from_gdpr_zip(p)
 
     def _from_html(self, p: Path):
         """saveddit-style export: one <li> per saved item — a content link (url +
@@ -301,48 +340,71 @@ class RedditConnector(BaseConnector):
             metadata=meta,
         )
 
+    def _rows_to_items(self, reader):
+        for raw in reader:
+            row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
+            permalink = row.get("permalink") or ""
+            sid = row.get("fullname") or ""
+            rid = row.get("id") or ""
+            if not sid and rid:
+                sid = rid if rid.startswith(("t1_", "t3_")) else (
+                    "t1_" + rid if _PERMA_COMMENT.search(permalink) else "t3_" + rid
+                )
+            if not sid:
+                sid = _sid_from_permalink(permalink)
+            if not sid:
+                continue
+            meta = {}
+            sub = row.get("subreddit") or _sub_from_permalink(permalink)
+            if sub:
+                meta["subreddit"] = sub
+            if permalink:
+                meta["permalink"] = permalink
+            if row.get("score"):
+                meta["score"] = row["score"]
+            kind = "comment" if str(sid).startswith("t1_") else "post"
+            body = row.get("body") or row.get("selftext") or ""
+            url = _classify_media(meta, row.get("url"), permalink, body, kind)
+            yield new_item(
+                source="reddit",
+                source_id=sid,
+                kind=kind,
+                title=row.get("title") or _title_from_permalink(permalink),
+                body=body,
+                url=url,
+                author=row.get("author") or "",
+                metadata=meta,
+            )
+
     def _from_csv(self, p: Path):
         with open(p, "r", encoding="utf-8", errors="ignore", newline="") as fh:
-            for raw in csv.DictReader(fh):
-                row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
-                permalink = row.get("permalink") or ""
-                sid = row.get("fullname") or ""
-                rid = row.get("id") or ""
-                if not sid and rid:
-                    sid = rid if rid.startswith(("t1_", "t3_")) else (
-                        "t1_" + rid if _PERMA_COMMENT.search(permalink) else "t3_" + rid
-                    )
-                if not sid:
-                    sid = _sid_from_permalink(permalink)
-                if not sid:
+            yield from self._rows_to_items(csv.DictReader(fh))
+
+    def _from_gdpr_zip(self, p: Path):
+        with zipfile.ZipFile(p) as zf:
+            for info in zf.infolist():
+                if Path(info.filename).name not in ("saved_posts.csv", "saved_comments.csv"):
                     continue
-                meta = {}
-                sub = row.get("subreddit") or _sub_from_permalink(permalink)
-                if sub:
-                    meta["subreddit"] = sub
-                if permalink:
-                    meta["permalink"] = permalink
-                if row.get("score"):
-                    meta["score"] = row["score"]
-                kind = "comment" if str(sid).startswith("t1_") else "post"
-                body = row.get("body") or row.get("selftext") or ""
-                url = _classify_media(meta, row.get("url"), permalink, body, kind)
-                yield new_item(
-                    source="reddit",
-                    source_id=sid,
-                    kind=kind,
-                    title=row.get("title") or _title_from_permalink(permalink),
-                    body=body,
-                    url=url,
-                    author=row.get("author") or "",
-                    metadata=meta,
-                )
+                try:
+                    with zf.open(info) as stream:
+                        text = io.TextIOWrapper(stream, encoding="utf-8-sig", newline="")
+                        reader = csv.DictReader(text)
+                        yield from self._rows_to_items(reader)
+                except Exception:
+                    continue
 
     def _from_json(self, p: Path):
         try:
             data = json.loads(Path(p).read_text(encoding="utf-8", errors="ignore"))
         except (ValueError, OSError):
             return
+        # Single submission/comment dict (BDFR JSON file)
+        if isinstance(data, dict) and not isinstance(data.get("data"), dict):
+            if any(k in data for k in ("permalink", "name", "subreddit")):
+                item = child_to_item(data)
+                if item:
+                    yield item
+                return
         if isinstance(data, dict) and isinstance(data.get("data"), dict):
             children = data["data"].get("children", [])
         elif isinstance(data, list):

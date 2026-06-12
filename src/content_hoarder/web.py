@@ -461,8 +461,11 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/reddit/items/<path:fullname>/thread")
     def reddit_thread_route(fullname):
         from content_hoarder import reddit_thread
+        sort = request.args.get("sort", "best")
+        if sort not in ("best", "top", "new"):
+            sort = "best"
         with conn() as c:
-            res = reddit_thread.get_thread(c, fullname)
+            res = reddit_thread.get_thread(c, fullname, sort)
         if res is None:
             return jsonify({"error": "not found"}), 404
         return jsonify(res)
