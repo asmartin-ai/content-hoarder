@@ -529,6 +529,17 @@ build-tracking now, not open design questions:*
   color+icon swap at the second threshold + a haptic pulse (`navigator.vibrate`); long-press
   stays = select. **Design locked 2026-06-11** (06-adhd-round.html, thresholds ≈90px/≈170px,
   demoed working); build in Stage C.
+- [ ] **P2 — 4-way swipe: Snooze on the unassigned long-left (+ snooze-decay).** *(User idea
+  2026-06-12.)* The locked two-stage map leaves long-← unassigned — claim it for **Snooze**:
+  "I don't want to decide right now" as a first-class gesture, killing decision fatigue without
+  the guilt of skipping. Sketch (design rides the Stage C gate): snooze hides the item from
+  triage batches for a window (e.g. `metadata.snoozed_until`, ~7d); **repeated snoozes are
+  themselves a decision** — after N snoozes (~3) the item flows into the Epic 21 guilt-free
+  decay path (auto-archive + stamp, reversible, no badge/no "snoozed 3 times!" guilt copy).
+  Friction-asymmetry note: snooze *defers* rather than preserves — price it above
+  Done/Archive but below Keep; never the cheapest gesture in reach. Open questions: window
+  length/escalation curve, quiet resurface marker vs silent return, overlap with the deferred
+  ☾ resting-soon markers (both want the same server-side flag).
 - [x] ~~**P2 — Command palette v1.**~~ Shipped (2026-06-11, the bakeoff's T3 winner —
   GLM-5.1's sample + review fixes): `static/browse/palette.js` (ES module, fuzzy
   subsequence match with strict-prefix > word-boundary > scattered tiers, arrows wrap,
@@ -640,3 +651,42 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   nature isn't visible from subreddit/title (announcement bodies, "ends Sunday" buried in
   text) need body analysis — local-LLM lane once the GPU is back in service. The subreddit +
   title-keyword v1 above covers the high-precision bulk first.
+
+## Epic 22 — Triage as a separate app: the engagement deck  (`research`, `area:triage`)
+*User idea (2026-06-12): spin triage out into its own app that hooks into the content-hoarder
+DB, so OTHER card types can be laced into the triage stream to keep engagement up — first
+candidate: **Anki flashcards** interleaved between content cards. Triage becomes one
+swipe-stream for "things needing a small decision," and the variety itself is the
+engagement mechanic.*
+
+- [ ] **P3 — Architecture research FIRST (decision gate).** Decide the shape before any build:
+  (a) same Flask app, pluggable card sources behind the existing `/random` batch endpoint
+  (cheapest, no new process); (b) sibling service reading `app.db` directly (SQLite
+  cross-process write coordination needed — triage writes statuses); (c) fully separate app
+  consuming an HTTP API the hoarder exposes (cleanest seam, most work). Overlaps the open
+  PKMS sibling-service question (Epic 21 icebox) — answer them together. Note the tension
+  with Epic 17 (unify surfaces): that unification targeted browse+reddit; triage spinning
+  OUT can coexist, but decide deliberately. Sketch the card-source interface while deciding:
+  a card = `{id, source_app, render(), actions[], on_action()}` — content items, Anki due
+  cards, and the Epic 20 resurfacing/surprise-me cards would all implement it.
+- [ ] **P3 — Anki interleave prototype (after the architecture gate).** AnkiConnect
+  (localhost:8765 JSON-RPC, requires desktop Anki running) exposes due cards + answering;
+  interleave N content cards : 1 due flashcard. Swipe maps to Again/Good at minimum. Offline
+  Anki = the lane simply doesn't appear (no error state, no guilt).
+
+## Epic 23 — ADHD design-language bridge (shared with PKMS)  (`chore`, `area:design`)
+*User idea (2026-06-12): the ADHD-friendly design knowledge accumulating here — friction
+asymmetry, guilt-free decay, no backlog counts, recognition-over-recall resurfacing, win
+pebbles, startable/closable task shaping — should be shareable so PKMS (K:\Projects\PKMS)
+pulls from one source instead of re-deriving it.*
+
+- [ ] **P3 — Decide the sharing shape, then extract.** Options: (a) `docs/design-language.md`
+  in this repo that PKMS references by path; (b) a small standalone repo (e.g.
+  `K:\Projects\adhd-design-language`) both projects copy/submodule; (c) skill-first — keep
+  the source of truth in the frontend-design skill here and generate a PKMS-side mirror.
+  Source material to distill: `.claude/skills/frontend-design/SKILL.md` (principles incl.
+  friction asymmetry), the Epic 20/21 research-mandated guardrails (no raw counts, no guilt
+  mechanics, finishable batches, machine-initiated-but-curious phrasing), and the PKMS
+  research corpus (`K:\Projects\PKMS\vault\resources\research\`, esp. 17-hoarder-mining).
+  Decide ownership + sync model (who edits, how the other side pulls) BEFORE extracting —
+  a divergent copy is worse than a path reference.
