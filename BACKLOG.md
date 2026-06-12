@@ -674,6 +674,26 @@ engagement mechanic.*
   interleave N content cards : 1 due flashcard. Swipe maps to Again/Good at minimum. Offline
   Anki = the lane simply doesn't appear (no error state, no guilt).
 
+## Epic 24 — Reddit thread hydration backfill (promote enabler for PKMS)  (`feature`, `area:reddit`)
+*From the PKMS session (2026-06-12): `pkms promote` renders saved threads from this DB into
+vault reading notes but can only offer hydrated ones — 672 of 55,444. Full feasibility:
+`docs/thread-hydration-feasibility.md`. Key facts: NOTHING hydrates today (the RSM migration
+was the only writer; the /reddit "Recover" state is a stub); the `reddit_session` cookie path
+is validated and returns the exact listing shape `reddit_threads` stores; the promote-priority
+slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch, ~200–400 MB.*
+
+- [ ] **P2 — `reddit-hydrate` CLI + on-demand endpoint.** Single-fullname hydration via the
+  cookie (`<permalink>.json` → `db.set_reddit_thread`), wiring the existing Recover stub in
+  the thread viewer; `--batch` over the prioritized set (non-empty body, newest-saved first)
+  with ledger resume, rate limiting, `--limit`, and **dry-run scope listing + explicit user
+  approval before any mass fetch** (Epic 21 trust mechanics). Skip identity/meme content —
+  don't hydrate all 55k (design language §5).
+- [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
+  best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
+  lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
+- [ ] **P3 — port note for Epic 22:** AnkiConnect's default `localhost:8765` collides with
+  PKMS's capture service (now live on 8765) — whichever lands second picks a new port.
+
 ## Epic 23 — ADHD design-language bridge (shared with PKMS)  (`chore`, `area:design`)
 *User idea (2026-06-12): the ADHD-friendly design knowledge accumulating here — friction
 asymmetry, guilt-free decay, no backlog counts, recognition-over-recall resurfacing, win
