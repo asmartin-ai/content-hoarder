@@ -22,6 +22,14 @@ allowed; v3 ships Lexend + JetBrains Mono in `static/fonts/`).
 > (the v3 browse shell, `index.html` + `static/browse/*`), `/triage`, and `/reddit`
 > (both still v2). There is **NO `/browse` route** — don't assert or link one.
 
+> **Shared ADHD design language (2026-06-12):** the cross-project *behavioral* principles
+> (friction asymmetry, no backlog counts, guilt-free decay, recognition-over-recall
+> resurfacing, shame-free copy, …) now live in
+> **`K:\Projects\adhd-design-language\DESIGN-LANGUAGE.md`** — the single source of truth
+> shared with PKMS (Epic 23). Consult it before designing any new surface/flow/copy;
+> reference by path, never copy. This skill keeps the content-hoarder-specific visual
+> system (tokens, gestures, PWA rules) below.
+
 ## Principles (avoid generic AI output)
 1. **Tokens, not magic numbers.** Every color/space/size/radius/shadow comes from a CSS
    custom property in `:root`. One change should ripple everywhere.

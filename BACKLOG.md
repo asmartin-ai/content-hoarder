@@ -680,13 +680,14 @@ asymmetry, guilt-free decay, no backlog counts, recognition-over-recall resurfac
 pebbles, startable/closable task shaping — should be shareable so PKMS (K:\Projects\PKMS)
 pulls from one source instead of re-deriving it.*
 
-- [ ] **P3 — Decide the sharing shape, then extract.** Options: (a) `docs/design-language.md`
-  in this repo that PKMS references by path; (b) a small standalone repo (e.g.
-  `K:\Projects\adhd-design-language`) both projects copy/submodule; (c) skill-first — keep
-  the source of truth in the frontend-design skill here and generate a PKMS-side mirror.
-  Source material to distill: `.claude/skills/frontend-design/SKILL.md` (principles incl.
-  friction asymmetry), the Epic 20/21 research-mandated guardrails (no raw counts, no guilt
-  mechanics, finishable batches, machine-initiated-but-curious phrasing), and the PKMS
-  research corpus (`K:\Projects\PKMS\vault\resources\research\`, esp. 17-hoarder-mining).
-  Decide ownership + sync model (who edits, how the other side pulls) BEFORE extracting —
-  a divergent copy is worse than a path reference.
+- [x] ~~**P3 — Decide the sharing shape, then extract.**~~ **DONE 2026-06-12 (decided +
+  extracted from the PKMS session, user-directed as the PKMS pre-Phase-4 prerequisite).**
+  Shape = option (b): standalone repo **`K:\Projects\adhd-design-language`**
+  (`DESIGN-LANGUAGE.md` + README). Ownership/sync model: that repo is the single source
+  of truth for the shared *behavioral* principles; both projects reference it **by
+  absolute path, never copy**; sessions in either project may edit + commit there;
+  evidence stays in the PKMS research corpus; project-specific applications (visual
+  tokens, gesture maps, copy strings) stay local — this repo's frontend-design skill
+  keeps its v2/v3 token system and now points at the shared repo for the behavioral
+  layer. Distilled from: PKMS 10-synthesis + closed decision gates, this skill's
+  friction-asymmetry principle, and the Epic 20/21 guardrails.
