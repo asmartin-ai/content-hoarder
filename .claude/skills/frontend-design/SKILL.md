@@ -6,8 +6,21 @@ description: "Design principles + content-hoarder's design system. Use when edit
 # Frontend design — principles + content-hoarder design system
 
 Distilled from the Claude-Code-Frontend-Design-Toolkit (the lightweight, dependency-free
-parts). Apply these when touching the UI. **No new runtime dependencies, no web fonts, no
-heavy frameworks** — this is a local-first vanilla-JS PWA.
+parts). Apply these when touching the UI. **No new runtime dependencies, no CDN web fonts,
+no heavy frameworks** — this is a local-first vanilla-JS PWA (locally-vendored woff2 is
+allowed; v3 ships Lexend + JetBrains Mono in `static/fonts/`).
+
+> **v3 transition (Epic 20, 2026-06-09):** the sections below describe the **v2** system,
+> which still governs `/triage` + `/reddit` and legacy `static/tokens.css`. **v3 pages**
+> (browse rewrite onward, branch `feat/frontend-v3`) use `static/core/tokens.css` —
+> "Log Book II" design: charcoal night + apricot accent / dimmed daylight light, Lexend +
+> JetBrains Mono, soft radii, components consume the semantic aliases only. Spec:
+> `design-ref/v3-explorations/05-log-book-2.html` + README there. Rewrite this skill to
+> v3 once Epic 20 ships all three pages.
+>
+> **Page→route map (verified 2026-06-11):** the app serves exactly three pages — `/`
+> (the v3 browse shell, `index.html` + `static/browse/*`), `/triage`, and `/reddit`
+> (both still v2). There is **NO `/browse` route** — don't assert or link one.
 
 ## Principles (avoid generic AI output)
 1. **Tokens, not magic numbers.** Every color/space/size/radius/shadow comes from a CSS
@@ -22,6 +35,12 @@ heavy frameworks** — this is a local-first vanilla-JS PWA.
 6. **Accessibility is non-negotiable.** Visible `:focus-visible` rings on every interactive
    element; hit targets ≥ 40px on touch; `aria-*` on icon-only controls.
 7. **Depth via subtle elevation,** not heavy borders — small shadows + 1px hairline borders.
+8. **Friction asymmetry (ADHD core thesis: process and reduce).** Actions that REDUCE the
+   backlog (Archive, Done) must be the cheapest gestures in reach; the one action that
+   PRESERVES items (Keep — the hoarder's exception) gets deliberate friction (e.g. the
+   long-stage swipe, never the shortest gesture). When adding any new action, ask which
+   side of reduce/preserve it sits on and price its gesture accordingly. (User-ratified
+   2026-06-09 during the v3 Gate-1 review.)
 
 ## content-hoarder design system (source of truth: `static/tokens.css`)
 All design values live in `src/content_hoarder/static/tokens.css` (linked before `app.css`
@@ -53,6 +72,24 @@ dark, the native identity); `theme.js` persists the choice and applies it before
 - Target **Firefox on Android (Pixel 6)**. The triage card keeps its **40px `.card-stack`
   inset + 30px pointer edge-deadzone** so the system back-gesture never fires — never reduce it.
 - Respect `env(safe-area-inset-*)`; `viewport-fit=cover` is set.
+
+## Standalone mockups & device frames (gotchas that shipped broken phone views once)
+When building self-contained HTML mockups with a phone-frame toggle (the v3 Gate-1 round):
+- **Fixed screen + inner scroller**, not a scrolling frame: `.frame{overflow:hidden;
+  height:<screen>}` + `.scroll{height:100%;overflow-y:auto;overflow-x:clip}` wrapping only
+  the page content. Overlays (dock, bottom sheets, bulk bar, toast, scrim) live OUTSIDE the
+  scroller, `position:absolute`, anchored to the frame — otherwise `bottom:0` anchors to the
+  scrolled CONTENT and sheets render off-screen below the visible viewport.
+- **Off-canvas panels need `visibility:hidden`** when closed (with a `transition:
+  visibility 0s <dur>` for the exit animation). A panel translated out by 105% still
+  contributes to `scrollWidth` → phantom horizontal scrolling (measured 158px once).
+- **Verify by measurement, not presence**: per density/breakpoint assert
+  `scroller.scrollWidth - scroller.clientWidth === 0`, fixed row heights via
+  `getComputedStyle().height`, and overlay rects within the frame rect. "The element
+  exists" catches none of these.
+- Container queries (`container-type:inline-size` on the frame) make the phone toggle
+  genuinely responsive — but see the `claude-preview-verify` skill (#6/#7) before
+  asserting any of it in the preview (0-width fresh viewports; frozen transitions).
 
 ## Checklist before finishing a UI change
 - [ ] New values reference tokens (no stray hex/px); status colors use `--keep/--archive/--done`.
