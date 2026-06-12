@@ -352,6 +352,10 @@
 
   // NSFW reveal + Ask AI + gallery lightbox
   stack.addEventListener("click", function (e) {
+    // NSFW check must run before the gallery lightbox: the first tap on a blurred
+    // gallery un-blurs it; only an already-revealed gallery opens the lightbox.
+    var media = e.target.closest(".tcard-media.nsfw");
+    if (media) { media.classList.remove("nsfw"); return; }
     // Inline gallery image → open lightbox with all gallery images
     var galImg = e.target.closest(".tcard-gallery-img");
     if (galImg) {
@@ -365,8 +369,6 @@
       }
       return;
     }
-    var media = e.target.closest(".tcard-media.nsfw");
-    if (media) { media.classList.remove("nsfw"); return; }
     var pv = e.target.closest(".rd-preview-lg");
     if (pv) {
       var holder = e.target.closest(".tcard-embed");
