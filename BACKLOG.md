@@ -211,18 +211,28 @@ false positives.*
   flips `is_saved` and **Undo** (`POST /reddit/items/<fn>/undo`) cancels a still-pending unsave locally
   (no spurious live re-save) and surfaces a genuine re-save failure; dropped a redundant per-item
   `get_item` in the sync loop + dead `updateCounts`/`filterSource`/`thumbnail`/`gallery`.
-- [ ] **P3 — Port RSM's richer importers.** Reddit **GDPR data-export ZIP** (keyless full saved-list
-  backfill — the canonical fallback if cookie sync is unviable), **BDFR JSON**, and recursive directory walk.
+- [x] ~~**P3 — Port RSM's richer importers.**~~ Shipped (2026-06-12, trio head-to-head batch 1,
+  merge `8df9880`): **GDPR data-export ZIP** (`_from_gdpr_zip`, saved_posts/saved_comments
+  members, root or nested — winner GLM-5.1) + **BDFR single-JSON** (single-dict shape through
+  `child_to_item`) + **recursive directory walk** (`can_import`/`import_file` on dirs, strict
+  reddit head-sniff so Keep Takeout dirs still dispatch to Keep — winner DeepSeek V4). 17 new tests.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
   groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
 - [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, merge `feat/reddit-oauth` (OAuth sync + live
   thread fetch + OAuth save/unsave); prefer OAuth over the cookie path when configured.
 
-- [ ] **P3 — Reddit comments sort option in the inbox.** Pick a comment sort (best/top/new) when
-  opening a Reddit thread inline.
-- [ ] **P2 — Extend tagging beyond Reddit (YouTube, etc.).** The multi-label tag system (this epic /
-  `categorize.py`) is reddit-only today; apply tags to YouTube videos (channel/title heuristics) so the
-  tag filter spans sources.
+- [x] ~~**P3 — Reddit comments sort option in the inbox.**~~ Shipped (2026-06-12, trio batch 1,
+  winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
+  new = created_utc, best = cached order), `?sort=` validated at the route, `#thread-sort`
+  select persisted to localStorage. 7 tests.
+- [x] ~~**P2 — Extend tagging beyond Reddit (YouTube, etc.).**~~ Shipped (2026-06-12, trio
+  batch 1, winner Kimi K2.6): `youtube_tags()` (16-channel seed map + title-keyword fallback
+  into existing buckets) + `tag_youtube_source()` (dry-run/retry, preserves processing tags,
+  drops enrich keyword noise, never touches `metadata.category`) + `categorize --topics` CLI.
+  Note: `merge_upsert`'s category mirror re-appends the processing tag at the END of
+  `metadata.tags` on every write — on-disk order is `[topic..., processing]`. Seed maps are
+  deliberately conservative — extend `_YOUTUBE_CHANNEL_TAGS`/`_YOUTUBE_KEYWORD_TAGS` with
+  corpus-confirmed channels next.
 - [ ] **P2 — Add incremental "Sync newest" to the main browse view.** *(User-requested 2026-06-08.)* The
   working `POST /reddit/sync` button lives only in `/reddit` (`reddit.html` `#btn-sync`); surface it in the
   main browse header/tools too.
