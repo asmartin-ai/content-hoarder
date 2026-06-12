@@ -785,6 +785,22 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
     object-fit: cover;
 }
 
+/* Inline gallery images in the triage card (metadata.gallery). Stacked vertically;
+   each image capped to keep the card scannable; tap opens the lightbox. */
+.tcard-gallery {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+.tcard-gallery .tcard-gallery-img {
+    width: 100%;
+    display: block;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    cursor: zoom-in;
+}
+
 .tcard-media.nsfw img {
     filter: blur(22px);
 }
