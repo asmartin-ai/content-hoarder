@@ -288,6 +288,14 @@
   };
 
   // ── Thread view ────────────────────────────────────────────────────────────
+  let threadSort = localStorage.getItem('ch-thread-sort') || 'best';
+  const threadSortSelect = $('thread-sort');
+  threadSortSelect.addEventListener('change', function () {
+    threadSort = this.value;
+    localStorage.setItem('ch-thread-sort', threadSort);
+    if (selectedFullname) { openThread(selectedFullname); }
+  });
+
   window.openThread = function (fullname) {
     selectedFullname = fullname;
     detailPanel.style.display = 'flex';
@@ -295,8 +303,9 @@
     commentsList.innerHTML    = '';
     commentsHead.style.display = 'none';
     detailPermalink.href = '#';
+    threadSortSelect.style.display = 'none';
 
-    fetch(`/reddit/items/${encodeURIComponent(fullname)}/thread`)
+    fetch(`/reddit/items/${encodeURIComponent(fullname)}/thread?sort=${encodeURIComponent(threadSort)}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) {
@@ -304,6 +313,8 @@
           return;
         }
         renderThread(data);
+        threadSortSelect.value = threadSort;
+        if ((data.comments || []).length) { threadSortSelect.style.display = ''; }
         activeContainer().querySelectorAll('[data-fullname]').forEach(el => {
           el.classList.toggle('selected-row', el.dataset.fullname === fullname);
         });
@@ -349,6 +360,7 @@
     } else {
       commentsHead.style.display = 'none';
       commentsList.innerHTML = '<p style="color:#555;font-size:12px">No comments loaded.</p>';
+      threadSortSelect.style.display = 'none';
     }
   }
 
