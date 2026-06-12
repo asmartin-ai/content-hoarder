@@ -198,6 +198,8 @@ class RedditConnector(BaseConnector):
 
     def can_import(self, path: Path) -> bool:
         p = Path(path)
+        if p.is_dir():
+            return self._can_import_dir(p)
         if not p.is_file():
             return False
         suf = p.suffix.lower()
@@ -221,6 +223,20 @@ class RedditConnector(BaseConnector):
             return False
         return any(s in head for s in ('"permalink"', '"subreddit"', '"kind": "t3', '"kind":"t3'))
 
+    def _can_import_dir(self, p: Path) -> bool:
+        try:
+            files = sorted(p.rglob("*.json"))
+        except OSError:
+            return False
+        count = 0
+        for f in files:
+            if count >= 50:
+                break
+            count += 1
+            if self._looks_reddit(f):
+                return True
+        return False
+
     def _looks_reddit_html(self, p: Path) -> bool:
         try:
             head = Path(p).read_text(encoding="utf-8", errors="ignore")[:16384]
@@ -232,6 +248,10 @@ class RedditConnector(BaseConnector):
 
     def import_file(self, path: Path):
         p = Path(path)
+        if p.is_dir():
+            for json_file in sorted(p.rglob("*.json")):
+                yield from self._from_json(json_file)
+            return
         suf = p.suffix.lower()
         if suf in (".db", ".sqlite", ".sqlite3"):
             yield from self._from_db(p)
@@ -378,6 +398,13 @@ class RedditConnector(BaseConnector):
             data = json.loads(Path(p).read_text(encoding="utf-8", errors="ignore"))
         except (ValueError, OSError):
             return
+        # Single submission/comment dict (BDFR JSON file)
+        if isinstance(data, dict) and not isinstance(data.get("data"), dict):
+            if any(k in data for k in ("permalink", "name", "subreddit")):
+                item = child_to_item(data)
+                if item:
+                    yield item
+                return
         if isinstance(data, dict) and isinstance(data.get("data"), dict):
             children = data["data"].get("children", [])
         elif isinstance(data, list):
