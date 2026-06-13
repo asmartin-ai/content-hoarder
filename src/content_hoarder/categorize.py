@@ -17,7 +17,8 @@ from content_hoarder import config, db
 from content_hoarder.models import parse_metadata
 
 # Title keywords that mark a wotagei (ヲタ芸) idol-event performance.
-_WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b", re.IGNORECASE)
+# Includes romanized forms and compound dance terms.
+_WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b|\botagei\b|打ち師|サイリウムダンス|ペンライトダンス|\bcyalume\b", re.IGNORECASE)
 
 # Channels that are reliably "listenable" (audio-first: long-form talk, music, podcasts).
 # Word-boundaried so short tokens (e.g. "lofi") don't match unrelated names like

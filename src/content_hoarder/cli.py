@@ -429,6 +429,19 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--topics", action="store_true", help="YouTube: multi-label topic tags instead of processing areas.")
     pc.set_defaults(func=cmd_categorize)
 
+    ph = sub.add_parser("reddit-hydrate",
+                        help="Hydrate a single saved Reddit item's full comment thread (cached in reddit_threads).")
+    ph.add_argument("fullname", help="Item fullname to hydrate (e.g. 'reddit:t3_xxxxx').")
+    ph.set_defaults(func=cmd_reddit_hydrate)
+
+
+def cmd_reddit_hydrate(args) -> int:
+    from content_hoarder import reddit_hydrate
+    with _connect() as conn:
+        res = reddit_hydrate.hydrate_one(conn, args.fullname)
+    print(json.dumps(res, indent=2))
+    return 0 if res.get("status") == "hydrated" else 1
+
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
     pd.add_argument("--by", choices=("url", "title"), default="url",
                     help="Group by identical URL (safe) or title (looser).")

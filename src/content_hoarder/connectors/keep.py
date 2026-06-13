@@ -15,17 +15,34 @@ class KeepConnector(BaseConnector):
     label = "Google Keep"
     badge_color = "#fbbc04"
 
+    def _looks_keep(self, p: Path) -> bool:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
+        except (json.JSONDecodeError, OSError):
+            return False
+        return isinstance(data, dict) and any(
+            k in data for k in ("textContent", "listContent", "isTrashed")
+        )
+
+    def _can_import_dir(self, p: Path) -> bool:
+        try:
+            files = sorted(p.rglob("*.json"))
+        except OSError:
+            return False
+        count = 0
+        for f in files:
+            if count >= 50:
+                break
+            count += 1
+            if self._looks_keep(f):
+                return True
+        return False
+
     def can_import(self, path: Path) -> bool:
         if path.is_dir():
-            return next(path.rglob("*.json"), None) is not None
+            return self._can_import_dir(path)
         if path.suffix.lower() == ".json":
-            try:
-                data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-            except (json.JSONDecodeError, OSError):
-                return False
-            return isinstance(data, dict) and any(
-                k in data for k in ("textContent", "listContent", "isTrashed")
-            )
+            return self._looks_keep(path)
         return False
 
     def import_file(self, path: Path):
