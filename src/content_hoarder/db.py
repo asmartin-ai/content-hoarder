@@ -10,6 +10,7 @@ Design notes / gotchas (see AGENTS.md):
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import re
@@ -1186,7 +1187,12 @@ def get_reddit_thread(conn: sqlite3.Connection, fullname: str) -> dict | None:
     row = conn.execute(
         "SELECT thread_json, hydrated_at FROM reddit_threads WHERE fullname=?", (fullname,)
     ).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    result = dict(row)
+    if isinstance(result["thread_json"], bytes):
+        result["thread_json"] = gzip.decompress(result["thread_json"]).decode("utf-8")
+    return result
 
 
 def set_reddit_thread(
@@ -1198,11 +1204,12 @@ def set_reddit_thread(
     commit: bool = True,
 ) -> None:
     """Cache (or replace) a thread JSON blob for an item. Idempotent."""
+    compressed = gzip.compress(thread_json.encode("utf-8"))
     conn.execute(
         "INSERT INTO reddit_threads(fullname, thread_json, hydrated_at) VALUES(?, ?, ?) "
         "ON CONFLICT(fullname) DO UPDATE SET "
         "thread_json=excluded.thread_json, hydrated_at=excluded.hydrated_at",
-        (fullname, thread_json, hydrated_at if hydrated_at is not None else int(time.time())),
+        (fullname, compressed, hydrated_at if hydrated_at is not None else int(time.time())),
     )
     if commit:
         conn.commit()
