@@ -83,6 +83,9 @@ const fmtDur = (secs) => {
 
 /* ---- per-density builders ---- */
 
+/* inline row chips: fixed-height log/ledger rows can't grow, so no expander */
+const rowChips = (item, o) => tagChips(item, { curated: o.curated, max: 2, expand: false });
+
 export const logRow = (item, opts) => {
   const o = opts || {};
   return '<div class="row' + (item.status !== "inbox" && o.view === "" ? " seen" : "") +
@@ -93,7 +96,7 @@ export const logRow = (item, opts) => {
     '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + "</div>" +
+    '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
     snippet(item) +
     "</div>" +
     '<div class="trail">' + monitorHtml(item, o.nsfwRevealed) + actsHtml(o.view) + "</div>" +
@@ -113,7 +116,7 @@ export const ledgerRow = (item, n, opts) => {
     '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + "</div>" +
+    '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
     "</div>" +
     '<div class="trail">' + play + actsHtml(o.view) + "</div>" +
     "</div></div>";
