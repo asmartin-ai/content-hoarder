@@ -1,4 +1,5 @@
 import json
+import random
 import time
 
 from content_hoarder import db
@@ -65,3 +66,17 @@ def let_it_go(conn, cluster, *, apply=True) -> dict:
     if cluster not in KNOWLEDGE_TAGS:
         raise ValueError(cluster)
     return db.decay(conn, tags=[cluster], label="resurface", apply=apply)
+
+
+def surprise(conn, *, now=None, dormant_days=90) -> dict | None:
+    if now is None:
+        now = int(time.time())
+    cutoff = now - dormant_days * 86400
+    items = db.search_items(conn, "", status="inbox", tags=list(KNOWLEDGE_TAGS), limit=10000)
+    dormant = [item for item in items if item.get("created_utc", 0) < cutoff]
+    if not dormant:
+        return None
+    pick = random.choice(dormant)
+    tags = pick.get("metadata", {}).get("tags", [])
+    first_tag = next((t for t in KNOWLEDGE_TAGS if t in tags), None)
+    return {"kind": "surprise", "fullname": pick["fullname"], "title": pick.get("title", ""), "tag": first_tag}
