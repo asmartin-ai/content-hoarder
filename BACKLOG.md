@@ -381,8 +381,15 @@ need separate filter controls.*
 - [ ] **P2 — Three-dot ⋯ visual menu shouldn't auto-close on change.** Changing a setting
   (density/theme/focus) closes `#visual-menu-pop`; keep it open so several can be toggled without
   reopening.
-- [ ] **P2 — Tag chips only render in card view.** `tagChips` shows on cards but not on compact/
-  comfortable rows; render across all densities (subject to the tag-chip-overload fix above). `app.js`.
+- [x] ~~**P2 — Tag chips only render in card view.**~~ Shipped on v3 (parallel session 2026-06-12,
+  `feat/ui-polish-sweep`, verified 19/19 headless): `core/render.js` `tagChips` gained an
+  `{expand:false}` mode wired into `logRow` (comfortable) + `ledgerRow` (compact); curated-first,
+  capped, static "+N", display-only.
+  > **Epic 13 polish-sweep audit (same session):** these P2s were verified ALREADY-SHIPPED on v3 —
+  > **bulk Undo, bulk-bar no-shift, bulk button colors, NSFW blurred-thumb width, row-click-scope,
+  > side-gutter scroll** (detail in `K:\Projects\ch-parallel\PARALLEL-RUN-NOTES.md`). The "three-dot
+  > ⋯ menu stays open" item is **superseded by the settings menu** (Epic 14) — closed, no ⋯ menu
+  > built (user-confirmed). Tick these on your next BACKLOG pass if you concur with the audit.
 - [ ] **P2 — NSFW blurred thumbnail renders too wide (comfortable/list).** The over-18 blurred thumb
   expands to ~40% of the row width with a centered "NSFW" overlay (screenshot) instead of the normal
   thumbnail box; constrain it to the standard thumb width/aspect. Likely shares a root with the
@@ -422,13 +429,14 @@ need separate filter controls.*
 ## Epic 14 — Settings menu  (`enhancement`, `area:ui`)
 *A single settings cog consolidating preferences that are currently scattered or absent.*
 
-- [ ] **P2 — Settings cog + panel.** A gear in the header opening a settings sheet.
-- [ ] **P2 — View density in settings** (compact / cozy / cards) — surface the existing density toggle.
-- [ ] **P2 — Light/dark theme toggle in settings** — surface the existing `theme.js` toggle.
-- [ ] **P2 — Infinite scroll by default; Focus mode batches.** *(User decision 2026-06-08.)* Make all
-  lists **load-on-scroll** (drop the "Show more" button) EXCEPT **Focus mode**, which restricts to
-  deliberate **batches** (the old `BATCH=25` becomes the Focus batch size). Supersedes the batch-vs-scroll
-  toggle.
+*Epic 14 effectively complete on `feat/frontend-v3` (parallel session 2026-06-12, verified 27/27
+headless). The gear + settings sheet (theme / density / loading / daily-goal) shipped earlier; the
+parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) into the menu.*
+- [x] ~~**P2 — Settings cog + panel.**~~ Shipped on v3 (gear → `#settings` sheet, Esc/scrim close).
+- [x] ~~**P2 — View density in settings**~~ (compact / cozy / cards) — in the settings sheet, persisted.
+- [x] ~~**P2 — Light/dark theme toggle in settings**~~ — `theme.js` toggle surfaced in the sheet.
+- [x] ~~**P2 — Infinite scroll by default; Focus mode batches.**~~ Shipped: load-on-scroll default,
+  Focus mode batches; LOADING control lives in the settings sheet.
 - [ ] **P3 — Focus mode wider on desktop.** Desktop Focus mode should use a wider content column.
 - [ ] **P3 — "Swipe only on mobile" → now a decision (see Epic 16).** Inbox swipe is mobile/touch-only by
   default, not a toggle.
