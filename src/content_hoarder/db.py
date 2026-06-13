@@ -749,6 +749,21 @@ def enqueue_existing_done(conn: sqlite3.Connection) -> int:
     return after - before
 
 
+def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> int:
+    """Queue every still-saved reddit item carrying *tag* for unsaving.
+
+    Finds items via search_items and reuses enqueue_unsave (idempotent).
+    Does NOT drain or make any network call.  Returns the number newly enqueued.
+    """
+    before = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+    items = search_items(conn, "", source="reddit", is_saved=1, tags=[tag], limit=100_000)
+    for item in items:
+        enqueue_unsave(conn, item["fullname"])
+    conn.commit()
+    after = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
+    return after - before
+
+
 # Any MANUAL status transition exits the decayed state (see decay/undecay): strip the
 # wave marks so "stamped == currently decayed" holds and is:swept never matches a rescued
 # item. One definition for every status writer — a future writer that forgets this breaks
