@@ -31,12 +31,54 @@ export const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.
 
 /* Full image URL to open in a lightbox (direct images / i.redd.it), else "". */
 export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
+/* A URL is a directly-renderable image if it ends in an image ext or lives on
+   i.redd.it (reddit's image CDN; paths are <id>.<ext> even without a query). */
+const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
+/* Epic 13:344 — recognize images by media_url SHAPE, not the unreliable media_type
+   label (only ~1,250 of ~35k media posts were ever type-corrected). This unlocks the
+   ~23.5k i.redd.it posts that sit in the reddit_media catch-all with item.url = permalink. */
 export const imageUrl = (item) => {
   const m = item.metadata || {};
-  const u = item.url || "";
-  if (IMG_EXT.test(u) || /i\.redd\.it\//i.test(u)) return u;
+  if (_directImg(item.url)) return item.url;
+  if (_directImg(m.media_url)) return m.media_url;       // ← the catch-all unlock
   return m.media_type === "image" ? (m.media_url || "") : "";
 };
+
+/* Epic 13:344 — the shared detection layer. Convert an item into a render PLAN,
+   deciding on EVIDENCE (gallery array > media_url shape) before LABELS (media_type),
+   because the archive's media_url/gallery are correct for nearly everything while
+   media_type is wrong for ~85% of media posts. Pure + DOM-free (keep it above
+   createLightbox so it stays unit-testable in node). Returned kinds:
+     gallery {urls, poster} · video {id?, hls?, fallback, loop?, poster, permalink}
+     image {url} · dead {url, poster, permalink} · link {url, permalink}            */
+export function resolveMedia(item) {
+  const m = item.metadata || {};
+  const mu = m.media_url || "";
+  const poster = m.thumbnail || "";
+  const permalink = m.permalink || "";
+
+  if (Array.isArray(m.gallery) && m.gallery.length)
+    return { kind: "gallery", urls: m.gallery.slice(), poster };
+
+  const v = mu.match(/v\.redd\.it\/([\w-]+)/i);
+  if (v)
+    return {
+      kind: "video", id: v[1],
+      fallback: /\.mp4(\?|$)/i.test(mu) ? mu : "",          // stored DASH_/CMAF_*.mp4 if present
+      hls: "https://v.redd.it/" + v[1] + "/HLSPlaylist.m3u8",
+      poster, permalink,
+    };
+
+  if (/\.gifv(\?|$)/i.test(mu))                              // imgur .gifv → .mp4 (muted loop)
+    return { kind: "video", fallback: mu.replace(/\.gifv/i, ".mp4"), loop: true, poster, permalink };
+
+  if (_directImg(mu)) return { kind: "image", url: mu };
+  if (/gfycat\.com/i.test(mu)) return { kind: "dead", url: mu, poster, permalink };  // host shut down 2023
+
+  if (_directImg(item.url)) return { kind: "image", url: item.url };  // item.url heuristic last
+  if (m.media_type === "image" && mu) return { kind: "image", url: mu };
+  return { kind: "link", url: item.url || "", permalink };
+}
 
 /* ---- media/content classification (from reddit.js — drives the Epic 13:344
    native-embed pass: galleries/video from archived metadata, no reddit iframe). */
