@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from content_hoarder import config, connectors, db, pipeline, search_query
+from content_hoarder import config, connectors, db, pipeline, resurface, search_query
 
 
 def _int(value, default: int = 0) -> int:
@@ -322,6 +322,24 @@ def create_app(db_path: str | None = None) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"updated": n})
+
+    @app.get("/resurface")
+    def get_resurface():
+        with conn() as c:
+            candidate = resurface.pick_candidate(c)
+        if candidate is None:
+            return "", 204
+        return jsonify(candidate)
+
+    @app.post("/resurface/dismiss")
+    def resurface_dismiss():
+        data = request.get_json(silent=True) or {}
+        cluster = (data.get("cluster") or "").strip()
+        if not cluster:
+            return jsonify({"error": "cluster required"}), 400
+        with conn() as c:
+            resurface.dismiss(c, cluster)
+        return jsonify({"dismissed": cluster})
 
     # -- reddit unsave: cookie auth + on-demand queue drain --------------
 
