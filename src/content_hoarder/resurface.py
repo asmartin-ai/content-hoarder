@@ -59,3 +59,9 @@ def dismiss(conn, cluster, *, now=None, days=30):
     tag_state["dismissed_until"] = now + days * 86400
     state[cluster] = tag_state
     _save_state(conn, state)
+
+
+def let_it_go(conn, cluster, *, apply=True) -> dict:
+    if cluster not in KNOWLEDGE_TAGS:
+        raise ValueError(cluster)
+    return db.decay(conn, tags=[cluster], label="resurface", apply=apply)

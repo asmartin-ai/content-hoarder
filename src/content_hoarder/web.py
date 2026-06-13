@@ -341,6 +341,19 @@ def create_app(db_path: str | None = None) -> Flask:
             resurface.dismiss(c, cluster)
         return jsonify({"dismissed": cluster})
 
+    @app.post("/resurface/letgo")
+    def resurface_letgo():
+        data = request.get_json(silent=True) or {}
+        cluster = (data.get("cluster") or "").strip()
+        if not cluster:
+            return jsonify({"error": "cluster required"}), 400
+        with conn() as c:
+            try:
+                res = resurface.let_it_go(c, cluster)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+        return jsonify({"decayed": res["total"], "cluster": cluster})
+
     # -- reddit unsave: cookie auth + on-demand queue drain --------------
 
     @app.get("/reddit/unsave/status")
