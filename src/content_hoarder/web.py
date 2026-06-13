@@ -327,6 +327,8 @@ def create_app(db_path: str | None = None) -> Flask:
     def get_resurface():
         with conn() as c:
             candidate = resurface.pick_candidate(c)
+            if candidate is None:
+                candidate = resurface.surprise(c)
         if candidate is None:
             return "", 204
         return jsonify(candidate)
