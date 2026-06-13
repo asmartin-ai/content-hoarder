@@ -343,6 +343,11 @@ body.focus .batchstrip{display:flex}
   background:var(--surface-card);border:1px solid var(--border-hairline);
   border-radius:var(--r-pill);padding:5px 9px;cursor:pointer}
 .tag-chip.tag-more{color:var(--accent);border-style:dashed}
+/* inline chips on log/ledger meta lines (Epic 13: chips in every density) —
+   compact enough not to grow the fixed-height rows; overflow clips with the meta */
+.row .meta .tag-chips{margin-left:8px;flex-wrap:nowrap;vertical-align:-3px}
+.row .meta .tag-chip{font-size:.62rem;padding:2px 7px;background:var(--surface-inset)}
+.tag-chip.tag-rest{color:var(--text-dim);border-style:dashed;cursor:default}
 
 /* ===================== decay line + empty state (locked #10/#12) ===================== */
 .decayline{padding:var(--sp-3) var(--sp-4) var(--sp-4);
