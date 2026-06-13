@@ -444,6 +444,20 @@ body.focus .batchstrip{display:flex}
 .tagsheet-list{display:flex;flex-wrap:wrap;gap:8px}
 .tagsheet-list .tag-chip{font-size:var(--fs-sm);padding:9px 13px}
 
+/* settings: plain action button + the stats sheet (Epic 14) */
+.setbtn{display:block;width:100%;text-align:left;font:var(--fw-medium) var(--fs-sm)/1.4 var(--font-sans);
+  color:var(--text);background:var(--surface-inset);border:1px solid var(--border-control);
+  border-radius:var(--r-md);padding:11px 14px;cursor:pointer;min-height:40px}
+.setbtn:hover{border-color:var(--accent)}
+.stats-list{font:var(--fw-regular) var(--fs-sm)/1.5 var(--font-sans);color:var(--text)}
+.stats-list .lab{font:var(--fw-bold) var(--fs-xs)/1 var(--font-mono);letter-spacing:.16em;
+  color:var(--text-dim);margin:var(--sp-4) 0 var(--sp-2)}
+.stat-row{display:flex;align-items:center;gap:10px;padding:5px 0}
+.stat-row .sk{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat-row .bar{flex:1 1 0;height:6px;border-radius:3px;background:var(--accent);opacity:.45}
+.stat-row .sv{margin-left:auto;font-family:var(--font-mono);font-size:var(--fs-xs);
+  color:var(--text-muted)}
+
 .kbd-sheet{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.97);z-index:51;
   background:var(--surface-card);border:1px solid var(--border-control);border-radius:var(--r-lg);
   box-shadow:var(--shadow-pop);padding:var(--sp-5);width:430px;max-width:90%;opacity:0;
