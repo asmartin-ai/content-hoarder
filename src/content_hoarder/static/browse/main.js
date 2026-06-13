@@ -531,7 +531,7 @@ document.addEventListener("keydown", (e) => {
 const scrim = $("#scrim");
 function openPanel(id) { closeSheets(); $(id).classList.add("show"); scrim.classList.add("show"); }
 function closeSheets() {
-  ["#settings", "#tagsheet", "#kbd"].forEach((s) => $(s).classList.remove("show"));
+  ["#settings", "#tagsheet", "#kbd", "#statsheet"].forEach((s) => $(s).classList.remove("show"));
   scrim.classList.remove("show");
 }
 function toggleKbd() {
@@ -543,6 +543,37 @@ scrim.addEventListener("click", closeSheets);
 $("#open-settings").addEventListener("click", () => openPanel("#settings"));
 $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 $("#open-tags-phone").addEventListener("click", () => openPanel("#tagsheet"));
+
+/* ---- stats sheet (Epic 14: Stats lives in the settings menu) ---- */
+function statsBarRows(obj, max) {
+  return Object.entries(obj || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) =>
+      '<div class="stat-row"><span class="sk">' + esc(k) + "</span>" +
+      '<i class="bar" style="width:' + Math.round((v / max) * 100) + '%"></i>' +
+      '<span class="sv">' + v.toLocaleString() + "</span></div>")
+    .join("");
+}
+function statsHtml(d) {
+  const head =
+    '<div class="stat-row"><span class="sk">Processed this week</span><span class="sv">' +
+    (d.processed_this_week || 0).toLocaleString() + "</span></div>" +
+    '<div class="stat-row"><span class="sk">Total saves</span><span class="sv">' +
+    (d.total || 0).toLocaleString() + "</span></div>" +
+    '<div class="stat-row"><span class="sk">With a link</span><span class="sv">' +
+    (d.with_url || 0).toLocaleString() + "</span></div>";
+  const maxOf = (o) => Math.max(...Object.values(o || {}), 1);
+  return head +
+    '<div class="lab">BY SOURCE</div>' + statsBarRows(d.by_source, maxOf(d.by_source)) +
+    '<div class="lab">BY STATUS</div>' + statsBarRows(d.by_status, maxOf(d.by_status));
+}
+$("#open-stats").addEventListener("click", async () => {
+  const list = $("#stats-list");
+  list.textContent = "Counting the shelves…";
+  openPanel("#statsheet");
+  try { list.innerHTML = statsHtml(await api.fetchStats()); }
+  catch (e) { list.textContent = "Couldn't load stats — try again."; }
+});
 
 $$("#set-theme button").forEach((b) => b.addEventListener("click", () => {
   // theme.js owns persistence; mirror its storage contract ("ch-theme")
