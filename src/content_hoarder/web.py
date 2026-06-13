@@ -502,6 +502,16 @@ def create_app(db_path: str | None = None) -> Flask:
             c.commit()
         return jsonify({"queued": True, "fullname": fullname, "is_saved": 0})
 
+    @app.post("/reddit/unsave/enqueue-by-tag")
+    def reddit_unsave_by_tag():
+        body = request.get_json(silent=True) or {}
+        tag = body.get("tag", "")
+        if not tag:
+            return jsonify({"error": "tag required"}), 400
+        with conn() as c:
+            n = db.enqueue_unsave_by_tag(c, tag)
+        return jsonify({"enqueued": n})
+
     @app.post("/reddit/items/<path:fullname>/undo")
     def reddit_undo_unsave(fullname):
         # Undo a Reddit-view "Unsave". If the unsave is still queued (not yet drained to
