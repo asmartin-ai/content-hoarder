@@ -126,9 +126,11 @@ export const consumeMeta = (item) => {
    opts.curated — Set of curated vocabulary (FILTER_TAGS); curated tags sort first.
    opts.max — visible cap (default 3); the rest render hidden behind a
    "+M more" expander button (page CSS/JS toggles .expanded on the wrapper).
+   opts.expand=false — for fixed-height rows that can't grow: no hidden chips,
+   just a static "+N" marker (Epic 13: chips across all densities).
    All tags stay in metadata.tags for FTS — this is display-only. */
 export const tagChips = (item, opts) => {
-  const { curated = null, max = 3 } = opts || {};
+  const { curated = null, max = 3, expand = true } = opts || {};
   const all = (item.metadata || {}).tags || [];
   if (!all.length) return "";
   let tags = all;
@@ -139,12 +141,13 @@ export const tagChips = (item, opts) => {
   }
   const head = tags.slice(0, max);
   const tail = tags.slice(max);
+  const overflow = !tail.length ? "" : expand
+    ? tail.map((t) => '<button type="button" class="tag-chip tag-overflow" hidden>' + esc(t) + "</button>").join("") +
+      '<button type="button" class="tag-chip tag-more" aria-expanded="false">+' + tail.length + " more</button>"
+    : '<span class="tag-chip tag-rest">+' + tail.length + "</span>";
   return '<div class="tag-chips">' +
     head.map((t) => '<button type="button" class="tag-chip">' + esc(t) + "</button>").join("") +
-    (tail.length
-      ? tail.map((t) => '<button type="button" class="tag-chip tag-overflow" hidden>' + esc(t) + "</button>").join("") +
-        '<button type="button" class="tag-chip tag-more" aria-expanded="false">+' + tail.length + " more</button>"
-      : "") +
+    overflow +
     "</div>";
 };
 
