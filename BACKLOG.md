@@ -23,10 +23,10 @@ area. Goal: tag videos so they can be filtered into dedicated "processing areas"
 - [ ] **P2 — Local-LLM auto-classify (`assist/llm.py`).** Classify from title + channel
   (listenable/watch/wotagei) with a manual override per item. Only after heuristics are validated.
   *(WIP exists on the unmerged `feat/llm-auto-classify` branch — review + merge or rebase.)*
-- [ ] **P3 — Widen wotagei detection vocabulary.** Current rules are deliberately tight (3/4998 WL2
-  matches: ヲタ芸/wotagei/wota only). Needs user-supplied terms (idol-event names, performers,
-  サイリウム/cyalume, specific channels) → widen `_WOTAGEI_RE` in `categorize.py`. *(Salvaged from
-  DEFERRED_QUESTIONS.md before deletion.)*
+- [x] ~~**P3 — Widen wotagei detection vocabulary.**~~ Shipped (trio/quad batch 2 winner GLM-5.1,
+  `b6baa07` on main): `_WOTAGEI_RE` now also matches `otagei`/`打ち師`/`サイリウムダンス`/
+  `ペンライトダンス`/`cyalume` (word-boundaried for precision; bare penlight/サイリウム excluded).
+  Further idol-event/performer/channel terms can still be appended as the user supplies them.
 - [x] ~~**Manual re-tagging UI.**~~ Shipped: a category chip-row on the triage card (youtube items)
   + `POST /items/<fn>/category` (validated, non-destructive). List-row picker left out to avoid
   clutter — triage is the focused single-item view.
@@ -119,6 +119,10 @@ false positives.*
   Later via a browser-extension export (the connector already accepts a flat array).
 - [ ] **P2 — Google Keep import.** Per-account Takeout → `import path/to/Keep` (connector exists;
   just needs the export).
+  - [x] ~~Dispatch-hazard fix~~ (quad batch 2 winner Kimi K2.6, `9fa3c04` on main): `KeepConnector`
+    no longer claims *any* `.json` directory — it now samples for actual Keep-note markers
+    (mirrors `RedditConnector._can_import_dir`), so a BDFR/generic json tree falls through to the
+    right connector. Directly protected today's savedreddit import.
 - [x] ~~**Firefox tabs connector.**~~ Shipped: parses "Export Tabs URLs (Rich format)" .txt
   (title / url / favicon / window / pinned) → `firefox:<url-hash>` items, de-duped across the
   overlapping daily exports. Imported one sample (326 tabs). OneTab / `recovery.jsonlz4` remain future.
@@ -694,12 +698,17 @@ was the only writer; the /reddit "Recover" state is a stub); the `reddit_session
 is validated and returns the exact listing shape `reddit_threads` stores; the promote-priority
 slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch, ~200–400 MB.*
 
-- [ ] **P2 — `reddit-hydrate` CLI + on-demand endpoint.** Single-fullname hydration via the
-  cookie (`<permalink>.json` → `db.set_reddit_thread`), wiring the existing Recover stub in
-  the thread viewer; `--batch` over the prioritized set (non-empty body, newest-saved first)
-  with ledger resume, rate limiting, `--limit`, and **dry-run scope listing + explicit user
-  approval before any mass fetch** (Epic 21 trust mechanics). Skip identity/meme content —
-  don't hydrate all 55k (design language §5).
+- [~] **P2 — `reddit-hydrate` CLI + on-demand endpoint — SINGLE-FULLNAME SHIPPED.** Quad batch 2
+  winner MiniMax M3 (`cde5b01` on main, + CLI fix `e353da8`): `reddit_hydrate.hydrate_one()`
+  fetches `<permalink>.json` via the cookie → `db.set_reddit_thread`; `reddit-hydrate <fullname>`
+  CLI + `POST /reddit/items/<fn>/hydrate` endpoint, with status taxonomy (not_found/no_permalink/
+  auth_missing/auth_expired/network_error/bad_shape/hydrated). **Still open (deliberately deferred):**
+  `--batch` over the prioritized set, ledger resume, rate limiting, dry-run scope listing + the
+  explicit-approval gate (Epic 21 trust mechanics), wiring the Recover stub in the thread viewer.
+  Skip identity/meme content — don't hydrate all 55k (design language §5).
+  - Note: today's savedreddit BDFR archive (`data/incoming/savedreddit/`, 672 files) holds full
+    comment trees a *local-archive* hydrate path could load directly (no cookie) — a possible
+    `--from <bdfr-dir>` variant; flagged, not built.
 - [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
   best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
   lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
