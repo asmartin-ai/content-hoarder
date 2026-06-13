@@ -322,10 +322,12 @@ need separate filter controls.*
 - [ ] **P2 — Operator suggestions / autocomplete (Gmail/Discord-style).** *(User-requested.)* The
   operators work but are invisible — add a discovery affordance: suggest keys + values as you type (e.g.
   after `source:` list the sources), and render applied operators as chips. No surface today.
-- [ ] **P2 — Cross-source / boolean queries (research first).** `source:reddit AND source:youtube`
-  doesn't work — an item has one source, and bare `AND` is treated as free text. Decide the model:
-  multi-value `source:a,b` (OR) vs. a real boolean grammar (AND/OR/grouping). **User to research how
-  Gmail / Discord / GitHub-search handle multi-value + boolean before designing.**
+- [ ] **P2 — Cross-source / boolean queries — Model B APPROVED (2026-06-12).** Research done
+  (`docs/search-boolean-research.md` in repo @ main): user approved **Model B** — comma/pipe
+  multi-value (`source:reddit,youtube`) + same-key-repeat=OR on single-valued keys
+  (source/kind/status/subreddit/has); `tag:` keeps comma=OR / repeat=AND; bare `AND`/`OR` stay
+  free text (documented non-feature); NO boolean grammar. Build in flight: trio/quad batch 2
+  spec `search-multivalue` (2026-06-12).
 - [x] ~~**P2 — `has:` media-type operator.**~~ Shipped (overnight 2026-06-10): `has:video`
   (= `reddit_video`) / `has:image` / `has:gallery` on browse + `/reddit`; unknown values
   degrade to free text.
@@ -356,11 +358,11 @@ need separate filter controls.*
   endpoint/payload. Relates to Epic 9 (tagging) and the FILTER_TAGS perf work in the round-2 handoff.
 - [x] ~~**Card-view text clipping / title overlap.**~~ Fixed by the v2 card (adaptive hero + bottom
   action row). (Also noted in Epic 5.)
-- [ ] **P1 — Reddit videos & galleries broken.** Video/gallery items don't play / render correctly in
-  the inbox; audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
-  `openGallery`) against real Reddit data. **Direction (2026-06-08): avoid the Reddit iframe** — render
-  galleries/video with native embeds from the archived `media`/`gallery` metadata instead. Study how
-  Reddit Enhancement Suite + old.reddit present media. Bigger than a quick fix — a media-handling pass.
+- [ ] **P1 — Reddit videos & galleries broken — GATE G1 APPROVED (2026-06-12).** User approved the
+  tiered-native-HLS recommendation in `docs/reddit-media-rendering.md` (repo @ main): media-type
+  backfill + native `<video>`/HLS rendering, no Reddit iframe. Build next (after trio/quad batch 2
+  ships): audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
+  `openGallery`) per the doc's 3-defect decomposition.
 - [ ] **P2 — Card density visual rework.** The cards layout is structurally correct but reads poorly.
   **Root cause (from screenshot, 2026-06-08):** many Reddit posts are **tall text-screenshots** (e.g.
   r/BlueskySkeets) and the fixed **16:9 `object-fit:cover` hero crops the text off** — "image difficult
