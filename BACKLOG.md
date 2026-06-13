@@ -706,14 +706,36 @@ slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch
   `--batch` over the prioritized set, ledger resume, rate limiting, dry-run scope listing + the
   explicit-approval gate (Epic 21 trust mechanics), wiring the Recover stub in the thread viewer.
   Skip identity/meme content — don't hydrate all 55k (design language §5).
-  - Note: today's savedreddit BDFR archive (`data/incoming/savedreddit/`, 672 files) holds full
-    comment trees a *local-archive* hydrate path could load directly (no cookie) — a possible
-    `--from <bdfr-dir>` variant; flagged, not built.
+  - [ ] **P3 — `reddit-hydrate --from <bdfr-dir>` (local-archive hydrate).** The savedreddit BDFR
+    archive (`data/archives/savedreddit-bdfr-2026-06-12/`, 672 files, only copy) holds full nested
+    comment trees (author/body/score/created_utc/parent_id/replies). Convert each to the
+    `[post-listing, comments-listing]` shape and call `db.set_reddit_thread` (blob model, decided
+    2026-06-12) → makes all 672 threads readable + Top/New-sortable in the thread view, no cookie.
+    score/created_utc/replies map cleanly; only per-comment permalink is absent. **Running this is
+    what makes the archive safe to delete.** ~30–45 min.
 - [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
   best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
   lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
 - [ ] **P3 — port note for Epic 22:** AnkiConnect's default `localhost:8765` collides with
   PKMS's capture service (now live on 8765) — whichever lands second picks a new port.
+
+### Icebox — comment storage evolution *(decision 2026-06-12: KEEP the blob model for now)*
+Current: whole thread stored as one JSON blob in `reddit_threads.thread_json`, in a sibling
+table (does NOT bloat `items`; loaded only when a thread is opened). This fits the local,
+read-mostly, read-whole-thread access pattern. Revisit only when a concrete need below appears
+— reactivation condition in parens.
+- [ ] **Near-term cheap lever: gzip the blob.** `thread_json` compresses ~5–10× (JSON, SQLite
+  stores none compressed). gzip on write / gunzip on read, no schema change. (Reactivate if the
+  hydrated DB size becomes a concern — feasibility doc est. ~200–400 MB uncompressed for 8.5k
+  threads → ~30–60 MB gzipped.)
+- [ ] **Lean middle option: normalize to a `comments` table.** One row per comment with only the
+  UI fields (`thread_fullname, parent_id, author, body, score, created_utc, depth`) — smaller than
+  the blob AND queryable; tree via adjacency list (`parent_id`). (Reactivate when you want
+  sort-in-SQL instead of in-Python, or single-comment writes.)
+- [ ] **Advanced: comment search + pagination.** FTS over comment bodies; paginate the few
+  multi-thousand-comment monster threads instead of loading the whole tree. Builds on the lean
+  table (+ optional materialized-path/closure table for subtree queries). (Reactivate when comment
+  search is actually wanted or a giant thread causes a real UX/memory problem.)
 
 ## Epic 23 — ADHD design-language bridge (shared with PKMS)  (`chore`, `area:design`)
 *User idea (2026-06-12): the ADHD-friendly design knowledge accumulating here — friction
