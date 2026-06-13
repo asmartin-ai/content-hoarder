@@ -387,7 +387,7 @@ need separate filter controls.*
   capped, static "+N", display-only.
   > **Epic 13 polish-sweep audit (same session):** these P2s were verified ALREADY-SHIPPED on v3 —
   > **bulk Undo, bulk-bar no-shift, bulk button colors, NSFW blurred-thumb width, row-click-scope,
-  > side-gutter scroll** (detail in `K:\Projects\ch-parallel\PARALLEL-RUN-NOTES.md`). The "three-dot
+  > side-gutter scroll** (detail in `docs/parallel-run-2026-06-12.md`). The "three-dot
   > ⋯ menu stays open" item is **superseded by the settings menu** (Epic 14) — closed, no ⋯ menu
   > built (user-confirmed). Tick these on your next BACKLOG pass if you concur with the audit.
 - [ ] **P2 — NSFW blurred thumbnail renders too wide (comfortable/list).** The over-18 blurred thumb
