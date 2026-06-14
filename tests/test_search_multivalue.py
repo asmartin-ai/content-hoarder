@@ -98,3 +98,26 @@ def test_db_has_media_list_filter(conn):
     rows = db.search_items(conn, "", has_media=["video", "image"])
     fullnames = {r["fullname"] for r in rows}
     assert fullnames == {"reddit:1", "reddit:2"}
+
+
+def test_db_hide_nsfw_filter(conn):
+    items = [
+        models.new_item(source="reddit", source_id="1", metadata={"tags": ["nsfw_erotic"]}),
+        models.new_item(source="reddit", source_id="2", metadata={"tags": ["coding"]}),
+        models.new_item(source="reddit", source_id="3", metadata={"tags": ["nsfw_other", "japan"]}),
+        models.new_item(source="reddit", source_id="4", metadata={}),
+    ]
+    for item in items:
+        db.merge_upsert(conn, item)
+
+    # hide_nsfw drops anything carrying an NSFW tag; clean + untagged items stay.
+    safe = {r["fullname"] for r in db.search_items(conn, "", hide_nsfw=True)}
+    assert safe == {"reddit:2", "reddit:4"}
+
+    # the existing include-filter is the exact inverse (unchanged behavior).
+    nsfw = {r["fullname"] for r in db.search_items(conn, "", nsfw=True)}
+    assert nsfw == {"reddit:1", "reddit:3"}
+
+    # neither flag → all four (default behavior untouched).
+    allrows = {r["fullname"] for r in db.search_items(conn, "")}
+    assert allrows == {"reddit:1", "reddit:2", "reddit:3", "reddit:4"}

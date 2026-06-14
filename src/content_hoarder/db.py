@@ -500,6 +500,7 @@ def search_items(
     subreddit: str | list[str] | None = None,
     is_saved: int | None = None,
     nsfw: bool = False,
+    hide_nsfw: bool = False,
     decayed: bool = False,
     swept: bool = False,
     has_media: str | list[str] | None = None,
@@ -578,6 +579,14 @@ def search_items(
             ph = ",".join("?" for _ in NSFW_TAGS)
             filters.append(
                 f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
+            )
+            params.extend(NSFW_TAGS)
+        if hide_nsfw:
+            # the inverse of the nsfw include-filter: drop anything carrying an NSFW tag
+            # (over_18-flagged items are folded in as nsfw_other by categorize.py)
+            ph = ",".join("?" for _ in NSFW_TAGS)
+            filters.append(
+                f"NOT EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
             )
             params.extend(NSFW_TAGS)
         if has_media:

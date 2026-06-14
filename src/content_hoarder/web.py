@@ -206,6 +206,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 # "quoted phrases" are always exact (parser routes them to exact=);
                 # ?exact=1 (the repurposed checkbox) forces the exact FTS path.
                 fuzzy=a.get("exact") != "1",
+                hide_nsfw=a.get("safe") in ("1", "true"),
                 sort=a.get("sort", "last_seen_utc"),
                 order=a.get("order", "desc"),
                 limit=limit + 1,
