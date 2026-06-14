@@ -24,8 +24,8 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 - [x] App loads at `/`; no console errors on first paint. ⬛
 - [ ] **Offline:** load, kill the network, reload — the shell still renders (service worker). ⬛
-- [ ] **Install to home screen** (Firefox menu → Install); the `install-hint` banner appears and the
-      installed PWA opens standalone. 📱
+- [ ] **Install to home screen** (Firefox menu → Install); the installed PWA opens standalone. 📱
+      *(No in-app `install-hint` banner exists in v3 — install via the browser menu only.)*
 - [x] **Theme toggle** (three-dot ⋯ menu → Light/dark) switches instantly, persists across reload, and
       both modes are readable. ⬛
 - [ ] **Reduced motion:** with the OS "reduce motion" setting on, swipes/animations are neutralized. ⬛

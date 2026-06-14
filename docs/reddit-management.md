@@ -45,8 +45,8 @@ Reads the RSM DB read-only and copies non-empty `thread_json` into `reddit_threa
 `dedup` (URL dedup is safe + reversible; title dedup is looser — review before resolving).
 
 ## Syncing new saves
-content-hoarder has **no Reddit API key**, so live OAuth sync is parked on the unmerged
-`feat/reddit-oauth` branch (dead code until a key arrives). The default is a **cookie-based
+content-hoarder has **no Reddit API key**, so live OAuth sync is **unbuilt** (rebuild it when a key
+arrives — the old `feat/reddit-oauth` branch no longer exists). The default is a **cookie-based
 incremental sync** — implemented in `reddit_sync.py`, exposed as the `reddit-sync` CLI and a
 **"Sync newest"** button on `/reddit`:
 

@@ -154,7 +154,7 @@ false positives.*
   Store it in `saved_utc` (or `metadata.added_to_playlist_utc`) so the existing date display picks it up.
   Note: **Reddit's save-date is genuinely unavailable** — no cookie/OAuth endpoint returns *when* you
   saved an item (`saved.json` gives newest-first *order* only, no timestamp). Don't chase it.
-- [ ] **P3 — Needs the API (keyless not possible):** (a) ~~render **Reddit gallery images** inline — the
+- [ ] **P3 — Needs the API (keyless not possible — except (a), now shipped):** (a) ✅ **inline gallery rendering SHIPPED on v3** (`core/media.js:110` `openGallery` + `browse/main.js:184` dispatch + `🖼 N` badge); was: ~~render **Reddit gallery images** inline — the
   archives keep `is_gallery` but drop `media_metadata`~~ **CORRECTION (2026-06-03 probe):** the archives
   DO return `media_metadata` with full gallery image URLs — inline gallery rendering is keyless-feasible
   via the archive fetch; folded into [`docs/reddit-media-refinement.md`](docs/reddit-media-refinement.md)
@@ -222,8 +222,9 @@ false positives.*
   reddit head-sniff so Keep Takeout dirs still dispatch to Keep — winner DeepSeek V4). 17 new tests.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
   groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
-- [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, merge `feat/reddit-oauth` (OAuth sync + live
-  thread fetch + OAuth save/unsave); prefer OAuth over the cookie path when configured.
+- [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, (re)build OAuth sync + live
+  thread fetch + OAuth save/unsave; prefer OAuth over the cookie path when configured. *(The old
+  `feat/reddit-oauth` branch is gone — this is a rebuild, not a merge.)*
 
 - [x] ~~**P3 — Reddit comments sort option in the inbox.**~~ Shipped (2026-06-12, trio batch 1,
   winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
@@ -338,6 +339,11 @@ need separate filter controls.*
   (source/kind/status/subreddit/has); `tag:` keeps comma=OR / repeat=AND; bare `AND`/`OR` stay
   free text (documented non-feature); NO boolean grammar. Build in flight: trio/quad batch 2
   spec `search-multivalue` (2026-06-12).
+  **Status 2026-06-13 (code-verified):** the `tag:` half is LIVE in `search_query.py` (comma/pipe=OR
+  within a token, repeated `tag:`=AND via `tags_all`). The `source/kind/status/subreddit/has`
+  comma=OR + same-key-repeat=OR half is **NOT built** — those keys still store a single scalar
+  (`ParsedQuery` fields are `str|None`, not lists), so `source:reddit,youtube` matches nothing and a
+  repeated key is last-wins. This box stays open for that half.
 - [x] ~~**P2 — `has:` media-type operator.**~~ Shipped (overnight 2026-06-10): `has:video`
   (= `reddit_video`) / `has:image` / `has:gallery` on browse + `/reddit`; unknown values
   degrade to free text.
@@ -384,14 +390,14 @@ need separate filter controls.*
   native HLS isn't supported (Chrome/Firefox). Per `docs/reddit-media-rendering.md` §4.3: feature-detect
   `canPlayType('application/vnd.apple.mpegurl')`, prefer the HLS manifest when supported, keep the MP4
   fallback otherwise; revisit hls.js only if real use demands it. Verify audio on a real device first.
-- [ ] **P2 — Card density visual rework.** The cards layout is structurally correct but reads poorly.
+- [x] ~~**P2 — Card density visual rework.**~~ ✅ v3: card density ("Pinboard") uses natural height — `.pin .screen img{width:100%;object-fit:contain;max-height:430px}` (`browse.css:335`), no forced 16:9 `cover` crop, so tall text-screenshots render fully. Orig: The cards layout is structurally correct but reads poorly.
   **Root cause (from screenshot, 2026-06-08):** many Reddit posts are **tall text-screenshots** (e.g.
   r/BlueskySkeets) and the fixed **16:9 `object-fit:cover` hero crops the text off** — "image difficult
   to look at." First-pass tweaks applied for review (hero `max-height` 280→200px, `object-position: top`,
   trimmed head/main padding); if still bad, do a full rework — likely needs **per-aspect media handling**
   (don't force 16:9 on portrait/text images) and overlaps the Epic 13 P1 Reddit-media pass. User may
   provide a Figma layout. Touches `app.css` `.items.density-card` + `mediaSlotHtml` in `app.js`.
-- [ ] **P2 — Compact density visual cleanup.** Compact rows are mostly fine, but the **NSFW label
+- [x] ~~**P2 — Compact density visual cleanup.**~~ ✅ v3: NSFW marker is an inline `.nsfw-tag` pill prepended to the meta line (`render.js:43`, `browse.css:265`) — no absolute overlay, so no collision with the byline. Orig: Compact rows are mostly fine, but the **NSFW label
   collides with the meta line** (screenshot): the "NSFW" text + teal pill overlap the byline so "posted …"
   is truncated/clipped (looks like a doubled "NSFV/NSFW"). Fix the NSFW marker placement in compact +
   general spacing polish.
@@ -425,7 +431,7 @@ need separate filter controls.*
   still toggles select).
 - [x] ~~**P2 — Esc doesn't close the Reddit video/thread modal.**~~ ✅ v3: `createLightbox` (core/media.js:88-90) has Esc + backdrop/`[data-media-close]` close built in, and clears the body to stop playback. Orig: `Esc` (and backdrop click) should close
   it like the other modals.
-- [ ] **P3 — Reposition / iconify the Sort control.** Replace the sort dropdown with a sort icon or move
+- [x] ~~**P3 — Reposition / iconify the Sort control.**~~ ✅ v3: moved OUT of the rail into the top shelf bar (`index.html:77-89`) — satisfies the "…or move it out of the rail" half. (Still a `<select>`, not an icon; iconify deferred if ever wanted.) Orig: Replace the sort dropdown with a sort icon or move
   it out of the rail.
 - [x] ~~**P2 — Scroll the list from the side gutters too.**~~ ✅ v3: a `document` `wheel` handler forwards gutter scroll to the list (main.js:612, "13:385"). Orig: With the Gmail-style independent scroll, only
   the content column captures the mouse wheel — hovering the blank space beside it does nothing. Make the
@@ -455,7 +461,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P2 — Infinite scroll by default; Focus mode batches.**~~ Shipped: load-on-scroll default,
   Focus mode batches; LOADING control lives in the settings sheet.
 - [ ] **P3 — Focus mode wider on desktop.** Desktop Focus mode should use a wider content column.
-- [ ] **P3 — "Swipe only on mobile" → now a decision (see Epic 16).** Inbox swipe is mobile/touch-only by
+- [x] ~~**P3 — "Swipe only on mobile" → now a decision (see Epic 16).**~~ ✅ v3: implemented — `swipe.js:37` ignores mouse pointers, `attachSwipe` is touch-only by default (no toggle). Orig: Inbox swipe is mobile/touch-only by
   default, not a toggle.
 - [x] ~~**P3 — Hide the Stats button under settings.**~~ ✅ v3: Stats is the `#statsheet` panel inside the settings menu (GET /stats), per the 2026-06-12 parallel session. De-cluttered.
 
@@ -479,15 +485,15 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
 mobile-friendly".*
 
-- [ ] **P1 — Swipe must not trigger horizontal page scroll.** Lock the layout to the device width
+- [x] ~~**P1 — Swipe must not trigger horizontal page scroll.**~~ ✅ v3: `body{overflow-x:clip}` (`browse.css:15`) + `swipe.js:27` `touchAction="pan-y"` (transform-only drag + edge-zone guard) — a row swipe can't side-scroll the page. Orig: Lock the layout to the device width
   (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
-- [ ] **P2 — NSFW blur in the inbox/triage** — adopt the Reddit view's blur for over-18 media.
-- [ ] **P2 — Tap thumbnail opens the view modal; long-press enters group-select.** Today a thumbnail
+- [x] ~~**P2 — NSFW blur in the inbox/triage**~~ ✅ v3: over-18 media blurred in the browse list (`render.js:13/62` veil + `browse.css:318` `filter:blur(16px)`), reveal-on-tap. Orig: adopt the Reddit view's blur for over-18 media.
+- [ ] **P2 — Tap thumbnail opens the view modal; long-press enters group-select.** ✅ tap-opens-modal SHIPPED on v3 (`main.js:161-180` delegated `[data-media]` → `openMediaFor`); ⏳ the **long-press → group-select** half is still unbuilt (`swipe.js` has no long-press; select is via the avatar `[data-select]` button). Box stays open for that half. Orig: Today a thumbnail
   tap on mobile doesn't open the modal.
 - [ ] **P2 — Swipe physics feel.** The current swipe is a little stiff; add momentum/spring + better
   thresholds for a smoother feel.
 - [ ] **P3 — Mobile-friendly scrollbar** (Nova-Launcher-style fast-scroll handle).
-- [ ] **P2 — Inbox swipe = mobile/touch only.** *(User decision 2026-06-08.)* Disable row-swipe on the
+- [x] ~~**P2 — Inbox swipe = mobile/touch only.**~~ ✅ v3: `swipe.js:37` ignores `pointerType==="mouse"` unless `{mouse:true}`; `main.js` `attachSwipe` passes no `mouse` flag → desktop uses buttons, touch swipes. *(User decision 2026-06-08.)* Orig: Disable row-swipe on the
   inbox on desktop (desktop uses the action buttons/hover); keep swipe for touch only.
 - [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
   touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
@@ -612,7 +618,7 @@ Stage C design gate:*
   decided) + card rendered verbatim in 06; build = `resurface.py` + `GET /resurface` +
   dismiss/letgo POSTs in Stage C (triage_score ranking term degrades to dormancy-only
   until feat/triage-score integrates).
-- [ ] **P2 — "Surprise me" card.** One bounded random old save on demand — converts the
+- [x] ~~**P2 — "Surprise me" card.**~~ ✅ SHIPPED on v3 2026-06-13: `surprise()` (`browse/main.js:358`) pulls `/random?n=1` into the ambient slot ("DEALT AT RANDOM — NO STRINGS"); ⚄ dice button (`main.js:378`, `render.js:196`). No count/streak. Orig: One bounded random old save on demand — converts the
   rediscovery-joy that sustains the save habit into a deliberate retention loop. Rides
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
   **Design locked 2026-06-11** (06: same ambient slot, never both cards, + ⚄ dice for
@@ -655,7 +661,7 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   wave touches them) + conservative title keywords (`giveaway` with a dead-giveaway idiom
   guard, `N% off`, `humble bundle`, …; never bare `free`/`sale`/`event`). 203 items on the
   live corpus (197 subreddit-path, 6 keyword-path); precision samples in the rehearsal report.
-- [ ] **P1 — One-shot supervised "swept" backfill — REHEARSED (round 2), awaiting sign-off.**
+- [x] ~~**P1 — One-shot supervised "swept" backfill.**~~ ✅ APPLIED LIVE 2026-06-11 (user signed off): **21,610 items** carry `decay_label='swept'` in `data/app.db` (re-verified 2026-06-13); reddit inbox 82,190→60,580. Backup `data/app.backup-20260611-1340.db`. Rehearsal detail below kept for the record:
   Policy per user review 2026-06-10: wave 1 = `memes/gaming/esports` older than ~90 days;
   wave 2 = `ephemeral` older than ~60 days; both labeled `swept`. Rehearsal passed on a
   live-DB copy: **21,615 items would decay (33.3% of reddit inbox)** — wave 1 21,414 +
@@ -757,7 +763,7 @@ Current: whole thread stored as one JSON blob in `reddit_threads.thread_json`, i
 table (does NOT bloat `items`; loaded only when a thread is opened). This fits the local,
 read-mostly, read-whole-thread access pattern. Revisit only when a concrete need below appears
 — reactivation condition in parens.
-- [ ] **Near-term cheap lever: gzip the blob.** `thread_json` compresses ~5–10× (JSON, SQLite
+- [x] ~~**Near-term cheap lever: gzip the blob.**~~ ✅ SHIPPED: `db.py:1213` `gzip.compress` on write / `:1200` `gzip.decompress` on read (a bytes-guard keeps legacy uncompressed rows readable), same `thread_json` column, no schema change. Orig: `thread_json` compresses ~5–10× (JSON, SQLite
   stores none compressed). gzip on write / gunzip on read, no schema change. (Reactivate if the
   hydrated DB size becomes a concern — feasibility doc est. ~200–400 MB uncompressed for 8.5k
   threads → ~30–60 MB gzipped.)

@@ -6,7 +6,8 @@ you don't reintroduce known bugs.
 ## What this is
 A local-first, **triage-first** manager for saved content from many sources. Thesis: **process and
 reduce, not just aggregate**. Phase 1 = import + search + a usable triage UI. Phase 2 = polish (swipe
-animations, offline PWA, metrics, LLM assist, Obsidian export, optional Karakeep push).
+animations, metrics, LLM assist, Obsidian export, optional Karakeep push). The offline PWA (service
+worker + manifest) already ships.
 
 ## Stack & run
 - Python 3.12, Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
@@ -30,7 +31,11 @@ src/content_hoarder/
   connectors/   base.py (BaseConnector ABC + registry); one module per source
   bridge/       karakeep.py (opt-in push of 'keep' items; no-op when unconfigured)
   assist/       llm.py (optional local-LLM suggestions; Phase 2)
-  templates/ static/   index.html + triage.html + app.* + triage.* + manifest.webmanifest
+  templates/     index.html (v3 browse) + triage.html + reddit.html + manifest.webmanifest
+  static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
+  static/browse/ v3 browse shell: main.js, render.js, operators.js, palette.js + browse.css
+  static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
+                 (the v2 app.js + swipe.js were deleted 2026-06-13)
 ```
 
 ## Data model (one generic `items` table)
@@ -127,8 +132,9 @@ The RSM interface folded in over the generic `items` table. Full notes: `docs/re
   re-saves a drained one (the generic `/items/<fn>/resave` primitive still exists). Frontend =
   `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed to `/reddit/*`; OAuth/import/export/archival
   controls dropped via JS null-guards).
-- **Auth:** cookie-based incremental sync (newest-first, stop-on-overlap) is the intended default but is
-  pending a Phase-0 spike + a `reddit_session` cookie. OAuth lives on the unmerged `feat/reddit-oauth`.
+- **Auth:** cookie-based incremental sync (newest-first, stop-on-overlap) is implemented and is the
+  default — `reddit_sync.py`, the `reddit-sync` CLI, and `POST /reddit/sync` (needs a `reddit_session`
+  cookie). OAuth is unbuilt (the old `feat/reddit-oauth` branch is gone); rebuild it if a Reddit API key arrives.
 
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.

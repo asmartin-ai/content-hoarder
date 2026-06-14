@@ -26,7 +26,7 @@ post *content* onto `items` rows — it does not produce comment trees in
 |---|---|---|---|
 | **Cookie fetch of `<permalink>.json`** | `reddit_session` cookie (same one `reddit-sync`/`reddit-unsave` already manage; validated live ~0.5s/req, no login wall — note unauthenticated `.json` is 403-blocked from this machine, so the cookie is what makes this work) | Exactly the `[post, comments]` listing `reddit_threads` already stores and PKMS consumes | **Primary.** Cookie expires every few days → fine for attended batches + on-demand, wrong for unattended cron |
 | Archives (PullPush/Arctic-Shift, already integrated) | none | Flat comment lists, different shape; PullPush omits comment permalinks; lossy/laggy | **Fallback only** — for threads deleted from Reddit; needs tree re-assembly + shape conversion |
-| OAuth (`feat/reddit-oauth`, parked) | needs the reddit script app (also a pending PKMS-program user action) | native | Unlocks unattended hydration later; not a blocker |
+| OAuth (unbuilt — rebuild when a key arrives) | needs the reddit script app (also a pending PKMS-program user action) | native | Unlocks unattended hydration later; not a blocker |
 
 ## 3. Scope & cost (queried 2026-06-12)
 

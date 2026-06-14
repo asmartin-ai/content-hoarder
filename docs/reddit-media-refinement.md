@@ -37,7 +37,7 @@ Shipped on the existing `enrich --source reddit --scores` path; no new command.
   `reddit_video` (that would clobber the connector's accurate `youtube`). Only
   `post_hint == "hosted:video"` (reddit-hosted) maps to `reddit_video`; `rich:video`
   falls through to `""`. (Caught in code-review.)
-- **Frontend** (`static/app.js`, `static/triage.js`): `imageUrl` reads `media_url`
+- **Frontend** (now `static/core/media.js` + `static/browse/main.js`; orig `static/app.js`/`triage.js`, app.js since deleted): `imageUrl` reads `media_url`
   for images (returns `""`, never a permalink, when absent); list + triage make
   video/gallery thumbnails click-to-embed; `sw.js` cache bumped to `v7`.
 - **Tests:** `tests/test_archival.py` — provider extraction (image/video/gallery/

@@ -2,7 +2,7 @@
 
 *Epic 20 Stage-C design input (PKMS research adoption, 2026-06-10). Status: **DESIGN
 LOCKED 2026-06-11** (all four open questions decided by Kenja — see Decisions at the
-bottom); build waits for the Stage-C shell. Research constraints baked in from
+bottom). **BUILT + SHIPPED 2026-06-11** (`resurface.py` + `/resurface*` routes + the v3 browse card in `main.js`). Research constraints baked in from
 `K:\Projects\PKMS\vault\resources\research\32-theme-retrieval.md`.*
 
 ## What it is
@@ -41,7 +41,8 @@ Ranking (pick ONE candidate per day, highest first):
    cluster within the last 14 days after ≥90 days of dormancy → "you're back on X —
    want your old saves?"
 2. **Dormant + high propensity:** mean `metadata.triage_score` of the cluster's inbox
-   items (the Epic 10 model, already shipped) × months dormant — surfaces clusters the
+   items (the Epic 10 triage-score model — NOT yet built; only on the unmerged `feat/triage-score`, so
+   this term currently degrades to a dormancy-only prior) × months dormant — surfaces clusters the
    model thinks he'd actually process.
 3. Tie-break random among the top 3 so repeat days vary (bounded surprise).
 
@@ -51,7 +52,7 @@ Ranking (pick ONE candidate per day, highest first):
 | --- | --- |
 | **Show me** | Opens browse filtered to the cluster (`tag:` or `subreddit:` + `status:inbox`), sorted by `triage_score` desc — quick wins first. |
 | **Not now** | Silent dismiss; cluster ineligible for `no_renag_days` (default 30). Stored in `settings.resurfacing_state` (JSON: `{cluster: {dismissed_until, last_shown}}`). No schema change. |
-| **Let it go** | Offers a one-tap decay of the cluster's inbox items (`decay --subreddit X --label swept` semantics via a POST) with the standard undo toast. Guilt-free exit — "let go" copy, never "delete" or "overdue". |
+| **Let it go** | Offers a one-tap decay of the cluster's inbox items (reversible *unlabeled* cluster decay — `is:decayed`, **not** `is:swept`; via a POST) with the standard undo toast. Guilt-free exit — "let go" copy, never "delete" or "overdue". |
 
 ## A "surprise me" sibling (same slot, cheaper)
 
@@ -72,7 +73,7 @@ into a deliberate loop. Never both cards at once.
 4. **"Let it go" needs no extra confirmation** — the standard undo toast suffices
    (it's a reversible decay; extra confirms are exactly the friction to avoid).
 
-## Build sketch (after design sign-off; ~0.5–1d)
+## Build sketch — ✅ BUILT (shipped 2026-06-11: `resurface.py` + `/resurface*` routes + the `main.js` card)
 
 - `GET /resurface` → `{cluster, label, sample[3], action_urls}` or `204` (no candidate
   today). Candidate logic in a small `resurface.py` (testable, DB-only).
