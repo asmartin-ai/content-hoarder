@@ -41,6 +41,9 @@ Thumbs.db
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json
 
+# Local MCP server picks (machine-specific; brave-search reads an ambient BRAVE_API_KEY)
+.mcp.json
+
 # Autonomous-run tracking artifacts (charter, progress, report — not product source)
 .autonomous/
 
