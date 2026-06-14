@@ -1279,8 +1279,11 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 .toast:not([hidden]) { animation: toast-in 200ms var(--ease); }
 
 /* Empty-batch state: celebratory icon + clear hierarchy. */
-.triage-empty-icon { font-size: 2.8rem; line-height: 1; margin-bottom: var(--sp-3); }
+.triage-empty-icon { font-size: 2.8rem; line-height: 1; margin-bottom: var(--sp-3); color: var(--accent); }
 .triage-empty p { font-size: var(--fs-lg); color: var(--text); margin: 0 0 var(--sp-4); }
+.triage-empty .triage-empty-title { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--text); letter-spacing: -.01em; margin: 0 0 var(--sp-1); }
+.triage-empty .triage-empty-sub { font-size: var(--fs-md); color: var(--muted); margin: 0 0 var(--sp-4); min-height: 1.2em; }
+.triage-empty-acts { display: flex; flex-direction: column; gap: var(--sp-2); align-items: center; }
 
 /* ============================================================
    Main-app polish (frontend-design skill) — index / browse

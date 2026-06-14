@@ -47,9 +47,13 @@
   <main id="triage-main" class="triage-main">
     <div id="card-stack" class="card-stack"><!-- current card injected here --></div>
     <div id="triage-empty" class="triage-empty" hidden>
-      <div class="triage-empty-icon" aria-hidden="true">🎉</div>
-      <p>Inbox clear for this batch</p>
-      <button id="next-batch" class="btn primary">Get another batch</button>
+      <div class="triage-empty-icon" aria-hidden="true">&#10003;</div>
+      <p class="triage-empty-title">Page cleared</p>
+      <p class="triage-empty-sub" id="triage-empty-sub"></p>
+      <div class="triage-empty-acts">
+        <button id="next-batch" class="btn primary">Deal another batch</button>
+        <a class="btn ghost" href="/">That&rsquo;s enough for now</a>
+      </div>
     </div>
     <div id="actions" class="triage-actions">
       <button class="act done" data-action="done" title="Done (← or Y)">
