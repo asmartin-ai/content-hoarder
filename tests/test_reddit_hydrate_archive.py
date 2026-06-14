@@ -76,11 +76,13 @@ def test_bdfr_to_listing_shape_round_trips_through_parse_thread():
     assert ("second comment", 0) in bodies
 
 
-def test_bdfr_comment_without_permalink_is_empty_not_crashing():
+def test_bdfr_comment_permalink_is_synthesized():
+    # BDFR omits per-comment permalink; we synthesize /r/<sub>/comments/<sid>/_/<cid>/
     sub = _bdfr_submission(comments=[_bdfr_comment("c1", "x")])
     parsed = parse_thread(json.dumps(reddit_hydrate.bdfr_to_listing(sub)),
                           {"fullname": "reddit:t3_13lityl"})
-    assert parsed["comments"][0]["permalink"] == ""  # BDFR omits it; no exception
+    assert parsed["comments"][0]["permalink"].endswith(
+        "/r/19684/comments/13lityl/_/c1/")
 
 
 # ---------- hydrate_from_archive ----------
@@ -92,10 +94,27 @@ def test_hydrate_from_archive_caches_existing_and_is_readable(conn, tmp_path):
     ])
     res = reddit_hydrate.hydrate_from_archive(conn, archive)
     assert res == {"files": 1, "hydrated": 1, "skipped_no_item": 0,
-                   "skipped_bad": 0, "errors": 0}
+                   "skipped_hydrated": 0, "skipped_bad": 0, "errors": 0}
     thread = get_thread(conn, "reddit:t3_13lityl")
     assert thread["cached"] is True
     assert thread["comments"][0]["body"] == "hi"
+
+
+def test_skip_hydrated_default_protects_existing_blob(conn, tmp_path):
+    # Seed an item AND a pre-existing (richer) cached thread.
+    _seed_item(conn, "13lityl")
+    db.set_reddit_thread(conn, "reddit:t3_13lityl",
+                         json.dumps([{"data": {"children": [{"data": {"title": "RICH"}}]}},
+                                     {"data": {"children": []}}]))
+    archive = _write_archive(tmp_path, [_bdfr_submission("13lityl", title="bdfr")])
+    # default: skip_hydrated -> the richer blob is untouched
+    res = reddit_hydrate.hydrate_from_archive(conn, archive)
+    assert res["hydrated"] == 0 and res["skipped_hydrated"] == 1
+    assert get_thread(conn, "reddit:t3_13lityl")["post"]["title"] == "RICH"
+    # --overwrite (skip_hydrated=False) replaces it with the archive version
+    res2 = reddit_hydrate.hydrate_from_archive(conn, archive, skip_hydrated=False)
+    assert res2["hydrated"] == 1
+    assert get_thread(conn, "reddit:t3_13lityl")["post"]["title"] == "bdfr"
 
 
 def test_hydrate_from_archive_skips_orphan_posts_by_default(conn, tmp_path):

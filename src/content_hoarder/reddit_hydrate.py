@@ -77,30 +77,36 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None) -> dict:
 # --- Offline local-archive hydration (BDFR JSON -> reddit_threads) --------------
 
 
-def _bdfr_comment_to_child(c: dict) -> dict:
+def _bdfr_comment_to_child(c: dict, subreddit: str, submission_id: str) -> dict:
     """One BDFR comment dict (+ nested ``replies``) -> a Reddit-listing ``t1`` child.
 
     Mirrors what ``<permalink>.json`` returns so ``reddit_thread._extract_comments``
-    reads it identically. BDFR omits per-comment permalink (the only lossy field), so
-    it is left empty. Empty replies become ``""`` (not a dict) which is exactly how
+    reads it identically. BDFR omits the per-comment ``permalink`` field, so we
+    synthesize the canonical slugless form (``/r/<sub>/comments/<sid>/_/<cid>/``) from
+    subreddit + submission id + comment id — making the conversion lossless rather than
+    dropping the link. Empty replies become ``""`` (not a dict), which is exactly how
     ``_extract_comments`` detects "no further nesting".
     """
     replies = c.get("replies")
     if isinstance(replies, list) and replies:
         reply_listing: object = {
             "kind": "Listing",
-            "data": {"children": [_bdfr_comment_to_child(r) for r in replies
-                                  if isinstance(r, dict)]},
+            "data": {"children": [_bdfr_comment_to_child(r, subreddit, submission_id)
+                                  for r in replies if isinstance(r, dict)]},
         }
     else:
         reply_listing = ""
+    cid = (c.get("id") or "").strip()
+    sid = (c.get("submission") or submission_id or "").strip()
+    permalink = (f"/r/{subreddit}/comments/{sid}/_/{cid}/"
+                 if (subreddit and sid and cid) else "")
     return {
         "kind": "t1",
         "data": {
             "author": c.get("author") or "",
             "body": c.get("body") or "",
             "score": c.get("score") or 0,
-            "permalink": "",
+            "permalink": permalink,
             "created_utc": c.get("created_utc") or 0,
             "replies": reply_listing,
         },
@@ -125,8 +131,9 @@ def bdfr_to_listing(sub: dict) -> list:
         "url": sub.get("url") or "",
         "created_utc": sub.get("created_utc") or 0,
     }
-    children = [_bdfr_comment_to_child(c) for c in (sub.get("comments") or [])
-                if isinstance(c, dict)]
+    submission_id = (sub.get("id") or "").strip()
+    children = [_bdfr_comment_to_child(c, subreddit, submission_id)
+                for c in (sub.get("comments") or []) if isinstance(c, dict)]
     return [
         {"kind": "Listing", "data": {"children": [{"kind": "t3", "data": post}]}},
         {"kind": "Listing", "data": {"children": children}},
@@ -143,17 +150,23 @@ def _bdfr_fullname(sub: dict) -> str | None:
 
 
 def hydrate_from_archive(conn, archive_dir: str, *, limit: int | None = None,
-                         only_existing: bool = True, progress=None) -> dict:
+                         only_existing: bool = True, skip_hydrated: bool = True,
+                         progress=None) -> dict:
     """Offline-hydrate every BDFR submission ``.json`` under ``archive_dir``.
 
     Converts each to the ``reddit_threads`` blob shape and caches it — no network, no
-    cookie. Idempotent (``set_reddit_thread`` upserts). ``only_existing`` skips files
-    whose ``reddit:t3_<id>`` has no matching ``items`` row, so we don't cache orphan
-    threads for posts not in the library. ``limit`` caps how many are written.
+    cookie. ``only_existing`` (default) skips files whose ``reddit:t3_<id>`` has no
+    matching ``items`` row, so we don't cache orphan threads. ``skip_hydrated``
+    (default) skips items that ALREADY have a cached thread — this is the safety guard:
+    a live cookie/RSM blob can be richer than the archive (e.g. real comment permalinks
+    with slugs), so we never clobber it unless the caller passes ``skip_hydrated=False``
+    (CLI ``--overwrite``). ``limit`` caps how many are written.
     """
     files = sorted(glob.glob(os.path.join(archive_dir, "**", "*.json"), recursive=True))
     res = {"files": len(files), "hydrated": 0, "skipped_no_item": 0,
-           "skipped_bad": 0, "errors": 0}
+           "skipped_hydrated": 0, "skipped_bad": 0, "errors": 0}
+    already = ({r[0] for r in conn.execute("SELECT fullname FROM reddit_threads")}
+               if skip_hydrated else set())
     for path in files:
         if limit is not None and res["hydrated"] >= limit:
             break
@@ -174,6 +187,9 @@ def hydrate_from_archive(conn, archive_dir: str, *, limit: int | None = None,
             "SELECT 1 FROM items WHERE fullname=?", (fullname,)
         ).fetchone():
             res["skipped_no_item"] += 1
+            continue
+        if skip_hydrated and fullname in already:
+            res["skipped_hydrated"] += 1
             continue
         db.set_reddit_thread(conn, fullname, json.dumps(bdfr_to_listing(sub)),
                              commit=False)

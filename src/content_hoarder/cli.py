@@ -400,6 +400,7 @@ def cmd_reddit_hydrate(args) -> int:
             res = reddit_hydrate.hydrate_from_archive(
                 conn, args.from_dir, limit=args.limit,
                 only_existing=not args.include_orphans,
+                skip_hydrated=not args.overwrite,
                 progress=lambda m: print(m, file=sys.stderr),
             )
             print(json.dumps(res, indent=2))
@@ -461,6 +462,9 @@ def build_parser() -> argparse.ArgumentParser:
     ph.add_argument("--include-orphans", action="store_true",
                     help="--from: also cache threads whose post isn't in the items table "
                          "(default skips them).")
+    ph.add_argument("--overwrite", action="store_true",
+                    help="--from: re-write threads already cached (default SKIPS them — a "
+                         "live cookie/RSM blob can be richer than the archive).")
     ph.set_defaults(func=cmd_reddit_hydrate)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
