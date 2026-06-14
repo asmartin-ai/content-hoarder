@@ -546,6 +546,59 @@ $("#open-settings").addEventListener("click", () => openPanel("#settings"));
 $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 $("#open-tags-phone").addEventListener("click", () => openPanel("#tagsheet"));
 
+/* Swipe-DOWN-to-dismiss for the mobile bottom sheets. Engages only at scroll-top with a
+   downward drag, so it never fights the sheet's own scroll or its toggle buttons. The
+   preventDefault on the engaged drag also blocks the browser's pull-to-refresh, which
+   otherwise hijacks the down-swipe and reloads the page instead of closing the sheet. */
+function attachSheetDismiss(panel) {
+  if (!panel) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let startY = 0, dy = 0, dragging = false, engaged = false;
+
+  const settle = (toY, after) => {
+    let fired = false;
+    const fin = () => {
+      if (fired) return;
+      fired = true;
+      panel.removeEventListener("transitionend", fin);
+      if (after) after();           // before clearing inline: closeSheets removes .show while
+      panel.style.transition = "";  // the sheet is already off-screen → no flash back up
+      panel.style.transform = "";
+    };
+    if (reduced.matches) { panel.style.transition = "none"; panel.style.transform = toY; fin(); return; }
+    panel.style.transition = "transform 180ms var(--ease)";
+    panel.style.transform = toY;
+    panel.addEventListener("transitionend", fin);
+    setTimeout(fin, 240);           // fallback if transitionend never fires
+  };
+
+  panel.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    if (!window.matchMedia("(max-width:700px)").matches) return;  // bottom-sheet layout only
+    startY = e.touches[0].clientY; dy = 0; dragging = true;
+    engaged = panel.scrollTop <= 0;                               // decide once, up front
+    panel.style.transition = "none";
+  }, { passive: true });
+
+  panel.addEventListener("touchmove", (e) => {
+    if (!dragging || !engaged) return;
+    dy = e.touches[0].clientY - startY;
+    if (dy <= 0) return;                                          // upward → let content scroll
+    e.preventDefault();                                          // own the gesture (no pull-to-refresh)
+    panel.style.transform = "translate(-50%," + dy + "px)";
+  }, { passive: false });
+
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (engaged && dy > Math.min(120, panel.offsetHeight * 0.3)) settle("translate(-50%,110%)", closeSheets);
+    else if (dy > 0) settle("translate(-50%,0)");
+  };
+  panel.addEventListener("touchend", end);
+  panel.addEventListener("touchcancel", end);
+}
+["#settings", "#statsheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
+
 /* ---- stats sheet (Epic 14: Stats lives in the settings menu) ---- */
 function statsBarRows(obj, max) {
   return Object.entries(obj || {})
