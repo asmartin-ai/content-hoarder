@@ -222,6 +222,7 @@ def create_app(db_path: str | None = None) -> Flask:
             rows = db.get_random_batch(
                 c, n, source=a.get("source") or None,
                 unprocessed=a.get("unprocessed", "1") != "0",
+                mode=a.get("mode") or "random",
             )
         return jsonify({"items": rows})
 
