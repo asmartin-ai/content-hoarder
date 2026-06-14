@@ -272,7 +272,10 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
   skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
   (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
 
-- [ ] **P2 — Shuffle / mixed-content mode.** A triage/browse mode that interleaves a *mix* of sources
+- [x] ~~**P2 — Shuffle / mixed-content mode.**~~ ✅ Shipped 2026-06-13: a "SHUFFLE · MIX" sort that
+  interleaves sources round-robin (`db._order_clause` window fn: nth-of-each-source then source —
+  deterministic, so infinite-scroll pages don't dup/skip, unlike RANDOM()). +3 tests; preview-verified
+  (sources interleave hackernews/reddit/youtube…). Orig: interleaves a *mix* of sources
   and categories (not grouped) for variety; complements smart-triage above.
 - [ ] **P2 — Default "All" view sorted by "easy to triage".** Use the learned likely-done score (this
   epic) to order the default All view so quick wins surface first, instead of recency/random.
@@ -323,9 +326,12 @@ need separate filter controls.*
   negation honored even with no positive term.
 - [x] ~~**Tag operator semantics.**~~ Shipped: repeated `tag:` = AND (`tags_all`), `tag:a,b`/`tag:a|b` =
   OR; `search_items` gained the AND mode.
-- [ ] **P2 — Operator suggestions / autocomplete (Gmail/Discord-style).** *(User-requested.)* The
-  operators work but are invisible — add a discovery affordance: suggest keys + values as you type (e.g.
-  after `source:` list the sources), and render applied operators as chips. No surface today.
+- [x] ~~**P2 — Operator suggestions / autocomplete (Gmail/Discord-style).**~~ ✅ Shipped 2026-06-13
+  (`static/browse/operators.js`): the `#oppop` popover now gives context-aware suggestions — typing
+  suggests operator KEYS, and after `key:` it suggests VALUES (`source:` → the 6 sources;
+  status:/kind:/is:/has: static lists; `tag:` pulls the curated tag list). Keyboard-navigable (↑/↓ +
+  Enter/Tab, Esc), mouse too, and applied operators render as removable ✕ chips. Vocabulary mirrors
+  `search_query.py`. Preview-verified end-to-end. *(User-requested.)*
 - [ ] **P2 — Cross-source / boolean queries — Model B APPROVED (2026-06-12).** Research done
   (`docs/search-boolean-research.md` in repo @ main): user approved **Model B** — comma/pipe
   multi-value (`source:reddit,youtube`) + same-key-repeat=OR on single-valued keys
