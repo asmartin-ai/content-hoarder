@@ -396,6 +396,17 @@ def cmd_reddit_unsave(args) -> int:
 def cmd_reddit_hydrate(args) -> int:
     from content_hoarder import reddit_hydrate
     with _connect() as conn:
+        if args.from_dir:
+            res = reddit_hydrate.hydrate_from_archive(
+                conn, args.from_dir, limit=args.limit,
+                only_existing=not args.include_orphans,
+                progress=lambda m: print(m, file=sys.stderr),
+            )
+            print(json.dumps(res, indent=2))
+            return 0 if res.get("errors", 0) == 0 else 1
+        if not args.fullname:
+            print("error: provide a fullname or --from <bdfr-dir>", file=sys.stderr)
+            return 2
         res = reddit_hydrate.hydrate_one(conn, args.fullname)
     print(json.dumps(res, indent=2))
     return 0 if res.get("status") == "hydrated" else 1
@@ -438,8 +449,18 @@ def build_parser() -> argparse.ArgumentParser:
     pc.set_defaults(func=cmd_categorize)
 
     ph = sub.add_parser("reddit-hydrate",
-                        help="Hydrate a single saved Reddit item's full comment thread (cached in reddit_threads).")
-    ph.add_argument("fullname", help="Item fullname to hydrate (e.g. 'reddit:t3_xxxxx').")
+                        help="Hydrate saved Reddit comment threads into reddit_threads "
+                             "(one fullname via cookie, or --from a local BDFR archive, offline).")
+    ph.add_argument("fullname", nargs="?",
+                    help="Item fullname to hydrate via cookie (e.g. 'reddit:t3_xxxxx').")
+    ph.add_argument("--from", dest="from_dir", metavar="BDFR_DIR",
+                    help="Offline: hydrate every submission .json under this BDFR archive dir "
+                         "(no network, no cookie). Converts the local comment trees.")
+    ph.add_argument("--limit", type=int, default=None,
+                    help="--from: cap how many threads to write this run.")
+    ph.add_argument("--include-orphans", action="store_true",
+                    help="--from: also cache threads whose post isn't in the items table "
+                         "(default skips them).")
     ph.set_defaults(func=cmd_reddit_hydrate)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
