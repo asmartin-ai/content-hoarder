@@ -1,5 +1,7 @@
 # Spec 01 — Model B multi-value search
 
+> ✅ **SHIPPED 2026-06-14** — `b92fe63` on `main` (bakeoff Batch-4: glm-5p1). Dossier kept for history.
+
 BACKLOG: Epic 12 #335 (`docs/search-boolean-research.md` = approved design; `docs/search-operators-spec.md`).
 Branch: `feat/search-model-b`. Touches: `search_query.py`, `db.py`, `tests/test_search_query.py`,
 possibly `web.py`.

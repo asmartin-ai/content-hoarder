@@ -1,7 +1,10 @@
 # Overnight build batch — specs index
 
-Status: **DRAFT, queued.** Do NOT start until Kenja provides the handoff paste.
-Created 2026-06-14. Base: `main == feat/frontend-v3 == cf8b265`.
+Status: **EXECUTED (backend) 2026-06-14.** Specs **01, 02, 03, 07 SHIPPED to `main`** via the Fireworks
+bakeoff + a delegated subagent — 01 `b92fe63` (glm-5p1), 02 `bb5b1d8` (subagent), 03 `254cb91` (qwen3p7-plus),
+07 = verified no-op (already imported). Frontend specs **04/05/06 NOT built** — no objective offline test
+(weak bakeoff substrate), deferred. Base is now `254cb91`. The run-order/gates below are the original plan (historical).
+Created 2026-06-14.
 
 Context: frontend-v3 *design* work is parked pending Fable 5 (see memory `frontend-v3-parked`).
 These are the **non-design, offline-testable backlog features** safe to build unsupervised.

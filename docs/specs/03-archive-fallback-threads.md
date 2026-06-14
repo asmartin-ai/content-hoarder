@@ -1,5 +1,7 @@
 # Spec 03 — Archive fallback for deleted Reddit threads
 
+> ✅ **SHIPPED 2026-06-14** — `254cb91` on `main` (bakeoff Batch-4 winner: qwen3p7-plus). Dossier kept for history.
+
 BACKLOG: Epic 24 #749. Branch: `feat/archive-fallback`. Touches: `reddit_hydrate.py`,
 `reddit_unsave.py` (404 signal), `archival/providers.py`, `reddit_thread.py`, `tests/`.
 

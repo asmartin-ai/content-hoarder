@@ -1,5 +1,7 @@
 # Spec 07 — Import the remaining Firefox TabExports (data job)
 
+> ✅ **DONE 2026-06-14** — verified no-op (`254cb91`-era): all 163 files were already imported in a prior session, 0 new rows, backup retained. Dossier kept for history.
+
 BACKLOG: Epic 7 #135. Branch: `chore/import-tabexports`. Touches: NO product code (a CLI data job) —
 but it **writes the live `data/app.db`**, so back up first. RUN LAST and separately from the code specs.
 

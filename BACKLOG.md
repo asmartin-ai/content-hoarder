@@ -132,10 +132,12 @@ false positives.*
   `migrate-firefox-tabs [--apply]` (dry-run default) re-keys rows imported before this and collapses
   duplicates. Of the 326-tab sample, **219 were YouTube** (2 already saved, 217 orphans); browse them
   via the **"📑 Firefox tabs"** filter (`/items?open_in_firefox=1`).
-- [ ] **P3 — Import the remaining Firefox TabExports (data job).** Only 1 of ~17 daily TabExports
-  files was imported as the sample (326 tabs). Import the rest with
-  `python -m content_hoarder import "<Downloads>\TabExports\<file>.txt" --source firefox` — they
-  overlap heavily and de-dup by URL. *(Salvaged from DEFERRED_QUESTIONS.md before deletion.)*
+- [x] ~~**P3 — Import the remaining Firefox TabExports (data job).**~~ Done 2026-06-14: backed up the
+  live DB first (`data/app.backup-pre-tabexports-20260614-090812.db`) and looped all **163**
+  `*_ExportTabsURLs.txt` through `import … --source firefox`. Result: **0 new rows** — the files were
+  ALREADY fully imported in a prior session (the "only 1 sample" premise was stale; 2,269 firefox +
+  promoted YouTube items already present). Confirmed idempotent + non-destructive (total/saved/non-inbox
+  counts unchanged, 0 errors, DB intact). Backup retained.
 - [ ] **P2 — Re-surface the Firefox-tabs filter (regression).** The **"📑 Firefox tabs"**
   (`open_in_firefox=1`) filter referenced above has **no UI control** in the v2 layout — it was lost in
   the redesign (no `open_in_firefox` toggle in `app.js`/`index.html`). Re-add a way to filter to
@@ -333,17 +335,17 @@ need separate filter controls.*
   status:/kind:/is:/has: static lists; `tag:` pulls the curated tag list). Keyboard-navigable (↑/↓ +
   Enter/Tab, Esc), mouse too, and applied operators render as removable ✕ chips. Vocabulary mirrors
   `search_query.py`. Preview-verified end-to-end. *(User-requested.)*
-- [ ] **P2 — Cross-source / boolean queries — Model B APPROVED (2026-06-12).** Research done
+- [x] **P2 — Cross-source / boolean queries — Model B → SHIPPED 2026-06-14 (`b92fe63`).** Research done
   (`docs/search-boolean-research.md` in repo @ main): user approved **Model B** — comma/pipe
   multi-value (`source:reddit,youtube`) + same-key-repeat=OR on single-valued keys
   (source/kind/status/subreddit/has); `tag:` keeps comma=OR / repeat=AND; bare `AND`/`OR` stay
   free text (documented non-feature); NO boolean grammar. Build in flight: trio/quad batch 2
   spec `search-multivalue` (2026-06-12).
-  **Status 2026-06-13 (code-verified):** the `tag:` half is LIVE in `search_query.py` (comma/pipe=OR
-  within a token, repeated `tag:`=AND via `tags_all`). The `source/kind/status/subreddit/has`
-  comma=OR + same-key-repeat=OR half is **NOT built** — those keys still store a single scalar
-  (`ParsedQuery` fields are `str|None`, not lists), so `source:reddit,youtube` matches nothing and a
-  repeated key is last-wins. This box stays open for that half.
+  **SHIPPED 2026-06-14 (`b92fe63` on main — bakeoff Batch-4, glm-5p1's diff):** the
+  `source/kind/status/subreddit/has` comma=OR + same-key-repeat=OR half is now LIVE — `ParsedQuery`
+  fields are `str | list[str] | None`, `db.search_items` emits `IN (…)` (subreddit keeps COLLATE NOCASE,
+  `has_media` maps each member), and every existing single-value query is byte-for-byte unchanged. The
+  `tag:` half was already live. **Model B complete.**
 - [x] ~~**P2 — `has:` media-type operator.**~~ Shipped (overnight 2026-06-10): `has:video`
   (= `reddit_video`) / `has:image` / `has:gallery` on browse + `/reddit`; unknown values
   degrade to free text.
@@ -543,8 +545,12 @@ mobile-friendly".*
 - [x] ~~**P2 — Test-gap fills.**~~ Shipped: `test_rsm_threads.py` (5 tests) + 5 youtube_recover
   failure-path tests. The categorize/missing-rules case was already covered by
   `test_nsfw_disabled_without_rules_file`. *(delegation/10)*
-- [ ] **P3 — Unify the 4 divergent HTTP timeout/retry helpers** (`archival/_http.py`,
-  `reddit_unsave`, `youtube_recover`, `karakeep`). Refactor risk > current pain; do opportunistically.
+- [x] ~~**P3 — Unify the 4 divergent HTTP timeout/retry helpers**~~ Shipped 2026-06-14 (`bb5b1d8` on
+  main — delegated to an Opus subagent): one shared `_http.request(...)` primitive + `retry_after_seconds`
+  in new `src/content_hoarder/_http.py`; the 4 helpers (`archival/_http.get_json`, `reddit_unsave._http_get`/
+  `_http_post`, `youtube_recover._http_get`, `karakeep._post`) are now thin adapters with identical
+  signatures/return-shapes/error-policies; all injection seams preserved; the 6 network test files pass
+  unedited + 19 new offline `_http` tests. Behavior-preserving (no live round-trip exercised).
 
 ## Epic 20 — Frontend v3 overhaul  (`enhancement`, `area:ui`)
 *Decision (2026-06-09): full overhaul on `feat/frontend-v3` — vanilla JS, no build step, mobile
@@ -752,9 +758,12 @@ slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch
     blobs before this guard; reverted from backup). Net: the DB supersedes the archive. **The archive
     was DELETED 2026-06-13** (112 MB) after verifying 672/672 fullnames are in `reddit_threads`.
     15 offline tests.
-- [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
-  best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
-  lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
+- [x] ~~**P3 — Archive fallback for deleted threads.**~~ Shipped 2026-06-14 (`254cb91` on main —
+  bakeoff Batch-4, qwen3p7-plus's diff). A live-fetch HTTP 404 now raises `RedditNotFoundError` →
+  `hydrate_one_from_archive` assembles `[post, comments]` from the providers (Arctic-preferred for real
+  permalinks), rebuilds the comment tree from flat `parent_id` adjacency (orphans at root, missing
+  permalinks synthesized), marks the post `_archive_sourced` (surfaced by `parse_thread`), and the web
+  hydrate route maps `"archived"` → 200. Existing cache is never clobbered. Offline-tested (no live 404 round-trip yet).
 - [ ] **P3 — port note for Epic 22:** AnkiConnect's default `localhost:8765` collides with
   PKMS's capture service (now live on 8765) — whichever lands second picks a new port.
 
