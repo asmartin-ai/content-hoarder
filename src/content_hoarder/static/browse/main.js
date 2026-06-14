@@ -146,6 +146,8 @@ async function act(fullname, status) {
     toast("That didn't stick — try again.");
     return;
   }
+  const undoIdx = state.items.findIndex((it) => it.fullname === fullname);
+  const undoItem = undoIdx >= 0 ? state.items[undoIdx] : null;
   state.items = state.items.filter((it) => it.fullname !== fullname);
   if (state.focus) state.batchCleared += 1;
   bumpPulse(status === "inbox" ? 0 : 1);
@@ -156,7 +158,11 @@ async function act(fullname, status) {
       await api.undoItem(fullname);
       bumpPulse(status === "inbox" ? 0 : -1);
       if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
-      loadItems(true);
+      // restore the row in place — no full refetch/skeleton, keeps the scroll position
+      if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
+        state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
+      }
+      render();
     } catch (e) { toast("Undo failed."); }
   });
 }
@@ -221,6 +227,10 @@ $$("#bulktray [data-bulk]").forEach((b) => b.addEventListener("click", async () 
   clearSelection();
   try { await api.bulkStatus(fns, status); }
   catch (e) { toast("Bulk action failed."); return; }
+  const bulkRemoved = fns.map((fn) => {
+    const i = state.items.findIndex((it) => it.fullname === fn);
+    return i >= 0 ? { i, item: state.items[i] } : null;
+  }).filter(Boolean);
   state.items = state.items.filter((it) => !fns.includes(it.fullname));
   if (state.focus) state.batchCleared += fns.length;
   bumpPulse(status === "inbox" ? 0 : fns.length);
@@ -228,7 +238,13 @@ $$("#bulktray [data-bulk]").forEach((b) => b.addEventListener("click", async () 
   snackbar(fns.length + " — " + (COPY[status] || "logged.").toLowerCase(), async () => {
     const r = await api.bulkUndo(fns);
     bumpPulse(status === "inbox" ? 0 : -r.ok);
-    loadItems(true);
+    // restore the rows in place (ascending index) — no full refetch/skeleton
+    bulkRemoved.sort((a, b) => a.i - b.i).forEach(({ i, item }) => {
+      if (!state.items.some((it) => it.fullname === item.fullname)) {
+        state.items.splice(Math.min(i, state.items.length), 0, item);
+      }
+    });
+    render();
   });
 }));
 

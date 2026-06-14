@@ -4,6 +4,7 @@
    app.js:226-360/448-471 and triage.js:64-141. */
 
 import { esc, safeUrl, ago, fmtDate } from "./util.js";
+import { redditUrl } from "./media.js";
 
 /* ---- source identity ---- */
 export const CH_SOURCES = {
@@ -25,7 +26,9 @@ export const hnThreadUrl = (item) => {
   return id ? "https://news.ycombinator.com/item?id=" + encodeURIComponent(id) : "";
 };
 export const itemUrl = (item) =>
-  item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "") : (item.url || "");
+  item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "")
+  : item.source === "reddit" ? (redditUrl((item.metadata || {}).permalink) || item.url || "")
+  : (item.url || "");
 
 export const metaAnchor = (href, label, cls) => {
   const url = safeUrl(href);
