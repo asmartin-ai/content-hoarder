@@ -162,7 +162,10 @@ class ArchiveProvider:
                 return data if isinstance(data, dict) else {"data": data}
             except _http.ArchiveError as e:
                 if e.status == 429 and attempt < self.max_retries:
-                    wait = float(e.retry_after) if e.retry_after else delay
+                    # e.retry_after is now the shared parser's numeric value (float|None),
+                    # gaining the HTTP-date/negative guard the old `float(e.retry_after)`
+                    # lacked; fall back to the doubling delay when it's absent.
+                    wait = e.retry_after if e.retry_after is not None else delay
                     self._sleep(wait)
                     delay *= 2
                     continue

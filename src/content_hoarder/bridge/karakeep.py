@@ -8,9 +8,8 @@ fields, so per-source metadata is folded into tags + a provenance note.
 from __future__ import annotations
 
 import json
-import urllib.request
 
-from content_hoarder import config, db
+from content_hoarder import _http, config, db
 from content_hoarder.models import parse_metadata
 
 
@@ -40,20 +39,20 @@ def _payload(item: dict) -> dict:
 
 def _post(payload: dict):
     base = config.get("KARAKEEP_BASE_URL").rstrip("/")
-    req = urllib.request.Request(
-        f"{base}/api/v1/bookmarks",
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {config.get('KARAKEEP_API_KEY')}",
-            "Content-Type": "application/json",
-            "User-Agent": config.get("USER_AGENT"),
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception:
+        _status, _headers, raw = _http.request(
+            f"{base}/api/v1/bookmarks",
+            method="POST",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {config.get('KARAKEEP_API_KEY')}",
+                "Content-Type": "application/json",
+                "User-Agent": config.get("USER_AGENT"),
+            },
+            timeout=15,
+        )
+        return json.loads(raw.decode("utf-8"))
+    except Exception:  # any transport/HTTP/decode failure → best-effort None (unchanged policy)
         return None
 
 
