@@ -302,6 +302,31 @@
     attachSwipe(stack.querySelector(".tcard"));
     updateProgress();
   }
+  // Resume / re-entry (design-language §7): persist the live queue + position so reopening
+  // /triage picks up mid-flow instead of dealing a cold fresh batch. Lapse-tolerant — a week
+  // away still resumes; older sessions quietly start fresh, no guilt, no backfill debt.
+  var SESSION_KEY = "ch_triage_session";
+  var SESSION_TTL_MS = 7 * 86400 * 1000;
+  function saveSession() {
+    try {
+      if (queue.length) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+          queue: queue, reviewed: reviewed,
+          src: srcFilter ? srcFilter.value : "", savedAt: Date.now(),
+        }));
+      } else {
+        localStorage.removeItem(SESSION_KEY);   // finished the queue → nothing to resume
+      }
+    } catch (_e) {}
+  }
+  function loadSession() {
+    try {
+      var s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+      if (!s || !Array.isArray(s.queue) || !s.queue.length) return null;
+      if (Date.now() - (s.savedAt || 0) > SESSION_TTL_MS) { localStorage.removeItem(SESSION_KEY); return null; }
+      return s;
+    } catch (_e) { return null; }
+  }
   function loadBatch() {
     var src = srcFilter ? srcFilter.value : "";
     // mode=smart ranks by the learned likely-to-process score (Epic 10); it falls back to
@@ -311,6 +336,7 @@
       queue = data.items || [];
       reviewed = 0;
       renderCurrent();
+      saveSession();
     });
   }
 
@@ -332,6 +358,7 @@
     queue.shift();
     reviewed++;
     todayCleared++;
+    saveSession();   // persist the remaining queue so reopening resumes mid-flow
     setTimeout(function () { if (!queue.length) loadBatch(); else renderCurrent(); }, 180);
   }
 
@@ -347,6 +374,7 @@
         lastAction = null;
         updateUndoBtn();
         renderCurrent();
+        saveSession();
       });
   }
 
@@ -604,5 +632,18 @@
     // Honor ?source=<id> so the "Reddit"/"Triage" links land pre-filtered.
     var qsSource = new URLSearchParams(location.search).get("source");
     if (qsSource && srcFilter) srcFilter.value = qsSource;
-  }).then(loadBatch).catch(loadBatch);
+  }).then(function () {
+    // Resume where you left off — unless an explicit ?source means "deal a fresh filtered batch".
+    var explicit = new URLSearchParams(location.search).get("source");
+    var s = explicit ? null : loadSession();
+    if (s) {
+      queue = s.queue;
+      reviewed = s.reviewed || 0;
+      if (srcFilter && s.src) srcFilter.value = s.src;
+      renderCurrent();
+      toast("Picked up where you left off", false);
+    } else {
+      loadBatch();
+    }
+  }).catch(loadBatch);
 })();
