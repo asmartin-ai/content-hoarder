@@ -717,21 +717,27 @@ was the only writer; the /reddit "Recover" state is a stub); the `reddit_session
 is validated and returns the exact listing shape `reddit_threads` stores; the promote-priority
 slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch, ~200–400 MB.*
 
-- [~] **P2 — `reddit-hydrate` CLI + on-demand endpoint — SINGLE-FULLNAME SHIPPED.** Quad batch 2
+- [x] **P2 — `reddit-hydrate` CLI + endpoint — SHIPPED: single + `--batch` + `--from`.** Quad batch 2
   winner MiniMax M3 (`cde5b01` on main, + CLI fix `e353da8`): `reddit_hydrate.hydrate_one()`
   fetches `<permalink>.json` via the cookie → `db.set_reddit_thread`; `reddit-hydrate <fullname>`
   CLI + `POST /reddit/items/<fn>/hydrate` endpoint, with status taxonomy (not_found/no_permalink/
-  auth_missing/auth_expired/network_error/bad_shape/hydrated). **Still open (deliberately deferred):**
-  `--batch` over the prioritized set, ledger resume, rate limiting, dry-run scope listing + the
-  explicit-approval gate (Epic 21 trust mechanics), wiring the Recover stub in the thread viewer.
-  Skip identity/meme content — don't hydrate all 55k (design language §5).
-  - [ ] **P3 — `reddit-hydrate --from <bdfr-dir>` (local-archive hydrate).** The savedreddit BDFR
-    archive (`data/archives/savedreddit-bdfr-2026-06-12/`, 672 files, only copy) holds full nested
-    comment trees (author/body/score/created_utc/parent_id/replies). Convert each to the
-    `[post-listing, comments-listing]` shape and call `db.set_reddit_thread` (blob model, decided
-    2026-06-12) → makes all 672 threads readable + Top/New-sortable in the thread view, no cookie.
-    score/created_utc/replies map cleanly; only per-comment permalink is absent. **Running this is
-    what makes the archive safe to delete.** ~30–45 min.
+  auth_missing/auth_expired/network_error/bad_shape/hydrated). **`--batch` SHIPPED 2026-06-13
+  (`f3e6d7d`):** `priority_unhydrated()` (inbox selftext posts w/ permalink, newest-saved first —
+  7,335 live) + `hydrate_batch()` — rate-limited (`--throttle` 2s), resumable with no ledger
+  (hydrated rows drop out of the priority query), STOPS on a dead cookie, `--dry-run` scope listing
+  (zero network). 7 offline tests; NOT yet run against Reddit. **Still open:** the explicit-approval
+  UI gate (Epic 21 trust mechanics) before a real mass run; wiring the Recover stub in the thread
+  viewer. Skip identity/meme content — don't hydrate all 55k (design language §5).
+  - [x] ~~**P3 — `reddit-hydrate --from <bdfr-dir>` (local-archive hydrate).**~~ ✅ SHIPPED 2026-06-13
+    (`7140c04` + hardening `30fa648`). `bdfr_to_listing()` converts each BDFR submission to the
+    `[post-listing, comments-listing]` blob; `hydrate_from_archive()` walks the dir (offline, no
+    cookie), `--limit`/`--include-orphans`/`--overwrite`. **Comment permalink is SYNTHESIZED**
+    (`/r/<sub>/comments/<sid>/_/<cid>/`) so the conversion is lossless (not "permalink absent"). **Key
+    finding when run:** the archive (now at `F:\Backups\content-hoarder\savedreddit-bdfr-2026-06-12`,
+    672 files) was ALREADY fully hydrated in the DB — and the RSM blobs are RICHER (real slugged
+    comment permalinks). So `--from` defaults to **skip-already-hydrated** (a first run degraded 565
+    blobs before this guard; reverted from backup). Net: the DB supersedes the archive → **it is safe
+    to delete at the user's discretion** (the DB has everything it holds + more). 15 offline tests.
 - [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
   best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
   lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
