@@ -30,6 +30,17 @@ def _corpus(conn):
         _seed(conn, f"d{i}", sub="dullsub")
 
 
+def test_smart_sort_orders_by_triage_score(conn):
+    # browse "SORT: SMART" ranks by metadata.triage_score desc; unscored items sort last.
+    _seed(conn, "lo", triage_score=0.10)
+    _seed(conn, "hi", triage_score=0.90)
+    _seed(conn, "mid", triage_score=0.50)
+    _seed(conn, "none")  # no triage_score -> NULLS LAST
+    order = [it["fullname"] for it in db.search_items(conn, sort="smart", order="desc")]
+    assert order[:3] == ["reddit:hi", "reddit:mid", "reddit:lo"]
+    assert order[-1] == "reddit:none"
+
+
 def test_extract_features_shape():
     row = {"source": "reddit", "kind": "post", "created_utc": int(time.time()) - 100,
            "first_seen_utc": 0}
