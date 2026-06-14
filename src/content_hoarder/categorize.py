@@ -17,7 +17,8 @@ from content_hoarder import config, db
 from content_hoarder.models import parse_metadata
 
 # Title keywords that mark a wotagei (ヲタ芸) idol-event performance.
-_WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b", re.IGNORECASE)
+# Includes romanized forms and compound dance terms.
+_WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b|\botagei\b|打ち師|サイリウムダンス|ペンライトダンス|\bcyalume\b", re.IGNORECASE)
 
 # Channels that are reliably "listenable" (audio-first: long-form talk, music, podcasts).
 # Word-boundaried so short tokens (e.g. "lofi") don't match unrelated names like
@@ -387,6 +388,123 @@ def tag_reddit_source(conn, *, limit=None, retry: bool = False,
         "dry_run": dry_run,
         "tagged": len(rows) - untagged,
         "untagged": untagged,
+        "by_tag": {t: c for t, c in by_tag.items() if c},
+        "samples": {t: s for t, s in sample.items() if s},
+        "untagged_sample": untagged_sample,
+    }
+
+# channel-name substring (lowercase) -> tags. Checked with `key in channel.lower()`.
+_YOUTUBE_CHANNEL_TAGS = {
+    "isaac arthur": ["science"],
+    "kurzgesagt": ["science"],
+    "veritasium": ["science"],
+    "tom scott": ["science"],
+    "practical engineering": ["science"],
+    "technology connections": ["science"],
+    "perun": ["defense"],
+    "fireship": ["coding"],
+    "primeagen": ["coding"],
+    "lockpickinglawyer": ["tips"],
+    "gamers nexus": ["gaming"],
+    "digital foundry": ["gaming"],
+    "hololive": ["vtubers"],
+    "nijisanji": ["vtubers"],
+    "abroad in japan": ["japan"],
+    "trash taste": ["anime"],
+}
+
+# title keywords (word-bounded), applied ONLY when the channel map produced no tag.
+_YOUTUBE_KEYWORD_TAGS = [
+    ("minecraft", re.compile(r"\bminecraft\b|\bmodpack\b", re.IGNORECASE)),
+    ("anime", re.compile(r"\banime\b|\bmanga\b", re.IGNORECASE)),
+    ("vtubers", re.compile(r"\bvtuber\b|hololive|nijisanji", re.IGNORECASE)),
+    ("japan", re.compile(r"\bjapan(ese)?\b", re.IGNORECASE)),
+    ("coding", re.compile(r"\bpython\b|\bjavascript\b|\brust\b|\bprogramming\b", re.IGNORECASE)),
+]
+
+
+def youtube_tags(item) -> list[str]:
+    """Return ordered de-duped topic tags for a YouTube item."""
+    md = item.get("metadata", {})
+    title = item.get("title") or ""
+    channel = md.get("channel") or ""
+    channel_lower = channel.lower()
+    tags: list[str] = []
+
+    # Channel pass
+    for key, key_tags in _YOUTUBE_CHANNEL_TAGS.items():
+        if key in channel_lower:
+            for t in key_tags:
+                if t not in tags:
+                    tags.append(t)
+
+    # Keyword pass only if channel pass produced nothing
+    if not tags:
+        for tag_name, pattern in _YOUTUBE_KEYWORD_TAGS:
+            if pattern.search(title):
+                if tag_name not in tags:
+                    tags.append(tag_name)
+
+    return tags
+
+
+def tag_youtube_source(conn, *, limit=None, retry: bool = False,
+                       dry_run: bool = False, samples: int = 6) -> dict:
+    """Multi-label tag YouTube items into metadata.tags. dry_run previews without writing."""
+    where = ["source = 'youtube'"]
+    sql = ("SELECT fullname, title, metadata FROM items WHERE "
+           + " AND ".join(where) + " ORDER BY last_seen_utc DESC")
+    params: list = []
+    if limit:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+    rows = conn.execute(sql, params).fetchall()
+
+    by_tag = {t: 0 for t in REDDIT_TAGS}
+    sample: dict = {t: [] for t in REDDIT_TAGS}
+    untagged = 0
+    untagged_sample: list = []
+    now = int(time.time())
+    processed = 0
+
+    for r in rows:
+        md = parse_metadata(r["metadata"])
+        existing_tags = md.get("tags") or []
+        topic_tags = youtube_tags({"title": r["title"], "metadata": md})
+        label = f"{md.get('channel') or '?'}: {(r['title'] or '')[:60]}"
+
+        # Skip already-topic-tagged items unless retry or dry_run
+        if not retry and not dry_run:
+            if any(t in existing_tags for t in REDDIT_TAGS):
+                continue
+
+        processed += 1
+
+        if topic_tags:
+            for t in topic_tags:
+                by_tag[t] = by_tag.get(t, 0) + 1
+                if len(sample[t]) < samples:
+                    sample[t].append(label)
+            if not dry_run:
+                final_tags = [t for t in existing_tags if t in db.PROCESSING_TAGS] + topic_tags
+                seen = set()
+                deduped: list[str] = []
+                for t in final_tags:
+                    if t not in seen:
+                        seen.add(t)
+                        deduped.append(t)
+                db.merge_upsert(conn, {"fullname": r["fullname"],
+                                       "metadata": {"tags": deduped}, "last_seen_utc": now})
+        else:
+            untagged += 1
+            if len(untagged_sample) < samples * 2:
+                untagged_sample.append(label)
+    if not dry_run:
+        conn.commit()
+
+    return {
+        "selected": processed, "dry_run": dry_run,
+        "tagged": processed - untagged, "untagged": untagged,
         "by_tag": {t: c for t, c in by_tag.items() if c},
         "samples": {t: s for t, s in sample.items() if s},
         "untagged_sample": untagged_sample,

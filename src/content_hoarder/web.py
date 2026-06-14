@@ -284,6 +284,24 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "not a recoverable reddit item"}), 400
         return jsonify(res)
 
+    @app.post("/reddit/items/<path:fullname>/hydrate")
+    def hydrate_item(fullname):
+        from content_hoarder import reddit_hydrate
+        with conn() as c:
+            res = reddit_hydrate.hydrate_one(c, fullname)
+        status = res.get("status")
+        if status == "hydrated":
+            return jsonify(res), 200
+        if status == "not_found":
+            return jsonify(res), 404
+        if status in ("no_permalink", "bad_shape"):
+            return jsonify(res), 400
+        if status in ("auth_missing", "auth_expired"):
+            return jsonify(res), 401
+        if status == "network_error":
+            return jsonify(res), 502
+        return jsonify(res), 500
+
     @app.post("/items/<path:fullname>/category")
     def set_category(fullname):
         from content_hoarder.categorize import VALID_CATEGORIES
@@ -466,8 +484,11 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/reddit/items/<path:fullname>/thread")
     def reddit_thread_route(fullname):
         from content_hoarder import reddit_thread
+        sort = request.args.get("sort", "best")
+        if sort not in ("best", "top", "new"):
+            sort = "best"
         with conn() as c:
-            res = reddit_thread.get_thread(c, fullname)
+            res = reddit_thread.get_thread(c, fullname, sort)
         if res is None:
             return jsonify({"error": "not found"}), 404
         return jsonify(res)
@@ -485,6 +506,16 @@ def create_app(db_path: str | None = None) -> Flask:
             c.execute("UPDATE items SET is_saved=0 WHERE fullname=?", (fullname,))
             c.commit()
         return jsonify({"queued": True, "fullname": fullname, "is_saved": 0})
+
+    @app.post("/reddit/unsave/enqueue-by-tag")
+    def reddit_unsave_by_tag():
+        body = request.get_json(silent=True) or {}
+        tag = body.get("tag", "")
+        if not tag:
+            return jsonify({"error": "tag required"}), 400
+        with conn() as c:
+            n = db.enqueue_unsave_by_tag(c, tag)
+        return jsonify({"enqueued": n})
 
     @app.post("/reddit/items/<path:fullname>/undo")
     def reddit_undo_unsave(fullname):
