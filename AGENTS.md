@@ -12,7 +12,9 @@ animations, offline PWA, metrics, LLM assist, Obsidian export, optional Karakeep
 - Python 3.12, Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
 - `yt-dlp` is optional (YouTube only, **lazy-imported**). `adb` is an external CLI the user runs.
 - Run: `python -m content_hoarder <cmd>` (`init-db`, `import`, `enrich`, `serve`, `stats`, `sources`,
-  `bankruptcy`, `promote`). Web default `127.0.0.1:8788`.
+  `bankruptcy`, `promote`, `categorize`, `dedup`, `decay`, `reddit-sync`, `reddit-unsave`,
+  `reddit-hydrate`). Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` is an offline
+  local-archive thread hydrate; `--batch` is the cookie-based, rate-limited, resumable backfill.)
 - Tests: `python -m pytest` — all offline, `:memory:` SQLite, tiny synthetic fixtures, **no network**.
 
 ## Layout
