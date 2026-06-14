@@ -290,7 +290,7 @@ def create_app(db_path: str | None = None) -> Flask:
         with conn() as c:
             res = reddit_hydrate.hydrate_one(c, fullname)
         status = res.get("status")
-        if status == "hydrated":
+        if status in ("hydrated", "archived"):
             return jsonify(res), 200
         if status == "not_found":
             return jsonify(res), 404

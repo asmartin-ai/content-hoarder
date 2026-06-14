@@ -33,6 +33,11 @@ class RedditNetworkError(Exception):
     so a network blip never tells the user to re-paste a perfectly good cookie."""
 
 
+class RedditNotFoundError(RedditNetworkError):
+    """HTTP 404 — the post/thread was deleted or removed. Subclass of RedditNetworkError
+    so existing catch-all blocks still work, but callers can distinguish for archive fallback."""
+
+
 # ---------------------------------------------------------------------------
 # Live HTTP helpers (the defaults for the injectable post=/getf= params)
 # ---------------------------------------------------------------------------
@@ -57,6 +62,8 @@ def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
     except _http.HttpError as e:
         if e.status in (401, 403):
             return {}
+        if e.status == 404:
+            raise RedditNotFoundError(f"HTTP {e.status}") from e
         # Mirror the old messages: an HTTP error keeps "HTTP <code>"; transport
         # failures surface the underlying error string.
         if e.status is not None:

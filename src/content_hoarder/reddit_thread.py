@@ -50,6 +50,7 @@ def parse_thread(raw_json: str, item: dict, sort: str = "best") -> dict:
 
     post: dict = {}
     comments: list = []
+    pd: dict = {}
     if isinstance(data, list) and data:
         post_children = data[0].get("data", {}).get("children", [])
         if post_children:
@@ -71,6 +72,7 @@ def parse_thread(raw_json: str, item: dict, sort: str = "best") -> dict:
         "post": post,
         "comments": comments,
         "cached": True,
+        "archived": pd.get("_archive_sourced", False),
         "item_fullname": item.get("fullname"),
         "item_kind": item.get("kind"),
         "sort": sort,
