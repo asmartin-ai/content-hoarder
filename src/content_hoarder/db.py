@@ -154,6 +154,7 @@ _SORT_COLUMNS = {
     "duration": "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
     "position": "CAST(json_extract(metadata, '$.position') AS INTEGER)",  # YouTube playlist order
     "score": "CAST(json_extract(metadata, '$.score') AS INTEGER)",        # Reddit upvotes
+    "smart": "CAST(json_extract(metadata, '$.triage_score') AS REAL)",    # learned likely-to-process (Epic 10)
     "subreddit": "json_extract(metadata, '$.subreddit')",                 # Reddit subreddit (A–Z)
     "kind": "kind",
 }
