@@ -1,5 +1,11 @@
 # Reddit thread hydration backfill — feasibility (2026-06-12)
 
+> **STATUS 2026-06-13 — IMPLEMENTED.** This was the planning doc; the feature now exists.
+> `reddit-hydrate --from <bdfr-dir>` (offline local-archive, lossless synthesized comment
+> permalinks, skip-already-hydrated) + `reddit-hydrate --batch` (cookie, rate-limited, resumable,
+> `--dry-run`) shipped (Epic 24). The "nothing hydrates today / Recover is a stub" statements below
+> are the pre-build state, kept for the reasoning — no longer current.
+
 Prompted by PKMS: `pkms promote` (PKMS build-plan slice 2) renders saved threads from
 this DB into vault reading notes, but can only offer **hydrated** threads —
 `reddit_threads` holds **672** rows against **55,444** saved posts. Assessed read-only;
