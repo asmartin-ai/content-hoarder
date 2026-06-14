@@ -397,12 +397,19 @@ def cmd_reddit_hydrate(args) -> int:
     from content_hoarder import reddit_hydrate
     with _connect() as conn:
         if args.batch:
+            # Safe by default: without --yes, --batch only LISTS the scope (no network),
+            # mirroring the hard-delete double-gate. --yes is the explicit go-ahead.
+            scope_only = args.dry_run or not args.yes
             res = reddit_hydrate.hydrate_batch(
                 conn, limit=args.limit if args.limit is not None else 100,
-                throttle=args.throttle, dry_run=args.dry_run,
+                throttle=args.throttle, dry_run=scope_only,
                 progress=lambda m: print(m, file=sys.stderr),
             )
             print(json.dumps(res, indent=2))
+            if scope_only and not args.dry_run:
+                print(f"\n[scope only] {res['eligible']} eligible; nothing fetched. Re-run with "
+                      f"--yes to hydrate for real (hits Reddit at ~{args.throttle}s/request).",
+                      file=sys.stderr)
             return 1 if res.get("auth_error") else 0
         if args.from_dir:
             res = reddit_hydrate.hydrate_from_archive(
@@ -481,6 +488,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="--batch: seconds between requests (default 2.0 — be courteous to Reddit).")
     ph.add_argument("--dry-run", action="store_true",
                     help="--batch: print the scope (count + sample) without any network.")
+    ph.add_argument("--yes", action="store_true",
+                    help="--batch: actually hit Reddit. Without it, --batch only lists the scope "
+                         "(safe-by-default gate; be conservative with Reddit requests).")
     ph.set_defaults(func=cmd_reddit_hydrate)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
