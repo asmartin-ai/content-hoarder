@@ -1,5 +1,10 @@
 # Spec: search-bar operators (Epic 12)
 
+> **STATUS 2026-06-13 — SHIPPED.** Operator parsing (`search_query.py`) merged on
+> `feat/search-operators`; the discovery/autocomplete popover (`static/browse/operators.js`,
+> context-aware key+value suggestions + applied-operator chips) shipped 2026-06-13. This spec is the
+> historical design — the v2 `app.js` line references below predate v3 (app.js has since been removed).
+
 **Branch:** `feat/search-operators`
 **Audience:** an implementer with no prior context on this repo. Everything you need is below; verify
 the referenced line numbers (they drift) by reading the cited functions before editing.
