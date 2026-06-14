@@ -41,6 +41,9 @@ Thumbs.db
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json
 
+# Autonomous-run tracking artifacts (charter, progress, report — not product source)
+.autonomous/
+
 # Design-system reference bundle (vendored separately into static/; not product source)
 design-ref/
 
