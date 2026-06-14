@@ -32,9 +32,19 @@ const underlay =
   '<div class="item-bg r"><span class="u1">&#9635; ARCHIVE</span><span class="u2">&#9193; KEEP — kept on purpose</span></div>' +
   '<div class="item-bg l">&#10005; DONE</div>';
 
+// Best display title: a real title, else a body snippet (so title-less reddit COMMENTS show
+// their text instead of "(untitled)"), else the placeholder. snippet() suppresses itself when
+// there's no real title, so the body isn't shown twice.
+export const displayTitle = (item) => {
+  const t = (item.title || "").trim();
+  if (t) return t;
+  const body = (item.body || "").trim().replace(/\s+/g, " ");
+  if (body) return body.length > 90 ? body.slice(0, 90).trim() + "…" : body;
+  return "(untitled)";
+};
 const titleLine = (item) => {
   const url = itemUrl(item);
-  const t = esc(item.title || "(untitled)");
+  const t = esc(displayTitle(item));
   return url
     ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + t + "</a>"
     : t;
@@ -54,6 +64,7 @@ const metaHtml = (item) => {
 };
 
 const snippet = (item) => {
+  if (!(item.title || "").trim()) return "";   // body is already the title (displayTitle) — don't repeat it
   const body = (item.body || "").trim().replace(/\s+/g, " ");
   return body ? '<div class="snippet">' + esc(body.slice(0, 140)) + "</div>" : "";
 };

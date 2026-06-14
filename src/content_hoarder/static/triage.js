@@ -239,7 +239,8 @@
 
   function cardHtml(item) {
     var href = itemUrl(item);
-    var title = item.title || (href || item.fullname);
+    var snip = (item.body || "").trim().replace(/\s+/g, " ").slice(0, 90);
+    var title = (item.title && item.title.trim()) || snip || href || item.fullname;
     var titleHtml = safeUrl(href)
       ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(title) + "</a>"
       : esc(title);
@@ -259,7 +260,8 @@
       tagChips(item) +
       catHtml(item) +
       recoverHtml(item) +
-      (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
+      // only when a real title exists — else the body is already the title (snip), don't repeat it
+      ((item.title || "").trim() && snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
       '<div class="tcard-ai">' + ai + "</div>" +
       "</article>";
   }

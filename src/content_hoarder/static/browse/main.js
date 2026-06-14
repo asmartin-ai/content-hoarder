@@ -9,7 +9,7 @@ import { toast, snackbar } from "../core/toast.js";
 import { createLightbox, imageUrl, mediaType, redditUrl } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
-import { listHtml, emptyHtml, isNsfw } from "./render.js";
+import { listHtml, emptyHtml, isNsfw, displayTitle } from "./render.js";
 import { initPalette } from "./palette.js";
 import { initOperators } from "./operators.js";
 
@@ -366,7 +366,7 @@ async function surprise() {
     if (!it) { toast("Nothing to deal — the shelves are empty."); return; }
     const m = it.metadata || {};
     ambient.innerHTML = '<div class="amb-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
-      "<h3>“" + esc(it.title || "(untitled)") + "”</h3>" +
+      "<h3>“" + esc(displayTitle(it)) + "”</h3>" +
       '<div class="amb-body"><div class="amb-meta">' +
       (m.subreddit ? "<b>r/" + esc(m.subreddit) + "</b> · " : "") +
       (it.created_utc ? "from " + new Date(it.created_utc * 1000).getFullYear() : "") +
