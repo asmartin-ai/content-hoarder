@@ -489,18 +489,18 @@ def search_items(
     conn: sqlite3.Connection,
     q: str = "",
     *,
-    source: str | None = None,
-    kind: str | None = None,
-    status: str | None = None,
+    source: str | list[str] | None = None,
+    kind: str | list[str] | None = None,
+    status: str | list[str] | None = None,
     category: str | None = None,
     tags: list[str] | None = None,
     tags_all: bool = False,
-    subreddit: str | None = None,
+    subreddit: str | list[str] | None = None,
     is_saved: int | None = None,
     nsfw: bool = False,
     decayed: bool = False,
     swept: bool = False,
-    has_media: str | None = None,
+    has_media: str | list[str] | None = None,
     before: int | None = None,
     after: int | None = None,
     score_min: int | None = None,
@@ -522,14 +522,29 @@ def search_items(
     def add_filters(alias: str) -> None:
         a = (alias + ".") if alias else ""
         if source:
-            filters.append(f"{a}source = ?")
-            params.append(source)
+            if isinstance(source, list):
+                ph = ",".join("?" for _ in source)
+                filters.append(f"{a}source IN ({ph})")
+                params.extend(source)
+            else:
+                filters.append(f"{a}source = ?")
+                params.append(source)
         if kind:
-            filters.append(f"{a}kind = ?")
-            params.append(kind)
+            if isinstance(kind, list):
+                ph = ",".join("?" for _ in kind)
+                filters.append(f"{a}kind IN ({ph})")
+                params.extend(kind)
+            else:
+                filters.append(f"{a}kind = ?")
+                params.append(kind)
         if status:
-            filters.append(f"{a}status = ?")
-            params.append(status)
+            if isinstance(status, list):
+                ph = ",".join("?" for _ in status)
+                filters.append(f"{a}status IN ({ph})")
+                params.extend(status)
+            else:
+                filters.append(f"{a}status = ?")
+                params.append(status)
         if category:
             if category in PROCESSING_TAGS:
                 filters.append(
@@ -566,9 +581,15 @@ def search_items(
         if has_media:
             # has:video|image|gallery — facet over metadata.media_type. "video" means
             # reddit-hosted video ('reddit_video'); external embeds keep media_type='link'.
-            mt = {"video": "reddit_video"}.get(has_media, has_media)
-            filters.append(f"json_extract({a}metadata, '$.media_type') = ?")
-            params.append(mt)
+            if isinstance(has_media, list):
+                mapped = [{"video": "reddit_video"}.get(h, h) for h in has_media]
+                ph = ",".join("?" for _ in mapped)
+                filters.append(f"json_extract({a}metadata, '$.media_type') IN ({ph})")
+                params.extend(mapped)
+            else:
+                mt = {"video": "reddit_video"}.get(has_media, has_media)
+                filters.append(f"json_extract({a}metadata, '$.media_type') = ?")
+                params.append(mt)
         if decayed:
             # decayed (is:decayed): the item carries a decay-wave stamp (see db.decay).
             filters.append(f"json_extract({a}metadata, '$.decayed_at') IS NOT NULL")
@@ -576,8 +597,13 @@ def search_items(
             # swept (is:swept): decayed in the labeled initial backfill pass specifically.
             filters.append(f"json_extract({a}metadata, '$.decay_label') = 'swept'")
         if subreddit:
-            filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
-            params.append(subreddit)
+            if isinstance(subreddit, list):
+                ph = ",".join("?" for _ in subreddit)
+                filters.append(f"json_extract({a}metadata, '$.subreddit') IN ({ph}) COLLATE NOCASE")
+                params.extend(subreddit)
+            else:
+                filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
+                params.append(subreddit)
         if before is not None or after is not None:
             # created_utc=0 means "unknown" for many sparse imports; avoid treating 0 as
             # "ancient" when date filters are active.
