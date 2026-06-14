@@ -737,8 +737,9 @@ slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch
     finding when run:** the archive (now at `F:\Backups\content-hoarder\savedreddit-bdfr-2026-06-12`,
     672 files) was ALREADY fully hydrated in the DB — and the RSM blobs are RICHER (real slugged
     comment permalinks). So `--from` defaults to **skip-already-hydrated** (a first run degraded 565
-    blobs before this guard; reverted from backup). Net: the DB supersedes the archive → **it is safe
-    to delete at the user's discretion** (the DB has everything it holds + more). 15 offline tests.
+    blobs before this guard; reverted from backup). Net: the DB supersedes the archive. **The archive
+    was DELETED 2026-06-13** (112 MB) after verifying 672/672 fullnames are in `reddit_threads`.
+    15 offline tests.
 - [ ] **P3 — Archive fallback for deleted threads.** On cookie-fetch 404, assemble a
   best-effort tree from `archival/` providers (shape conversion needed; PullPush comments
   lack permalinks — prefer Arctic-Shift), mark thread as archive-sourced.
