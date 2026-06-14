@@ -56,6 +56,21 @@
       .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
     return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   }
+
+  // Gallery lightbox (reuse the same .media-gallery + .gallery-img pattern as browse).
+  function openGallery(urls) {
+    var imgs = (urls || []).filter(safeUrl);
+    if (!imgs.length) return;
+    document.getElementById("media-body").innerHTML =
+      '<div class="media-gallery">' +
+      imgs.map(function (u) { return '<img class="media-img gallery-img" loading="lazy" src="' + esc(u) + '" alt="">'; }).join("") +
+      "</div>" + '<p class="media-fallback">' + imgs.length + " images</p>";
+    document.getElementById("media-modal").hidden = false;
+  }
+  function closeMedia() {
+    document.getElementById("media-modal").hidden = true;
+    document.getElementById("media-body").innerHTML = "";
+  }
   function closeShortcuts() { if (shortcutModal) shortcutModal.hidden = true; }
   function toggleShortcuts() {
     if (!shortcutModal) return;
@@ -154,7 +169,20 @@
   function mediaHtml(item) {
     var m = item.metadata || {};
     var mt = m.media_type;
-    // Reddit video/gallery → keep the click-to-load inline embed button (don't let a
+    // Reddit gallery with captured image URLs → show inline gallery images (tap opens lightbox).
+    if (item.source === "reddit" && Array.isArray(m.gallery) && m.gallery.length) {
+      var nsfw = m.over_18 ? " nsfw" : "";
+      var imgs = m.gallery.filter(safeUrl);
+      if (imgs.length) {
+        return '<div class="tcard-media tcard-gallery' + nsfw + '">' +
+          imgs.map(function (u) {
+            return '<img class="tcard-gallery-img" loading="lazy" src="' + esc(u) + '" alt="">';
+          }).join("") +
+          (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") +
+          "</div>";
+      }
+    }
+    // Reddit video/media → keep the click-to-load inline embed button (don't let a
     // thumbnail replace it, which would drop the play/open affordance).
     if (item.source === "reddit" && (mt === "reddit_video" || mt === "reddit_media" || mt === "gallery")) {
       var permalink = m.permalink || item.url || "";
@@ -292,7 +320,7 @@
     card.addEventListener("pointerdown", function (e) {
       // Android back-gesture safety: ignore drags starting near a screen edge.
       if (e.clientX < EDGE_DEADZONE || e.clientX > window.innerWidth - EDGE_DEADZONE) return;
-      if (e.target.closest("a,button")) return;      // let links/buttons work
+      if (e.target.closest("a,button,.tcard-gallery-img")) return;      // let links/buttons/gallery work
       dragging = true; startX = e.clientX;
       card.setPointerCapture(e.pointerId);
       card.style.transition = "none";
@@ -322,10 +350,25 @@
     card.addEventListener("pointercancel", function () { dragging = false; renderCurrent(); });
   }
 
-  // NSFW reveal + Ask AI
+  // NSFW reveal + Ask AI + gallery lightbox
   stack.addEventListener("click", function (e) {
+    // NSFW check must run before the gallery lightbox: the first tap on a blurred
+    // gallery un-blurs it; only an already-revealed gallery opens the lightbox.
     var media = e.target.closest(".tcard-media.nsfw");
     if (media) { media.classList.remove("nsfw"); return; }
+    // Inline gallery image → open lightbox with all gallery images
+    var galImg = e.target.closest(".tcard-gallery-img");
+    if (galImg) {
+      var galHolder = galImg.closest(".tcard-gallery");
+      if (galHolder) {
+        var urls = Array.prototype.map.call(
+          galHolder.querySelectorAll(".tcard-gallery-img"),
+          function (img) { return img.getAttribute("src"); }
+        );
+        openGallery(urls);
+      }
+      return;
+    }
     var pv = e.target.closest(".rd-preview-lg");
     if (pv) {
       var holder = e.target.closest(".tcard-embed");
@@ -492,6 +535,13 @@
   if (shortcutClose) shortcutClose.addEventListener("click", closeShortcuts);
   if (shortcutModal) shortcutModal.addEventListener("click", function (e) {
     if (e.target === shortcutModal) closeShortcuts();
+  });
+  // Media modal close wiring (gallery lightbox)
+  var mediaCloseBtn = document.getElementById("media-close");
+  if (mediaCloseBtn) mediaCloseBtn.addEventListener("click", closeMedia);
+  var mediaModal = document.getElementById("media-modal");
+  if (mediaModal) mediaModal.addEventListener("click", function (e) {
+    if (e.target === mediaModal) closeMedia();
   });
   updateUndoBtn();
 
