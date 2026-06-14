@@ -2,11 +2,11 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v15";
+const CACHE = "ch-shell-v16";
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
-  "/static/theme.js", "/static/core/tokens.css",
+  "/static/theme.js", "/static/haptics.js", "/static/core/tokens.css",
   "/static/core/util.js", "/static/core/api.js", "/static/core/toast.js",
   "/static/core/media.js", "/static/core/swipe.js", "/static/core/render.js",
   "/static/browse/browse.css", "/static/browse/main.js", "/static/browse/render.js",
