@@ -842,6 +842,16 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
     line-height: 1.5;
 }
 
+.tcard-why {
+    margin-top: var(--sp-1);
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.tcard-why .why-lead { color: var(--accent); font-weight: var(--fw-bold); }
+
 .tcard-snippet {
     color: var(--text);
     opacity: 0.86;
