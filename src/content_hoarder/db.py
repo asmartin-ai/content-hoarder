@@ -705,8 +705,20 @@ def get_random_batch(
     *,
     source: str | None = None,
     unprocessed: bool = True,
+    mode: str = "random",
+    smart_mix: float = 0.5,
 ) -> list[dict]:
-    """Return up to ``n`` random items — the triage batch (default: inbox only)."""
+    """Return up to ``n`` items — the triage batch (default: random inbox).
+
+    ``mode='smart'`` (Epic 10) interleaves likely-to-be-processed items with recent
+    ones instead of a flat shuffle: ~``smart_mix`` of the batch is sampled from the
+    top of ``metadata.triage_score`` (written by ``triage_score.learn``), the rest
+    from the newest-synced, topped up randomly when either pool runs short. Sampling
+    from a pool (5x oversample) rather than taking the strict top keeps repeat
+    batches varied. Falls back to pure random when no scores exist yet.
+    """
+    import random as _random
+
     filters = []
     params: list = []
     if unprocessed:
@@ -715,9 +727,45 @@ def get_random_batch(
         filters.append("source = ?")
         params.append(source)
     where = (" WHERE " + " AND ".join(filters)) if filters else ""
-    sql = f"SELECT * FROM items{where} ORDER BY RANDOM() LIMIT ?"
-    rows = conn.execute(sql, params + [int(n)]).fetchall()
-    return [_row_to_public(r) for r in rows]
+
+    if mode != "smart":
+        sql = f"SELECT * FROM items{where} ORDER BY RANDOM() LIMIT ?"
+        rows = conn.execute(sql, params + [int(n)]).fetchall()
+        return [_row_to_public(r) for r in rows]
+
+    n = int(n)
+    k_score = max(1, round(n * smart_mix))
+    k_recent = max(0, n - k_score)
+    score_where = where + (" AND " if where else " WHERE ") + \
+        "json_extract(metadata, '$.triage_score') IS NOT NULL"
+    score_pool = conn.execute(
+        f"SELECT * FROM items{score_where} "
+        f"ORDER BY json_extract(metadata, '$.triage_score') DESC LIMIT ?",
+        params + [k_score * 5],
+    ).fetchall()
+    recent_pool = conn.execute(
+        f"SELECT * FROM items{where} ORDER BY first_seen_utc DESC LIMIT ?",
+        params + [k_recent * 5],
+    ).fetchall()
+
+    picked: dict[str, object] = {}
+    for pool, k in ((score_pool, k_score), (recent_pool, k_recent)):
+        pool = [r for r in pool if r["fullname"] not in picked]
+        for r in _random.sample(pool, min(k, len(pool))):
+            picked[r["fullname"]] = r
+    if len(picked) < n:  # top up randomly (small inboxes, missing scores)
+        ph = ",".join("?" for _ in picked) or "''"
+        extra = conn.execute(
+            f"SELECT * FROM items{where}"
+            + (" AND " if where else " WHERE ")
+            + f"fullname NOT IN ({ph}) ORDER BY RANDOM() LIMIT ?",
+            params + list(picked.keys()) + [n - len(picked)],
+        ).fetchall()
+        for r in extra:
+            picked[r["fullname"]] = r
+    rows = list(picked.values())
+    _random.shuffle(rows)
+    return [_row_to_public(r) for r in rows[:n]]
 
 
 # ---------------------------------------------------------------------------
