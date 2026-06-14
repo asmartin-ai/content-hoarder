@@ -22,15 +22,8 @@
                aria-label="Search">
         <kbd>/</kbd>
         <div class="oppop" id="oppop">
-          <div class="ops">
-            <button type="button" class="opchip" data-ins="tag:">tag:</button>
-            <button type="button" class="opchip" data-ins="subreddit:">subreddit:</button>
-            <button type="button" class="opchip" data-ins="has:video">has:video</button>
-            <button type="button" class="opchip" data-ins="is:swept">is:swept</button>
-            <button type="button" class="opchip" data-ins="before:2024">before:2024</button>
-            <button type="button" class="opchip" data-ins="-term">-exclude</button>
-            <button type="button" class="opchip" data-ins="&quot;exact phrase&quot;">"exact phrase"</button>
-          </div>
+          <!-- operators.js fills .ops with applied-operator chips + live suggestions -->
+          <div class="ops" role="listbox" aria-label="Search operator suggestions"></div>
           <div class="hint">
             <span><b>Fuzzy by default</b> &mdash; close-enough spelling still hits. Quotes lock a phrase.</span>
             <label><input type="checkbox" id="exact"> exact only</label>

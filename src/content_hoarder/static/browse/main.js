@@ -11,6 +11,7 @@ import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
 import { initPalette } from "./palette.js";
+import { initOperators } from "./operators.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -464,7 +465,7 @@ $("#peekswept").addEventListener("click", () => {
   toast("Peeking at what rested — everything is still here.");
 });
 
-/* ---- search + operator popover (locked #6) ---- */
+/* ---- search + operator discovery (Epic 12: visible Gmail/Discord-style operators) ---- */
 const qInput = $("#q");
 const runSearch = debounce(() => {
   if (qInput.value.startsWith(">")) return;  // command mode — palette.js owns the input
@@ -472,16 +473,13 @@ const runSearch = debounce(() => {
   loadItems(true);
 }, 300);
 qInput.addEventListener("input", runSearch);
-qInput.addEventListener("focus", () => {
-  if (!qInput.value.startsWith(">")) $("#oppop").classList.add("show");
+initOperators(qInput, $("#oppop"), {
+  // tag values come from the curated tag-sheet already loaded client-side (full list)
+  getDyn: (which) => which === "tags"
+    ? [...document.querySelectorAll("#tagsheet-list [data-tag]")].map((b) => b.dataset.tag)
+    : [],
+  onApply: () => { state.q = qInput.value.trim(); loadItems(true); },
 });
-qInput.addEventListener("blur", () => setTimeout(() => $("#oppop").classList.remove("show"), 160));
-$$(".opchip").forEach((c) => c.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  qInput.value = (qInput.value + " " + c.dataset.ins).trim() + (c.dataset.ins.endsWith(":") ? "" : " ");
-  qInput.focus();
-  runSearch();
-}));
 $("#exact").addEventListener("change", (e) => { state.exact = e.target.checked; loadItems(true); });
 $("#dock-search").addEventListener("click", () => { qInput.focus(); window.scrollTo({ top: 0 }); });
 
