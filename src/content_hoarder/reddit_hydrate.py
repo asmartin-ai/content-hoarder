@@ -49,10 +49,16 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None) -> dict:
     if not auth:
         return {"status": "auth_missing", "fullname": fullname}
 
+    # permalink may be relative ("/r/sub/comments/id/slug/") from cookie syncs OR an
+    # absolute URL ("https://www.reddit.com/r/sub/...") from the legacy bulk import.
+    # Handle both — otherwise the absolute case double-prefixes the domain
+    # ("https://www.reddit.com/https://www.reddit.com/...") and 404s.
     permalink = metadata["permalink"]
-    if not permalink.startswith("/"):
-        permalink = "/" + permalink
-    url = f"https://www.reddit.com{permalink}.json?raw_json=1"
+    if permalink.startswith(("http://", "https://")):
+        base = permalink
+    else:
+        base = "https://www.reddit.com/" + permalink.lstrip("/")
+    url = base.rstrip("/") + "/.json?raw_json=1"
 
     try:
         data = getf(url, session_cookie=auth["session_cookie"], user_agent=user_agent)
