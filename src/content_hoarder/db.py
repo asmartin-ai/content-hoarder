@@ -468,9 +468,15 @@ def _trigram_exprs(q: str) -> tuple[str, str]:
 
 
 def _order_clause(sort: str, order: str, alias: str = "") -> str:
+    a = (alias + ".") if alias else ""
+    if sort == "shuffle":
+        # "Mixed-content" browse (Epic 10): interleave sources round-robin so a page is a
+        # varied MIX instead of grouped/recency. Deterministic (nth-item-of-each-source,
+        # then source) so infinite-scroll pages don't dup/skip — unlike ORDER BY RANDOM().
+        return (f"ORDER BY row_number() OVER (PARTITION BY {a}source "
+                f"ORDER BY {a}first_seen_utc DESC, {a}rowid), {a}source")
     col = _SORT_COLUMNS.get(sort or "", "last_seen_utc")
     direction = "ASC" if (order or "desc").lower() == "asc" else "DESC"
-    a = (alias + ".") if alias else ""
     # Expression sort keys (json_extract/CAST) must not be table-alias-prefixed, and
     # NULLs (e.g. videos with no duration) should sort last in either direction.
     is_expr = "(" in col
