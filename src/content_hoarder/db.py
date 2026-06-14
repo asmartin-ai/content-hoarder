@@ -60,6 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_items_status       ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_last_seen    ON items(last_seen_utc);
 CREATE INDEX IF NOT EXISTS idx_items_created      ON items(created_utc);
 CREATE INDEX IF NOT EXISTS idx_items_saved_status ON items(is_saved, status);
+CREATE INDEX IF NOT EXISTS idx_items_status_seen  ON items(status, first_seen_utc);
 
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
