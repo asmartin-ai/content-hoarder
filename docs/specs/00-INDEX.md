@@ -58,3 +58,10 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   over the 163 files; `import` has NO built-in backup — add one.
 - **03:** a 404 is currently indistinguishable from a network blip (both → `network_error`); the spec
   adds a distinct signal. Decision gates (marker location, status name) are pre-decided in spec 03.
+
+## Later additions (post-batch)
+
+- [08](08-reddit-title-hydration.md) — Hydrate real titles for "(untitled)" Reddit **comments**
+  (`submission_title`). ⏸ PLANNED/user-held 2026-06-14; branch `feat/reddit-title-hydration` off
+  `staging/session-2026-06-14`. 106 local-backfillable, 41 network, 3 deleted. Supersedes the
+  `73e16ab` body-snippet stopgap. **Mutates live `data/app.db` — backup first.**
