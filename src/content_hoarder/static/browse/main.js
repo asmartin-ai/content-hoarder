@@ -26,6 +26,7 @@ const state = {
   sort: localStorage.chSort || "first_seen_utc:desc",
   density: localStorage.chDensity || "comfortable",
   focus: localStorage.chFocus === "1",
+  safe: localStorage.chSafe !== "0",   // default ON: hide NSFW unless the user opted into "Show all"
   goal: localStorage.chGoal === undefined ? 8 : parseInt(localStorage.chGoal, 10) || 0,
   offset: 0,
   hasMore: false,
@@ -55,6 +56,7 @@ function params(extra) {
   if (state.source) p.source = state.source;
   if (state.q) p.q = state.q;
   if (state.exact) p.exact = "1";
+  if (state.safe) p.safe = "1";
   const sp = new URLSearchParams(p);
   state.tags.forEach((t) => sp.append("tag", t));
   return sp;
@@ -651,6 +653,12 @@ $$("#set-goal button").forEach((b) => b.addEventListener("click", () => {
   $$("#set-goal button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
   paintWins();
 }));
+$$("#set-nsfw button").forEach((b) => b.addEventListener("click", () => {
+  state.safe = b.dataset.nsfw === "hide";
+  localStorage.chSafe = state.safe ? "1" : "0";
+  $$("#set-nsfw button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  loadItems(true);
+}));
 
 /* reflect persisted settings into the panel */
 $$("#set-density button").forEach((b) =>
@@ -659,6 +667,8 @@ $$("#set-loading button").forEach((b) =>
   b.setAttribute("aria-pressed", String((b.dataset.focus === "1") === state.focus)));
 $$("#set-goal button").forEach((b) =>
   b.setAttribute("aria-pressed", String((parseInt(b.dataset.g, 10) || 0) === state.goal)));
+$$("#set-nsfw button").forEach((b) =>
+  b.setAttribute("aria-pressed", String((b.dataset.nsfw === "hide") === state.safe)));
 $$("#set-theme button").forEach((b) =>
   b.setAttribute("aria-pressed",
     String((document.documentElement.dataset.theme || "dark") === b.dataset.theme)));
