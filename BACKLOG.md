@@ -558,7 +558,7 @@ README + plan file. New backend in scope: `GET /pulse` (new_today/cleared_today/
 `GET /resurface` + dismiss/letgo POSTs per `docs/resurfacing-card-design.md`. Items below are
 build-tracking now, not open design questions:*
 
-- [ ] **P2 — Two-stage swipe actions (mobile).** Sync-style short/long thresholds per direction:
+- [x] ~~**P2 — Two-stage swipe actions (mobile).**~~ ✅ v3: `core/swipe.js` `commit2`/`onRightLong` (commit2≈170px) wired in `browse/main.js` (commit 80, commit2 170, onRightLong→keep). Sync-style short/long thresholds per direction:
   short → = Archive, **long → = Keep** (the extra travel is deliberate friction — a "hoarder
   tax" that fits the reduce-the-backlog thesis), short ← = Done, long-left unassigned. Underlay
   color+icon swap at the second threshold + a haptic pulse (`navigator.vibrate`); long-press
@@ -581,7 +581,7 @@ build-tracking now, not open design questions:*
   Enter runs, Escape exits, listbox/option ARIA), commands for pages/theme/density/sort.
   `>` flips the search bar to command mode; placeholder now advertises it. Deferred to a
   v2: status-view switching, bulk ops on selection (need the selection model exposed).
-- [ ] **P2 — Filter-state visibility (simple now).** Active source/tag chips with ✕ + "clear
+- [x] ~~**P2 — Filter-state visibility (simple now).**~~ ✅ v3: active source/tag chips (`#fchips`) built from `state.source`/`state.tags` (main.js:440). Active source/tag chips with ✕ + "clear
   all" rendered in the sheet shelf next to the result count; define the algebra (single-select
   source, multi-select tags) and keep it visible. **Design locked 2026-06-11** (06, demoed);
   build in Stage C. **P3 — advanced later:** palette-driven filter builder, saved filters,
@@ -590,14 +590,14 @@ build-tracking now, not open design questions:*
 *PKMS-research additions (2026-06-10 handoff; see Epic 21 for context). These ride the same
 Stage C design gate:*
 
-- [ ] **P2 — No backlog counts in v3 (research-mandated).** No raw inbox/All totals anywhere —
+- [x] ~~**P2 — No backlog counts in v3 (research-mandated).**~~ ✅ v3: the pulse shows "· N new" + win pebbles, never raw totals (`state.pulse` = new_today/cleared_today/swept_recent). No raw inbox/All totals anywhere —
   backlog counts read as failure and drive abandonment (97.55% of items never leave inbox; the
   number can only be demoralizing). Sidebar shows curated slices instead; audit the Stats modal
   + progress copy for guilt framing (never re-open/read-% as health, no "you haven't…");
   finishable batch progress only ("3 of 7"), never streaks/points/leaderboards.
   **Design locked 2026-06-11** (06: `Inbox · N new` slice, Archived count dropped, win
   pebbles w/ optional goal); build in Stage C via `GET /pulse`.
-- [ ] **P2 — Resurfacing card: "Still interested in X?".** Machine-initiated, phrased as a
+- [x] ~~**P2 — Resurfacing card: "Still interested in X?".**~~ ✅ v3: the ambient slot renders "Still interested in <em>X</em>?" + Not-now/Let-it-go, fetching GET /resurface (main.js:301-350, locked-design `resurface.py`). Machine-initiated, phrased as a
   curious question, never a count badge or red dot (recognition beats recall for ADHD). v1
   candidates need no LLM: cluster = curated knowledge tag (`tips`/`coding`/`science`) × old
   saves; never `memes`/`vtubers` (identity content isn't a task). Dismiss = silent decay + a
