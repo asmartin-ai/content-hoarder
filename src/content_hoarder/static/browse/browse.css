@@ -443,7 +443,7 @@ body.focus .batchstrip{display:flex}
   background:var(--surface-card);border-left:1px solid var(--border-control);
   box-shadow:var(--shadow-pop);transform:translateX(105%);visibility:hidden;
   transition:transform 180ms var(--ease),visibility 0s 180ms;
-  padding:var(--sp-5) var(--sp-4);overflow-y:auto}
+  padding:var(--sp-5) var(--sp-4);overflow-y:auto;overscroll-behavior:contain}
 .sheetpanel.show{transform:none;visibility:visible;transition:transform 180ms var(--ease)}
 .sheetpanel h2,.kbd-sheet h2{font:var(--fw-semibold) var(--fs-lg)/1.2 var(--font-disp);
   letter-spacing:-.01em;margin:0 0 var(--sp-4)}
