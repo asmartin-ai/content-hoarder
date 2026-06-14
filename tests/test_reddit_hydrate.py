@@ -60,6 +60,25 @@ def test_hydrate_success(conn):
     assert json.loads(row["thread_json"]) == blob
 
 
+def test_hydrate_absolute_permalink_not_double_prefixed(conn):
+    # The legacy bulk import stored permalink as a FULL URL (not "/r/..."). hydrate_one
+    # must not turn it into https://www.reddit.com/https://www.reddit.com/... (404).
+    _seed(conn, source_id="t3_abs",
+          permalink="https://www.reddit.com/r/test/comments/abs/x/")
+    _auth(conn)
+    captured = {}
+
+    def fake_getf(url, *, session_cookie, user_agent):
+        captured["url"] = url
+        return [{"data": {"children": [{"data": {"id": "abs"}}]}},
+                {"data": {"children": []}}]
+
+    res = hydrate_one(conn, "reddit:t3_abs", getf=fake_getf)
+    assert res["status"] == "hydrated"
+    assert captured["url"] == "https://www.reddit.com/r/test/comments/abs/x/.json?raw_json=1"
+    assert "reddit.com/https" not in captured["url"]
+
+
 # ---------- (b) not_found ----------
 
 def test_hydrate_not_found(conn):
