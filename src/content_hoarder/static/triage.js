@@ -25,6 +25,8 @@
 
   var queue = [];
   var reviewed = 0;
+  var todayCleared = 0;      // today's manual clears, shared with browse via /pulse — wins, never debt
+  var emptyStamped = false;  // guard so the "page cleared" milestone fires once per emptying
   var sources = {};
   var lastAction = null;       // {fullname, status} for undo
   var toastTimer = null;
@@ -252,11 +254,26 @@
 
   // ---- rendering / flow ----
   function updateProgress() {
-    progressEl.textContent = "Reviewed " + reviewed + " · " + queue.length + " left";
+    // Wins-forward, never a "N left" debt frame: finishable batch progress + today's clears.
+    var total = reviewed + queue.length;
+    var batch = total ? reviewed + " of " + total + " cleared" : "";
+    progressEl.textContent = batch + (todayCleared ? " · " + todayCleared + " today" : "");
   }
   function showEmpty(show) {
     emptyEl.hidden = !show;
     actionsEl.hidden = show;
+    if (show) {
+      if (!emptyStamped) {                                 // fire the celebration once per emptying
+        emptyStamped = true;
+        if (window.chHaptic) window.chHaptic("milestone");
+      }
+      var sub = document.getElementById("triage-empty-sub");
+      if (sub) sub.textContent = todayCleared
+        ? todayCleared + " cleared today — nice work."
+        : "Nothing waiting here. No rush.";
+    } else {
+      emptyStamped = false;
+    }
   }
   function renderCurrent() {
     if (!queue.length) { stack.innerHTML = ""; showEmpty(true); updateProgress(); return; }
@@ -292,6 +309,7 @@
     }).catch(function () { toast("Failed — check connection", false); });
     queue.shift();
     reviewed++;
+    todayCleared++;
     setTimeout(function () { if (!queue.length) loadBatch(); else renderCurrent(); }, 180);
   }
 
@@ -303,6 +321,7 @@
       .then(function (item) {
         queue.unshift(item);
         reviewed = Math.max(0, reviewed - 1);
+        todayCleared = Math.max(0, todayCleared - 1);
         lastAction = null;
         updateUndoBtn();
         renderCurrent();
@@ -549,6 +568,8 @@
 
   // ---- boot ----
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+  // Today's clears (shared with browse) so the header shows accumulating wins across batches.
+  fetchJSON("/pulse").then(function (p) { todayCleared = (p && p.cleared_today) || 0; updateProgress(); }).catch(function () {});
   fetchJSON("/sources").then(function (data) {
     (data.sources || []).forEach(function (s) {
       sources[s.id] = s;
