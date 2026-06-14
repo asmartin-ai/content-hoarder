@@ -396,6 +396,14 @@ def cmd_reddit_unsave(args) -> int:
 def cmd_reddit_hydrate(args) -> int:
     from content_hoarder import reddit_hydrate
     with _connect() as conn:
+        if args.batch:
+            res = reddit_hydrate.hydrate_batch(
+                conn, limit=args.limit if args.limit is not None else 100,
+                throttle=args.throttle, dry_run=args.dry_run,
+                progress=lambda m: print(m, file=sys.stderr),
+            )
+            print(json.dumps(res, indent=2))
+            return 1 if res.get("auth_error") else 0
         if args.from_dir:
             res = reddit_hydrate.hydrate_from_archive(
                 conn, args.from_dir, limit=args.limit,
@@ -465,6 +473,14 @@ def build_parser() -> argparse.ArgumentParser:
     ph.add_argument("--overwrite", action="store_true",
                     help="--from: re-write threads already cached (default SKIPS them — a "
                          "live cookie/RSM blob can be richer than the archive).")
+    ph.add_argument("--batch", action="store_true",
+                    help="Cookie-hydrate the prioritized unhydrated set (inbox selftext posts, "
+                         "newest-saved first), rate-limited + resumable. Pair with --limit/"
+                         "--throttle; --dry-run lists the scope first.")
+    ph.add_argument("--throttle", type=float, default=2.0,
+                    help="--batch: seconds between requests (default 2.0 — be courteous to Reddit).")
+    ph.add_argument("--dry-run", action="store_true",
+                    help="--batch: print the scope (count + sample) without any network.")
     ph.set_defaults(func=cmd_reddit_hydrate)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")

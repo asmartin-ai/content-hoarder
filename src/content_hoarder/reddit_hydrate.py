@@ -12,6 +12,7 @@ import glob
 import json
 import os
 import re
+import time
 
 from content_hoarder import config, db, models
 from content_hoarder.reddit_unsave import (
@@ -197,4 +198,69 @@ def hydrate_from_archive(conn, archive_dir: str, *, limit: int | None = None,
         if progress and res["hydrated"] % 50 == 0:
             progress(f"hydrated {res['hydrated']}/{res['files']}…")
     conn.commit()
+    return res
+
+
+# --- Cookie batch hydration of the prioritized set (Epic 24 P2) -----------------
+
+
+def priority_unhydrated(conn, limit: int) -> list[tuple[str, str]]:
+    """The promote-priority hydration targets (feasibility doc §3): inbox reddit POSTS
+    with a non-empty body (selftext) + a permalink, not yet hydrated, newest-saved
+    first. Returns ``[(fullname, permalink), …]`` capped at ``limit``."""
+    rows = conn.execute(
+        """SELECT i.fullname AS fullname,
+                  json_extract(i.metadata, '$.permalink') AS permalink
+             FROM items i
+            WHERE i.source = 'reddit' AND i.kind = 'post' AND i.status = 'inbox'
+              AND i.body IS NOT NULL AND i.body <> ''
+              AND json_extract(i.metadata, '$.permalink') IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM reddit_threads t
+                               WHERE t.fullname = i.fullname)
+            ORDER BY i.saved_utc DESC
+            LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    return [(r["fullname"], r["permalink"]) for r in rows]
+
+
+def hydrate_batch(conn, *, limit: int = 100, throttle: float = 2.0,
+                  dry_run: bool = False, getf=None, sleep=None, progress=None) -> dict:
+    """Cookie-hydrate the prioritized unhydrated set, rate-limited and resumable.
+
+    Each successful hydration commits immediately (``hydrate_one`` does), and hydrated
+    items drop out of ``priority_unhydrated`` — so re-running simply continues where it
+    left off (no ledger needed). Courteous by default (``throttle`` s between requests)
+    and it STOPS on a dead cookie rather than hammering Reddit. ``dry_run`` lists the
+    scope without any network (honors the "approve the scope first" gate). All network
+    is injectable (``getf``/``sleep``) so tests are fully offline.
+    """
+    sleep = sleep or time.sleep
+    targets = priority_unhydrated(conn, limit)
+    res: dict = {"eligible": len(targets), "hydrated": 0, "failed": 0,
+                 "auth_error": False, "network_errors": 0, "dry_run": dry_run,
+                 "statuses": {}}
+    if dry_run:
+        res["sample"] = [fn for fn, _ in targets[:20]]
+        return res
+    if not get_auth(conn):
+        res["auth_error"] = True
+        return res
+    for idx, (fullname, _permalink) in enumerate(targets):
+        r = hydrate_one(conn, fullname, getf=getf)
+        st = r.get("status")
+        res["statuses"][st] = res["statuses"].get(st, 0) + 1
+        if st == "hydrated":
+            res["hydrated"] += 1
+        elif st in ("auth_expired", "auth_missing"):
+            res["auth_error"] = True
+            break  # dead cookie — stop, do not keep hitting Reddit
+        else:
+            res["failed"] += 1
+            if st == "network_error":
+                res["network_errors"] += 1
+        if progress and (idx + 1) % 10 == 0:
+            progress(f"hydrated {res['hydrated']}/{res['eligible']}…")
+        if idx + 1 < len(targets):
+            sleep(throttle)
     return res
