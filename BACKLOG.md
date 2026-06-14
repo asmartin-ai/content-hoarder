@@ -343,11 +343,11 @@ need separate filter controls.*
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
-- [ ] **P2 — Rework the comfortable density layout.** **User spec (2026-06-08):** positioning is good,
+- [x] ~~**P2 — Rework the comfortable density layout.**~~ ✅ Shipped on v3 (2026-06-13 audit): `.items.density-comfortable .item-fg` is locked to `height:100px` (browse.css:290) with the thumb constrained to the fixed monitor box; adaptive height is cards-only. Orig: **User spec (2026-06-08):** positioning is good,
   but make **every comfortable row a uniform fixed height (~100px)** — adaptive/dynamic height should
   apply to **cards density only**. Constrain the thumbnail within that fixed height (`object-fit: cover`)
   and keep the action slot aligned. Touches `app.css` `.items.density-comfortable`.
-- [ ] **P2 — Tag-chip overload on enriched YouTube cards.** Enriched YouTube videos render a wall of
+- [x] ~~**P2 — Tag-chip overload on enriched YouTube cards.**~~ ✅ Shipped on v3 (2026-06-13 audit): `core/render.js` `tagChips` is curated-first (`opts.curated`), capped (`max=3`) with a "+M more" expander on cards and a static "+N" on fixed-height rows — strategy (c) hybrid. `metadata.tags` untouched (FTS intact). Orig: Enriched YouTube videos render a wall of
   tag chips (e.g. the "I made a Self-Soldering Circuit" card shows ~25: `arduino`, `atmega`, `avr`,
   `circuit design`, `diy reflow`, `high voltage`, …). **Root cause:** the per-item chip renderers
   (`tagChips` in `static/app.js` *and* `static/triage.js`) print the raw `metadata.tags` array
@@ -362,11 +362,22 @@ need separate filter controls.*
   endpoint/payload. Relates to Epic 9 (tagging) and the FILTER_TAGS perf work in the round-2 handoff.
 - [x] ~~**Card-view text clipping / title overlap.**~~ Fixed by the v2 card (adaptive hero + bottom
   action row). (Also noted in Epic 5.)
-- [ ] **P1 — Reddit videos & galleries broken — GATE G1 APPROVED (2026-06-12).** User approved the
-  tiered-native-HLS recommendation in `docs/reddit-media-rendering.md` (repo @ main): media-type
-  backfill + native `<video>`/HLS rendering, no Reddit iframe. Build next (after trio/quad batch 2
-  ships): audit `media_type` handling + the preview/lightbox path (`mediaSlotHtml` / `openMedia` /
-  `openGallery`) per the doc's 3-defect decomposition.
+- [x] ~~**P1 — Reddit videos & galleries broken — GATE G1 APPROVED (2026-06-12).**~~ ✅ **Shipped on
+  v3 (verified by code audit 2026-06-13).** The design (`docs/reddit-media-rendering.md`) was
+  implemented during the v3 build: `core/media.js` (`mediaType`, `imageUrl` recognizing `media_url`,
+  `createLightbox` with `openImage`/`openGallery`/`openVideo`/`openMedia`, Esc + backdrop close) +
+  `browse/main.js` `openMediaFor` dispatch (gallery → stacked lightbox, video+`media_url` → native
+  `<video>`, image → lightbox, else permalink → redditmedia iframe fallback) + `browse/render.js`
+  monitor/screen slots with gallery/video badges and `data-media` hooks. No Reddit iframe for playable
+  media. **Remaining (deferred, documented §4.3):** the HLS/DASH **audio** tier for `v.redd.it` — a bare
+  `<video src=media_url>` plays the video-only stream without audio on browsers lacking native HLS;
+  the doc's "ship (c/a), revisit after a week" upgrade. Needs a real-browser audio check + possibly
+  feature-detected HLS. Tracked as Epic 13 P2 ▸ "reddit_video audio" below.
+- [ ] **P2 — reddit_video audio (HLS/DASH) — follow-up to the shipped media pass.** `openVideo` sets
+  `<video src=media_url>`; `v.redd.it` separates audio into a DASH/HLS track, so audio is silent where
+  native HLS isn't supported (Chrome/Firefox). Per `docs/reddit-media-rendering.md` §4.3: feature-detect
+  `canPlayType('application/vnd.apple.mpegurl')`, prefer the HLS manifest when supported, keep the MP4
+  fallback otherwise; revisit hls.js only if real use demands it. Verify audio on a real device first.
 - [ ] **P2 — Card density visual rework.** The cards layout is structurally correct but reads poorly.
   **Root cause (from screenshot, 2026-06-08):** many Reddit posts are **tall text-screenshots** (e.g.
   r/BlueskySkeets) and the fixed **16:9 `object-fit:cover` hero crops the text off** — "image difficult
@@ -378,7 +389,7 @@ need separate filter controls.*
   collides with the meta line** (screenshot): the "NSFW" text + teal pill overlap the byline so "posted …"
   is truncated/clipped (looks like a doubled "NSFV/NSFW"). Fix the NSFW marker placement in compact +
   general spacing polish.
-- [ ] **P2 — Three-dot ⋯ visual menu shouldn't auto-close on change.** Changing a setting
+- [x] ~~**P2 — Three-dot ⋯ visual menu shouldn't auto-close on change.**~~ ✅ SUPERSEDED (user-confirmed 2026-06-12): the v3 settings sheet (Epic 14) stays open across density/theme/loading changes and replaces the v2 `#visual-menu-pop` (which no v3 template loads). No ⋯ menu built. Orig: Changing a setting
   (density/theme/focus) closes `#visual-menu-pop`; keep it open so several can be toggled without
   reopening.
 - [x] ~~**P2 — Tag chips only render in card view.**~~ Shipped on v3 (parallel session 2026-06-12,
@@ -390,27 +401,27 @@ need separate filter controls.*
   > side-gutter scroll** (detail in `docs/parallel-run-2026-06-12.md`). The "three-dot
   > ⋯ menu stays open" item is **superseded by the settings menu** (Epic 14) — closed, no ⋯ menu
   > built (user-confirmed). Tick these on your next BACKLOG pass if you concur with the audit.
-- [ ] **P2 — NSFW blurred thumbnail renders too wide (comfortable/list).** The over-18 blurred thumb
+- [x] ~~**P2 — NSFW blurred thumbnail renders too wide (comfortable/list).**~~ ✅ v3: blur is constrained to the fixed monitor/screen thumb box (`browse.css:306-308`), with a veil overlay. The over-18 blurred thumb
   expands to ~40% of the row width with a centered "NSFW" overlay (screenshot) instead of the normal
   thumbnail box; constrain it to the standard thumb width/aspect. Likely shares a root with the
   comfortable-density fixed-height/thumbnail sizing above.
-- [ ] **P2 — Bulk-action Undo missing.** Group-select → Keep/Archive/Done shows no Undo (the per-item
+- [x] ~~**P2 — Bulk-action Undo missing.**~~ ✅ v3: `api.bulkUndo` (core/api.js) replays the prior statuses; wired into the bulk path (main.js:223) with a snackbar. Orig: Group-select → Keep/Archive/Done shows no Undo (the per-item
   Undo toast doesn't fire for bulk), so a bulk action can't be reversed. Wire Undo for `/bulk/status`.
-- [ ] **P2 — Bulk bar shifts the list down when it appears.** Selecting a row makes the bulk bar push the
+- [x] ~~**P2 — Bulk bar shifts the list down when it appears.**~~ ✅ v3: `.opsbar` is a `position:fixed` overlay (browse.css:386), so selecting a row no longer pushes the list. Orig: Selecting a row makes the bulk bar push the
   whole list down, so the cursor is no longer over the originally-selected row (bad on desktop). Overlay
   the bulk bar or reserve its space so the list doesn't jump.
-- [ ] **P2 — Bulk Keep/Archive/Done buttons not color-coded.** Color-code them to match the triage/row
+- [x] ~~**P2 — Bulk Keep/Archive/Done buttons not color-coded.**~~ ✅ v3: opbtn `.k/.a/.d` use the `--status-keep/-archive/-done` tokens (index.html:126-128). Orig: Color-code them to match the triage/row
   semantic colors.
-- [ ] **P2 — Move processed items back to Inbox.** Kept/Archived/Done items need a reversible action to
+- [x] ~~**P2 — Move processed items back to Inbox.**~~ ✅ v3: per-item "IN" button (`data-act="inbox"`, render.js:27) + bulk "X → INBOX" (index.html:129) + the `x` keyboard shortcut; toast "Back in the inbox." Orig: Kept/Archived/Done items need a reversible action to
   return them to `inbox` — per-item and as a bulk action.
-- [ ] **P2 — Row click should open only on the title/link, not the whole row body.** Refine the `#items`
+- [x] ~~**P2 — Row click should open only on the title/link, not the whole row body.**~~ ✅ v3 (Playwright-audited 2026-06-12): opens only via the title `<a>` / media slot; body + meta clicks open nothing; avatar toggles select. Orig: Refine the `#items`
   delegated handler so a body click doesn't open the item — only the title/link does (avatar/checkbox
   still toggles select).
-- [ ] **P2 — Esc doesn't close the Reddit video/thread modal.** `Esc` (and backdrop click) should close
+- [x] ~~**P2 — Esc doesn't close the Reddit video/thread modal.**~~ ✅ v3: `createLightbox` (core/media.js:88-90) has Esc + backdrop/`[data-media-close]` close built in, and clears the body to stop playback. Orig: `Esc` (and backdrop click) should close
   it like the other modals.
 - [ ] **P3 — Reposition / iconify the Sort control.** Replace the sort dropdown with a sort icon or move
   it out of the rail.
-- [ ] **P2 — Scroll the list from the side gutters too.** With the Gmail-style independent scroll, only
+- [x] ~~**P2 — Scroll the list from the side gutters too.**~~ ✅ v3: a `document` `wheel` handler forwards gutter scroll to the list (main.js:612, "13:385"). Orig: With the Gmail-style independent scroll, only
   the content column captures the mouse wheel — hovering the blank space beside it does nothing. Make the
   whole main pane (incl. side gutters) drive the content scroll (move `overflow-y` to a wider wrapper or
   widen the scroll region) so the wheel works anywhere in the main area, not just over the list. *(User
