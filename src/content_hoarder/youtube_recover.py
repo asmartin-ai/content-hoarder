@@ -15,10 +15,9 @@ import re
 import time
 import urllib.error
 import urllib.parse
-import urllib.request
 from html import unescape
 
-from content_hoarder import db
+from content_hoarder import _http, db
 
 DEFAULT_USER_AGENT = "content-hoarder/0.1 (youtube title recovery)"
 _WAYBACK_AVAILABLE = "https://archive.org/wayback/available?url="
@@ -38,9 +37,17 @@ _NEEDS_TITLE = (
 
 
 def _http_get(url: str, ua: str = DEFAULT_USER_AGENT, timeout: float = 20.0) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": ua}, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+    # Thin wrapper over the shared transport. Re-raise the underlying urllib error
+    # (URLError / timeout / HTTPError) rather than the wrapping HttpError so
+    # recover_title's existing ``except (URLError, OSError, ...)`` clauses still
+    # swallow a failed fetch into "" — preserving the propagate-raw contract.
+    try:
+        _status, _headers, raw = _http.request(
+            url, method="GET", headers={"User-Agent": ua}, timeout=timeout,
+        )
+    except _http.HttpError as e:
+        raise e.__cause__ from e
+    return raw.decode("utf-8", errors="replace")
 
 
 def _extract_title(html: str) -> str:

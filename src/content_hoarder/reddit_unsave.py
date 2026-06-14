@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 
-from content_hoarder import config
+from content_hoarder import _http, config
 
 UNSAVE_URL = "https://www.reddit.com/api/unsave"
 SAVE_URL = "https://www.reddit.com/api/save"
@@ -45,26 +43,27 @@ def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
     Returns {} only for a genuine logged-out response (401/403) — the shape
     `_refresh_modhash` maps to RedditAuthError. Anything transient (timeouts, DNS,
     429/5xx, an unparseable CDN error page) raises RedditNetworkError instead."""
-    req = urllib.request.Request(
-        url,
-        headers={
-            "Cookie": f"reddit_session={session_cookie}",
-            "Accept": "application/json",
-            "User-Agent": user_agent,
-        },
-        method="GET",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
+        _status, _headers, raw = _http.request(
+            url,
+            method="GET",
+            headers={
+                "Cookie": f"reddit_session={session_cookie}",
+                "Accept": "application/json",
+                "User-Agent": user_agent,
+            },
+            timeout=20,
+        )
+    except _http.HttpError as e:
+        if e.status in (401, 403):
             return {}
-        raise RedditNetworkError(f"HTTP {e.code}") from e
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise RedditNetworkError(str(e)) from e
+        # Mirror the old messages: an HTTP error keeps "HTTP <code>"; transport
+        # failures surface the underlying error string.
+        if e.status is not None:
+            raise RedditNetworkError(f"HTTP {e.status}") from e
+        raise RedditNetworkError(str(e.__cause__)) from e
     try:
-        return json.loads(body)
+        return json.loads(raw.decode("utf-8", errors="replace"))
     except ValueError as e:
         raise RedditNetworkError("unparseable response") from e
 
@@ -73,23 +72,26 @@ def _http_post(url: str, fields: dict, *, session_cookie: str, modhash: str,
                user_agent: str) -> tuple[int, dict]:
     """POST urlencoded `fields`. Returns (status_code, response_headers); status 0 = network error."""
     data = urllib.parse.urlencode(fields).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        method="POST",
-        headers={
-            "Cookie": f"reddit_session={session_cookie}",
-            "X-Modhash": modhash or "",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": user_agent,
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            return getattr(resp, "status", 200) or 200, dict(resp.headers)
-    except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers or {})
-    except (urllib.error.URLError, TimeoutError, OSError):
+        status, headers, _raw = _http.request(
+            url,
+            method="POST",
+            data=data,
+            headers={
+                "Cookie": f"reddit_session={session_cookie}",
+                "X-Modhash": modhash or "",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": user_agent,
+            },
+            timeout=20,
+        )
+        return status, headers
+    except _http.HttpError as e:
+        # An HTTP error response is data here, not a failure: hand back its status +
+        # headers (so 403 halts the drain, 429 carries Retry-After). Only a true
+        # transport failure (no status) collapses to the (0, {}) sentinel.
+        if e.status is not None:
+            return e.status, e.headers
         return 0, {}
 
 
@@ -174,19 +176,10 @@ def _refresh_modhash(session_cookie: str, *, user_agent: str, getf=None) -> tupl
 
 def _retry_after_seconds(headers: dict | None) -> float | None:
     """Numeric Retry-After value from a (case-insensitively searched) header dict.
-    None when absent or non-numeric (e.g. an RFC 7231 HTTP-date) — caller falls back
-    to its own backoff delay. Case-insensitive because the headers arrive as a plain
-    dict (``dict(resp.headers)``) with whatever casing the server sent."""
-    if not headers:
-        return None
-    ra = next((v for k, v in headers.items() if k.lower() == "retry-after"), None)
-    if not ra:
-        return None
-    try:
-        seconds = float(ra)
-    except (TypeError, ValueError):
-        return None
-    return seconds if seconds >= 0 else None
+    Delegates to the shared ``_http.retry_after_seconds`` (kept as a module-local name
+    so ``_send_with_retry`` and the existing tests still reach it here): None when
+    absent or non-numeric (e.g. an RFC 7231 HTTP-date), negative treated as absent."""
+    return _http.retry_after_seconds(headers)
 
 
 def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, modhash: str,
