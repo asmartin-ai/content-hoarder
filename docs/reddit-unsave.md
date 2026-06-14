@@ -78,8 +78,8 @@ Done/undo still work.
 ## Risks / notes
 
 - **Cookie auth is undocumented and fragile** (expiry, Cloudflare/bot challenges, login redirects). Failures
-  surface loudly; the queue persists so nothing is lost. `reddit_unsave._post_unsave` is the single network
-  seam — swapping to an OAuth "script" app transport later is localized.
+  surface loudly; the queue persists so nothing is lost. `reddit_unsave._http_post` (the default for the
+  injectable `post=` param) is the single network seam — swapping to an OAuth "script" app transport later is localized.
 - Reddit's unofficial rate limit is unknown; `--limit`/`--throttle` + a resumable queue keep drains polite.
 - All of `reddit_unsave.py` is offline-tested with injected `post`/`getf`/`sleep`
   (`tests/test_reddit_unsave.py`).
