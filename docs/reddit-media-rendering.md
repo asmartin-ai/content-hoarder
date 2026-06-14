@@ -1,6 +1,9 @@
 # Reddit media rendering — design for Epic 13 P1 "Reddit videos & galleries broken"
 
-Status: **decision-ready draft** · 2026-06-12 (overnight run, unattended)
+Status: **SHIPPED on v3** · 2026-06-13 (design draft was 2026-06-12, overnight run). Implemented in
+`static/core/media.js` + `static/browse/` (`openMediaFor` dispatch, `createLightbox` with Esc/backdrop,
+native `<video>`/gallery/image + iframe fallback). The v2 `app.js` line refs below are historical
+(app.js removed). One open follow-up: v.redd.it HLS/DASH **audio** (BACKLOG Epic 13 P2).
 Binding user direction (2026-06-08): **avoid the Reddit iframe embed** — render galleries/video
 natively from the archived `media`/`gallery` metadata; study how RES + old.reddit present media.
 
@@ -465,7 +468,7 @@ Consumers:
   build on `feat/frontend-v3` (browse + triage), cherry-pick to main only if v3 stalls.
 - **reddit.js (`/reddit`)** — out of scope this pass (classification only); add the bridge later
   if its thread view wants inline media.
-- **PWA:** bump `sw.js` `CACHE` (currently `ch-shell-v14`) — core/media.js is inside the cached shell.
+- **PWA:** bump `sw.js` `CACHE` (now `ch-shell-v15`) — core/media.js is inside the cached shell.
 
 Why core/ and not app.js: the user's standing plan retires v2 (Epic 20); duplicating the fix into
 58KB app.js would be paying twice for code already scheduled for deletion.

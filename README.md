@@ -10,7 +10,9 @@ Status: **Phase 1 (in development)**
 ## Features
 - Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep, and
   **Firefox tabs** into one local SQLite database.
-- Full-text **and** fuzzy (typo-tolerant) search across everything.
+- Full-text **and** fuzzy (typo-tolerant) search, with discoverable Gmail/Discord-style **operators**
+  (`source:`, `tag:`, `status:`, `is:swept`, `has:video`, `before:`, `score:>100`, `"exact"`, `-exclude`)
+  surfaced by an autocomplete popover, plus a **shuffle/mix** browse mode that interleaves sources.
 - A triage UI with two modes: a one-at-a-time **swipe/keyboard card** mode and a **list** view with
   bulk keep/archive actions, Gmail-style swipe icons, source tabs + a status sidebar, and an undo snackbar.
 - **Processing areas:** heuristic categorization of videos into *listenable* / *watch* / *wotagei*
@@ -48,6 +50,9 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
+| `reddit-sync` | Pull new saved Reddit items via the `reddit_session` cookie (newest-first, stop-on-overlap; set the cookie with `reddit-unsave --login`). |
+| `reddit-unsave [--enable\|--disable] [--drain] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit over the cookie (rate-limited, 429 backoff). Run against a DB copy first — it mutates real Reddit state. |
+| `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item via cookie, `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (rate-limited, resumable; safe-by-default — needs `--yes` to fetch). |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |
