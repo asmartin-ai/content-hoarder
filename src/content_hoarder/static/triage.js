@@ -277,6 +277,7 @@
 
   function commit(status) {
     if (!queue.length) return;
+    if (window.chHaptic) window.chHaptic(status);   // tactile confirm on the decision
     var item = queue[0];
     var dir = status === "archived" ? 1 : -1;  // archive flings right, done/keep fling left
     animateOut(stack.querySelector(".tcard"), dir);
@@ -296,6 +297,7 @@
 
   function undo() {
     if (!lastAction) return;
+    if (window.chHaptic) window.chHaptic("undo");
     var fn = lastAction.fullname;
     fetchJSON("/items/" + encodeURIComponent(fn) + "/undo", { method: "POST" })
       .then(function (item) {

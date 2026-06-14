@@ -131,6 +131,7 @@ function rowEl(fullname) {
 }
 
 async function act(fullname, status) {
+  if (window.chHaptic) window.chHaptic(status);   // tactile confirm on the decision (covers swipe + buttons)
   const row = rowEl(fullname);
   if (row && !row.classList.contains("leaving")) {
     row.classList.add("leaving", "lv-" + status);
@@ -148,6 +149,7 @@ async function act(fullname, status) {
   bumpPulse(status === "inbox" ? 0 : 1);
   render();
   snackbar(COPY[status] || "Logged.", async () => {
+    if (window.chHaptic) window.chHaptic("undo");
     try {
       await api.undoItem(fullname);
       bumpPulse(status === "inbox" ? 0 : -1);
@@ -213,6 +215,7 @@ $("#bulkclear").addEventListener("click", clearSelection);
 $$("#bulktray [data-bulk]").forEach((b) => b.addEventListener("click", async () => {
   const fns = [...selected], status = b.dataset.bulk;
   if (!fns.length) return;
+  if (window.chHaptic) window.chHaptic(status);
   clearSelection();
   try { await api.bulkStatus(fns, status); }
   catch (e) { toast("Bulk action failed."); return; }
@@ -270,6 +273,7 @@ function paintBatch() {
   $("#batchn").textContent = done + " of " + total + " cleared";
   if (total > 0 && state.items.length === 0 && !state.stamped) {
     state.stamped = true;
+    if (window.chHaptic) window.chHaptic("milestone");   // the one richer celebration
     $("#stampsub").textContent = total + " ENTRIES · " +
       new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
     $("#stamp").classList.add("show");
