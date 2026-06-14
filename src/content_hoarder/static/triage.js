@@ -216,6 +216,25 @@
       ? '<div class="tcard-recover"><button class="recover-btn" data-recover type="button">↻ Recover from archives</button></div>'
       : "";
   }
+  // "Why this surfaced" — the top signals from the learned triage score, humanized by
+  // stripping the model's feature prefixes (sub:/sk:/chan:/media:/cat:/age:) and the ×lift.
+  function humanizeWhy(w) {
+    var m = /^([a-z]+):([^×]+?)(?:\s*×.*)?$/.exec(String(w == null ? "" : w));
+    if (!m) return String(w == null ? "" : w).trim();
+    var k = m[1], v = m[2].trim();
+    if (k === "sub") return "r/" + v;
+    if (k === "sk") return v.replace("/", " ");   // reddit/post -> reddit post
+    return v;                                      // chan / media / cat / age value
+  }
+  function whyHtml(item) {
+    var why = (item.metadata || {}).triage_why;
+    if (!Array.isArray(why) || !why.length) return "";
+    var parts = why.map(humanizeWhy).filter(Boolean);
+    if (!parts.length) return "";
+    return '<div class="tcard-why" title="Why this surfaced — signals you tend to act on">' +
+      '<span class="why-lead" aria-hidden="true">&#8593;</span> ' + esc(parts.join(" · ")) + "</div>";
+  }
+
   function cardHtml(item) {
     var href = itemUrl(item);
     var title = item.title || (href || item.fullname);
@@ -232,6 +251,7 @@
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
       '<div class="tcard-meta">' + metaLine(item) + "</div>" +
+      whyHtml(item) +
       datesLine(item) +
       companionsHtml(item) +
       tagChips(item) +
@@ -267,7 +287,9 @@
   }
   function loadBatch() {
     var src = srcFilter ? srcFilter.value : "";
-    var url = "/random?n=" + BATCH + "&unprocessed=1" + (src ? "&source=" + encodeURIComponent(src) : "");
+    // mode=smart ranks by the learned likely-to-process score (Epic 10); it falls back to
+    // random server-side when no scores exist yet, so it's always safe as the default.
+    var url = "/random?n=" + BATCH + "&unprocessed=1&mode=smart" + (src ? "&source=" + encodeURIComponent(src) : "");
     return fetchJSON(url).then(function (data) {
       queue = data.items || [];
       reviewed = 0;
