@@ -23,10 +23,10 @@ from content_hoarder.models import NSFW_TAGS  # canonical vocabulary (DB-free le
 class ParsedQuery:
     text: str = ""
 
-    source: str | None = None
-    kind: str | None = None
-    status: str | None = None
-    subreddit: str | None = None
+    source: str | list[str] | None = None
+    kind: str | list[str] | None = None
+    status: str | list[str] | None = None
+    subreddit: str | list[str] | None = None
 
     tags: list[str] = field(default_factory=list)
     # When true: tags are AND-ed (one required-membership check per tag).
@@ -37,7 +37,7 @@ class ParsedQuery:
     nsfw: bool = False
     decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
     swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
-    has: str | None = None  # has:video|image|gallery — metadata.media_type facet
+    has: str | list[str] | None = None  # has:video|image|gallery — metadata.media_type facet
 
     before: int | None = None  # unix seconds (UTC)
     after: int | None = None
@@ -144,12 +144,15 @@ def parse(q: str) -> ParsedQuery:
     exclude: list[str] = []
     exact: list[str] = []
 
-    source = kind = status = subreddit = None
+    source_groups: list[list[str]] = []
+    kind_groups: list[list[str]] = []
+    status_groups: list[list[str]] = []
+    subreddit_groups: list[list[str]] = []
     tags_groups: list[list[str]] = []  # each token's group; later collapsed to tags/tags_all
     is_saved: int | None = None
     nsfw = False
     decayed = swept = False
-    has: str | None = None
+    has_groups: list[list[str]] = []
     before = after = None
     score_min = score_max = None
 
@@ -185,17 +188,21 @@ def parse(q: str) -> ParsedQuery:
             if not val:
                 text_terms.append(t)
                 continue
+            parts = [p.strip() for p in re.split(r"[,|]", val) if p.strip()]
+            if not parts:
+                text_terms.append(t)
+                continue
             # source/kind/status are stored canonical-lowercase, so normalize the typed
             # value (e.g. `source:YouTube` -> `youtube`) or it would silently match nothing.
             # subreddit is left as-typed (search_items matches it COLLATE NOCASE).
             if key == "source":
-                source = val.lower()
+                source_groups.append([p.lower() for p in parts])
             elif key == "kind":
-                kind = val.lower()
+                kind_groups.append([p.lower() for p in parts])
             elif key == "status":
-                status = val.lower()
+                status_groups.append([p.lower() for p in parts])
             elif key == "subreddit":
-                subreddit = val
+                subreddit_groups.append(parts)
             continue
 
         if key == "tag":
@@ -229,9 +236,12 @@ def parse(q: str) -> ParsedQuery:
         if key == "has":
             # Media facet over metadata.media_type (populated by the reddit connector +
             # archive refinement). Unknown values degrade to free text like any operator.
-            v = val.lower()
-            if v in {"video", "image", "gallery"}:
-                has = v
+            parts = [p.strip().lower() for p in re.split(r"[,|]", val) if p.strip()]
+            if not parts:
+                text_terms.append(t)
+                continue
+            if all(p in {"video", "image", "gallery"} for p in parts):
+                has_groups.append(parts)
                 continue
             text_terms.append(t)
             continue
@@ -257,6 +267,24 @@ def parse(q: str) -> ParsedQuery:
 
         # Unknown operator -> free text
         text_terms.append(t)
+
+    # Collapse per-key groups for source/kind/status/subreddit/has.
+    # Empty → None, single value → str, multiple → deduped list[str].
+    def _collapse(groups: list[list[str]]) -> str | list[str] | None:
+        if not groups:
+            return None
+        flat = _dedupe_preserve_order([x for g in groups for x in g])
+        if not flat:
+            return None
+        if len(flat) == 1:
+            return flat[0]
+        return flat
+
+    source = _collapse(source_groups)
+    kind = _collapse(kind_groups)
+    status = _collapse(status_groups)
+    subreddit = _collapse(subreddit_groups)
+    has = _collapse(has_groups)
 
     # Collapse tag groups into the simple API requested by the spec.
     #
