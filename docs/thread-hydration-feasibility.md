@@ -50,8 +50,8 @@ post *content* onto `items` rows — it does not produce comment trees in
    stub) and `--batch` over the prioritized set (non-empty body, newest-saved first),
    cookie-auth, ledger-resumable, `--limit` cap, **dry-run listing first and an
    explicit approved scope before any mass fetch** (Epic 21 trust mechanics apply).
-2. **Archive fallback** (P3): when the cookie fetch 404s (deleted thread), assemble a
-   best-effort tree from the archival providers, marked as archive-sourced.
+2. **Archive fallback** (P3) — **SHIPPED 2026-06-14 (`254cb91`):** a cookie fetch 404 (deleted thread)
+   now assembles a best-effort tree from the archival providers, marked archive-sourced.
 3. PKMS stays read-only on this DB; on-demand hydration is invoked on the hoarder side
    (CLI/endpoint), which PKMS's agent layer can shell out to later.
 

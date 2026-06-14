@@ -1,5 +1,7 @@
 # Spec 02 — Unify the 4 HTTP timeout/retry helpers
 
+> ✅ **SHIPPED 2026-06-14** — `bb5b1d8` on `main` (delegated to an Opus subagent). Dossier kept for history.
+
 BACKLOG: Epic 19 #540. Branch: `feat/http-unify`. Touches: new `src/content_hoarder/_http.py`,
 `archival/_http.py`, `reddit_unsave.py`, `youtube_recover.py`, `bridge/karakeep.py`.
 
