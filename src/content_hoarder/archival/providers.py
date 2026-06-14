@@ -128,6 +128,19 @@ def _norm_comment(rec: dict) -> dict:
     }
 
 
+def _norm_comment_tree(rec: dict) -> dict:
+    """Normalize a comment record for thread-tree reconstruction, preserving id/parent_id."""
+    return {
+        "id": rec.get("id") or "",
+        "parent_id": rec.get("parent_id") or "",
+        "author": rec.get("author") or "",
+        "body": rec.get("body") or "",
+        "score": rec.get("score") or 0,
+        "created_utc": rec.get("created_utc"),
+        "permalink": rec.get("permalink") or "",
+    }
+
+
 class ArchiveProvider:
     """Base provider: batching, throttling, and 429 backoff. Subclasses supply URLs."""
 
@@ -194,6 +207,10 @@ class ArchiveProvider:
     def search_comments(self, link_fullname: str, limit: int = 200) -> list:
         data = self._request(self._search_comments_url(link_fullname, limit))
         return [_norm_comment(rec) for rec in (data.get("data") or [])]
+
+    def search_comments_tree(self, link_fullname: str, limit: int = 200) -> list:
+        data = self._request(self._search_comments_url(link_fullname, limit))
+        return [_norm_comment_tree(rec) for rec in (data.get("data") or [])]
 
 
 class PullPushProvider(ArchiveProvider):

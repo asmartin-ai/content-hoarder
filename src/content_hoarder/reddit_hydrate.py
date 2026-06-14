@@ -17,14 +17,16 @@ import time
 from content_hoarder import config, db, models
 from content_hoarder.reddit_unsave import (
     RedditNetworkError,
+    RedditNotFoundError,
     _http_get,
     get_auth,
 )
+from content_hoarder.archival.providers import _bare_id, default_providers
 
 _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
 
 
-def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None) -> dict:
+def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
     """Hydrate one saved Reddit item's full comment thread.
 
     Returns a flat dict with a ``status`` key in every case; never raises for
@@ -62,6 +64,8 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None) -> dict:
 
     try:
         data = getf(url, session_cookie=auth["session_cookie"], user_agent=user_agent)
+    except RedditNotFoundError:
+        return hydrate_one_from_archive(conn, fullname, providers=providers, user_agent=user_agent)
     except RedditNetworkError as e:
         return {"status": "network_error", "fullname": fullname, "detail": str(e)}
 
@@ -145,6 +149,134 @@ def bdfr_to_listing(sub: dict) -> list:
         {"kind": "Listing", "data": {"children": [{"kind": "t3", "data": post}]}},
         {"kind": "Listing", "data": {"children": children}},
     ]
+
+
+def _build_comment_tree(comments: list, post_subreddit: str, bare_id: str) -> list:
+    """Rebuild a nested comment tree from flat archive records with parent_id adjacency.
+
+    Orphans (parent_id references a comment not in the fetched set) attach at root.
+    Each node is converted to the ``t1`` listing shape that ``parse_thread`` consumes.
+    """
+    children_of: dict = {}
+    by_id: dict = {}
+    for c in comments:
+        cid = (c.get("id") or "").strip()
+        pid = (c.get("parent_id") or "").strip()
+        if cid:
+            by_id[cid] = c
+        children_of.setdefault(pid, []).append(c)
+
+    post_parent = "t3_" + bare_id
+    roots: list = []
+    for c in comments:
+        pid = (c.get("parent_id") or "").strip()
+        if pid == post_parent:
+            roots.append(c)
+        else:
+            parent_bare = pid[3:] if pid.startswith(("t1_", "t3_")) else pid
+            if parent_bare not in by_id:
+                roots.append(c)
+
+    def _to_t1(c: dict) -> dict:
+        cid = (c.get("id") or "").strip()
+        sub = post_subreddit or ""
+        permalink = c.get("permalink") or ""
+        if not permalink and sub and cid and bare_id:
+            permalink = f"/r/{sub}/comments/{bare_id}/_/{cid}/"
+
+        child_parent = "t1_" + cid
+        child_comments = children_of.get(child_parent, [])
+
+        if child_comments:
+            reply_listing: object = {
+                "kind": "Listing",
+                "data": {"children": [_to_t1(ch) for ch in child_comments]},
+            }
+        else:
+            reply_listing = ""
+
+        return {
+            "kind": "t1",
+            "data": {
+                "author": c.get("author") or "",
+                "body": c.get("body") or "",
+                "score": c.get("score") or 0,
+                "permalink": permalink,
+                "created_utc": c.get("created_utc") or 0,
+                "replies": reply_listing,
+            },
+        }
+
+    return [_to_t1(c) for c in roots]
+
+
+def hydrate_one_from_archive(conn, fullname: str, *, providers=None, user_agent=None) -> dict:
+    """Assemble a best-effort [post, comments] listing from archival providers.
+
+    Called when the live Reddit fetch returns HTTP 404. Caches the result like a
+    normal hydrated thread and marks it ``_archive_sourced`` in the post data.
+    """
+    existing = db.get_reddit_thread(conn, fullname)
+    if existing:
+        return {"status": "archived", "fullname": fullname, "cached": True}
+
+    ua = user_agent or config.get("USER_AGENT")
+    providers = providers or default_providers(
+        ua, throttle=False, order=("arctic", "pullpush")
+    )
+
+    item = db.get_item(conn, fullname)
+    if not item:
+        return {"status": "archived", "fullname": fullname, "comments": 0}
+    sid = item.get("source_id") or ""
+    bare = _bare_id(sid)
+    if not bare:
+        return {"status": "archived", "fullname": fullname, "comments": 0}
+
+    post_data = None
+    chosen_provider = None
+    for prov in providers:
+        try:
+            found = prov.fetch_posts([bare])
+        except Exception:
+            continue
+        if bare in found:
+            post_data = found[bare]
+            chosen_provider = prov
+            break
+
+    if post_data is None:
+        return {"status": "archived", "fullname": fullname, "comments": 0}
+
+    try:
+        comments = chosen_provider.search_comments_tree(sid, limit=500)
+    except Exception:
+        comments = []
+
+    tree_comments = _build_comment_tree(
+        comments, post_data.get("subreddit") or "", bare
+    )
+
+    post = {
+        "title": post_data.get("title") or "",
+        "author": post_data.get("author") or "",
+        "selftext": post_data.get("selftext") or post_data.get("body") or "",
+        "subreddit": post_data.get("subreddit") or "",
+        "permalink": post_data.get("permalink") or "",
+        "score": post_data.get("score") or 0,
+        "url": post_data.get("url") or "",
+        "created_utc": post_data.get("created_utc") or 0,
+        "_archive_sourced": True,
+    }
+
+    blob = [
+        {"kind": "Listing", "data": {"children": [{"kind": "t3", "data": post}]}},
+        {"kind": "Listing", "data": {"children": tree_comments}},
+    ]
+
+    db.set_reddit_thread(conn, fullname, json.dumps(blob))
+
+    return {"status": "archived", "fullname": fullname, "comments": len(tree_comments)}
 
 
 def _bdfr_fullname(sub: dict) -> str | None:
