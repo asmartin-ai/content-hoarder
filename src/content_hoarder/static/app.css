@@ -1284,6 +1284,17 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 .triage-empty .triage-empty-title { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--text); letter-spacing: -.01em; margin: 0 0 var(--sp-1); }
 .triage-empty .triage-empty-sub { font-size: var(--fs-md); color: var(--muted); margin: 0 0 var(--sp-4); min-height: 1.2em; }
 .triage-empty-acts { display: flex; flex-direction: column; gap: var(--sp-2); align-items: center; }
+/* The empty state is the reward — a brief, restrained entrance (design-language §3/§5). */
+@media (prefers-reduced-motion: no-preference) {
+  .triage-empty:not([hidden]) .triage-empty-icon {
+    animation: ch-empty-pop var(--dur-slow, 200ms) var(--ease, cubic-bezier(.2, .7, .3, 1)) both;
+  }
+  .triage-empty:not([hidden]) .triage-empty-title {
+    animation: ch-empty-rise var(--dur-slow, 200ms) var(--ease, cubic-bezier(.2, .7, .3, 1)) 40ms both;
+  }
+}
+@keyframes ch-empty-pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes ch-empty-rise { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ============================================================
    Main-app polish (frontend-design skill) — index / browse
