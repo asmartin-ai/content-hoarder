@@ -451,7 +451,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [ ] **P3 — Focus mode wider on desktop.** Desktop Focus mode should use a wider content column.
 - [ ] **P3 — "Swipe only on mobile" → now a decision (see Epic 16).** Inbox swipe is mobile/touch-only by
   default, not a toggle.
-- [ ] **P3 — Hide the Stats button under settings.** Move Stats into the settings menu to de-clutter.
+- [x] ~~**P3 — Hide the Stats button under settings.**~~ ✅ v3: Stats is the `#statsheet` panel inside the settings menu (GET /stats), per the 2026-06-12 parallel session. De-cluttered.
 
 ## Epic 15 — Reddit / HN as-app navigation  (`enhancement`, `area:reddit`)
 *Make saved items behave like the native apps when tapped.*
@@ -725,9 +725,10 @@ slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch
   (`f3e6d7d`):** `priority_unhydrated()` (inbox selftext posts w/ permalink, newest-saved first —
   7,335 live) + `hydrate_batch()` — rate-limited (`--throttle` 2s), resumable with no ledger
   (hydrated rows drop out of the priority query), STOPS on a dead cookie, `--dry-run` scope listing
-  (zero network). 7 offline tests; NOT yet run against Reddit. **Still open:** the explicit-approval
-  UI gate (Epic 21 trust mechanics) before a real mass run; wiring the Recover stub in the thread
-  viewer. Skip identity/meme content — don't hydrate all 55k (design language §5).
+  (zero network). The CLI **approval gate shipped** too: `--batch` is safe-by-default (lists scope)
+  and requires `--yes` to actually hit Reddit (double-gate like hard-delete). 7 offline tests; NOT yet
+  run against Reddit. **Still open:** the approval gate in the *web* thread viewer + wiring the Recover
+  stub there. Skip identity/meme content — don't hydrate all 55k (design language §5).
   - [x] ~~**P3 — `reddit-hydrate --from <bdfr-dir>` (local-archive hydrate).**~~ ✅ SHIPPED 2026-06-13
     (`7140c04` + hardening `30fa648`). `bdfr_to_listing()` converts each BDFR submission to the
     `[post-listing, comments-listing]` blob; `hydrate_from_archive()` walks the dir (offline, no
