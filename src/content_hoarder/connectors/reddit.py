@@ -472,6 +472,11 @@ class RedditConnector(BaseConnector):
                 saved_utc = saved_order_anchor - i
             else:
                 saved_utc = 0
+            if saved_order_anchor is not None:
+                # Provenance marker: this item was confirmed present in a saved-list snapshot.
+                # db.reconcile_reddit_saves only ever un-saves MARKED items (delta reconcile),
+                # so bulk-imported rows that were never in a real saved list are never touched.
+                meta["saved_seen_utc"] = saved_order_anchor
             yield new_item(
                 source="reddit",
                 source_id=sid,
