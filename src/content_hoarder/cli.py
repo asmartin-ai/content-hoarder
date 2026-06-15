@@ -47,6 +47,28 @@ def cmd_import(args) -> int:
     return 0
 
 
+def cmd_reddit_hydrate_titles(args) -> int:
+    from content_hoarder import reddit_hydrate
+    bak = None
+    with _connect() as conn:
+        if not args.dry_run:
+            import datetime as _dt
+            import sqlite3 as _sqlite3
+            from pathlib import Path
+            stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+            bak = Path(config.db_path()).with_name(f"app.backup-pre-titles-{stamp}.db")
+            dst = _sqlite3.connect(str(bak))
+            with dst:
+                conn.backup(dst)
+            dst.close()
+            print(f"backed up DB -> {bak}", file=sys.stderr)
+        res = reddit_hydrate.backfill_titles_local(conn, dry_run=args.dry_run)
+    if bak:
+        res["backup"] = str(bak)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_enrich(args) -> int:
     from content_hoarder import enrich as enrich_mod
     with _connect() as conn:
@@ -475,6 +497,13 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--reconcile-dry-run", action="store_true",
                     help="Preview --reconcile (count would-be un-saves) without writing.")
     pi.set_defaults(func=cmd_import)
+
+    ph = sub.add_parser("reddit-hydrate-titles",
+                        help="Restore real titles for title-less saved reddit comments from "
+                             "raw_json.submission_title (spec 08 P1, local/offline). Backs up "
+                             "the DB first.")
+    ph.add_argument("--dry-run", action="store_true", help="Preview without writing.")
+    ph.set_defaults(func=cmd_reddit_hydrate_titles)
 
     pe = sub.add_parser("enrich", help="Fill sparse rows via source APIs.")
     pe.add_argument("--source", help="Only this source (else all that support it).")

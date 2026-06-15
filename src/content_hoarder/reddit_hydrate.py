@@ -26,6 +26,45 @@ from content_hoarder.archival.providers import _bare_id, default_providers
 _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
 
 
+def backfill_titles_local(conn, *, dry_run: bool = False) -> dict:
+    """Spec 08 P1: restore real titles for title-less saved reddit items (mostly COMMENTS,
+    which carry no title of their own) from ``raw_json.submission_title`` — the title of the
+    post the comment is on. Fully local/offline; idempotent + additive: only rows with an
+    EMPTY title AND a non-empty ``submission_title`` are touched, never overwriting a real
+    title. ``search_text`` is recomputed so the restored title is searchable. Returns a summary
+    dict; ``dry_run=True`` previews without writing. Back up the DB before a real run.
+    """
+    # raw_json defaults to '' (invalid JSON), so parse it in Python rather than via
+    # json_extract (which raises "malformed JSON" on the empty string).
+    rows = conn.execute(
+        "SELECT fullname, body, author, metadata, raw_json "
+        "FROM items WHERE source='reddit' AND trim(title) = '' AND raw_json != ''"
+    ).fetchall()
+    updated, samples = 0, []
+    for r in rows:
+        try:
+            raw = json.loads(r["raw_json"])
+        except (ValueError, TypeError):
+            continue
+        title = str((raw.get("submission_title") if isinstance(raw, dict) else "") or "").strip()
+        if not title:
+            continue
+        if not dry_run:
+            md = models.parse_metadata(r["metadata"])
+            search_text = models.build_search_text(
+                {"title": title, "body": r["body"], "author": r["author"]}, md)
+            conn.execute(
+                "UPDATE items SET title = ?, search_text = ? WHERE fullname = ?",
+                (title, search_text, r["fullname"]),
+            )
+        updated += 1
+        if len(samples) < 5:
+            samples.append({"fullname": r["fullname"], "title": title[:80]})
+    if updated and not dry_run:
+        conn.commit()
+    return {"candidates": len(rows), "updated": updated, "dry_run": dry_run, "samples": samples}
+
+
 def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
     """Hydrate one saved Reddit item's full comment thread.
 
