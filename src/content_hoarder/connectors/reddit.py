@@ -12,8 +12,10 @@ import io
 import json
 import re
 import sqlite3
+import time
 import zipfile
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 
 from content_hoarder.connectors.base import BaseConnector
@@ -191,6 +193,54 @@ def _is_gdpr_zip(p: Path) -> bool:
         return False
 
 
+class _TableRows(HTMLParser):
+    """Collect ``<tr>`` rows of ``<td>``/``<th>`` cell text from an HTML table."""
+
+    def __init__(self):
+        super().__init__()
+        self.rows: list[list[str]] = []
+        self._cur: list[str] | None = None
+        self._cell = False
+        self._buf: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._cur = []
+        elif tag in ("td", "th"):
+            self._cell = True
+            self._buf = []
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._cur is not None:
+            self._cur.append("".join(self._buf).strip())
+            self._cell = False
+        elif tag == "tr" and self._cur is not None:
+            self.rows.append(self._cur)
+            self._cur = None
+
+    def handle_data(self, data):
+        if self._cell:
+            self._buf.append(data)
+
+
+def _parse_html_table(text: str) -> list[dict]:
+    """Parse the first HTML ``<table>`` (header row + body) into a list of row dicts.
+    Used for the saveddit.vercel.app export, an HTML table commonly saved as ``.xls``."""
+    parser = _TableRows()
+    try:
+        parser.feed(text)
+    except Exception:
+        return []
+    rows = [r for r in parser.rows if r]
+    if len(rows) < 2:
+        return []
+    header = [h.strip() for h in rows[0]]
+    return [
+        {header[i]: (r[i] if i < len(r) else "") for i in range(len(header))}
+        for r in rows[1:]
+    ]
+
+
 class RedditConnector(BaseConnector):
     id = "reddit"
     label = "Reddit"
@@ -211,6 +261,9 @@ class RedditConnector(BaseConnector):
             return self._looks_reddit(p)
         if suf in (".html", ".htm"):
             return self._looks_reddit_html(p)
+        if suf in (".xls", ".xlsx"):
+            # saveddit.vercel.app emits an HTML <table> saved with a spreadsheet extension.
+            return self._looks_reddit_html_table(p)
         if suf == ".zip":
             return _is_gdpr_zip(p)
         return False
@@ -244,6 +297,22 @@ class RedditConnector(BaseConnector):
             return False
         return "reddit.com" in head and "/comments/" in head
 
+    def _looks_reddit_html_table(self, p: Path) -> bool:
+        """An HTML <table> reddit export (e.g. saveddit) saved as .xls/.xlsx. A real binary
+        .xls/.xlsx reads as garbage here and fails the markers, so it's left unhandled."""
+        try:
+            head = Path(p).read_text(encoding="utf-8", errors="ignore")[:16384]
+        except OSError:
+            return False
+        low = head.lower()
+        return "<table" in low and "reddit" in low and ("permalink" in low or "createdutc" in low)
+
+    def _is_html_table(self, p: Path) -> bool:
+        try:
+            return "<table" in Path(p).read_text(encoding="utf-8", errors="ignore")[:16384].lower()
+        except OSError:
+            return False
+
     # -- sources -----------------------------------------------------------
 
     def import_file(self, path: Path):
@@ -259,8 +328,11 @@ class RedditConnector(BaseConnector):
             yield from self._from_csv(p)
         elif suf == ".json":
             yield from self._from_json(p)
-        elif suf in (".html", ".htm"):
-            yield from self._from_html(p)
+        elif suf in (".html", ".htm", ".xls", ".xlsx"):
+            if self._is_html_table(p):
+                yield from self._from_html_table(p)
+            else:
+                yield from self._from_html(p)
         elif suf == ".zip":
             yield from self._from_gdpr_zip(p)
 
@@ -303,6 +375,20 @@ class RedditConnector(BaseConnector):
                 url=url, metadata=meta,
             )
 
+    def _from_html_table(self, p: Path):
+        """saveddit.vercel.app export: an HTML <table> (often saved with a .xls/.xlsx
+        extension), one <tr> per saved item with header columns like
+        author/createdUtc/domain/id/numComments/over18/permalink/score/subreddit/title/url.
+        Rows are in SAVE order (newest-saved first) — `createdUtc` is the post/comment CREATION
+        time, not the save time, so `saved_utc` is synthesized from the row position instead."""
+        try:
+            text = Path(p).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return
+        rows = _parse_html_table(text)
+        if rows:
+            yield from self._rows_to_items(rows, saved_order_anchor=int(time.time()))
+
     def _from_db(self, p: Path):
         con = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
         con.row_factory = sqlite3.Row
@@ -340,8 +426,13 @@ class RedditConnector(BaseConnector):
             metadata=meta,
         )
 
-    def _rows_to_items(self, reader):
-        for raw in reader:
+    def _rows_to_items(self, reader, *, saved_order_anchor: int | None = None):
+        """Normalize CSV/table row dicts into items. ``saved_order_anchor`` (an epoch ts):
+        when set and a row has no explicit ``saved_utc``, synthesize ``saved_utc = anchor - i``
+        from the row index so a later "sort by saved_utc desc" reproduces the export's save
+        order (newest-saved first). It's a RELATIVE ordering anchored at import time, not a real
+        wall-clock save time (Reddit exposes no per-item saved timestamp)."""
+        for i, raw in enumerate(reader):
             row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
             permalink = row.get("permalink") or ""
             sid = row.get("fullname") or ""
@@ -362,9 +453,25 @@ class RedditConnector(BaseConnector):
                 meta["permalink"] = permalink
             if row.get("score"):
                 meta["score"] = row["score"]
+            num_comments = row.get("numcomments") or row.get("num_comments")
+            if num_comments:
+                meta["num_comments"] = num_comments
+            over18 = row.get("over18") or row.get("over_18")
+            if over18:
+                meta["over_18"] = 1 if over18.lower() in ("true", "1", "yes") else 0
+            if row.get("domain"):
+                meta["domain"] = row["domain"]
             kind = "comment" if str(sid).startswith("t1_") else "post"
             body = row.get("body") or row.get("selftext") or ""
             url = _classify_media(meta, row.get("url"), permalink, body, kind)
+            created = row.get("createdutc") or row.get("created_utc") or ""
+            saved = row.get("saved_utc") or row.get("savedutc") or ""
+            if saved.isdigit():
+                saved_utc = int(saved)
+            elif saved_order_anchor is not None:
+                saved_utc = saved_order_anchor - i
+            else:
+                saved_utc = 0
             yield new_item(
                 source="reddit",
                 source_id=sid,
@@ -373,6 +480,8 @@ class RedditConnector(BaseConnector):
                 body=body,
                 url=url,
                 author=row.get("author") or "",
+                created_utc=int(created) if created.isdigit() else 0,
+                saved_utc=saved_utc,
                 metadata=meta,
             )
 
