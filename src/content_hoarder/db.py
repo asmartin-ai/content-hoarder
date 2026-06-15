@@ -873,10 +873,18 @@ def reconcile_reddit_saves(
     export was un-saved on reddit.com, so we clear ``is_saved`` locally (we do NOT enqueue an
     unsave — it's already gone server-side).
 
-    SAFETY — Reddit's saved listing caps at ~``cap`` items PER TYPE (links vs comments fetched
-    separately). A type whose export count reaches the cap may be *truncated*, so a missing item
-    could be merely beyond the cap rather than un-saved; that type is SKIPPED. Only a type with a
-    complete export (count < cap) is reconciled. A type with zero export rows is also skipped.
+    DELTA RECONCILE (the only safe design) — this NEVER touches a row that wasn't itself
+    previously confirmed in a saved-list snapshot. ``is_saved=1`` in this DB is the
+    ``new_item`` default for *every* imported reddit row (bulk Karakeep/GDPR/JSON dumps), not
+    "currently saved on reddit", so a single export can't tell un-saved from never-a-real-save.
+    We therefore only consider rows carrying the ``metadata.saved_seen_utc`` provenance marker
+    (stamped by the saveddit import / a saved-list sync). Consequence: the FIRST snapshot just
+    establishes the baseline (marks rows, un-saves nothing); later snapshots detect genuine
+    drop-outs among previously-seen items. Bulk-imported rows are never reconciled.
+
+    SAFETY — also Reddit's saved listing caps at ~``cap`` items PER TYPE (links vs comments
+    fetched separately). A type whose export count reaches the cap may be *truncated*, so a
+    missing item could be merely beyond the cap; that type is SKIPPED. Zero-row types are skipped.
 
     Returns ``{kind: {present, capped, skipped, unsaved, fullnames}}``. ``dry_run=True`` previews
     (computes the would-unsave set) without writing. This is a non-additive, destructive write —
@@ -894,9 +902,11 @@ def reconcile_reddit_saves(
             info["capped"] = True
             info["skipped"] = "cap_reached"
         else:
+            # Only previously-seen-in-a-snapshot rows are reconcile candidates (delta reconcile).
             rows = conn.execute(
                 "SELECT fullname, source_id FROM items "
-                "WHERE source='reddit' AND kind=? AND is_saved=1",
+                "WHERE source='reddit' AND kind=? AND is_saved=1 "
+                "AND json_extract(metadata, '$.saved_seen_utc') IS NOT NULL",
                 (kind,),
             ).fetchall()
             missing = [r["fullname"] for r in rows if r["source_id"] not in present]

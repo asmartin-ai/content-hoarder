@@ -491,9 +491,10 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--source", help="Force a connector id (else auto-detect).")
     pi.add_argument("--enrich", action="store_true", help="Enrich imported items immediately.")
     pi.add_argument("--reconcile", action="store_true",
-                    help="Treat a reddit saved-list export as authoritative: mark still-saved "
-                         "reddit items absent from it as un-saved (per-type <1000 cap-guarded). "
-                         "Destructive — back up the DB first.")
+                    help="Delta-reconcile saves: mark reddit items PREVIOUSLY seen in a saved-list "
+                         "snapshot (metadata.saved_seen_utc) but absent from THIS export as "
+                         "un-saved (per-type <1000 cap-guarded). The first snapshot only sets the "
+                         "baseline (un-saves nothing). Destructive — back up the DB first.")
     pi.add_argument("--reconcile-dry-run", action="store_true",
                     help="Preview --reconcile (count would-be un-saves) without writing.")
     pi.set_defaults(func=cmd_import)
