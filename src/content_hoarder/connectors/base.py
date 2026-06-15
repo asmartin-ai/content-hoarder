@@ -18,6 +18,8 @@ class ImportResult:
     imported: int = 0
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
+    #: Per-kind unsave-reconciliation summary when ``import_path(reconcile=True)``; else None.
+    reconcile: dict | None = None
 
 
 class BaseConnector(ABC):

@@ -29,11 +29,21 @@ def cmd_import(args) -> int:
     from content_hoarder import pipeline
     with _connect() as conn:
         res = pipeline.import_path(
-            conn, args.path, source=args.source, enrich=args.enrich
+            conn, args.path, source=args.source, enrich=args.enrich,
+            reconcile=args.reconcile, reconcile_dry_run=args.reconcile_dry_run,
         )
     print(f"imported={res.imported} skipped={res.skipped} errors={len(res.errors)}")
     for err in res.errors[:10]:
         print("  !", err)
+    if res.reconcile is not None:
+        tag = "[dry-run] " if args.reconcile_dry_run else ""
+        print(f"{tag}reconcile (mark missing reddit saves as un-saved):")
+        for kind, info in res.reconcile.items():
+            if info.get("skipped"):
+                print(f"  {kind}: skipped ({info['skipped']}; {info['present']} in export)")
+            else:
+                verb = "would un-save" if args.reconcile_dry_run else "un-saved"
+                print(f"  {kind}: {info['present']} in export, {verb} {info['unsaved']}")
     return 0
 
 
@@ -458,6 +468,12 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("path")
     pi.add_argument("--source", help="Force a connector id (else auto-detect).")
     pi.add_argument("--enrich", action="store_true", help="Enrich imported items immediately.")
+    pi.add_argument("--reconcile", action="store_true",
+                    help="Treat a reddit saved-list export as authoritative: mark still-saved "
+                         "reddit items absent from it as un-saved (per-type <1000 cap-guarded). "
+                         "Destructive — back up the DB first.")
+    pi.add_argument("--reconcile-dry-run", action="store_true",
+                    help="Preview --reconcile (count would-be un-saves) without writing.")
     pi.set_defaults(func=cmd_import)
 
     pe = sub.add_parser("enrich", help="Fill sparse rows via source APIs.")
