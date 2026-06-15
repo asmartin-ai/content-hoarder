@@ -29,11 +29,43 @@ def cmd_import(args) -> int:
     from content_hoarder import pipeline
     with _connect() as conn:
         res = pipeline.import_path(
-            conn, args.path, source=args.source, enrich=args.enrich
+            conn, args.path, source=args.source, enrich=args.enrich,
+            reconcile=args.reconcile, reconcile_dry_run=args.reconcile_dry_run,
         )
     print(f"imported={res.imported} skipped={res.skipped} errors={len(res.errors)}")
     for err in res.errors[:10]:
         print("  !", err)
+    if res.reconcile is not None:
+        tag = "[dry-run] " if args.reconcile_dry_run else ""
+        print(f"{tag}reconcile (mark missing reddit saves as un-saved):")
+        for kind, info in res.reconcile.items():
+            if info.get("skipped"):
+                print(f"  {kind}: skipped ({info['skipped']}; {info['present']} in export)")
+            else:
+                verb = "would un-save" if args.reconcile_dry_run else "un-saved"
+                print(f"  {kind}: {info['present']} in export, {verb} {info['unsaved']}")
+    return 0
+
+
+def cmd_reddit_hydrate_titles(args) -> int:
+    from content_hoarder import reddit_hydrate
+    bak = None
+    with _connect() as conn:
+        if not args.dry_run:
+            import datetime as _dt
+            import sqlite3 as _sqlite3
+            from pathlib import Path
+            stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+            bak = Path(config.db_path()).with_name(f"app.backup-pre-titles-{stamp}.db")
+            dst = _sqlite3.connect(str(bak))
+            with dst:
+                conn.backup(dst)
+            dst.close()
+            print(f"backed up DB -> {bak}", file=sys.stderr)
+        res = reddit_hydrate.backfill_titles_local(conn, dry_run=args.dry_run)
+    if bak:
+        res["backup"] = str(bak)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -458,7 +490,21 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("path")
     pi.add_argument("--source", help="Force a connector id (else auto-detect).")
     pi.add_argument("--enrich", action="store_true", help="Enrich imported items immediately.")
+    pi.add_argument("--reconcile", action="store_true",
+                    help="Delta-reconcile saves: mark reddit items PREVIOUSLY seen in a saved-list "
+                         "snapshot (metadata.saved_seen_utc) but absent from THIS export as "
+                         "un-saved (per-type <1000 cap-guarded). The first snapshot only sets the "
+                         "baseline (un-saves nothing). Destructive — back up the DB first.")
+    pi.add_argument("--reconcile-dry-run", action="store_true",
+                    help="Preview --reconcile (count would-be un-saves) without writing.")
     pi.set_defaults(func=cmd_import)
+
+    ph = sub.add_parser("reddit-hydrate-titles",
+                        help="Restore real titles for title-less saved reddit comments from "
+                             "raw_json.submission_title (spec 08 P1, local/offline). Backs up "
+                             "the DB first.")
+    ph.add_argument("--dry-run", action="store_true", help="Preview without writing.")
+    ph.set_defaults(func=cmd_reddit_hydrate_titles)
 
     pe = sub.add_parser("enrich", help="Fill sparse rows via source APIs.")
     pe.add_argument("--source", help="Only this source (else all that support it).")

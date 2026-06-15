@@ -26,6 +26,45 @@ from content_hoarder.archival.providers import _bare_id, default_providers
 _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
 
 
+def backfill_titles_local(conn, *, dry_run: bool = False) -> dict:
+    """Spec 08 P1: restore real titles for title-less saved reddit items (mostly COMMENTS,
+    which carry no title of their own) from ``raw_json.submission_title`` — the title of the
+    post the comment is on. Fully local/offline; idempotent + additive: only rows with an
+    EMPTY title AND a non-empty ``submission_title`` are touched, never overwriting a real
+    title. ``search_text`` is recomputed so the restored title is searchable. Returns a summary
+    dict; ``dry_run=True`` previews without writing. Back up the DB before a real run.
+    """
+    # raw_json defaults to '' (invalid JSON), so parse it in Python rather than via
+    # json_extract (which raises "malformed JSON" on the empty string).
+    rows = conn.execute(
+        "SELECT fullname, body, author, metadata, raw_json "
+        "FROM items WHERE source='reddit' AND trim(title) = '' AND raw_json != ''"
+    ).fetchall()
+    updated, samples = 0, []
+    for r in rows:
+        try:
+            raw = json.loads(r["raw_json"])
+        except (ValueError, TypeError):
+            continue
+        title = str((raw.get("submission_title") if isinstance(raw, dict) else "") or "").strip()
+        if not title:
+            continue
+        if not dry_run:
+            md = models.parse_metadata(r["metadata"])
+            search_text = models.build_search_text(
+                {"title": title, "body": r["body"], "author": r["author"]}, md)
+            conn.execute(
+                "UPDATE items SET title = ?, search_text = ? WHERE fullname = ?",
+                (title, search_text, r["fullname"]),
+            )
+        updated += 1
+        if len(samples) < 5:
+            samples.append({"fullname": r["fullname"], "title": title[:80]})
+    if updated and not dry_run:
+        conn.commit()
+    return {"candidates": len(rows), "updated": updated, "dry_run": dry_run, "samples": samples}
+
+
 def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
     """Hydrate one saved Reddit item's full comment thread.
 
@@ -83,6 +122,19 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
 
     db.set_reddit_thread(conn, fullname, json.dumps(data), commit=True)
     return {"status": "hydrated", "fullname": fullname, "comments": comments}
+
+
+def hydrate_if_missing(conn, fullname, *, getf=None, user_agent=None, providers=None) -> dict:
+    """Lazy hydration: if this item has no cached comment thread yet, fetch + store it
+    (cookie via :func:`hydrate_one`, with the PullPush/Arctic-Shift archive fallback), then
+    report the outcome. Makes NO network call when a thread is already cached — returns
+    ``{"status": "cached"}``. Meant to run on the first open of a Reddit item's thread so the
+    tree is fetched on demand and served from cache forever after.
+    """
+    existing = db.get_reddit_thread(conn, fullname)
+    if existing and existing.get("thread_json"):
+        return {"status": "cached", "fullname": fullname}
+    return hydrate_one(conn, fullname, getf=getf, user_agent=user_agent, providers=providers)
 
 
 # --- Offline local-archive hydration (BDFR JSON -> reddit_threads) --------------
