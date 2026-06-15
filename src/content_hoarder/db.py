@@ -176,11 +176,14 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             os.makedirs(parent, exist_ok=True)
     conn = sqlite3.connect(p)
     conn.row_factory = sqlite3.Row
+    # A scheduled `reddit-unsave --drain` writes the same DB as a running `serve`; wait out a
+    # brief writer lock instead of failing with "database is locked". Must precede the WAL
+    # switch: the one-time rollback->WAL upgrade on a brand-new DB takes a brief exclusive lock,
+    # so concurrent first-connects (e.g. a service worker prefetching / + /triage + /pulse) would
+    # otherwise 500 here without a busy_timeout to wait it out.
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
-    # A scheduled `reddit-unsave --drain` writes the same DB as a running `serve`; wait out a
-    # brief writer lock instead of failing with "database is locked".
-    conn.execute("PRAGMA busy_timeout=5000")
     init_db(conn)
     return conn
 
