@@ -101,6 +101,7 @@ def sync_saved_cookie(
     result["username"] = username
 
     from content_hoarder.connectors.reddit import child_to_item
+    snapshot_utc = int(time.time())  # provenance marker for this saved-list snapshot
 
     marks = _load_mark(db.get_setting(conn, _MARK_KEY))
     mark_set = set(marks)
@@ -138,7 +139,7 @@ def sync_saved_cookie(
             if mark_set and name in mark_set:  # reached where the last sync left off
                 hit_mark = True
                 break
-            item = child_to_item(ch)
+            item = child_to_item(ch, saved_seen_utc=snapshot_utc)
             if not item:
                 continue
             result["fetched"] += 1
