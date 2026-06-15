@@ -119,10 +119,15 @@ def _classify_media(meta: dict, raw_url, permalink: str, body: str, kind: str) -
     return perma_url
 
 
-def child_to_item(ch: dict):
+def child_to_item(ch: dict, *, saved_seen_utc: int | None = None):
     """A Reddit API listing child (``{"kind": "t1"/"t3", "data": {...}}``) → a normalized
     content-hoarder item dict, or ``None`` if unusable. Shared by the JSON importer and the
-    cookie sync so both shape items identically (subreddit/score/over_18/media in metadata)."""
+    cookie sync so both shape items identically (subreddit/score/over_18/media in metadata).
+
+    ``saved_seen_utc`` (set by the cookie sync, an authoritative current-saved snapshot) stamps
+    the ``metadata.saved_seen_utc`` provenance marker so ``db.reconcile_reddit_saves`` can treat
+    the row as a delta-reconcile candidate. The bulk JSON importer leaves it ``None`` — those
+    dumps are not authoritative saved-lists, so their rows stay un-reconcilable."""
     d = ch.get("data", ch) if isinstance(ch, dict) else {}
     if not isinstance(d, dict):
         return None
@@ -144,6 +149,8 @@ def child_to_item(ch: dict):
     kind = "comment" if str(sid).startswith("t1_") else "post"
     body = d.get("selftext") or d.get("body") or ""
     url = _classify_media(meta, d.get("url"), permalink, body, kind)
+    if saved_seen_utc is not None:
+        meta["saved_seen_utc"] = saved_seen_utc
     return new_item(
         source="reddit",
         source_id=sid,
@@ -502,10 +509,14 @@ class RedditConnector(BaseConnector):
             )
 
     def _from_csv(self, p: Path):
+        # A CSV (saveddit export or an extracted GDPR saved_*.csv) is a saved-list snapshot:
+        # anchor it like _from_html_table so rows carry the saved_seen_utc reconcile marker.
         with open(p, "r", encoding="utf-8", errors="ignore", newline="") as fh:
-            yield from self._rows_to_items(csv.DictReader(fh))
+            yield from self._rows_to_items(csv.DictReader(fh),
+                                           saved_order_anchor=int(time.time()))
 
     def _from_gdpr_zip(self, p: Path):
+        anchor = int(time.time())  # one saved-list snapshot per GDPR export
         with zipfile.ZipFile(p) as zf:
             for info in zf.infolist():
                 if Path(info.filename).name not in ("saved_posts.csv", "saved_comments.csv"):
@@ -514,7 +525,7 @@ class RedditConnector(BaseConnector):
                     with zf.open(info) as stream:
                         text = io.TextIOWrapper(stream, encoding="utf-8-sig", newline="")
                         reader = csv.DictReader(text)
-                        yield from self._rows_to_items(reader)
+                        yield from self._rows_to_items(reader, saved_order_anchor=anchor)
                 except Exception:
                     continue
 

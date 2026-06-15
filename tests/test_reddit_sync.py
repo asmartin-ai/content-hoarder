@@ -112,6 +112,18 @@ def test_sync_keeps_mark_on_max_pages_truncation(conn):
     assert db.get_setting(conn, "reddit_sync_newest") == "t3_old"  # unchanged — no gap
 
 
+def test_sync_stamps_saved_seen_utc_marker(conn):
+    """Cookie sync is an authoritative saved-list snapshot, so its rows carry the
+    metadata.saved_seen_utc provenance marker reconcile_reddit_saves requires."""
+    _auth(conn)
+    reddit_sync.sync_saved_cookie(
+        conn, getf=make_getf([([child("t3_a")], None)]), user_agent="ua")
+    seen = conn.execute(
+        "SELECT json_extract(metadata, '$.saved_seen_utc') FROM items "
+        "WHERE fullname='reddit:t3_a'").fetchone()[0]
+    assert seen is not None and seen > 0
+
+
 def test_sync_auth_error_without_cookie(conn):
     res = reddit_sync.sync_saved_cookie(conn, getf=make_getf([]), user_agent="ua")
     assert res["auth_error"] is True and res["stopped"] == "auth_error"
