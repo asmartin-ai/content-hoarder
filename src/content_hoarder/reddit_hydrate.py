@@ -21,9 +21,12 @@ from content_hoarder.reddit_unsave import (
     _http_get,
     get_auth,
 )
-from content_hoarder.archival.providers import _bare_id, default_providers
+from content_hoarder.archival.providers import _bare_id, _PLACEHOLDERS, default_providers
 
 _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
+# The submission base36 id sits between ``/comments/`` and the next ``/`` in a comment
+# permalink (``/r/<sub>/comments/<sid>/<slug-or-_>/<cid>/``), absolute or relative.
+_SID_FROM_PERMALINK = re.compile(r"/comments/([A-Za-z0-9]+)/")
 
 
 def backfill_titles_local(conn, *, dry_run: bool = False) -> dict:
@@ -63,6 +66,94 @@ def backfill_titles_local(conn, *, dry_run: bool = False) -> dict:
     if updated and not dry_run:
         conn.commit()
     return {"candidates": len(rows), "updated": updated, "dry_run": dry_run, "samples": samples}
+
+
+def backfill_titles_network(conn, *, providers=None, user_agent=None,
+                            dry_run: bool = False, limit: int | None = None,
+                            progress=None) -> dict:
+    """Spec 08 P2: fill titles for the title-less saved reddit items that ``backfill_titles_local``
+    can't (comments whose ``submission_title`` was never captured — they have no ``raw_json``) by
+    fetching the SUBMISSION each comment is on from web archives (PullPush -> Arctic-Shift) and using
+    its ``title``. The submission base36 id is read from ``metadata.permalink``
+    (``/r/<sub>/comments/<sid>/...``), so no per-comment id mapping is needed and comments sharing a
+    submission cost a single fetch. Idempotent + additive: only rows with an EMPTY title and a
+    resolvable submission id are touched, never overwriting a real title; ``search_text`` is
+    recomputed. ``dry_run=True`` reports the scope (incl. resolved submission ids) with NO network.
+    Back up the DB before a real run. All network is injectable via ``providers`` for offline tests.
+    """
+    rows = conn.execute(
+        "SELECT fullname, body, author, metadata FROM items "
+        "WHERE source='reddit' AND trim(title) = '' "
+        "ORDER BY last_seen_utc DESC"
+    ).fetchall()
+
+    targets, skipped_no_sid = [], 0
+    for r in rows:
+        md = models.parse_metadata(r["metadata"])
+        m = _SID_FROM_PERMALINK.search(md.get("permalink") or "")
+        if not m:
+            skipped_no_sid += 1
+            continue
+        targets.append((r["fullname"], m.group(1), r["body"], md, r["author"]))
+    if limit is not None:
+        targets = targets[:limit]
+
+    unique_sids = sorted({sid for _, sid, _, _, _ in targets})
+    res = {
+        "candidates": len(rows), "resolvable": len(targets),
+        "submissions": len(unique_sids), "skipped_no_submission_id": skipped_no_sid,
+        "updated": 0, "missed": 0, "dry_run": dry_run, "by_provider": {},
+    }
+    if dry_run:
+        res["sample_targets"] = [{"fullname": fn, "submission_id": sid}
+                                 for fn, sid, *_ in targets[:20]]
+        return res
+    if not targets:
+        return res
+
+    providers = providers or default_providers(user_agent or config.get("USER_AGENT"))
+    titles: dict = {}            # submission bare id -> recovered title
+    remaining = set(unique_sids)
+    errors: dict = {}
+    for prov in providers:
+        if not remaining:
+            break
+        try:
+            found = prov.fetch_posts(sorted(remaining))
+        except Exception as e:   # a single provider being down must not abort the chain
+            errors[prov.name] = str(e)
+            continue
+        got = 0
+        for sid, fields in found.items():
+            title = str(fields.get("title") or "").strip()
+            if title and title not in _PLACEHOLDERS:
+                titles[sid] = title
+                got += 1
+        remaining -= set(titles)
+        if got:
+            res["by_provider"][prov.name] = res["by_provider"].get(prov.name, 0) + got
+        if progress:
+            progress(f"  {prov.name}: {len(titles)}/{len(unique_sids)} submissions resolved")
+
+    samples = []
+    for fn, sid, body, md, author in targets:
+        title = titles.get(sid)
+        if not title:
+            res["missed"] += 1
+            continue
+        search_text = models.build_search_text(
+            {"title": title, "body": body, "author": author}, md)
+        conn.execute("UPDATE items SET title = ?, search_text = ? WHERE fullname = ?",
+                     (title, search_text, fn))
+        res["updated"] += 1
+        if len(samples) < 8:
+            samples.append({"fullname": fn, "submission_id": sid, "title": title[:80]})
+    if res["updated"]:
+        conn.commit()
+    res["samples"] = samples
+    if errors:
+        res["errors"] = errors
+    return res
 
 
 def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
