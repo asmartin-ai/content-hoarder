@@ -124,6 +124,19 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     return {"status": "hydrated", "fullname": fullname, "comments": comments}
 
 
+def hydrate_if_missing(conn, fullname, *, getf=None, user_agent=None, providers=None) -> dict:
+    """Lazy hydration: if this item has no cached comment thread yet, fetch + store it
+    (cookie via :func:`hydrate_one`, with the PullPush/Arctic-Shift archive fallback), then
+    report the outcome. Makes NO network call when a thread is already cached — returns
+    ``{"status": "cached"}``. Meant to run on the first open of a Reddit item's thread so the
+    tree is fetched on demand and served from cache forever after.
+    """
+    existing = db.get_reddit_thread(conn, fullname)
+    if existing and existing.get("thread_json"):
+        return {"status": "cached", "fullname": fullname}
+    return hydrate_one(conn, fullname, getf=getf, user_agent=user_agent, providers=providers)
+
+
 # --- Offline local-archive hydration (BDFR JSON -> reddit_threads) --------------
 
 
