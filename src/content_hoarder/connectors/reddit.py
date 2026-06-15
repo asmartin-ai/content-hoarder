@@ -241,6 +241,17 @@ def _parse_html_table(text: str) -> list[dict]:
     ]
 
 
+def _epoch_int(value) -> int:
+    """Parse an epoch-seconds string to int, tolerating reddit's float form ('123.0')."""
+    s = (value or "").strip()
+    if not s:
+        return 0
+    try:
+        return int(float(s))
+    except ValueError:
+        return 0
+
+
 class RedditConnector(BaseConnector):
     id = "reddit"
     label = "Reddit"
@@ -307,12 +318,6 @@ class RedditConnector(BaseConnector):
         low = head.lower()
         return "<table" in low and "reddit" in low and ("permalink" in low or "createdutc" in low)
 
-    def _is_html_table(self, p: Path) -> bool:
-        try:
-            return "<table" in Path(p).read_text(encoding="utf-8", errors="ignore")[:16384].lower()
-        except OSError:
-            return False
-
     # -- sources -----------------------------------------------------------
 
     def import_file(self, path: Path):
@@ -329,7 +334,10 @@ class RedditConnector(BaseConnector):
         elif suf == ".json":
             yield from self._from_json(p)
         elif suf in (".html", ".htm", ".xls", ".xlsx"):
-            if self._is_html_table(p):
+            # Route by the same strict table sniff used by can_import (needs the saveddit header
+            # markers), so a <li>-shape .html export that merely contains a <table> still parses
+            # via _from_html rather than being misrouted to the table reader.
+            if self._looks_reddit_html_table(p):
                 yield from self._from_html_table(p)
             else:
                 yield from self._from_html(p)
@@ -464,10 +472,9 @@ class RedditConnector(BaseConnector):
             kind = "comment" if str(sid).startswith("t1_") else "post"
             body = row.get("body") or row.get("selftext") or ""
             url = _classify_media(meta, row.get("url"), permalink, body, kind)
-            created = row.get("createdutc") or row.get("created_utc") or ""
-            saved = row.get("saved_utc") or row.get("savedutc") or ""
-            if saved.isdigit():
-                saved_utc = int(saved)
+            saved_explicit = _epoch_int(row.get("saved_utc") or row.get("savedutc"))
+            if saved_explicit:
+                saved_utc = saved_explicit
             elif saved_order_anchor is not None:
                 saved_utc = saved_order_anchor - i
             else:
@@ -477,15 +484,19 @@ class RedditConnector(BaseConnector):
                 # db.reconcile_reddit_saves only ever un-saves MARKED items (delta reconcile),
                 # so bulk-imported rows that were never in a real saved list are never touched.
                 meta["saved_seen_utc"] = saved_order_anchor
+            # A comment carries no title of its own. DON'T synthesize a permalink-slug title: it
+            # would overlay (merge_upsert _OVERLAY_FIELDS) and CLOBBER a real submission_title set
+            # by backfill_titles_local on a later re-import. Leave it empty so the backfill owns it.
+            title = row.get("title") or (_title_from_permalink(permalink) if kind == "post" else "")
             yield new_item(
                 source="reddit",
                 source_id=sid,
                 kind=kind,
-                title=row.get("title") or _title_from_permalink(permalink),
+                title=title,
                 body=body,
                 url=url,
                 author=row.get("author") or "",
-                created_utc=int(created) if created.isdigit() else 0,
+                created_utc=_epoch_int(row.get("createdutc") or row.get("created_utc")),
                 saved_utc=saved_utc,
                 metadata=meta,
             )
