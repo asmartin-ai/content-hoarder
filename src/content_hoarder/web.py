@@ -485,14 +485,20 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.get("/reddit/items/<path:fullname>/thread")
     def reddit_thread_route(fullname):
-        from content_hoarder import reddit_thread
+        from content_hoarder import reddit_thread, reddit_hydrate
         sort = request.args.get("sort", "best")
         if sort not in ("best", "top", "new"):
             sort = "best"
+        no_fetch = request.args.get("nofetch") == "1"  # opt out of the lazy live fetch
         with conn() as c:
+            # Lazy hydration: on the first open of an un-cached reddit thread, fetch + store it
+            # (cookie, with PullPush/Arctic-Shift archive fallback), then serve from cache.
+            hres = None if no_fetch else reddit_hydrate.hydrate_if_missing(c, fullname)
             res = reddit_thread.get_thread(c, fullname, sort)
-        if res is None:
-            return jsonify({"error": "not found"}), 404
+            if res is None:
+                return jsonify({"error": "not found"}), 404
+            if hres is not None:
+                res["hydrate_status"] = hres.get("status")  # hydrated|archived|cached|auth_*|...
         return jsonify(res)
 
     @app.post("/reddit/items/<path:fullname>/unsave")
