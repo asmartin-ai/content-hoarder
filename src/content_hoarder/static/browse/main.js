@@ -75,7 +75,11 @@ async function loadItems(reset) {
     state.items = [];
     state.batchCleared = 0;
     state.stamped = false;
-    itemsEl.innerHTML = '<div class="skeleton">FETCHING…</div>';
+    saveView();   // persist the active view so a reload/return keeps your place
+    // keep the current rows on screen (dimmed) during a refetch — only blank to the skeleton on a
+    // cold start, so changing filter/sort/status/source no longer flashes the whole list away
+    if (itemsEl.querySelector("[data-fullname]")) itemsEl.classList.add("loading");
+    else itemsEl.innerHTML = '<div class="skeleton">FETCHING…</div>';
   }
   try {
     const limit = state.focus ? FOCUS_BATCH : 50;
@@ -88,8 +92,10 @@ async function loadItems(reset) {
     if (reset && state.focus) state.batchTotal = r.items.length;
     render();
   } catch (e) {
-    if (gen === loadGen)
+    if (gen === loadGen) {
+      itemsEl.classList.remove("loading");
       itemsEl.innerHTML = '<div class="skeleton">COULDN’T LOAD — IS THE SERVER UP?</div>';
+    }
   } finally {
     if (gen === loadGen) state.loading = false;
   }
@@ -697,6 +703,27 @@ document.addEventListener("wheel", (e) => {
 }, { passive: true });
 
 wireTagExpanders(itemsEl);
+
+/* persist the active view (status/source/tags) across reloads — sessionStorage so it survives a
+   refresh/return within the session but a fresh app launch still starts clean at the inbox.
+   (sort/density/focus/goal/nsfw already persist via localStorage.) */
+const VIEW_KEY = "ch_view";
+function saveView() {
+  try {
+    sessionStorage.setItem(VIEW_KEY,
+      JSON.stringify({ status: state.status, source: state.source, tags: state.tags }));
+  } catch (e) { /* private mode / quota — non-fatal */ }
+}
+function restoreView() {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || "null");
+    if (!v || typeof v !== "object") return;
+    if (typeof v.status === "string") state.status = v.status;
+    if (typeof v.source === "string") state.source = v.source;
+    if (Array.isArray(v.tags)) state.tags = v.tags.filter((t) => typeof t === "string");
+  } catch (e) { /* ignore corrupt value */ }
+}
+restoreView();
 
 /* ---- boot ---- */
 paintTabs();
