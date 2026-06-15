@@ -5,10 +5,38 @@ The SOLE owner of database writes during import. Connectors only parse and yield
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from content_hoarder import connectors, db
 from content_hoarder.connectors.base import ImportResult
+from content_hoarder.models import parse_metadata
+
+_SAVED_ORDER_KEY = "reddit_saved_order_top"  # highest synthetic saved_utc allocated so far
+
+
+def _apply_monotonic_saved_order(conn, items: list[dict]) -> None:
+    """Re-rank synthetic reddit ``saved_utc`` so each import's block sits ABOVE all previous
+    ones — keeping "sort by saved newest" coherent across imports made at different times.
+
+    Reddit exposes no real per-item save time, so ``saved_utc`` is synthesized from export ROW
+    ORDER (newest-saved-first). A per-import wall-clock anchor put each import in a DISJOINT band
+    (older-only rows kept a stale band; re-seen rows jumped); a persistent monotonic anchor —
+    ``max(now, last_top + N)`` — stacks the blocks instead. Only rows carrying the
+    ``saved_seen_utc`` marker (authoritative saved-list snapshots) are re-ranked; bulk JSON dumps
+    keep their import default. The anchor stays ~wall-clock (it only rises above ``now`` when
+    imports cluster in time), so the "saved Xd ago" display stays sane. A re-seen row takes the
+    newest block's rank (newest-export-wins, via merge_upsert's saved_utc overlay)."""
+    ranked = [it for it in items
+              if it.get("source") == "reddit"
+              and parse_metadata(it.get("metadata")).get("saved_seen_utc") is not None]
+    if not ranked:
+        return
+    last_top = int(db.get_setting(conn, _SAVED_ORDER_KEY, 0) or 0)
+    anchor = max(int(time.time()), last_top + len(ranked))
+    for i, it in enumerate(ranked):  # items are newest-first within the export
+        it["saved_utc"] = anchor - i
+    db.set_setting(conn, _SAVED_ORDER_KEY, str(anchor))
 
 
 def import_path(
@@ -27,7 +55,9 @@ def import_path(
     batch: list[dict] = []
     do_reconcile = reconcile or reconcile_dry_run
     present = {"post": set(), "comment": set()}
-    for item in connector.import_file(p):
+    items = list(connector.import_file(p))
+    _apply_monotonic_saved_order(conn, items)
+    for item in items:
         # Record presence from the PARSED export regardless of upsert success — a row genuinely in
         # the export but failing to upsert must not be mistaken for "absent" (a false un-save).
         if do_reconcile and item.get("source") == "reddit":
