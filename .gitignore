@@ -41,6 +41,9 @@ Thumbs.db
 # Local preview-server config (machine-specific absolute paths)
 .claude/launch.json
 
+# Ephemeral worktrees created by scripts/serve_branch_verify.py (auto-cleaned)
+.verify-worktrees/
+
 # Local MCP server picks (machine-specific; brave-search reads an ambient BRAVE_API_KEY)
 .mcp.json
 
