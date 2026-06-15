@@ -28,14 +28,16 @@ def import_path(
     do_reconcile = reconcile or reconcile_dry_run
     present = {"post": set(), "comment": set()}
     for item in connector.import_file(p):
+        # Record presence from the PARSED export regardless of upsert success — a row genuinely in
+        # the export but failing to upsert must not be mistaken for "absent" (a false un-save).
+        if do_reconcile and item.get("source") == "reddit":
+            kind = item.get("kind")
+            if kind in present:
+                present[kind].add(item.get("source_id"))
         try:
             db.merge_upsert(conn, item)
             result.imported += 1
             batch.append(item)
-            if do_reconcile and item.get("source") == "reddit":
-                kind = item.get("kind")
-                if kind in present:
-                    present[kind].add(item.get("source_id"))
         except Exception as exc:  # one bad row must not kill the whole import
             result.skipped += 1
             result.errors.append(f"{item.get('fullname', '?')}: {exc}")

@@ -41,8 +41,9 @@ def test_saveddit_table_xls_import(tmp_path):
     assert cmt["kind"] == "comment"
     assert cmt["created_utc"] == 1700000000
     assert json.loads(cmt["metadata"])["over_18"] == 1
-    # empty title column -> slug-derived fallback (NOT the real submission title; that's spec 08)
-    assert cmt["title"] == "Is what we owe to each other"
+    # comments get NO synthesized slug title — it would clobber a real submission_title on
+    # re-import (merge_upsert overlays). The real title comes from backfill_titles_local (spec 08).
+    assert cmt["title"] == ""
 
     # saved_utc synthesized from row order: row 0 (newest saved) ranks above row 1, both > 0.
     assert post["saved_utc"] > cmt["saved_utc"] > 0
