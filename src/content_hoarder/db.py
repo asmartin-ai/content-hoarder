@@ -859,6 +859,71 @@ def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> int:
     return after - before
 
 
+def reconcile_reddit_saves(
+    conn: sqlite3.Connection,
+    present_by_kind: dict,
+    *,
+    dry_run: bool = False,
+    cap: int = 1000,
+) -> dict:
+    """Flip ``is_saved`` to 0 for reddit items missing from a fresh saved-list export.
+
+    ``present_by_kind`` maps ``"post"``/``"comment"`` -> the set of ``source_id``s
+    (``t3_``/``t1_`` ids) seen in the export. A DB item still marked saved but absent from the
+    export was un-saved on reddit.com, so we clear ``is_saved`` locally (we do NOT enqueue an
+    unsave — it's already gone server-side).
+
+    DELTA RECONCILE (the only safe design) — this NEVER touches a row that wasn't itself
+    previously confirmed in a saved-list snapshot. ``is_saved=1`` in this DB is the
+    ``new_item`` default for *every* imported reddit row (bulk Karakeep/GDPR/JSON dumps), not
+    "currently saved on reddit", so a single export can't tell un-saved from never-a-real-save.
+    We therefore only consider rows carrying the ``metadata.saved_seen_utc`` provenance marker
+    (stamped by the saveddit import / a saved-list sync). Consequence: the FIRST snapshot just
+    establishes the baseline (marks rows, un-saves nothing); later snapshots detect genuine
+    drop-outs among previously-seen items. Bulk-imported rows are never reconciled.
+
+    SAFETY — also Reddit's saved listing caps at ~``cap`` items PER TYPE (links vs comments
+    fetched separately). A type whose export count reaches the cap may be *truncated*, so a
+    missing item could be merely beyond the cap; that type is SKIPPED. Zero-row types are skipped.
+
+    Returns ``{kind: {present, capped, skipped, unsaved, fullnames}}``. ``dry_run=True`` previews
+    (computes the would-unsave set) without writing. This is a non-additive, destructive write —
+    back up the DB first.
+    """
+    summary: dict = {}
+    any_write = False
+    for kind in ("post", "comment"):
+        present = present_by_kind.get(kind) or set()
+        info = {"present": len(present), "capped": False, "skipped": None,
+                "unsaved": 0, "fullnames": []}
+        if not present:
+            info["skipped"] = "no_export_rows"
+        elif len(present) >= cap:
+            info["capped"] = True
+            info["skipped"] = "cap_reached"
+        else:
+            # Only previously-seen-in-a-snapshot rows are reconcile candidates (delta reconcile).
+            rows = conn.execute(
+                "SELECT fullname, source_id FROM items "
+                "WHERE source='reddit' AND kind=? AND is_saved=1 "
+                "AND json_extract(metadata, '$.saved_seen_utc') IS NOT NULL",
+                (kind,),
+            ).fetchall()
+            missing = [r["fullname"] for r in rows if r["source_id"] not in present]
+            info["unsaved"] = len(missing)
+            info["fullnames"] = missing
+            if missing and not dry_run:
+                conn.executemany(
+                    "UPDATE items SET is_saved=0 WHERE fullname=?",
+                    [(fn,) for fn in missing],
+                )
+                any_write = True
+        summary[kind] = info
+    if any_write:
+        conn.commit()
+    return summary
+
+
 # Any MANUAL status transition exits the decayed state (see decay/undecay): strip the
 # wave marks so "stamped == currently decayed" holds and is:swept never matches a rescued
 # item. One definition for every status writer — a future writer that forgets this breaks
