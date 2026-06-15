@@ -207,6 +207,7 @@ body.focus .batchstrip{display:flex}
 .grouphead::after{content:"";flex:1;height:1px;background:var(--border-hairline)}
 
 .items{padding-bottom:var(--sp-4)}
+.items.loading{opacity:.45;transition:opacity .12s var(--ease)}  /* refetch: dim in place, no skeleton flash */
 .row{position:relative;border-bottom:1px solid var(--border-hairline);overflow:clip}
 .row:last-child{border-bottom:none}
 .item-fg{display:grid;grid-template-columns:40px 30px minmax(0,1fr) auto;gap:var(--sp-3);
