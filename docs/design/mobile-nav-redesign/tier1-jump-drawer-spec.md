@@ -113,7 +113,7 @@ respects `env(safe-area-inset-*)`.
 |---|---|---|
 | `templates/index.html` | Replace `#open-tags-phone` with a `☰` control; replace the `#tagsheet` aside with a `.navdrawer` aside that **reuses the existing `.scrim` (`#scrim`) overlay** and mirrors the `.sheetpanel` slide pattern. Desktop `.rail` untouched. | not off-limits |
 | `static/browse/browse.css` | Drawer styles built from existing tokens; reuse `.rail`/pill/row rules where possible; mobile-only (`.rail` stays the desktop expression of the same content). | not off-limits |
-| `static/browse/main.js` | Drawer open/close controller, shared rail+drawer render, live-filter, pin state, section-visibility, active-filter wiring. | **OFF-LIMITS** — owned by the `ch-hydration` worktree (it edits `main.js`). **Coordinate timing: port after that branch merges to staging.** |
+| `static/browse/main.js` | Drawer open/close controller, shared rail+drawer render, live-filter, pin state, section-visibility, active-filter wiring. | **Writable** — `feat/reddit-title-hydration` merged to staging (`0fda16f`) and its worktree was removed 2026-06-15, so `main.js` is no longer off-limits. |
 
 Net new design surface is minimal: a left drawer is the mobile expression of the existing `.rail`, using the
 existing overlay/scrim mechanism — it should read as "always been part of Log Book."
