@@ -62,7 +62,12 @@ def cmd_reddit_hydrate_titles(args) -> int:
                 conn.backup(dst)
             dst.close()
             print(f"backed up DB -> {bak}", file=sys.stderr)
-        res = reddit_hydrate.backfill_titles_local(conn, dry_run=args.dry_run)
+        if getattr(args, "network", False):
+            res = reddit_hydrate.backfill_titles_network(
+                conn, dry_run=args.dry_run, limit=args.limit,
+                progress=lambda m: print(m, file=sys.stderr))
+        else:
+            res = reddit_hydrate.backfill_titles_local(conn, dry_run=args.dry_run)
     if bak:
         res["backup"] = str(bak)
     print(json.dumps(res, indent=2, ensure_ascii=False))
@@ -500,10 +505,17 @@ def build_parser() -> argparse.ArgumentParser:
     pi.set_defaults(func=cmd_import)
 
     ph = sub.add_parser("reddit-hydrate-titles",
-                        help="Restore real titles for title-less saved reddit comments from "
-                             "raw_json.submission_title (spec 08 P1, local/offline). Backs up "
-                             "the DB first.")
-    ph.add_argument("--dry-run", action="store_true", help="Preview without writing.")
+                        help="Restore real titles for title-less saved reddit comments. Default: "
+                             "local/offline from raw_json.submission_title (spec 08 P1). --network: "
+                             "fetch the rest from web archives (spec 08 P2). Backs up the DB first.")
+    ph.add_argument("--dry-run", action="store_true",
+                    help="Preview the scope without writing (and without network when --network).")
+    ph.add_argument("--network", action="store_true",
+                    help="Phase 2: fetch remaining titles from web archives (PullPush -> Arctic-Shift) "
+                         "for comments with no local submission_title, keyed on the submission id in "
+                         "metadata.permalink. Network; resumable via --limit.")
+    ph.add_argument("--limit", type=int, default=None,
+                    help="--network: cap how many items to attempt this run (resumable).")
     ph.set_defaults(func=cmd_reddit_hydrate_titles)
 
     pe = sub.add_parser("enrich", help="Fill sparse rows via source APIs.")
