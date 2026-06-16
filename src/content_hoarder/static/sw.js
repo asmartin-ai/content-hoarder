@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v18";  // v18: drawer de-dupes category-named tags (Categories group owns them)
+const CACHE = "ch-shell-v20";  // v20: reader "open original" absolutizes relative reddit permalinks
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
@@ -10,6 +10,7 @@ const SHELL = [
   "/static/core/util.js", "/static/core/api.js", "/static/core/toast.js",
   "/static/core/media.js", "/static/core/swipe.js", "/static/core/render.js",
   "/static/browse/browse.css", "/static/browse/main.js", "/static/browse/render.js",
+  "/static/browse/reader.js",
   "/static/browse/palette.js", "/static/browse/operators.js",
   // /triage is still the v2 page
   "/static/app.css", "/static/triage.js",
