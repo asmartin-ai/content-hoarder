@@ -8,7 +8,8 @@ Binding user direction (2026-06-08): **avoid the Reddit iframe embed** — rende
 natively from the archived `media`/`gallery` metadata; study how RES + old.reddit present media.
 
 Inputs: live-DB inventory (read-only, `data/app.db`, scripts in `K:\Projects\overnight-20260612\q*.py`),
-v2 code (`K:\Projects\ch-score`, main), v3 code (`K:\Projects\content-hoarder`, `feat/frontend-v3`),
+v2 code (`K:\Projects\content-hoarder`, `main` branch — read at the time via the `ch-score` worktree,
+removed 2026-06-16), v3 code (`K:\Projects\content-hoarder`, `feat/frontend-v3`),
 RES source (fetched verbatim from GitHub this session), live URL probes against reddit CDNs
 (curl, 2026-06-12). All claims below are tagged **[measured]**, **[probed]**, **[fetched]**
 (verbatim source read this session), or **[reported]** (web search/paraphrase, not independently verified).
@@ -50,8 +51,7 @@ themed wrong, frequently refuses to render in an iframe, and leaks browsing to R
 
 ### 1.1 Current code paths
 
-**v2 inbox — `K:\Projects\ch-score\src\content_hoarder\static\app.js`** (classic script, served at `/`
-on main):
+**v2 inbox — `src\content_hoarder\static\app.js`** (on `main`; classic script, served at `/`):
 
 | Function | Lines | Behavior today |
 |---|---|---|
@@ -65,7 +65,7 @@ on main):
 | `mediaSlotHtml(item)` | 413–438 | thumb + class routing: `img-open` (lightbox) vs `rd-preview` (iframe) |
 | click handler | 827–836 | `[data-gallery]` → `openGallery` (✓ native); `.rd-preview` → `openMedia` (✗ iframe — **all videos land here**); `.img-open` → `openImage` |
 
-**v2 triage — `K:\Projects\ch-score\src\content_hoarder\static\triage.js`:**
+**v2 triage — `src\content_hoarder\static\triage.js`** (on `main`):
 `openGallery` (61–67, duplicated copy), `mediaHtml` (169–206) — galleries with arrays render
 **inline** (`tcard-gallery`, lines 173–183, tap → lightbox via 360–368); but `reddit_video` /
 `reddit_media` / `gallery`-typed posts without arrays get a `rd-preview-lg` button (187–192)
