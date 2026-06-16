@@ -475,10 +475,16 @@ def cmd_reddit_oauth(args) -> int:
         print("Reddit read-only OAuth — one-time setup:\n")
         print("1) Open this URL in your browser and click 'Allow':\n")
         print("   " + url + "\n")
-        print("2) The browser will try to open a 'redreader://…' URL it can't handle — that's")
-        print("   expected. Copy the FULL redirected URL from the address bar.\n")
+        print("2) The browser then redirects to a 'redreader://rr_oauth_redir?...' URL it CANNOT")
+        print("   open — that's EXPECTED (there's no RedReader app on the PC). Grab the code from")
+        print("   that failed redirect one of two ways:")
+        print("     - Easiest: after the error page appears, copy the full 'redreader://...' URL")
+        print("       straight from the address bar.")
+        print("     - If the address bar doesn't change: open dev tools (F12) -> Network tab, tick")
+        print("       'Persist Logs', click Allow, find the 302 (or the red 'redreader://' entry),")
+        print("       and copy its 'Location' response header.\n")
         try:
-            pasted = input("3) Paste it here (or just the code): ").strip()
+            pasted = input("3) Paste the redirected URL (or just the code) here: ").strip()
         except EOFError:
             print("error: no input received.", file=sys.stderr)
             return 2
