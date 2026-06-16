@@ -5,38 +5,32 @@ The SOLE owner of database writes during import. Connectors only parse and yield
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 from content_hoarder import connectors, db
 from content_hoarder.connectors.base import ImportResult
 from content_hoarder.models import parse_metadata
 
-_SAVED_ORDER_KEY = "reddit_saved_order_top"  # highest synthetic saved_utc allocated so far
-
 
 def _apply_monotonic_saved_order(conn, items: list[dict]) -> None:
-    """Re-rank synthetic reddit ``saved_utc`` so each import's block sits ABOVE all previous
-    ones — keeping "sort by saved newest" coherent across imports made at different times.
+    """Assign each reddit import's synthetic ``saved_utc`` as a contiguous block ABOVE all prior
+    ingests, so "sort by saved newest" stays coherent across imports made at different times
+    (the older per-import wall-clock anchor left disjoint bands). Imports AND cookie syncs share
+    one monotonic counter via :func:`db.allocate_saved_order`.
 
-    Reddit exposes no real per-item save time, so ``saved_utc`` is synthesized from export ROW
-    ORDER (newest-saved-first). A per-import wall-clock anchor put each import in a DISJOINT band
-    (older-only rows kept a stale band; re-seen rows jumped); a persistent monotonic anchor —
-    ``max(now, last_top + N)`` — stacks the blocks instead. Only rows carrying the
-    ``saved_seen_utc`` marker (authoritative saved-list snapshots) are re-ranked; bulk JSON dumps
-    keep their import default. The anchor stays ~wall-clock (it only rises above ``now`` when
-    imports cluster in time), so the "saved Xd ago" display stays sane. A re-seen row takes the
-    newest block's rank (newest-export-wins, via merge_upsert's saved_utc overlay)."""
+    Only rows from an authoritative saved-list snapshot (the ``saved_seen_utc`` marker) AND
+    lacking a real explicit ``saved_utc`` are ranked — bulk JSON dumps and rows carrying a genuine
+    save time are left untouched. The counter advance is folded into the import's transaction
+    (``commit=False``), so a crash rolls back the anchor with the rows it ranked."""
     ranked = [it for it in items
               if it.get("source") == "reddit"
+              and not it.get("saved_utc")  # a real explicit save time is preserved, not re-ranked
               and parse_metadata(it.get("metadata")).get("saved_seen_utc") is not None]
     if not ranked:
         return
-    last_top = int(db.get_setting(conn, _SAVED_ORDER_KEY, 0) or 0)
-    anchor = max(int(time.time()), last_top + len(ranked))
+    top = db.allocate_saved_order(conn, len(ranked), commit=False)
     for i, it in enumerate(ranked):  # items are newest-first within the export
-        it["saved_utc"] = anchor - i
-    db.set_setting(conn, _SAVED_ORDER_KEY, str(anchor))
+        it["saved_utc"] = top - i
 
 
 def import_path(

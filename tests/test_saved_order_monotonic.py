@@ -50,3 +50,13 @@ def test_bulk_json_dump_is_not_reranked(conn, tmp_path):
     pipeline.import_path(conn, p, source="reddit")
     # no saved_seen_utc marker -> left at the import default, never monotonic-stamped
     assert _saved(conn, "t3_j") == 0
+
+
+def test_explicit_saved_utc_is_preserved_not_reranked(conn, tmp_path):
+    # An export carrying a REAL saved time keeps it — the monotonic re-rank only touches rows
+    # that lack one (synthetic ordering), never clobbers a genuine timestamp.
+    p = tmp_path / "withsaved.csv"
+    p.write_text("id,permalink,saved_utc\r\n"
+                 "e1,https://www.reddit.com/r/test/comments/e1/slug/,1600000000\r\n")
+    pipeline.import_path(conn, p, source="reddit")
+    assert _saved(conn, "t3_e1") == 1600000000

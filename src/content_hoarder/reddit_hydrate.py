@@ -229,7 +229,9 @@ def _hydrate_failed_at(conn, fullname):
 
 
 def _mark_hydrate_failed(conn, fullname, now):
-    """Stamp ``metadata.hydrate_failed_at`` (targeted update — no last_seen/search_text churn)."""
+    """Stamp ``metadata.hydrate_failed_at`` via a targeted UPDATE. Deliberately NOT
+    ``db._update_metadata``: that helper also bumps ``last_seen_utc`` and rebuilds ``search_text``,
+    which is wrong here — a thread-open failure is not a re-ingest, and the marker isn't searchable."""
     row = conn.execute("SELECT metadata FROM items WHERE fullname=?", (fullname,)).fetchone()
     if row is None:
         return
