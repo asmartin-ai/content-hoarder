@@ -98,6 +98,23 @@ When building self-contained HTML mockups with a phone-frame toggle (the v3 Gate
 - Container queries (`container-type:inline-size` on the frame) make the phone toggle
   genuinely responsive — but see the `claude-preview-verify` skill (#6/#7) before
   asserting any of it in the preview (0-width fresh viewports; frozen transitions).
+- **Rendering an app mockup via `show_widget` (visualize MCP):** its house style (sentence-case only,
+  two font-weights, transparent outer bg, **no `position:fixed`**) fights an app's own design language.
+  Wrap the app-styled phone in a neutral host container (`background:var(--color-background-secondary)`),
+  give the phone its OWN tokens + dark bg, anchor overlays (drawer/scrim/sheet) with `position:absolute`
+  inside a `position:relative` faux-viewport (never `fixed` — it collapses the iframe height), and
+  deliberately deviate on uppercase labels / weights *inside* the frame for fidelity. Icons: Tabler
+  (`ti ti-*`, human-made/MIT) or the app's `icons.js` — never AI-drawn art.
+
+## Where design artifacts live (repo conventions)
+- **`design-ref/` is git-ignored** (root `.gitignore`) — it's LOCAL reference material (the v3 explorations,
+  mockups, bulky screen-recordings/frame sets), never committed. Don't try to commit into it.
+- **Version-controlled design docs go in `docs/`** (docs-as-code) — e.g. `docs/design/<topic>/`. Commit the
+  markdown plus only the SMALL images it embeds; keep bulky raw source (videos, full frame extractions) OUT of
+  git (local in `design-ref/`, regenerable via ffmpeg; git-LFS or external storage only if it must be versioned).
+- **Gotcha: `git add <ignored-path>` adds nothing and still exits 0** (prints a hint, not an error) — a commit
+  can silently omit the files you meant to add. After staging into a tree with ignored dirs, **verify the staged
+  count** (`git diff --cached --name-only | wc -l`) before committing; use `git add -f` only deliberately.
 
 ## Checklist before finishing a UI change
 - [ ] New values reference tokens (no stray hex/px); status colors use `--keep/--archive/--done`.
