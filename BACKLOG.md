@@ -226,9 +226,11 @@ false positives.*
   reddit head-sniff so Keep Takeout dirs still dispatch to Keep — winner DeepSeek V4). 17 new tests.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
   groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
-- [ ] **P3 — OAuth go-live.** When a Reddit API key arrives, (re)build OAuth sync + live
-  thread fetch + OAuth save/unsave; prefer OAuth over the cookie path when configured. *(The old
-  `feat/reddit-oauth` branch is gone — this is a rebuild, not a merge.)*
+- [~] **P3 — OAuth go-live.** **READ half SHIPPED via Epic 25 (F5), 2026-06-16:** live thread fetch over
+  `oauth.reddit.com` + bearer, preferred over the cookie when configured — using an installed-app
+  (RedReader) client id, so NO Reddit API key was needed. **Remaining:** OAuth-based saved-list **sync**
+  and **save/unsave writes** (both still on the cookie) — lower priority, since writes are the
+  elevated-risk path best kept rare. *(The old `feat/reddit-oauth` branch is gone.)*
 
 - [x] ~~**P3 — Reddit comments sort option in the inbox.**~~ Shipped (2026-06-12, trio batch 1,
   winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
@@ -249,23 +251,6 @@ false positives.*
   `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
-- [ ] **P3 — "Human-mimic" jitter for hydration pacing (learning experiment).** *(User idea
-  2026-06-16; explicitly a learning project — Kenja wants to build it himself.)* Replace/augment the
-  uniform `_http.jittered_throttle` (`base*(0.75+rng())` → uniform `[0.75,1.75]×base`) with a
-  human-shaped delay distribution. **Honest verdict — don't expect a real win:** it won't save speed
-  (real browse timing is heavy-tailed/log-normal and *slower* on average — it embeds read-pauses a bot
-  doesn't need; for raw speed just lower `--throttle`, OAuth has ~4× headroom under the 100 QPM budget),
-  and the anti-detection gain is marginal (uniform already kills the exact-interval fingerprint; Reddit
-  isn't distribution-profiling low-volume authenticated reads). The value is the *learning*, not the
-  outcome. **Seam:** `jittered_throttle` is one function, called in 3 places (`reddit_hydrate.hydrate_batch`,
-  `reddit_unsave.drain`, `reddit_sync.sync_saved_cookie`) as `sleep(_http.jittered_throttle(throttle))` —
-  swap it or make it pluggable; keep the `_http.MIN_THROTTLE` floor and add a cap so a sampled long pause
-  can't stall a batch. **Ladder:** (a) log-normal `base*random.lognormvariate(0,0.5)` clamped (~2 lines);
-  (b) two-state burst/pause Markov (short bursts + occasional long pause = the real browsing rhythm);
-  (c) empirical "copy me" — log real thread-open gaps from the `/reddit/items/<fn>/thread` route into a
-  small table, then sample at hydration time (caveat: truncate the long read-pauses so it stays
-  human-*shaped* without being bot-pointlessly slow). Builds on the shipped Reddit de-risking work
-  ([`docs/reddit-derisking.md`](docs/reddit-derisking.md) — all 7 features merged to main 2026-06-16).
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
@@ -821,3 +806,48 @@ pulls from one source instead of re-deriving it.*
   keeps its v2/v3 token system and now points at the shared repo for the behavioral
   layer. Distilled from: PKMS 10-synthesis + closed decision gates, this skill's
   friction-asymmetry principle, and the Epic 20/21 guardrails.
+
+## Epic 25 — Reddit access de-risking  (`enhancement`, `area:reddit`)
+*Harden cookie-authed Reddit hydration against the (low but real) ban / IP-block risk and move reads to
+Reddit's sanctioned lane. **Full risk model + per-feature rationale + as-built notes:
+[`docs/reddit-derisking.md`](docs/reddit-derisking.md)** — that doc is the source of truth; details live
+there, not here. All 7 features SHIPPED + merged to main 2026-06-16 (`282a0d8`): new `reddit_oauth.py` +
+`_http` jitter helpers; +33 offline tests, full suite 454 green; passed a high-effort /code-review.
+**OAuth ships DORMANT** — `hydrate_one` prefers it once a refresh token exists; activate once with
+`python -m content_hoarder reddit-oauth --login` (cookie stays as the automatic fallback).*
+
+- [x] ~~**F1 — Jitter the throttle.**~~ `_http.jittered_throttle` (uniform `[0.75,1.75]×base`) replaces
+  the fixed inter-request `sleep` on hydrate/drain/sync — kills the exact-interval bot fingerprint.
+- [x] ~~**F2 — 429/Retry-After + full-jitter backoff on the READ path.**~~ `_http_get` opts into
+  `_http.request(retries=4, backoff=1.0, jitter=True)` (`_http.full_jitter_delay`); hydration now honors
+  rate-limit signals instead of treating the first 429 as a hard failure. Non-jitter path byte-identical
+  (golden test guarded).
+- [x] ~~**F3 — Transport-aware User-Agent.**~~ `REDDIT_BROWSER_USER_AGENT` on every cookie path
+  (login/sync/drain/resave/hydrate); a compliant `windows:content-hoarder:<ver>` UA on OAuth; the generic
+  `USER_AGENT` is retained for archives/youtube/karakeep.
+- [x] ~~**F4 — On-demand default; cap/gate bulk backfill.**~~ `reddit_hydrate.DEFAULT_BATCH_LIMIT`
+  lowered 100→25 behind the existing dry-run/`--yes` gate; tap-to-hydrate stays the norm.
+- [x] ~~**F5 — OAuth read-only path (installed-app, RedReader client id, no secret).**~~ New
+  `reddit_oauth.py` (authorize / code-exchange / refresh; refresh token in the DB, NOT the repo;
+  `oauth_get` with the F2 backoff) + the `reddit-oauth` CLI; `hydrate_one` prefers OAuth when configured.
+  **Live-verified** (a real `oauth.reddit.com` read returned a Listing). Client id in `.env` + a User env
+  var; `read` scope only (no `identity`, so the username is omitted from the UA — by design).
+- [x] ~~**F6 — Treat mass-unsave (writes) as elevated risk.**~~ `drain` now jittered + an inline
+  elevated-risk note; the approve-scope gate is kept (programmatic writes are what bans actually target).
+- [x] ~~**F7 — Global rate cap.**~~ `_http.MIN_THROTTLE` (0.6 s) floor on the hydrate/drain/sync
+  throttles — never approaches Reddit's 100 QPM authenticated budget, even if misconfigured.
+- [ ] **P3 — "Human-mimic" jitter for hydration pacing (learning experiment).** *(User idea
+  2026-06-16; explicitly a learning project — Kenja wants to build it himself.)* Replace/augment the
+  uniform `_http.jittered_throttle` with a human-shaped delay distribution. **Honest verdict — don't
+  expect a real win:** it won't save speed (real browse timing is heavy-tailed/log-normal and *slower*
+  on average — it embeds read-pauses a bot doesn't need; for raw speed just lower `--throttle`, OAuth
+  has ~4× headroom under 100 QPM), and the anti-detection gain is marginal (uniform already kills the
+  exact-interval fingerprint; Reddit isn't distribution-profiling low-volume authenticated reads). The
+  value is the *learning*, not the outcome. **Seam:** `jittered_throttle` is one function, called in 3
+  places (`reddit_hydrate.hydrate_batch`, `reddit_unsave.drain`, `reddit_sync.sync_saved_cookie`) as
+  `sleep(_http.jittered_throttle(throttle))` — swap it or make it pluggable; keep the `_http.MIN_THROTTLE`
+  floor and add a cap so a sampled long pause can't stall a batch. **Ladder:** (a) log-normal
+  `base*random.lognormvariate(0,0.5)` clamped (~2 lines); (b) two-state burst/pause Markov (short bursts
+  + occasional long pause = the real browsing rhythm); (c) empirical "copy me" — log real thread-open
+  gaps from the `/reddit/items/<fn>/thread` route into a small table, then sample (caveat: truncate the
+  long read-pauses so it stays human-*shaped* without being bot-pointlessly slow).
