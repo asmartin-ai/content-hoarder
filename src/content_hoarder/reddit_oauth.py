@@ -268,6 +268,33 @@ def oauth_get(url: str, *, bearer: str, user_agent: str, sleep=time.sleep) -> di
         raise RedditNetworkError("unparseable response") from e
 
 
+def oauth_post(url: str, fields: dict, *, bearer: str, user_agent: str) -> tuple[int, dict]:
+    """POST form-encoded ``fields`` to an oauth.reddit.com write endpoint (e.g. /api/unsave) with a
+    bearer token. Returns ``(status_code, response_headers)``; status 0 = a true transport failure.
+
+    Deliberately mirrors ``reddit_unsave._http_post``'s contract (status+headers, no internal
+    retry) so the shared ``_send_with_retry`` stays transport-agnostic: a 403 halts the drain, a
+    429's ``Retry-After`` is honored by the caller. No modhash — OAuth uses the bearer for CSRF."""
+    data = urllib.parse.urlencode(fields).encode("utf-8")
+    try:
+        status, headers, _raw = _http.request(
+            url, method="POST", data=data,
+            headers={
+                "Authorization": f"bearer {bearer}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": user_agent,
+            },
+            timeout=20,
+        )
+        return status, headers
+    except _http.HttpError as e:
+        # An HTTP error response is data here, not a failure (403 halts, 429 carries Retry-After).
+        # Only a true transport failure (no status) collapses to the (0, {}) sentinel.
+        if e.status is not None:
+            return e.status, e.headers
+        return 0, {}
+
+
 def access_token(conn, *, post=None, now=None) -> str | None:
     """Return a valid bearer access token, refreshing on (near-)expiry. ``None`` when not
     configured or a refresh permanently fails (the caller then falls back to the cookie). A
