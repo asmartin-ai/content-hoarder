@@ -20,7 +20,7 @@ def test_build_authorize_url_has_required_params():
     q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
     assert q == {"client_id": "CID", "response_type": "code", "state": "ST",
                  "redirect_uri": "redreader://rr_oauth_redir",
-                 "duration": "permanent", "scope": "read"}
+                 "duration": "permanent", "scope": "read history identity save"}
 
 
 def test_build_authorize_url_requires_client_id(monkeypatch):
