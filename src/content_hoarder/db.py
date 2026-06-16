@@ -241,11 +241,32 @@ def get_setting(conn: sqlite3.Connection, key: str, default=None):
     return row[0] if row else default
 
 
-def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+def set_setting(conn: sqlite3.Connection, key: str, value: str, *, commit: bool = True) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", (key, str(value))
     )
-    conn.commit()
+    if commit:
+        conn.commit()
+
+
+_SAVED_ORDER_KEY = "reddit_saved_order_top"  # highest synthetic saved_utc rank allocated so far
+
+
+def allocate_saved_order(conn: sqlite3.Connection, n: int, *, commit: bool = True) -> int:
+    """Reserve a contiguous block of ``n`` synthetic ``saved_utc`` ranks ABOVE every block
+    allocated before, and return the block's TOP value; callers assign ``top, top-1, …,
+    top-(n-1)`` in newest-saved-first order.
+
+    Reddit exposes no real per-item save time, so saved_utc is synthesized from export/listing
+    ROW ORDER. A persistent monotonic anchor — ``max(now, last_top + n)`` — keeps "sort by saved
+    newest" coherent across imports AND cookie syncs made at different times (no disjoint bands),
+    while staying ~wall-clock (it only rises above ``now`` when ingests cluster), so the
+    "saved Xd ago" display stays sane. ``commit=False`` folds the counter advance into the
+    caller's transaction so it commits atomically with the rows it ranks."""
+    last_top = int(get_setting(conn, _SAVED_ORDER_KEY, 0) or 0)
+    top = max(int(time.time()), last_top + max(n, 0))
+    set_setting(conn, _SAVED_ORDER_KEY, str(top), commit=commit)
+    return top
 
 
 # ---------------------------------------------------------------------------

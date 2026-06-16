@@ -45,6 +45,8 @@ def test_saveddit_table_xls_import(tmp_path):
     # re-import (merge_upsert overlays). The real title comes from backfill_titles_local (spec 08).
     assert cmt["title"] == ""
 
-    # saved_utc synthesized from row order: row 0 (newest saved) ranks above row 1, both > 0.
-    assert post["saved_utc"] > cmt["saved_utc"] > 0
-    assert post["saved_utc"] - cmt["saved_utc"] == 1
+    # saved_utc is no longer synthesized in the connector — the pipeline owns the monotonic rank
+    # (see test_saved_order_monotonic). The connector leaves it 0 and stamps the saved_seen_utc
+    # snapshot marker so reconcile_reddit_saves can consider the row.
+    assert post["saved_utc"] == 0 and cmt["saved_utc"] == 0
+    assert json.loads(post["metadata"])["saved_seen_utc"] > 0
