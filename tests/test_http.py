@@ -87,6 +87,40 @@ def _install_opener(monkeypatch, fn):
 
 
 # --------------------------------------------------------------------------
+# _ascii_safe_url — percent-encode non-ASCII URLs (regression: a unicode permalink
+# slug crashed hydration with UnicodeEncodeError in http.client's request-line encode)
+# --------------------------------------------------------------------------
+
+def test_ascii_safe_url_leaves_ascii_unchanged():
+    u = "https://oauth.reddit.com/r/test/comments/abc/some_slug/.json?raw_json=1"
+    assert _http._ascii_safe_url(u) is u            # identity for the common case: zero behavior change
+
+
+def test_ascii_safe_url_percent_encodes_non_ascii_path():
+    out = _http._ascii_safe_url(
+        "https://oauth.reddit.com/r/test/comments/abc/café/.json?raw_json=1")
+    assert "caf%C3%A9" in out                        # é (UTF-8) -> %C3%A9
+    assert out.endswith("/.json?raw_json=1")         # query + structure preserved
+    out.encode("ascii")                              # the whole thing is now ASCII-encodable
+
+
+def test_ascii_safe_url_does_not_double_encode_existing_escapes():
+    # a pre-existing %20 must survive (not become %2520) even while a non-ASCII char is encoded
+    out = _http._ascii_safe_url("https://x/a%20b/café")
+    assert "a%20b" in out and "caf%C3%A9" in out
+
+
+def test_request_non_ascii_url_is_encoded_before_urlopen(monkeypatch):
+    # The real crash: the non-ASCII URL reached urllib verbatim. Now request() hands the opener an
+    # ASCII-safe URL, so http.client's ascii request-line encode never raises.
+    calls = _install_opener(monkeypatch, lambda req, n: _FakeResp(body=b"{}"))
+    _http.request("https://oauth.reddit.com/r/test/comments/abc/café/.json?raw_json=1")
+    sent = calls[0][0].full_url
+    sent.encode("ascii")                             # would raise if the fix regressed
+    assert "caf%C3%A9" in sent
+
+
+# --------------------------------------------------------------------------
 # request — success path
 # --------------------------------------------------------------------------
 
