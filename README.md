@@ -41,6 +41,16 @@ python -m content_hoarder import <path>     # a file or a directory (auto-detect
 python -m content_hoarder serve             # then open http://127.0.0.1:8788
 ```
 
+### Serve from anywhere (no `cd`)
+The DB path defaults to `data/app.db` *relative to the current directory*, so to launch from any
+folder without `cd`-ing in, point `CONTENT_HOARDER_DB` at an absolute path and call the venv's
+Python directly. One line to paste (PowerShell):
+```powershell
+$env:CONTENT_HOARDER_DB="K:\Projects\content-hoarder\data\app.db"; & "K:\Projects\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve
+```
+Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe equivalent:
+`set "CONTENT_HOARDER_DB=K:\Projects\content-hoarder\data\app.db" && "K:\Projects\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve`.)
+
 ## CLI commands
 | Command | Description |
 |---------|-------------|
@@ -52,7 +62,8 @@ python -m content_hoarder serve             # then open http://127.0.0.1:8788
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
 | `reddit-sync` | Pull new saved Reddit items via the `reddit_session` cookie (newest-first, stop-on-overlap; set the cookie with `reddit-unsave --login`). |
 | `reddit-unsave [--enable\|--disable] [--drain] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit over the cookie (rate-limited, 429 backoff). Run against a DB copy first — it mutates real Reddit state. |
-| `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item via cookie, `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (rate-limited, resumable; safe-by-default — needs `--yes` to fetch). |
+| `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **read-only OAuth** hydration transport (installed-app, no client secret; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
+| `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item (OAuth if configured, else cookie), `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (jittered throttle, small cap, resumable; safe-by-default — needs `--yes` to fetch). |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |

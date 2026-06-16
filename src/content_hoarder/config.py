@@ -19,6 +19,16 @@ _DEFAULTS = {
     "CONTENT_HOARDER_ALLOWED_HOSTS": "",
     "FLASK_SECRET_KEY": "dev-insecure-change-me",
     "USER_AGENT": "content-hoarder/0.1 (local personal use)",
+    # Reddit cookie transport: a real browser UA makes a logged-in session blend in, unlike
+    # the generic USER_AGENT above (which still serves archives/youtube/karakeep). Override in
+    # .env with YOUR actual browser's UA string for the closest blend. See docs/reddit-derisking.md.
+    "REDDIT_BROWSER_USER_AGENT":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0",
+    # Reddit OAuth (installed-app, read-only). Client id is a PUBLIC installed-app id (e.g.
+    # RedReader's) — there is no client secret. The redirect URI must match that app's
+    # registered one (RedReader = redreader://rr_oauth_redir). Blank client id = cookie-only.
+    "REDDIT_OAUTH_CLIENT_ID": "",
+    "REDDIT_OAUTH_REDIRECT_URI": "redreader://rr_oauth_redir",
     "KARAKEEP_BASE_URL": "",
     "KARAKEEP_API_KEY": "",
     "LLM_BASE_URL": "http://127.0.0.1:1234/v1",

@@ -82,7 +82,9 @@ def test_batch_hydrates_and_throttles_between_requests(conn):
     res = hydrate_batch(conn, throttle=2.0, getf=_ok_getf, sleep=sleeps)
     assert res["hydrated"] == 3 and res["failed"] == 0
     assert res["statuses"].get("hydrated") == 3
-    assert sleeps.calls == [2.0, 2.0]  # throttle BETWEEN the 3, not after the last
+    # jittered throttle BETWEEN the 3 (not after the last): base 2.0 -> uniform(1.5, 3.5)
+    assert len(sleeps.calls) == 2
+    assert all(1.5 <= s < 3.5 for s in sleeps.calls)
     # the threads are now cached -> a re-run finds nothing (resumable)
     assert priority_unhydrated(conn, 100) == []
 

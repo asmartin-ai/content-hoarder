@@ -1,5 +1,6 @@
 # Environment / secrets
 .env
+RED_READER_APP_ID.txt
 # NSFW rule lists — kept out of source; see nsfw_rules.example.json for the schema
 /nsfw_rules.json
 

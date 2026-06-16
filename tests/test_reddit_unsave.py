@@ -1,7 +1,11 @@
 """Offline tests for the reddit unsave-on-done queue + drain. No real network: post/getf/sleep
 are injected. Mirrors the archival/youtube_recover injectable-callable test style."""
 
-from content_hoarder import db, models, reddit_unsave as ru
+import urllib.error
+
+import pytest
+
+from content_hoarder import _http, db, models, reddit_unsave as ru
 
 
 # --- helpers ---------------------------------------------------------------
@@ -106,7 +110,9 @@ def test_drain_success(conn):
     saved = conn.execute("SELECT COUNT(*) FROM items WHERE is_saved=0").fetchone()[0]
     assert saved == 3
     assert post.calls == [(ru.UNSAVE_URL, "t3_a"), (ru.UNSAVE_URL, "t3_b"), (ru.UNSAVE_URL, "t3_c")]
-    assert sleeps == [1.0, 1.0]  # throttle between the 3 items, not before the first
+    # jittered throttle between the 3 items (not before the first): base 1.0 -> uniform(0.75, 1.75)
+    assert len(sleeps) == 2
+    assert all(0.75 <= s < 1.75 for s in sleeps)
 
 
 def test_drain_respects_limit(conn):
@@ -312,3 +318,72 @@ def test_resave_network_error_returns_false(conn):
     ru.set_auth(conn, session_cookie="ck")
     ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
     assert ru.resave(conn, "reddit:t3_a", post=_Post(), getf=_raise_network) is False
+
+
+# --- read-path 429/5xx backoff (de-risking feature 2) -----------------------
+
+class _Resp:
+    def __init__(self, status=200, headers=None, body=b""):
+        self.status, self.headers, self._b = status, headers or {}, body
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _herror(code, headers=None):
+    return urllib.error.HTTPError(url="http://x", code=code, msg="e",
+                                  hdrs=(headers or {}), fp=None)
+
+
+def _install_opener(monkeypatch, fn):
+    calls = []
+
+    def urlopen(req, timeout=None):
+        calls.append(req)
+        r = fn(req, len(calls) - 1)
+        if isinstance(r, BaseException):
+            raise r
+        return r
+
+    monkeypatch.setattr(_http, "_opener", lambda: urlopen)
+    return calls
+
+
+def test_http_get_retries_429_then_raises_network(monkeypatch):
+    calls = _install_opener(monkeypatch, lambda req, n: _herror(429))  # always rate-limited
+    slept = []
+    with pytest.raises(ru.RedditNetworkError) as ei:
+        ru._http_get("http://x", session_cookie="c", user_agent="ua", sleep=slept.append)
+    assert "429" in str(ei.value)
+    assert len(calls) == 5             # initial + 4 retries
+    assert len(slept) == 4             # backed off before each retry, not after the last
+
+
+def test_http_get_retry_after_then_success(monkeypatch):
+    def fn(req, n):
+        if n == 0:
+            return _herror(429, {"Retry-After": "3"})
+        return _Resp(status=200, body=b'{"ok": 1}')
+    calls = _install_opener(monkeypatch, fn)
+    slept = []
+    out = ru._http_get("http://x", session_cookie="c", user_agent="ua", sleep=slept.append)
+    assert out == {"ok": 1}
+    assert slept == [3.0] and len(calls) == 2  # honored Retry-After, then succeeded
+
+
+def test_http_get_401_returns_empty_no_retry(monkeypatch):
+    calls = _install_opener(monkeypatch, lambda req, n: _herror(401))
+    out = ru._http_get("http://x", session_cookie="c", user_agent="ua", sleep=lambda s: None)
+    assert out == {} and len(calls) == 1       # logged-out is terminal, no backoff loop
+
+
+# --- transport-aware User-Agent (de-risking feature 3) ----------------------
+
+def test_cookie_user_agent_is_browser_like():
+    assert ru.cookie_user_agent().startswith("Mozilla/")
