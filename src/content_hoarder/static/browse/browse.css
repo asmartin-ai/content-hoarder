@@ -654,3 +654,116 @@ kbd{font:var(--fw-bold) .7rem/1 var(--font-mono);background:var(--surface-inset)
   border:1px solid var(--border-control);border-radius:var(--r-sm);padding:2px 6px;
   margin-left:12px;flex-shrink:0}
 .pal-row.sel .pal-hint{color:var(--accent);border-color:var(--accent)}
+
+/* ===================== inline Reddit reader ===================== */
+/* Full-screen sheet over the feed: post + collapsible comment thread, in-reader
+   triage, "open original" escape. Slides in from the right; swipe-right / the
+   system back-gesture returns to the feed. Built from core tokens. z-index 53
+   sits above the sheets/dock (51) but below the media lightbox (#media-modal, 55)
+   so tapping post media still opens the lightbox over the reader. */
+html.reader-lock{overflow:hidden}
+.reader{position:fixed;inset:0;z-index:53;display:flex;flex-direction:column;
+  background:var(--surface-app);background-image:var(--glowsky);
+  transform:translateX(100%);visibility:hidden;
+  transition:transform var(--dur-slow) var(--ease),visibility 0s var(--dur-slow);
+  will-change:transform}
+.reader.show{transform:none;visibility:visible;
+  transition:transform var(--dur-slow) var(--ease)}
+
+.rd-head{display:flex;align-items:center;gap:10px;flex:none;
+  padding:calc(env(safe-area-inset-top) + var(--sp-3)) var(--sp-3) var(--sp-3);
+  border-bottom:1px solid var(--border-hairline);background:var(--surface-card)}
+.rd-head .led{width:9px;height:9px;border-radius:50%;background:var(--source-reddit);
+  box-shadow:0 0 7px var(--source-reddit);flex:none}
+.rd-sub{font:var(--fw-semibold) var(--fs-sm)/1 var(--font-sans);letter-spacing:.01em;
+  color:var(--text-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd-oo{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:5px;
+  font:var(--fw-medium) var(--fs-xs)/1 var(--font-mono);color:var(--text-muted);
+  text-decoration:none;border:1px solid var(--border-control);border-radius:var(--r-pill);
+  padding:7px 11px}
+.rd-oo:hover{color:var(--text-body);border-color:var(--accent)}
+.rd-x{width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--border-control);border-radius:var(--r-pill);
+  color:var(--text-muted);cursor:pointer}
+.rd-x:hover{color:var(--text-body);border-color:var(--accent)}
+
+.rd-scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch}
+
+/* ---- post ---- */
+.rd-post{padding:var(--sp-4) var(--sp-4) var(--sp-3);border-bottom:1px solid var(--border-hairline)}
+.rd-ttl{margin:0 0 var(--sp-2);font:var(--fw-semibold) var(--fs-xl)/1.28 var(--font-disp);
+  letter-spacing:-.01em;color:var(--text-body)}
+.rd-by{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  font:var(--fw-regular) var(--fs-xs)/1 var(--font-mono);color:var(--text-dim)}
+.rd-by .rd-au{color:var(--text-muted)}
+.rd-by .rd-pscore{color:var(--accent);font-variant-numeric:tabular-nums}
+.rd-body{margin-top:var(--sp-3);font:var(--fw-regular) var(--fs-md)/1.6 var(--font-sans);
+  color:var(--text-body)}
+.rd-body p{margin:0 0 var(--sp-3)}
+.rd-body p:last-child{margin-bottom:0}
+.rd-media{display:block;width:100%;margin-top:var(--sp-3);padding:0;position:relative;
+  border:1px solid var(--border-hairline);border-radius:var(--r-md);overflow:hidden;
+  background:var(--tile-fill);cursor:pointer}
+.rd-media img{display:block;width:100%;max-height:58vh;object-fit:contain}
+.rd-media.nsfw img{filter:blur(26px)}
+.rd-mglyph{position:absolute;left:8px;bottom:8px;font-size:1.1rem}
+.rd-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:var(--fw-bold) var(--fs-xs)/1 var(--font-mono);letter-spacing:.08em;color:var(--text-body);
+  background:rgba(8,6,12,.42)}
+.rd-chip{display:inline-flex;align-items:center;margin-top:var(--sp-3);
+  font:var(--fw-medium) var(--fs-xs)/1 var(--font-mono);letter-spacing:.03em;
+  border-radius:var(--r-pill);padding:5px 10px}
+.rd-chip.ok{color:var(--archive);background:var(--archive-tint)}
+.rd-chip.arch{color:var(--accent);background:var(--accent-tint)}
+
+/* ---- comments ---- */
+.rd-comments{padding:var(--sp-2) var(--sp-3) var(--sp-5)}
+.rd-chead{display:flex;align-items:center;gap:8px;padding:var(--sp-3) 6px var(--sp-2);
+  font:var(--fw-medium) var(--fs-xs)/1 var(--font-mono);letter-spacing:.1em;color:var(--text-muted)}
+.rd-chead .rd-cn{color:var(--text-body);font-weight:var(--fw-bold)}
+.rd-chead .rd-csort{margin-left:auto;color:var(--text-dim);border:1px solid var(--border-control);
+  border-radius:var(--r-pill);padding:3px 9px}
+.rd-cmtstate{padding:24px 10px;text-align:center;color:var(--text-dim);
+  font:var(--fw-medium) var(--fs-sm)/1.55 var(--font-mono)}
+.rd-cmtstate.err{color:var(--text-muted)}
+.rd-oolink{display:inline-block;margin-top:8px;color:var(--accent);text-decoration:none;
+  font-weight:var(--fw-semibold)}
+
+.rd-cmt{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;
+  padding:var(--sp-3) 0 var(--sp-2);border-top:1px solid var(--border-hairline)}
+.rd-cmt.d1{margin-left:14px}.rd-cmt.d2{margin-left:28px}.rd-cmt.d3{margin-left:42px}
+.rd-cmt.d4{margin-left:56px}.rd-cmt.d5{margin-left:70px}.rd-cmt.d6{margin-left:84px}
+.rd-cmt.d1,.rd-cmt.d2,.rd-cmt.d3,.rd-cmt.d4,.rd-cmt.d5,.rd-cmt.d6{
+  border-top:none;border-left:2px solid var(--border);padding-left:10px}
+.rd-ctoggle{grid-row:1/span 2;align-self:start;width:18px;height:22px;display:inline-flex;
+  align-items:center;justify-content:center;background:none;border:none;cursor:pointer;
+  color:var(--text-dim);font:var(--fw-bold) .95rem/1 var(--font-mono)}
+.rd-ctoggle:hover{color:var(--accent)}
+.rd-cmain{min-width:0}
+.rd-cby{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:3px;
+  font:var(--fw-regular) var(--fs-xs)/1 var(--font-mono);color:var(--text-dim)}
+.rd-cby .rd-au{color:var(--text-muted);font-weight:var(--fw-medium)}
+.rd-cby .rd-op{color:var(--accent-ink);background:var(--accent);border-radius:var(--r-sm);
+  padding:1px 5px;font-size:.62rem;font-weight:var(--fw-bold);letter-spacing:.02em}
+.rd-cby .rd-cscore{color:var(--text-dim);font-variant-numeric:tabular-nums}
+.rd-cby .rd-hidden{color:var(--accent)}
+.rd-ctext{font:var(--fw-regular) var(--fs-sm)/1.55 var(--font-sans);color:var(--text-body);
+  overflow-wrap:anywhere;white-space:pre-wrap}
+.rd-cmt.collapsed .rd-cmain{opacity:.82}
+
+/* ---- foot triage (clears the Pixel 6 gesture bar via safe-area inset) ---- */
+.rd-foot{flex:none;display:flex;gap:8px;padding:var(--sp-3) var(--sp-3);
+  border-top:1px solid var(--border-hairline);background:var(--surface-card);
+  padding-bottom:calc(var(--sp-3) + env(safe-area-inset-bottom))}
+.rd-act{flex:1;min-height:var(--touch-min);display:inline-flex;align-items:center;justify-content:center;
+  gap:7px;border-radius:var(--r-md);cursor:pointer;
+  font:var(--fw-semibold) var(--fs-sm)/1 var(--font-sans);
+  border:1px solid var(--border-control);background:transparent;color:var(--text-muted);
+  transition:transform var(--dur-fast) var(--ease)}
+.rd-act svg{width:18px;height:18px}
+.rd-act.a{color:var(--archive);border-color:var(--archive);background:var(--archive-tint)}
+.rd-act.d{color:var(--done);border-color:var(--done);background:var(--done-tint)}
+.rd-act.k{color:var(--keep);border-color:var(--keep)}   /* no fill — Keep stays deliberate */
+.rd-act:active{transform:scale(.98)}
+.rd-act:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}

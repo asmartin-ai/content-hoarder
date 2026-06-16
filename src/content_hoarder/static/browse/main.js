@@ -10,6 +10,7 @@ import { createLightbox, imageUrl, mediaType, redditUrl } from "../core/media.js
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
+import { initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
 import { initOperators } from "./operators.js";
 
@@ -170,6 +171,10 @@ async function act(fullname, status) {
   });
 }
 
+/* the in-app Reddit reader — replaces the external Firefox/Relay handoff for
+   reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
+const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets });
+
 /* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
   const actBtn = e.target.closest(".act");
@@ -189,6 +194,17 @@ itemsEl.addEventListener("click", (e) => {
       return;
     }
     openMediaFor(item);
+    return;
+  }
+  // reddit items: tapping the title link or body text opens the in-app reader.
+  // A title link's parent is an <h3> (every density); meta links (r/subreddit) sit
+  // in .meta, so they keep their external navigation.
+  const rItem = state.items.find((it) => it.fullname === fn);
+  if (rItem && rItem.source === "reddit") {
+    const a = e.target.closest("a");
+    const onTitle = a && a.parentElement && a.parentElement.tagName === "H3";
+    const onText = !a && e.target.closest(".title, .snippet, .pin h3");
+    if (onTitle || onText) { e.preventDefault(); readerUI.open(rItem); }
   }
 });
 
