@@ -50,6 +50,12 @@ def test_parse_redirect_error_param_raises():
         reddit_oauth.parse_redirect("x://y?error=access_denied&state=ST", expected_state="ST")
 
 
+def test_parse_redirect_rejects_urlish_without_code():
+    # a mis-pasted URL with no code must fail early, not get sent verbatim as the "code"
+    with pytest.raises(reddit_oauth.RedditOAuthError):
+        reddit_oauth.parse_redirect("https://www.example.com/oops", expected_state="ST")
+
+
 # ---------- token exchange / refresh (injected post) ----------
 
 def _post_returning(resp):
