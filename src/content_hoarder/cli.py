@@ -851,6 +851,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "--live --yes, but ONLY when unsave-on-done is enabled — that opt-in + the "
                          "cap + the audit log is the consent. Use this for scheduled runs, not the "
                          "big-blast bulk `--drain --live --yes`.")
+    pu.add_argument("--status", action="store_true",
+                    help="Print status (configured? enabled? pending/failed counts) — also the "
+                         "default when no flag is given.")
     pu.add_argument("--enqueue-existing", action="store_true",
                     help="One-time backfill: queue all reddit items already marked 'done'.")
     pu.add_argument("--limit", type=int, default=None, help="Max items to unsave this drain run.")
