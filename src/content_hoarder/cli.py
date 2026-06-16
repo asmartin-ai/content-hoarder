@@ -472,7 +472,10 @@ def cmd_reddit_oauth(args) -> int:
             return 2
         state = reddit_oauth.new_state()
         url = reddit_oauth.build_authorize_url(state=state)
-        print("Reddit read-only OAuth — one-time setup:\n")
+        print("Reddit OAuth — one-time setup:\n")
+        print("   (The consent screen will request read + history + identity + save permissions —")
+        print("    that's RedReader's standard scope set. Reads work immediately; save/unsave stays")
+        print("    dormant until you enable it, and bulk unsave needs an explicit --live --yes.)\n")
         print("1) Open this URL in your browser and click 'Allow':\n")
         print("   " + url + "\n")
         print("2) The browser then redirects to a 'redreader://rr_oauth_redir?...' URL it CANNOT")
@@ -497,8 +500,9 @@ def cmd_reddit_oauth(args) -> int:
             print(f"network error talking to Reddit: {exc}", file=sys.stderr)
             return 1
         who = f" as u/{username}" if username else ""
-        print(f"\nOAuth configured{who}. Hydration now uses the sanctioned read-only OAuth "
-              f"transport (the cookie stays as a fallback).")
+        print(f"\nOAuth configured{who}. Hydration now uses the sanctioned OAuth transport "
+              f"(the cookie stays as a fallback). The grant also carries history + save scopes "
+              f"for the saved-list sync and unsave writes (activated separately).")
         return 0
 
 
@@ -801,8 +805,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     po = sub.add_parser(
         "reddit-oauth",
-        help="Set up / inspect the sanctioned read-only Reddit OAuth transport (installed-app, "
-             "no client secret). No args = status; --login authorizes (one-time, interactive).")
+        help="Set up / inspect the sanctioned Reddit OAuth transport (installed-app, no client "
+             "secret; read + history + identity + save scopes). No args = status; --login "
+             "authorizes (one-time, interactive).")
     po.add_argument("--login", action="store_true",
                     help="Interactive one-time authorization: prints an authorize URL, then takes "
                          "the redirected URL/code. Needs REDDIT_OAUTH_CLIENT_ID set.")

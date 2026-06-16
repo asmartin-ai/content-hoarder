@@ -1,9 +1,12 @@
-"""Reddit OAuth2 read-only transport (installed-app, no client secret).
+"""Reddit OAuth2 transport (installed-app, no client secret).
 
 The sanctioned + durable + lower-risk alternative to scripting a logged-in browser session
 (de-risking feature 5). Uses an *installed app* client id — a PUBLIC id such as RedReader's,
-configured via ``REDDIT_OAUTH_CLIENT_ID`` — with the read-only ``read`` scope and a permanent
-refresh token. There is **no client secret**.
+configured via ``REDDIT_OAUTH_CLIENT_ID`` — and a permanent refresh token. There is **no client
+secret**. The grant requests RedReader's scope set (``read history identity save``): ``read`` for
+hydration, ``history`` for the saved-list sync, ``identity`` for the compliant-UA username, and
+``save`` for unsave writes. NOTE: this module's live transport is GET-only (``oauth_get``) until
+the write path lands; ``save`` is granted ahead of it so re-authorization isn't needed twice.
 
 One-time setup (interactive, via ``reddit-oauth --login``): we print an authorize URL; the user
 approves it in a browser; Reddit redirects to the app's registered redirect URI (which a local
@@ -35,7 +38,10 @@ ACCESS_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"  # noqa: S105 (p
 OAUTH_API_BASE = "https://oauth.reddit.com"
 ME_URL = OAUTH_API_BASE + "/api/v1/me"
 DEFAULT_REDIRECT_URI = "redreader://rr_oauth_redir"  # RedReader's registered installed-app URI
-SCOPE = "read"
+# RedReader's installed-app grant: read=hydration, history=saved-list sync, identity=UA
+# username, save=unsave writes. Reddit grants scopes per-authorize-request (not per app), so
+# the public client id can request all four. Widen here = one re-login covers every OAuth feature.
+SCOPE = "read history identity save"
 
 _SERVICE = "reddit_oauth"
 _ACCESS_TTL = 3600    # Reddit access tokens live ~1h
@@ -306,7 +312,7 @@ def login(conn, redirect_response: str, *, expected_state: str, post=None, getf=
     access = tok.get("access_token")
     if not refresh or not access:
         raise RedditOAuthError(
-            "token response missing a refresh/access token — request duration=permanent + scope=read.")
+            "token response missing a refresh/access token — request duration=permanent + a non-empty scope.")
     username = _fetch_username(access, getf=getf)
     _store(conn, refresh_token=refresh, access_token=access, username=username, now=now)
     return username or ""
