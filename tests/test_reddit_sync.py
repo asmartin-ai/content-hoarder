@@ -158,6 +158,33 @@ def test_sync_learns_username_from_me(conn):
     assert res["username"] == "bob" and res["new"] == 1
 
 
+def test_sync_prefers_oauth_when_configured(conn, monkeypatch):
+    """With OAuth configured and no injected cookie getf, the sync hits oauth.reddit.com with a
+    bearer token + compliant UA and addresses /user/<me>/saved — mirroring hydrate_one's selection."""
+    from content_hoarder import reddit_oauth
+    reddit_oauth._store(conn, refresh_token="RT", access_token="AT", username="alice")
+    captured = {}
+
+    def fake_oauth_get(url, *, bearer, user_agent):
+        captured.update(url=url, bearer=bearer, ua=user_agent)
+        return {"data": {"children": [child("t3_a"), child("t3_b")], "after": None}}
+
+    monkeypatch.setattr(reddit_oauth, "oauth_get", fake_oauth_get)
+    res = reddit_sync.sync_saved(conn)                 # getf=None -> OAuth path
+    assert res["transport"] == "oauth" and res["new"] == 2 and res["username"] == "alice"
+    assert captured["url"].startswith("https://oauth.reddit.com/user/alice/saved")
+    assert captured["bearer"] == "AT"
+    assert captured["ua"].startswith("windows:content-hoarder:")     # compliant OAuth UA
+
+
+def test_sync_cookie_transport_labeled(conn):
+    """An injected getf keeps the cookie path (transport='cookie') — the OAuth selector is bypassed."""
+    _auth(conn)
+    res = reddit_sync.sync_saved(
+        conn, getf=make_getf([([child("t3_a")], None)]), user_agent="ua")
+    assert res["transport"] == "cookie" and res["new"] == 1
+
+
 def test_sync_network_error_keeps_mark(conn):
     """A transport failure must not read as 'cookie expired' and must not move the mark."""
     _auth(conn)
