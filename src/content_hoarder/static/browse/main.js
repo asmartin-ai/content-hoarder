@@ -20,6 +20,7 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const state = {
   status: "inbox",
   source: "",
+  category: "",
   tags: [],
   q: "",
   exact: false,
@@ -42,6 +43,17 @@ const FOCUS_BATCH = 25;
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
 
+/* ---- mobile "Jump" drawer state (the phone expression of the .rail) ---- */
+const drawer = $("#navdrawer");
+let facets = { sources: [], categories: [], tags: [] };
+let navFilter = "";
+let managing = false;
+const loadJSON = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? f; } catch (e) { return f; } };
+const saveSet = (k, s) => { try { localStorage.setItem(k, JSON.stringify([...s])); } catch (e) {} };
+const pins = new Set(loadJSON("chDrawerPins", []));
+const hiddenGroups = new Set(loadJSON("chDrawerHidden", []));
+const collapsed = new Set(loadJSON("chDrawerCollapsed", []));
+
 const COPY = {
   keep: "Kept — filed, worth revisiting.",
   archived: "Archived — set aside, out of the way.",
@@ -54,6 +66,7 @@ function params(extra) {
   const p = { sort: state.sort.split(":")[0], order: state.sort.split(":")[1], ...extra };
   if (state.status) p.status = state.status;
   if (state.source) p.source = state.source;
+  if (state.category) p.category = state.category;
   if (state.q) p.q = state.q;
   if (state.exact) p.exact = "1";
   if (state.safe) p.safe = "1";
@@ -407,11 +420,11 @@ $("#dice").addEventListener("click", surprise);
 
 /* ---- tabs / rail / chips (locked #2/#7) ---- */
 function paintTabs() {
-  $$(".folder, .spill:not(.tagsbtn)").forEach((t) => {
+  $$(".folder, .spill").forEach((t) => {
     t.setAttribute("aria-selected", String((t.dataset.status ?? "") === state.status));
   });
 }
-$$(".folder, .spill:not(.tagsbtn)").forEach((t) => t.addEventListener("click", () => {
+$$(".folder, .spill").forEach((t) => t.addEventListener("click", () => {
   if (t.dataset.status === undefined) return;
   state.status = t.dataset.status;
   paintTabs(); refreshRail(); loadItems(true); loadCounts();
@@ -439,23 +452,28 @@ function railBtn(label, value, count, kind, color) {
 }
 async function refreshRail() {
   try {
-    const [src, tags] = await Promise.all([
+    const qs = new URLSearchParams(state.status ? { status: state.status } : {}).toString();
+    const [src, cats, tags] = await Promise.all([
       api.fetchSources(state.status || undefined),
-      api.getJSON("/tags?" + new URLSearchParams(state.status ? { status: state.status } : {})),
+      api.getJSON("/categories?" + qs),
+      api.getJSON("/tags?" + qs),
     ]);
-    $("#rail-sources").innerHTML = src.sources.map((s) =>
+    // one fetch fills BOTH the desktop rail and the mobile drawer (shared facet data)
+    facets.sources = src.sources || [];
+    facets.categories = cats.categories || [];
+    facets.tags = Object.entries(tags.tags || {}).map(([id, count]) => ({ id, label: id, count }));
+    state.curated = new Set(facets.tags.map((t) => t.id));
+    $("#rail-sources").innerHTML = facets.sources.map((s) =>
       railBtn(s.label, s.id, s.count, "source", s.badge_color)).join("");
-    const entries = Object.entries(tags.tags || {});
-    state.curated = new Set(entries.map(([t]) => t));
-    $("#rail-tags").innerHTML = entries.slice(0, 12).map(([t, n]) =>
-      railBtn(t, t, n, "tag")).join("");
-    $("#tagsheet-list").innerHTML = entries.map(([t, n]) =>
-      '<button type="button" class="tag-chip" data-tag="' + esc(t) + '">' + esc(t) + " · " + n + "</button>").join("");
+    $("#rail-tags").innerHTML = facets.tags.slice(0, 12).map((t) =>
+      railBtn(t.label, t.id, t.count, "tag")).join("");
+    renderDrawer();
   } catch (e) { /* rail is navigation sugar */ }
 }
 document.addEventListener("click", (e) => {
   const r = e.target.closest("[data-source], [data-tag]");
-  if (!r || e.target.closest("#fchips")) return;
+  // the drawer owns its own rows (and the category facet) — see the #navdrawer handler
+  if (!r || e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
   if (r.dataset.source !== undefined) {
     state.source = state.source === r.dataset.source ? "" : r.dataset.source;
   } else if (r.dataset.tag !== undefined) {
@@ -467,9 +485,10 @@ document.addEventListener("click", (e) => {
 });
 function paintChips() {
   const chips = [];
-  if (state.source) chips.push(["source", "source:" + state.source]);
-  state.tags.forEach((t) => chips.push(["tag:" + t, "tag:" + t]));
-  $("#fchips").innerHTML = chips.map(([, label]) =>
+  if (state.source) chips.push("source:" + state.source);
+  if (state.category) chips.push("category:" + state.category);
+  state.tags.forEach((t) => chips.push("tag:" + t));
+  $("#fchips").innerHTML = chips.map((label) =>
     '<button type="button" class="fchip" data-chip="' + esc(label) + '">' + esc(label) +
     '<span class="x">✕</span></button>').join("") +
     (chips.length > 1 ? '<button type="button" class="fclear">clear all</button>' : "");
@@ -479,9 +498,10 @@ $("#fchips").addEventListener("click", (e) => {
   if (chip) {
     const v = chip.dataset.chip;
     if (v.startsWith("source:")) state.source = "";
+    else if (v.startsWith("category:")) state.category = "";
     else { const t = v.slice(4); const i = state.tags.indexOf(t); if (i >= 0) state.tags.splice(i, 1); }
   } else if (e.target.closest(".fclear")) {
-    state.source = ""; state.tags = [];
+    state.source = ""; state.category = ""; state.tags = [];
   } else return;
   paintChips(); refreshRail(); loadItems(true);
 });
@@ -502,10 +522,8 @@ const runSearch = debounce(() => {
 }, 300);
 qInput.addEventListener("input", runSearch);
 initOperators(qInput, $("#oppop"), {
-  // tag values come from the curated tag-sheet already loaded client-side (full list)
-  getDyn: (which) => which === "tags"
-    ? [...document.querySelectorAll("#tagsheet-list [data-tag]")].map((b) => b.dataset.tag)
-    : [],
+  // tag values come from the shared drawer/rail facet data (full curated list)
+  getDyn: (which) => which === "tags" ? facets.tags.map((t) => t.id) : [],
   onApply: () => { state.q = qInput.value.trim(); loadItems(true); },
 });
 $("#exact").addEventListener("change", (e) => { state.exact = e.target.checked; loadItems(true); });
@@ -557,7 +575,8 @@ document.addEventListener("keydown", (e) => {
 const scrim = $("#scrim");
 function openPanel(id) { closeSheets(); $(id).classList.add("show"); scrim.classList.add("show"); }
 function closeSheets() {
-  ["#settings", "#tagsheet", "#kbd", "#statsheet"].forEach((s) => $(s).classList.remove("show"));
+  ["#settings", "#navdrawer", "#kbd", "#statsheet"].forEach((s) => $(s).classList.remove("show"));
+  if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
 }
 function toggleKbd() {
@@ -568,7 +587,172 @@ function toggleKbd() {
 scrim.addEventListener("click", closeSheets);
 $("#open-settings").addEventListener("click", () => openPanel("#settings"));
 $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
-$("#open-tags-phone").addEventListener("click", () => openPanel("#tagsheet"));
+
+/* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
+   The phone expression of the desktop .rail. Rows render from the SAME facet data
+   refreshRail() fetches (sources/categories/tags); selecting a row drives the same
+   state.source/category/tags filter + #fchips chips the rail/desktop already use.
+   Deferred to a later tier: the per-row ⋮ action sheet (Mute/Rename need backend
+   endpoints that don't exist yet) and a standalone "+ New tag" (tags attach to items,
+   there's no standalone-tag create flow). The star (pin) + ⚙ (sections) cover the
+   locked Tier-1 affordances today. */
+const GROUPS = [
+  { id: "sources", label: "SOURCES", kind: "source" },
+  { id: "categories", label: "CATEGORIES", kind: "category" },
+  { id: "tags", label: "TAGS", kind: "tag" },
+];
+const titleCase = (s) => s.charAt(0) + s.slice(1).toLowerCase();
+function siCount(n) {
+  n = +n || 0;
+  if (n < 1000) return String(n);
+  const unit = n < 1e6 ? "k" : "m";
+  const v = n / (n < 1e6 ? 1000 : 1e6);
+  return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.round(v))) + unit;
+}
+function facetRows(kind) {
+  if (kind === "source")
+    return facets.sources.map((s) => ({ kind, value: s.id, label: s.label, count: s.count, color: s.badge_color }));
+  if (kind === "category")
+    return facets.categories.map((c) => ({ kind, value: c.id, label: c.label, count: c.count }));
+  return facets.tags.map((t) => ({ kind, value: t.id, label: t.label, count: t.count }));
+}
+const pinKey = (r) => r.kind + ":" + r.value;
+function isActive(r) {
+  return r.kind === "source" ? state.source === r.value
+    : r.kind === "category" ? state.category === r.value
+    : state.tags.includes(r.value);
+}
+function highlight(label, q) {
+  const i = label.toLowerCase().indexOf(q);
+  if (i < 0) return esc(label);
+  return esc(label.slice(0, i)) + "<mark>" + esc(label.slice(i, i + q.length)) +
+    "</mark>" + esc(label.slice(i + q.length));
+}
+function rowHtml(r) {
+  const pinned = pins.has(pinKey(r));
+  const q = navFilter.trim().toLowerCase();
+  const mark = r.kind === "tag"
+    ? '<span class="jmark tag" aria-hidden="true">#</span>'
+    : '<span class="jmark ' + (r.kind === "category" ? "cat" : "") + '"' +
+      (r.color ? ' style="--src:' + r.color + '"' : "") + ' aria-hidden="true"></span>';
+  return '<div class="jrow" role="button" tabindex="0" data-' + r.kind + '="' + esc(r.value) + '"' +
+    ' aria-pressed="' + isActive(r) + '" aria-label="' + esc(r.label) + '">' + mark +
+    '<span class="jlabel">' + (q ? highlight(r.label, q) : esc(r.label)) + "</span>" +
+    '<span class="jcount" title="' + r.count + '">' + siCount(r.count) + "</span>" +
+    '<button type="button" class="jstar' + (pinned ? " on" : "") + '" data-pin="' + esc(pinKey(r)) + '"' +
+    ' aria-pressed="' + pinned + '" aria-label="' + (pinned ? "Unpin " : "Pin ") + esc(r.label) + '">' +
+    (pinned ? "★" : "☆") + "</button></div>";
+}
+function groupHtml(id, label, rows) {
+  const col = collapsed.has(id);
+  return '<div class="nd-group' + (col ? " collapsed" : "") + '" data-group="' + id + '">' +
+    '<button type="button" class="nd-ghead" aria-expanded="' + !col + '">' +
+    '<span class="nd-glabel">' + label + "</span>" +
+    '<span class="nd-gcount">' + rows.length + "</span>" +
+    '<span class="nd-chev" aria-hidden="true">▸</span></button>' +
+    '<div class="nd-rows">' + rows.map(rowHtml).join("") + "</div></div>";
+}
+function renderDrawer() {
+  if (!drawer) return;
+  const q = navFilter.trim().toLowerCase();
+  const match = (r) => !q || r.label.toLowerCase().includes(q);
+  const byKey = new Map([].concat(facetRows("source"), facetRows("category"), facetRows("tag"))
+    .map((r) => [pinKey(r), r]));
+  const pinnedRows = [...pins].map((k) => byKey.get(k)).filter(Boolean).filter(match);
+
+  let groups = "";
+  if (pinnedRows.length) groups += groupHtml("pinned", "PINNED", pinnedRows);
+  for (const g of GROUPS) {
+    if (hiddenGroups.has(g.id)) continue;
+    const rows = facetRows(g.kind).filter(match);
+    if (rows.length) groups += groupHtml(g.id, g.label, rows);
+  }
+  const manage = managing
+    ? '<div class="nd-managebar"><span class="nd-mlab">SHOW SECTIONS</span>' +
+      GROUPS.map((g) => '<button type="button" class="nd-mtoggle" data-section="' + g.id + '"' +
+        ' aria-pressed="' + !hiddenGroups.has(g.id) + '">' + titleCase(g.label) + "</button>").join("") +
+      "</div>"
+    : "";
+  const empty = '<div class="nd-empty">' +
+    (q ? "no matches for “" + esc(navFilter.trim()) + "”" : "nothing to jump to yet") + "</div>";
+  $("#nav-list").innerHTML = manage + (groups || empty);
+}
+function selectFacet(kind, value) {
+  if (kind === "source") state.source = state.source === value ? "" : value;
+  else if (kind === "category") state.category = state.category === value ? "" : value;
+  else { const i = state.tags.indexOf(value); if (i >= 0) state.tags.splice(i, 1); else state.tags.push(value); }
+  paintChips(); refreshRail(); loadItems(true);
+  closeSheets();
+}
+function openDrawer() {
+  closeSheets();
+  navFilter = ""; const f = $("#nav-filter"); if (f) f.value = "";
+  managing = false; $("#nav-manage").setAttribute("aria-pressed", "false");
+  renderDrawer();
+  drawer.classList.add("show"); scrim.classList.add("show");
+  drawer.setAttribute("aria-hidden", "false");
+  setTimeout(() => { const fi = $("#nav-filter"); if (fi) fi.focus(); }, 60);
+}
+$("#open-nav").addEventListener("click", openDrawer);
+$("#nav-close").addEventListener("click", closeSheets);
+$("#nav-filter").addEventListener("input", (e) => { navFilter = e.target.value; renderDrawer(); });
+$("#nav-manage").addEventListener("click", () => {
+  managing = !managing;
+  $("#nav-manage").setAttribute("aria-pressed", String(managing));
+  renderDrawer();
+});
+drawer.addEventListener("click", (e) => {
+  // The drawer owns every click inside it. stopPropagation BEFORE any renderDrawer()
+  // re-render: re-rendering detaches the clicked node mid-event, which would otherwise
+  // bubble to the document rail handler and misfire (its #navdrawer guard sees an
+  // orphaned node and fails). Stopping here keeps drawer clicks out of that handler.
+  const ghead = e.target.closest(".nd-ghead");
+  if (ghead) {
+    e.stopPropagation();
+    const g = ghead.closest(".nd-group").dataset.group;
+    collapsed.has(g) ? collapsed.delete(g) : collapsed.add(g);
+    saveSet("chDrawerCollapsed", collapsed); renderDrawer(); return;
+  }
+  const star = e.target.closest(".jstar");
+  if (star) {
+    e.stopPropagation();
+    const k = star.dataset.pin;
+    pins.has(k) ? pins.delete(k) : pins.add(k);
+    saveSet("chDrawerPins", pins); renderDrawer();
+    toast(pins.has(k) ? "Pinned." : "Unpinned."); return;
+  }
+  const mtoggle = e.target.closest(".nd-mtoggle");
+  if (mtoggle) {
+    e.stopPropagation();
+    const s = mtoggle.dataset.section;
+    hiddenGroups.has(s) ? hiddenGroups.delete(s) : hiddenGroups.add(s);
+    saveSet("chDrawerHidden", hiddenGroups); renderDrawer(); return;
+  }
+  const row = e.target.closest(".jrow");
+  if (row) {
+    e.stopPropagation();
+    const kind = row.dataset.source !== undefined ? "source"
+      : row.dataset.category !== undefined ? "category" : "tag";
+    selectFacet(kind, row.dataset[kind]);
+  }
+});
+drawer.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const row = e.target.closest(".jrow");
+  if (row && e.target === row) { e.preventDefault(); row.click(); }
+});
+
+/* left edge-swipe opens the drawer (mobile only — desktop uses the rail) */
+let edgeX = null;
+const isPhone = () => window.matchMedia("(max-width:700px)").matches;
+document.addEventListener("touchstart", (e) => {
+  edgeX = (!drawer.classList.contains("show") && e.touches[0].clientX <= 22) ? e.touches[0].clientX : null;
+}, { passive: true });
+document.addEventListener("touchmove", (e) => {
+  if (edgeX == null) return;
+  if (e.touches[0].clientX - edgeX > 40) { edgeX = null; if (isPhone()) openDrawer(); }
+}, { passive: true });
+document.addEventListener("touchend", () => { edgeX = null; }, { passive: true });
 
 /* Swipe-DOWN-to-dismiss for the mobile bottom sheets. Engages only at scroll-top with a
    downward drag, so it never fights the sheet's own scroll or its toggle buttons. The

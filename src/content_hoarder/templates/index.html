@@ -15,6 +15,8 @@
 
   <header class="console">
     <div class="con-row">
+      <button type="button" class="icon-btn nav-burger" id="open-nav"
+              aria-controls="navdrawer" aria-label="Jump to a source, category, or tag">&#9776;</button>
       <h1 class="brand"><span class="led"></span>content&#8209;hoarder</h1>
       <div class="cmd">
         <span class="prompt">/</span>
@@ -61,7 +63,6 @@
     <button class="spill" role="tab" data-status="done" aria-selected="false">Done
       <span class="n" data-count="done"></span></button>
     <button class="spill" role="tab" data-status="" aria-selected="false">All</button>
-    <button class="spill tagsbtn" id="open-tags-phone" type="button"># tags</button>
   </nav>
 
   <main class="desk">
@@ -195,9 +196,25 @@
     <div class="stats-list" id="stats-list">Loading&hellip;</div>
   </aside>
 
-  <aside class="sheetpanel" id="tagsheet" aria-label="Tags">
-    <h2>Tags</h2>
-    <div class="tagsheet-list" id="tagsheet-list"></div>
+  <!-- mobile "Jump" drawer — the phone expression of the desktop .rail.
+       Reuses the shared #scrim overlay; slides from the left. Sources/categories/
+       tags render from the same data that fills the rail (main.js refreshRail). -->
+  <aside class="navdrawer" id="navdrawer" aria-label="Jump to a source, category, or tag" aria-hidden="true">
+    <div class="nd-head">
+      <span class="led" aria-hidden="true"></span>
+      <h2>Jump to&hellip;</h2>
+      <button type="button" class="nd-x" id="nav-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="nd-search">
+      <span class="prompt" aria-hidden="true">/</span>
+      <input type="search" id="nav-filter" placeholder="filter sources &amp; tags&hellip;"
+             autocomplete="off" aria-label="Filter sources and tags">
+    </div>
+    <div class="nd-list" id="nav-list"><!-- groups rendered by main.js --></div>
+    <div class="nd-foot">
+      <button type="button" class="nd-manage" id="nav-manage" aria-pressed="false"
+              aria-label="Show or hide sections">&#9881; sections</button>
+    </div>
   </aside>
 
   <div class="kbd-sheet" id="kbd" role="dialog" aria-label="Keyboard shortcuts">
