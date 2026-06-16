@@ -249,6 +249,23 @@ false positives.*
   `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
+- [ ] **P3 — "Human-mimic" jitter for hydration pacing (learning experiment).** *(User idea
+  2026-06-16; explicitly a learning project — Kenja wants to build it himself.)* Replace/augment the
+  uniform `_http.jittered_throttle` (`base*(0.75+rng())` → uniform `[0.75,1.75]×base`) with a
+  human-shaped delay distribution. **Honest verdict — don't expect a real win:** it won't save speed
+  (real browse timing is heavy-tailed/log-normal and *slower* on average — it embeds read-pauses a bot
+  doesn't need; for raw speed just lower `--throttle`, OAuth has ~4× headroom under the 100 QPM budget),
+  and the anti-detection gain is marginal (uniform already kills the exact-interval fingerprint; Reddit
+  isn't distribution-profiling low-volume authenticated reads). The value is the *learning*, not the
+  outcome. **Seam:** `jittered_throttle` is one function, called in 3 places (`reddit_hydrate.hydrate_batch`,
+  `reddit_unsave.drain`, `reddit_sync.sync_saved_cookie`) as `sleep(_http.jittered_throttle(throttle))` —
+  swap it or make it pluggable; keep the `_http.MIN_THROTTLE` floor and add a cap so a sampled long pause
+  can't stall a batch. **Ladder:** (a) log-normal `base*random.lognormvariate(0,0.5)` clamped (~2 lines);
+  (b) two-state burst/pause Markov (short bursts + occasional long pause = the real browsing rhythm);
+  (c) empirical "copy me" — log real thread-open gaps from the `/reddit/items/<fn>/thread` route into a
+  small table, then sample at hydration time (caveat: truncate the long read-pauses so it stays
+  human-*shaped* without being bot-pointlessly slow). Builds on the shipped Reddit de-risking work
+  ([`docs/reddit-derisking.md`](docs/reddit-derisking.md) — all 7 features merged to main 2026-06-16).
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
