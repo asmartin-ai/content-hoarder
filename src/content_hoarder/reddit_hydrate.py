@@ -13,12 +13,14 @@ import json
 import os
 import re
 import time
+from urllib.parse import urlsplit
 
-from content_hoarder import config, db, models
+from content_hoarder import _http, config, db, models, reddit_oauth
 from content_hoarder.reddit_unsave import (
     RedditNetworkError,
     RedditNotFoundError,
     _http_get,
+    cookie_user_agent,
     get_auth,
 )
 from content_hoarder.archival.providers import _bare_id, _PLACEHOLDERS, default_providers
@@ -156,6 +158,17 @@ def backfill_titles_network(conn, *, providers=None, user_agent=None,
     return res
 
 
+def _permalink_path(permalink: str) -> str:
+    """The bare ``r/<sub>/comments/<id>/<slug>`` path of a permalink — host-stripped, no
+    surrounding slashes — so a transport can prefix it with either ``www.reddit.com`` (cookie)
+    or ``oauth.reddit.com`` (OAuth). Accepts both relative (``/r/...`` from cookie syncs) and
+    absolute (``https://www.reddit.com/r/...`` from the legacy bulk import) forms; the absolute
+    case is host-stripped so it never double-prefixes (``reddit.com/https://...`` -> 404)."""
+    if permalink.startswith(("http://", "https://")):
+        permalink = urlsplit(permalink).path
+    return permalink.strip("/")
+
+
 def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
     """Hydrate one saved Reddit item's full comment thread.
 
@@ -163,9 +176,7 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     the cases documented below (logged-out, transient network, malformed
     payload, etc.).
     """
-    user_agent = user_agent or config.get("USER_AGENT")
-    if getf is None:
-        getf = _http_get
+    user_agent = user_agent or cookie_user_agent()
 
     row = conn.execute(
         "SELECT source, metadata FROM items WHERE fullname=?", (fullname,)
@@ -177,23 +188,27 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     if row["source"] != "reddit" or not metadata.get("permalink"):
         return {"status": "no_permalink", "fullname": fullname}
 
-    auth = get_auth(conn)
-    if not auth:
-        return {"status": "auth_missing", "fullname": fullname}
-
-    # permalink may be relative ("/r/sub/comments/id/slug/") from cookie syncs OR an
-    # absolute URL ("https://www.reddit.com/r/sub/...") from the legacy bulk import.
-    # Handle both — otherwise the absolute case double-prefixes the domain
-    # ("https://www.reddit.com/https://www.reddit.com/...") and 404s.
-    permalink = metadata["permalink"]
-    if permalink.startswith(("http://", "https://")):
-        base = permalink
+    # Transport selection: prefer the sanctioned OAuth read path when it's configured (a refresh
+    # token exists) and the caller didn't inject its own getf; otherwise use the reddit_session
+    # cookie. OAuth ships DORMANT — is_configured stays False until a one-time `reddit-oauth
+    # login`, so until then this is the cookie path, byte-for-byte unchanged.
+    oauth_token = (reddit_oauth.access_token(conn)
+                   if (getf is None and reddit_oauth.is_configured(conn)) else None)
+    if oauth_token:
+        host, ua = "https://oauth.reddit.com", reddit_oauth.oauth_user_agent(conn)
     else:
-        base = "https://www.reddit.com/" + permalink.lstrip("/")
-    url = base.rstrip("/") + "/.json?raw_json=1"
+        auth = get_auth(conn)
+        if not auth:
+            return {"status": "auth_missing", "fullname": fullname}
+        host, ua = "https://www.reddit.com", user_agent
+
+    url = host + "/" + _permalink_path(metadata["permalink"]) + "/.json?raw_json=1"
 
     try:
-        data = getf(url, session_cookie=auth["session_cookie"], user_agent=user_agent)
+        if oauth_token:
+            data = reddit_oauth.oauth_get(url, bearer=oauth_token, user_agent=ua)
+        else:
+            data = (getf or _http_get)(url, session_cookie=auth["session_cookie"], user_agent=ua)
     except RedditNotFoundError:
         return hydrate_one_from_archive(conn, fullname, providers=providers, user_agent=user_agent)
     except RedditNetworkError as e:
@@ -548,18 +563,26 @@ def priority_unhydrated(conn, limit: int) -> list[tuple[str, str]]:
     return [(r["fullname"], r["permalink"]) for r in rows]
 
 
-def hydrate_batch(conn, *, limit: int = 100, throttle: float = 2.0,
+# Bulk cookie hydration is the bot-shaped pattern (volume + regular timing), so the default cap is
+# deliberately SMALL (de-risking feature 4): on-demand tap-to-hydrate is the norm, and any batch
+# stays behind the dry-run gate with a modest cap. Resumable, so a larger backfill is just re-runs.
+DEFAULT_BATCH_LIMIT = 25
+
+
+def hydrate_batch(conn, *, limit: int = DEFAULT_BATCH_LIMIT, throttle: float = 2.0,
                   dry_run: bool = False, getf=None, sleep=None, progress=None) -> dict:
     """Cookie-hydrate the prioritized unhydrated set, rate-limited and resumable.
 
     Each successful hydration commits immediately (``hydrate_one`` does), and hydrated
     items drop out of ``priority_unhydrated`` — so re-running simply continues where it
-    left off (no ledger needed). Courteous by default (``throttle`` s between requests)
-    and it STOPS on a dead cookie rather than hammering Reddit. ``dry_run`` lists the
-    scope without any network (honors the "approve the scope first" gate). All network
-    is injectable (``getf``/``sleep``) so tests are fully offline.
+    left off (no ledger needed). Paces with a *jittered* throttle (floored at the global
+    rate cap — no exact-interval fingerprint) and STOPS on a dead cookie rather than
+    hammering Reddit. ``dry_run`` lists the scope without any network (honors the "approve
+    the scope first" gate). All network is injectable (``getf``/``sleep``) so tests are
+    fully offline.
     """
     sleep = sleep or time.sleep
+    throttle = max(throttle, _http.MIN_THROTTLE)
     targets = priority_unhydrated(conn, limit)
     res: dict = {"eligible": len(targets), "hydrated": 0, "failed": 0,
                  "auth_error": False, "network_errors": 0, "dry_run": dry_run,
@@ -586,5 +609,5 @@ def hydrate_batch(conn, *, limit: int = 100, throttle: float = 2.0,
         if progress and (idx + 1) % 10 == 0:
             progress(f"hydrated {res['hydrated']}/{res['eligible']}…")
         if idx + 1 < len(targets):
-            sleep(throttle)
+            sleep(_http.jittered_throttle(throttle))
     return res

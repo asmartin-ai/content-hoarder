@@ -22,12 +22,13 @@ import json
 import time
 import urllib.parse
 
-from content_hoarder import config, db
+from content_hoarder import _http, db
 from content_hoarder.reddit_unsave import (
     RedditAuthError,
     RedditNetworkError,
     _http_get,
     _refresh_modhash,
+    cookie_user_agent,
     get_auth,
 )
 
@@ -73,7 +74,8 @@ def sync_saved_cookie(
     """
     getf = getf or _http_get
     sleep = sleep or time.sleep
-    user_agent = user_agent or config.get("USER_AGENT")
+    user_agent = user_agent or cookie_user_agent()
+    throttle = max(throttle, _http.MIN_THROTTLE)
     result = {"fetched": 0, "new": 0, "updated": 0, "pages": 0,
               "stopped": None, "auth_error": False, "network_error": False,
               "username": None}
@@ -113,7 +115,7 @@ def sync_saved_cookie(
 
     for page in range(max_pages):
         if page:
-            sleep(throttle)  # be polite between pages (skipped before the first)
+            sleep(_http.jittered_throttle(throttle))  # jittered politeness between pages
         params = {"limit": per_page, "raw_json": 1}
         if after:
             params["after"] = after

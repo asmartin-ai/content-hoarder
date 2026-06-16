@@ -42,12 +42,17 @@ class RedditNotFoundError(RedditNetworkError):
 # Live HTTP helpers (the defaults for the injectable post=/getf= params)
 # ---------------------------------------------------------------------------
 
-def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
+def _http_get(url: str, *, session_cookie: str, user_agent: str, sleep=time.sleep) -> dict:
     """GET `url` with the reddit_session cookie; parse JSON.
 
     Returns {} only for a genuine logged-out response (401/403) — the shape
     `_refresh_modhash` maps to RedditAuthError. Anything transient (timeouts, DNS,
-    429/5xx, an unparseable CDN error page) raises RedditNetworkError instead."""
+    429/5xx, an unparseable CDN error page) raises RedditNetworkError instead.
+
+    Honors a 429/5xx ``Retry-After`` and otherwise backs off with full jitter
+    (de-risking §B) for a few attempts before giving up — so hydration stops hammering a
+    rate-limited Reddit instead of treating the first 429 as a hard failure. ``sleep`` is
+    injectable so the backoff is testable offline."""
     try:
         _status, _headers, raw = _http.request(
             url,
@@ -58,6 +63,7 @@ def _http_get(url: str, *, session_cookie: str, user_agent: str) -> dict:
                 "User-Agent": user_agent,
             },
             timeout=20,
+            retries=4, backoff=1.0, jitter=True, sleep=sleep,
         )
     except _http.HttpError as e:
         if e.status in (401, 403):
@@ -141,10 +147,17 @@ def is_configured(conn) -> bool:
     return get_auth(conn) is not None
 
 
+def cookie_user_agent() -> str:
+    """User-Agent for the reddit_session-cookie transport: a real browser string
+    (``REDDIT_BROWSER_USER_AGENT``) so an authenticated session blends in, rather than the
+    generic script UA that still serves archives/youtube/karakeep. De-risking feature 3."""
+    return config.get("REDDIT_BROWSER_USER_AGENT")
+
+
 def login(conn, session_cookie: str, *, getf=None, user_agent: str | None = None) -> str:
     """Validate a reddit_session cookie via /api/me.json, store it, return the username.
     Raises RedditAuthError if the cookie is logged out or invalid."""
-    user_agent = user_agent or config.get("USER_AGENT")
+    user_agent = user_agent or cookie_user_agent()
     modhash, username = _refresh_modhash(session_cookie, user_agent=user_agent, getf=getf)
     set_auth(conn, session_cookie=session_cookie, modhash=modhash, username=username)
     return username
@@ -217,11 +230,18 @@ def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, mod
 
 def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.sleep,
           post=None, getf=None, user_agent: str | None = None, progress=None) -> dict:
-    """Unsave pending queue rows on Reddit (~1 req/sec). Refreshes the modhash once up front and
-    fails fast (auth_error, nothing sent) on a dead cookie. Returns a summary dict."""
+    """Unsave pending queue rows on Reddit. Refreshes the modhash once up front and fails fast
+    (auth_error, nothing sent) on a dead cookie. Returns a summary dict.
+
+    Elevated-risk path (de-risking feature 6): programmatic WRITES are what Reddit's automated
+    enforcement actually targets, so this is treated more cautiously than reads — it stays behind
+    the approve-scope gate (``reddit_unsave_on_done`` + the enqueue step), paces with a *jittered*
+    throttle floored at the global rate cap (no exact-interval fingerprint, never above ~100 QPM),
+    honors ``Retry-After``, and 403-halts. Keep drains modest rather than mass-draining in one run."""
     post = post or _http_post
     getf = getf or _http_get
-    user_agent = user_agent or config.get("USER_AGENT")
+    user_agent = user_agent or cookie_user_agent()
+    throttle = max(throttle, _http.MIN_THROTTLE)
     result = {"selected": 0, "unsaved": 0, "failed": 0, "auth_error": False,
               "network_error": False, "remaining": count_pending(conn)}
 
@@ -246,8 +266,8 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
     result["selected"] = len(rows)
 
     for i, row in enumerate(rows):
-        if i:  # throttle between requests; don't pre-sleep the first
-            sleep(throttle)
+        if i:  # jittered throttle between requests; don't pre-sleep the first
+            sleep(_http.jittered_throttle(throttle))
         fullname, reddit_id = row["fullname"], row["reddit_id"]
         try:
             ok, err = _send_with_retry(
@@ -284,7 +304,7 @@ def resave(conn, fullname: str, *, post=None, getf=None, user_agent: str | None 
     """Best-effort re-save (undo of a drained 'done'). Returns True if Reddit accepted the save."""
     post = post or _http_post
     getf = getf or _http_get
-    user_agent = user_agent or config.get("USER_AGENT")
+    user_agent = user_agent or cookie_user_agent()
     auth = get_auth(conn)
     if not auth:
         return False
