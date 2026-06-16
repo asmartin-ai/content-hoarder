@@ -147,7 +147,12 @@ def cmd_serve(args) -> int:
     host = args.host or config.host()
     port = args.port or config.port()
     print(f"Serving on http://{host}:{port}/  (Ctrl+C to stop)")
-    app.run(host=host, port=port, debug=False)
+    # threaded: the dev server is single-threaded by default, so one slow request
+    # (a live Reddit thread hydrate — a network round-trip to reddit.com) blocks ALL
+    # others, making the whole app feel wedged. Each request opens + closes its own
+    # SQLite connection within its own thread (db.connect via closing()), and WAL +
+    # busy_timeout handle concurrent read/write, so threading is safe here.
+    app.run(host=host, port=port, debug=False, threaded=True)
     return 0
 
 
