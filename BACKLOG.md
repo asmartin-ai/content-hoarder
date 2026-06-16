@@ -226,11 +226,13 @@ false positives.*
   reddit head-sniff so Keep Takeout dirs still dispatch to Keep — winner DeepSeek V4). 17 new tests.
 - [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
   groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
-- [~] **P3 — OAuth go-live.** **READ half SHIPPED via Epic 25 (F5), 2026-06-16:** live thread fetch over
-  `oauth.reddit.com` + bearer, preferred over the cookie when configured — using an installed-app
-  (RedReader) client id, so NO Reddit API key was needed. **Remaining:** OAuth-based saved-list **sync**
-  and **save/unsave writes** (both still on the cookie) — lower priority, since writes are the
-  elevated-risk path best kept rare. *(The old `feat/reddit-oauth` branch is gone.)*
+- [x] ~~**P3 — OAuth go-live.**~~ ✅ COMPLETE 2026-06-16 (PR #2). READ half shipped via Epic 25 (F5);
+  then the WRITE half: OAuth grant widened to the full RedReader scope set (`read history identity
+  save` — Reddit grants scopes per-authorize-request, so the public installed-app id needs no Reddit
+  API key); saved-list **sync** + **unsave/resave writes** routed through `oauth.reddit.com` (cookie
+  fallback); bulk drain money-action-gated (`--live --yes` + `data/unsave-audit.jsonl`); async unsave
+  **trickle** (in-app idle debounce + `reddit-unsave --trickle` for scheduled jobs). ⚠️ write path
+  offline-tested only — live-verify before relying.
 
 - [x] ~~**P3 — Reddit comments sort option in the inbox.**~~ Shipped (2026-06-12, trio batch 1,
   winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
