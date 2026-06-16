@@ -558,7 +558,7 @@ def create_app(db_path: str | None = None) -> Flask:
             max_pages = 50 if full else 3
         max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
-            res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages, stop_on_known=not full)
+            res = reddit_sync.sync_saved(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
 
     @app.get("/sources")

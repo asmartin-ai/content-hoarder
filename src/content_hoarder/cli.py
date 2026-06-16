@@ -404,7 +404,7 @@ def cmd_reddit_sync(args) -> int:
     from content_hoarder import reddit_sync
     max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
     with _connect() as conn:
-        res = reddit_sync.sync_saved_cookie(
+        res = reddit_sync.sync_saved(
             conn, max_pages=max_pages, stop_on_known=not args.full,
             progress=lambda m: print(m, file=sys.stderr),
         )
