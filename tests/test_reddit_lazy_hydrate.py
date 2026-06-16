@@ -4,7 +4,7 @@ import pytest
 
 from content_hoarder import db, models, web
 import content_hoarder.reddit_hydrate as rh
-from content_hoarder.reddit_unsave import set_auth
+from content_hoarder.reddit_unsave import RedditNotFoundError, set_auth
 
 _BLOB = [
     {"kind": "Listing", "data": {"children": [{"data": {"id": "h1", "title": "Post T"}}]}},
@@ -88,3 +88,52 @@ def test_thread_route_nofetch_skips_hydration(tmp_db):
         assert calls == []                       # no network call
     finally:
         rh._http_get = orig
+
+
+# --- Negative cache: a 404 + archive-miss is terminal; don't re-fetch every open ---
+
+
+class _MissProvider:
+    """Archive provider that finds nothing — drives the 404 -> archive-miss terminal failure."""
+
+    name = "miss"
+
+    def fetch_posts(self, ids):
+        return {}
+
+    def search_comments_tree(self, sid, limit=500):
+        return []
+
+
+def _getf_404(calls):
+    def getf(url, *, session_cookie, user_agent):
+        calls.append(url)
+        raise RedditNotFoundError("gone")
+    return getf
+
+
+def test_negative_cache_short_circuits_after_terminal_failure(conn):
+    _seed(conn)  # reddit:t3_h1 with a permalink
+    set_auth(conn, session_cookie="c", modhash="m")
+    calls = []
+    getf, miss = _getf_404(calls), [_MissProvider()]
+    r1 = rh.hydrate_if_missing(conn, "reddit:t3_h1", getf=getf, providers=miss, now=1000)
+    assert r1["status"] == "archived" and r1.get("cached_failure") is True
+    assert len(calls) == 1                        # one live fetch attempt, then archive miss
+    # reopen within the TTL -> short-circuit, no further network
+    r2 = rh.hydrate_if_missing(conn, "reddit:t3_h1", getf=getf, providers=miss, now=1100)
+    assert r2["status"] == "unavailable" and r2.get("cached_failure") is True
+    assert len(calls) == 1                        # getf NOT called again
+
+
+def test_negative_cache_retries_after_ttl(conn):
+    _seed(conn)
+    set_auth(conn, session_cookie="c", modhash="m")
+    calls = []
+    getf, miss = _getf_404(calls), [_MissProvider()]
+    rh.hydrate_if_missing(conn, "reddit:t3_h1", getf=getf, providers=miss, now=1000, ttl=100)
+    assert len(calls) == 1
+    rh.hydrate_if_missing(conn, "reddit:t3_h1", getf=getf, providers=miss, now=1050, ttl=100)
+    assert len(calls) == 1                        # within TTL -> no retry
+    rh.hydrate_if_missing(conn, "reddit:t3_h1", getf=getf, providers=miss, now=1200, ttl=100)
+    assert len(calls) == 2                        # past TTL -> one retry attempt

@@ -215,17 +215,60 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     return {"status": "hydrated", "fullname": fullname, "comments": comments}
 
 
-def hydrate_if_missing(conn, fullname, *, getf=None, user_agent=None, providers=None) -> dict:
+_HYDRATE_FAIL_TTL = 7 * 24 * 3600  # seconds; retry a terminally-failed hydration after a week
+
+
+def _hydrate_failed_at(conn, fullname):
+    """Epoch of the last terminal hydration failure stamped on this item, or None."""
+    row = conn.execute(
+        "SELECT CASE WHEN json_valid(metadata) "
+        "THEN json_extract(metadata, '$.hydrate_failed_at') END "
+        "FROM items WHERE fullname=?", (fullname,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _mark_hydrate_failed(conn, fullname, now):
+    """Stamp ``metadata.hydrate_failed_at`` via a targeted UPDATE. Deliberately NOT
+    ``db._update_metadata``: that helper also bumps ``last_seen_utc`` and rebuilds ``search_text``,
+    which is wrong here — a thread-open failure is not a re-ingest, and the marker isn't searchable."""
+    row = conn.execute("SELECT metadata FROM items WHERE fullname=?", (fullname,)).fetchone()
+    if row is None:
+        return
+    md = models.parse_metadata(row["metadata"])
+    md["hydrate_failed_at"] = now
+    conn.execute("UPDATE items SET metadata=? WHERE fullname=?",
+                 (json.dumps(md, ensure_ascii=False), fullname))
+    conn.commit()
+
+
+def hydrate_if_missing(conn, fullname, *, getf=None, user_agent=None, providers=None,
+                       now=None, ttl=_HYDRATE_FAIL_TTL) -> dict:
     """Lazy hydration: if this item has no cached comment thread yet, fetch + store it
     (cookie via :func:`hydrate_one`, with the PullPush/Arctic-Shift archive fallback), then
     report the outcome. Makes NO network call when a thread is already cached — returns
     ``{"status": "cached"}``. Meant to run on the first open of a Reddit item's thread so the
     tree is fetched on demand and served from cache forever after.
+
+    Negative cache: a live 404 whose archive lookup also misses is the one expensive outcome that
+    caches nothing (a live fetch plus BOTH archive providers), and it would otherwise re-run on
+    every open of a permanently-dead thread. On that terminal failure we stamp
+    ``metadata.hydrate_failed_at``; reopens within ``ttl`` short-circuit (``status='unavailable'``,
+    no network). After the TTL one retry is allowed, in case the archives have since backfilled.
     """
     existing = db.get_reddit_thread(conn, fullname)
     if existing and existing.get("thread_json"):
         return {"status": "cached", "fullname": fullname}
-    return hydrate_one(conn, fullname, getf=getf, user_agent=user_agent, providers=providers)
+    now = now if now is not None else int(time.time())
+    failed_at = _hydrate_failed_at(conn, fullname)
+    if failed_at is not None and now - failed_at < ttl:
+        return {"status": "unavailable", "fullname": fullname, "cached_failure": True}
+    res = hydrate_one(conn, fullname, getf=getf, user_agent=user_agent, providers=providers)
+    # The 404 -> archive-miss path is the only non-transient outcome that stores no thread.
+    if res.get("status") == "archived" and not (db.get_reddit_thread(conn, fullname) or {}).get("thread_json"):
+        _mark_hydrate_failed(conn, fullname, now)
+        res["cached_failure"] = True
+    return res
 
 
 # --- Offline local-archive hydration (BDFR JSON -> reddit_threads) --------------
