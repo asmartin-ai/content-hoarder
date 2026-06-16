@@ -196,6 +196,59 @@ def test_resave_auth_dead_returns_false(conn):
     assert ok is False
 
 
+# --- OAuth write transport (Phase 2: prefer the sanctioned save scope) -----
+
+def _configure_oauth(conn, username="me"):
+    from content_hoarder import reddit_oauth
+    reddit_oauth._store(conn, refresh_token="RT", access_token="AT", username=username)
+
+
+def test_drain_prefers_oauth_when_configured(conn, monkeypatch):
+    """With OAuth configured and NOTHING injected, the drain writes over oauth.reddit.com with a
+    bearer (no cookie, no modhash) and labels the transport — mirroring hydrate_one/sync_saved."""
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a", "t3_b")
+    _configure_oauth(conn)                              # note: NO cookie set
+    calls = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        calls.append((url, fields["id"], bearer))
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    res = ru.drain(conn, sleep=lambda s: None)          # no post=/getf= -> OAuth path
+    assert res["transport"] == "oauth" and res["unsaved"] == 2 and res["auth_error"] is False
+    assert calls == [(ru.OAUTH_UNSAVE_URL, "t3_a", "AT"), (ru.OAUTH_UNSAVE_URL, "t3_b", "AT")]
+    assert conn.execute("SELECT COUNT(*) FROM items WHERE is_saved=0").fetchone()[0] == 2
+
+
+def test_drain_injected_post_stays_cookie(conn):
+    """The cookie golden path is unchanged: an injected post forces transport='cookie' even if
+    OAuth happens to be configured."""
+    _seed_pending(conn, "t3_a")
+    _configure_oauth(conn)
+    ru.set_auth(conn, session_cookie="ck")
+    res = ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
+    assert res["transport"] == "cookie" and res["unsaved"] == 1
+
+
+def test_resave_prefers_oauth_when_configured(conn, monkeypatch):
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a")
+    _configure_oauth(conn)
+    posts = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        posts.append(url)
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    ru.drain(conn, sleep=lambda s: None)                # OAuth unsave -> done + is_saved=0
+    ok = ru.resave(conn, "reddit:t3_a")                 # OAuth re-save (undo)
+    assert ok is True and posts[-1] == ru.OAUTH_SAVE_URL
+    assert conn.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_a'").fetchone()[0] == 1
+
+
 # --- schema idempotency ----------------------------------------------------
 
 def test_enqueue_existing_done_backfill(conn):
