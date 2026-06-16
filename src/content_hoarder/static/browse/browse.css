@@ -112,7 +112,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
   font-variant-numeric:tabular-nums}
 .spill[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .spill[aria-selected="true"] .n{color:var(--accent-ink);opacity:.75}
-.spill.navbtn{border-style:dashed;color:var(--accent);gap:7px}
+/* the Jump drawer's trigger lives top-left in the header on mobile (desktop uses the rail) */
+.nav-burger{display:none}
 
 /* ===================== desk: rail + sheet ===================== */
 .desk{max-width:1100px;margin:0 auto var(--sp-5);padding:0 var(--sp-4);
@@ -604,6 +605,7 @@ kbd{font:var(--fw-bold) .7rem/1 var(--font-mono);background:var(--surface-inset)
   .wins{margin-left:auto}
   .btn-triage{display:none}     /* the dock FAB owns triage */
   #open-settings{display:none}  /* dock MORE owns settings */
+  .nav-burger{display:inline-flex}  /* top-left Jump trigger (mobile only) */
   .folders{display:none}
   .statuspills{display:flex}
   .dock{display:flex}
