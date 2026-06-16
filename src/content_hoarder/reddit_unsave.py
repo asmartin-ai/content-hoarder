@@ -256,10 +256,36 @@ def _oauth_write_transport(conn):
 # Drain (batch, throttled, resumable) + undo re-save
 # ---------------------------------------------------------------------------
 
+def _drain_plan(conn, limit: int | None = None) -> dict:
+    """The dry-run scope of an unsave drain (money-action-safety §1): which pending items WOULD be
+    unsaved, with per-subreddit counts + a sample. No network, no writes — this is the confirmation
+    surface the user reviews before passing --live --yes."""
+    sql = ("SELECT u.fullname, u.reddit_id, i.title, "
+           "json_extract(i.metadata, '$.subreddit') AS subreddit "
+           "FROM reddit_unsave u LEFT JOIN items i ON i.fullname = u.fullname "
+           "WHERE u.state='pending' ORDER BY u.enqueued_utc")
+    rows = (conn.execute(sql + " LIMIT ?", (limit,)) if limit else conn.execute(sql)).fetchall()
+    by_sub: dict = {}
+    for r in rows:
+        by_sub[r["subreddit"] or "?"] = by_sub.get(r["subreddit"] or "?", 0) + 1
+    return {
+        "dry_run": True,
+        "selected": len(rows),
+        "by_subreddit": dict(sorted(by_sub.items(), key=lambda kv: -kv[1])),
+        "sample": [{"fullname": r["fullname"], "subreddit": r["subreddit"],
+                    "title": (r["title"] or "")[:80]} for r in rows[:20]],
+    }
+
+
 def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.sleep,
-          post=None, getf=None, user_agent: str | None = None, progress=None) -> dict:
+          post=None, getf=None, user_agent: str | None = None, progress=None,
+          dry_run: bool = False, audit=None) -> dict:
     """Unsave pending queue rows on Reddit. Refreshes the modhash once up front and fails fast
     (auth_error, nothing sent) on a dead cookie. Returns a summary dict.
+
+    ``dry_run=True`` returns the scope plan (``_drain_plan``) with NO network/writes — the
+    money-action confirmation surface. ``audit`` (optional callable) is invoked with a record per
+    successful unsave (ts, fullname, reddit_id, transport) so every live write is reconstructable.
 
     Elevated-risk path (de-risking feature 6): programmatic WRITES are what Reddit's automated
     enforcement actually targets, so this is treated more cautiously than reads — it stays behind
@@ -273,6 +299,9 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
     throttle = max(throttle, _http.MIN_THROTTLE)
     result = {"selected": 0, "unsaved": 0, "failed": 0, "auth_error": False,
               "network_error": False, "transport": None, "remaining": count_pending(conn)}
+
+    if dry_run:                          # safe-by-default: list the scope, send nothing
+        return _drain_plan(conn, limit)
 
     oauth = None if injected else _oauth_write_transport(conn)
     if oauth:
@@ -325,6 +354,9 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
             conn.execute("UPDATE items SET is_saved=0 WHERE fullname=?", (fullname,))
             conn.commit()
             result["unsaved"] += 1
+            if audit:  # append-before-continue: every live write is reconstructable (safety §7)
+                audit({"ts": now, "fullname": fullname, "reddit_id": reddit_id,
+                       "transport": result["transport"]})
             if progress:
                 progress(f"unsaved {reddit_id}")
         else:

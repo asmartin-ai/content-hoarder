@@ -437,8 +437,30 @@ def cmd_reddit_unsave(args) -> int:
             print(f"queued {n} existing 'done' reddit item(s) for unsaving")
             return 0
         if args.drain:
-            res = ru.drain(conn, limit=args.limit, throttle=args.throttle,
+            # Money-action gate: execute ONLY with --live --yes (and not --dry-run). Anything else
+            # is a dry run that lists the scope and sends nothing — the confirmation surface.
+            execute = args.live and args.yes and not args.dry_run
+            if not execute:
+                plan = ru.drain(conn, limit=args.limit, dry_run=True)
+                print(json.dumps(plan, indent=2))
+                if args.live and not args.yes and not args.dry_run:
+                    print("\nrefusing: --live needs --yes too. The plan above is a DRY RUN — nothing "
+                          "was sent. Re-run with --live --yes to unsave for real.", file=sys.stderr)
+                    return 2
+                print(f"\n[dry run] {plan['selected']} item(s) would be unsaved from your REAL "
+                      f"Reddit Saved list (reversible via the undo/re-save). Re-run with "
+                      f"--live --yes to execute.", file=sys.stderr)
+                return 0
+            # --- live execution path ---
+            audit_path = Path(config.db_path()).with_name("unsave-audit.jsonl")
+
+            def _audit(rec):  # append each live unsave before the next one (reconstructable trail)
+                with audit_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+            res = ru.drain(conn, limit=args.limit, throttle=args.throttle, audit=_audit,
                            progress=lambda m: print(m, file=sys.stderr))
+            res["audit_log"] = str(audit_path)
             print(json.dumps(res, indent=2))
             # Non-zero for network errors too (scheduled-run visibility); the printed JSON
             # distinguishes auth_error (re-paste cookie) from network_error (retry later).
@@ -794,8 +816,15 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--enable", action="store_true", help="Turn unsave-on-done ON.")
     pu.add_argument("--disable", action="store_true", help="Turn unsave-on-done OFF.")
     pu.add_argument("--drain", action="store_true",
-                    help="Unsave queued items now (the scheduled job runs this). "
-                         "Exits non-zero if the cookie has expired.")
+                    help="Unsave queued items. SAFE BY DEFAULT: a bare --drain is a DRY RUN that "
+                         "lists the scope and sends nothing. Add --live --yes to execute (it "
+                         "MUTATES your real Reddit Saved list). Exits non-zero on an expired auth.")
+    pu.add_argument("--live", action="store_true",
+                    help="With --drain: actually send. Requires --yes too (--live alone refuses).")
+    pu.add_argument("--yes", action="store_true",
+                    help="With --drain --live: the explicit go-ahead to mutate Reddit.")
+    pu.add_argument("--dry-run", action="store_true",
+                    help="With --drain: force the dry-run plan even if --live/--yes are present.")
     pu.add_argument("--enqueue-existing", action="store_true",
                     help="One-time backfill: queue all reddit items already marked 'done'.")
     pu.add_argument("--limit", type=int, default=None, help="Max items to unsave this drain run.")
