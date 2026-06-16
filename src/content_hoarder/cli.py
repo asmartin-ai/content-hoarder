@@ -455,6 +455,47 @@ def cmd_reddit_unsave(args) -> int:
     return 0
 
 
+def cmd_reddit_oauth(args) -> int:
+    from content_hoarder import reddit_oauth
+    with _connect() as conn:
+        if args.logout:
+            reddit_oauth.clear(conn)
+            print("reddit OAuth tokens cleared.")
+            return 0
+        if not args.login:  # default: status
+            print(json.dumps(reddit_oauth.status(conn), indent=2))
+            return 0
+        # --login: interactive one-time authorization.
+        if not reddit_oauth.client_id():
+            print("error: set REDDIT_OAUTH_CLIENT_ID (.env or a user env var) first.",
+                  file=sys.stderr)
+            return 2
+        state = reddit_oauth.new_state()
+        url = reddit_oauth.build_authorize_url(state=state)
+        print("Reddit read-only OAuth — one-time setup:\n")
+        print("1) Open this URL in your browser and click 'Allow':\n")
+        print("   " + url + "\n")
+        print("2) The browser will try to open a 'redreader://…' URL it can't handle — that's")
+        print("   expected. Copy the FULL redirected URL from the address bar.\n")
+        try:
+            pasted = input("3) Paste it here (or just the code): ").strip()
+        except EOFError:
+            print("error: no input received.", file=sys.stderr)
+            return 2
+        try:
+            username = reddit_oauth.login(conn, pasted, expected_state=state)
+        except reddit_oauth.RedditOAuthError as exc:
+            print(f"OAuth failed: {exc}", file=sys.stderr)
+            return 1
+        except reddit_oauth.RedditNetworkError as exc:
+            print(f"network error talking to Reddit: {exc}", file=sys.stderr)
+            return 1
+        who = f" as u/{username}" if username else ""
+        print(f"\nOAuth configured{who}. Hydration now uses the sanctioned read-only OAuth "
+              f"transport (the cookie stays as a fallback).")
+        return 0
+
+
 def cmd_reddit_hydrate(args) -> int:
     from content_hoarder import reddit_hydrate
     with _connect() as conn:
@@ -463,7 +504,8 @@ def cmd_reddit_hydrate(args) -> int:
             # mirroring the hard-delete double-gate. --yes is the explicit go-ahead.
             scope_only = args.dry_run or not args.yes
             res = reddit_hydrate.hydrate_batch(
-                conn, limit=args.limit if args.limit is not None else 100,
+                conn,
+                limit=args.limit if args.limit is not None else reddit_hydrate.DEFAULT_BATCH_LIMIT,
                 throttle=args.throttle, dry_run=scope_only,
                 progress=lambda m: print(m, file=sys.stderr),
             )
@@ -750,6 +792,18 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--throttle", type=float, default=1.0,
                     help="Seconds between unsave requests (default 1.0).")
     pu.set_defaults(func=cmd_reddit_unsave)
+
+    po = sub.add_parser(
+        "reddit-oauth",
+        help="Set up / inspect the sanctioned read-only Reddit OAuth transport (installed-app, "
+             "no client secret). No args = status; --login authorizes (one-time, interactive).")
+    po.add_argument("--login", action="store_true",
+                    help="Interactive one-time authorization: prints an authorize URL, then takes "
+                         "the redirected URL/code. Needs REDDIT_OAUTH_CLIENT_ID set.")
+    po.add_argument("--logout", action="store_true", help="Clear the stored OAuth tokens.")
+    po.add_argument("--status", action="store_true",
+                    help="Print OAuth status (configured? username? — the default with no flag).")
+    po.set_defaults(func=cmd_reddit_oauth)
 
     return p
 

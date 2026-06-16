@@ -221,3 +221,63 @@ def test_request_4xx_other_than_429_not_retried(monkeypatch):
         _http.request("http://x", retries=5, sleep=lambda s: None)
     assert ei.value.status == 404
     assert len(calls) == 1        # 404 is terminal, no retry
+
+
+# --------------------------------------------------------------------------
+# jitter helpers (de-risking §A/§B) — pure, no network
+# --------------------------------------------------------------------------
+
+def test_full_jitter_delay_scales_and_caps():
+    # full jitter = rng() * min(cap, base * 2**attempt)
+    assert _http.full_jitter_delay(1.0, 0, rng=lambda: 0.5) == 0.5
+    assert _http.full_jitter_delay(1.0, 1, rng=lambda: 0.5) == 1.0
+    assert _http.full_jitter_delay(1.0, 3, rng=lambda: 1.0) == 8.0
+    assert _http.full_jitter_delay(1.0, 10, cap=60.0, rng=lambda: 1.0) == 60.0  # capped
+    assert _http.full_jitter_delay(1.0, 0, rng=lambda: 0.0) == 0.0
+
+
+def test_jittered_throttle_band():
+    # base*(0.75 + rng()) -> [0.75*base, 1.75*base)
+    assert _http.jittered_throttle(2.0, rng=lambda: 0.0) == 1.5
+    assert _http.jittered_throttle(2.0, rng=lambda: 0.5) == 2.5
+    assert _http.jittered_throttle(1.0, rng=lambda: 0.0) == 0.75
+    import random
+    random.seed(1)
+    for _ in range(50):                       # default rng stays in the documented band
+        assert 1.5 <= _http.jittered_throttle(2.0) < 3.5
+
+
+def test_request_jitter_backoff_when_no_retry_after(monkeypatch):
+    calls = _install_opener(monkeypatch, lambda req, n: _http_error(429))  # 429, no Retry-After
+    slept = []
+    with pytest.raises(_http.HttpError) as ei:
+        _http.request("http://x", retries=3, backoff=1.0, jitter=True,
+                      sleep=slept.append, rng=lambda: 0.5)
+    assert ei.value.status == 429
+    assert len(calls) == 4                    # initial + 3 retries
+    assert slept == [0.5, 1.0, 2.0]           # full jitter: 0.5*1, 0.5*2, 0.5*4
+
+
+def test_request_jitter_still_honors_retry_after(monkeypatch):
+    def fn(req, n):
+        if n == 0:
+            return _http_error(429, headers={"Retry-After": "5"})
+        return _FakeResp(status=200, body=b"ok")
+    _install_opener(monkeypatch, fn)
+    slept = []
+    status, _h, _raw = _http.request("http://x", retries=2, jitter=True,
+                                     sleep=slept.append, rng=lambda: 0.5)
+    assert status == 200
+    assert slept == [5.0]                      # Retry-After is authoritative, beats jitter
+
+
+def test_request_non_jitter_backoff_unchanged(monkeypatch):
+    # Regression guard: jitter defaults off -> exponential doubling, byte-identical to before.
+    def fn(req, n):
+        if n < 2:
+            return _http_error(503)
+        return _FakeResp(status=200, body=b"ok")
+    _install_opener(monkeypatch, fn)
+    slept = []
+    _http.request("http://x", retries=3, backoff=2.0, sleep=slept.append)
+    assert slept == [2.0, 4.0]

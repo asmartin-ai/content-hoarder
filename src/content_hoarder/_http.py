@@ -13,9 +13,17 @@ so it must not sit under ``archival/``.
 
 from __future__ import annotations
 
+import random
 import time
 import urllib.error
 import urllib.request
+
+_RETRY_JITTER_CAP = 60.0  # seconds; full-jitter backoff never waits longer than this
+
+# Global rate cap: never pace inter-request gaps faster than this, even if a caller passes a
+# tiny throttle. ~0.6s ≈ Reddit's authenticated 100 QPM budget; the real defaults (drain 1.0s,
+# hydrate 2.0s) sit far above it, so this only guards against misconfiguration.
+MIN_THROTTLE = 0.6
 
 
 class HttpError(Exception):
@@ -62,14 +70,34 @@ def retry_after_seconds(headers) -> float | None:
     return seconds if seconds >= 0 else None
 
 
+def full_jitter_delay(base: float, attempt: int, *, cap: float = _RETRY_JITTER_CAP,
+                      rng=random.random) -> float:
+    """AWS "full jitter" backoff: a uniform random wait in ``[0, min(cap, base * 2**attempt)]``.
+
+    Lowest upstream load / no thundering herd — we optimize for being polite to the server,
+    not for our own completion time. ``attempt`` is 0-based; ``rng`` (default
+    ``random.random``) is injectable so tests stay deterministic.
+    """
+    return rng() * min(cap, base * (2 ** attempt))
+
+
+def jittered_throttle(base: float, *, rng=random.random) -> float:
+    """A steady-state politeness delay jittered around ``base`` — uniform in
+    ``[0.75*base, 1.75*base)`` so no two successive gaps are identical (kills the
+    exact-interval bot fingerprint). For ``base=2.0`` this is the de-risking spec's
+    ``uniform(1.5, 3.5)``. ``rng`` injectable for deterministic tests.
+    """
+    return base * (0.75 + rng())
+
+
 def _opener():
     """Indirection seam so tests can monkeypatch the urlopen call without real network."""
     return urllib.request.urlopen
 
 
 def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
-            retries=0, backoff=2.0, sleep=time.sleep, user_agent=None
-            ) -> tuple[int, dict, bytes]:
+            retries=0, backoff=2.0, sleep=time.sleep, user_agent=None,
+            jitter=False, rng=random.random) -> tuple[int, dict, bytes]:
     """GET/POST ``url`` and return ``(status, headers_dict, raw_bytes)``.
 
     On success the status is ``resp.status`` (defaulting to 200), ``headers_dict`` is
@@ -78,9 +106,10 @@ def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
 
     Raises :class:`HttpError` on an HTTP error status, a URL/transport error, or a
     read timeout. When ``retries > 0``, a 429 or 5xx response is retried up to
-    ``retries`` extra times with a ``Retry-After``-aware exponential backoff (header
-    value if numeric, else ``backoff`` doubled each attempt); the final failure still
-    raises ``HttpError`` carrying the last status / Retry-After / headers.
+    ``retries`` extra times: a numeric ``Retry-After`` is always honored exactly;
+    otherwise the wait is ``backoff`` doubled each attempt, or — when ``jitter=True`` —
+    AWS full-jitter (:func:`full_jitter_delay`, the lower-load default). The final
+    failure still raises ``HttpError`` carrying the last status / Retry-After / headers.
     """
     req_headers = dict(headers or {})
     if user_agent is not None:
@@ -99,7 +128,12 @@ def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
             resp_headers = dict(e.headers or {})
             ra = retry_after_seconds(resp_headers)
             if attempt < retries and (e.code == 429 or 500 <= e.code < 600):
-                sleep(ra if ra is not None else delay)
+                if ra is not None:
+                    sleep(ra)                                   # authoritative — honor exactly
+                elif jitter:
+                    sleep(full_jitter_delay(backoff, attempt, rng=rng))
+                else:
+                    sleep(delay)
                 delay *= 2
                 continue
             raise HttpError(
