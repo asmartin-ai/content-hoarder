@@ -9,6 +9,28 @@ from pathlib import Path
 
 from content_hoarder import connectors, db
 from content_hoarder.connectors.base import ImportResult
+from content_hoarder.models import parse_metadata
+
+
+def _apply_monotonic_saved_order(conn, items: list[dict]) -> None:
+    """Assign each reddit import's synthetic ``saved_utc`` as a contiguous block ABOVE all prior
+    ingests, so "sort by saved newest" stays coherent across imports made at different times
+    (the older per-import wall-clock anchor left disjoint bands). Imports AND cookie syncs share
+    one monotonic counter via :func:`db.allocate_saved_order`.
+
+    Only rows from an authoritative saved-list snapshot (the ``saved_seen_utc`` marker) AND
+    lacking a real explicit ``saved_utc`` are ranked — bulk JSON dumps and rows carrying a genuine
+    save time are left untouched. The counter advance is folded into the import's transaction
+    (``commit=False``), so a crash rolls back the anchor with the rows it ranked."""
+    ranked = [it for it in items
+              if it.get("source") == "reddit"
+              and not it.get("saved_utc")  # a real explicit save time is preserved, not re-ranked
+              and parse_metadata(it.get("metadata")).get("saved_seen_utc") is not None]
+    if not ranked:
+        return
+    top = db.allocate_saved_order(conn, len(ranked), commit=False)
+    for i, it in enumerate(ranked):  # items are newest-first within the export
+        it["saved_utc"] = top - i
 
 
 def import_path(
@@ -27,7 +49,9 @@ def import_path(
     batch: list[dict] = []
     do_reconcile = reconcile or reconcile_dry_run
     present = {"post": set(), "comment": set()}
-    for item in connector.import_file(p):
+    items = list(connector.import_file(p))
+    _apply_monotonic_saved_order(conn, items)
+    for item in items:
         # Record presence from the PARSED export regardless of upsert success — a row genuinely in
         # the export but failing to upsert must not be mistaken for "absent" (a false un-save).
         if do_reconcile and item.get("source") == "reddit":

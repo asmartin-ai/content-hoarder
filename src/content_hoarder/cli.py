@@ -15,6 +15,21 @@ def _connect():
     return db.connect()
 
 
+def _backup_db(conn, suffix: str):
+    """Write a timestamped online backup of the live DB beside it
+    (``app.backup-<suffix>-<stamp>.db``) and return its Path. Used before
+    destructive/irreversible commands so a run stays recoverable."""
+    import sqlite3
+    from pathlib import Path
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    bak = Path(config.db_path()).with_name(f"app.backup-{suffix}-{stamp}.db")
+    dst = sqlite3.connect(str(bak))
+    with dst:
+        conn.backup(dst)
+    dst.close()
+    return bak
+
+
 def cmd_init_db(args) -> int:
     from content_hoarder import db
     with _connect() as conn:
@@ -52,15 +67,7 @@ def cmd_reddit_hydrate_titles(args) -> int:
     bak = None
     with _connect() as conn:
         if not args.dry_run:
-            import datetime as _dt
-            import sqlite3 as _sqlite3
-            from pathlib import Path
-            stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-            bak = Path(config.db_path()).with_name(f"app.backup-pre-titles-{stamp}.db")
-            dst = _sqlite3.connect(str(bak))
-            with dst:
-                conn.backup(dst)
-            dst.close()
+            bak = _backup_db(conn, "pre-titles")
             print(f"backed up DB -> {bak}", file=sys.stderr)
         if getattr(args, "network", False):
             res = reddit_hydrate.backfill_titles_network(
@@ -310,8 +317,6 @@ def cmd_delete(args) -> int:
     """PERMANENT delete with the money-action safety shape: dry-run is the default and
     the confirmation surface; --apply alone refuses (exit 3); --apply --yes executes
     after an automatic timestamped backup, then appends to the audit log."""
-    import datetime as _dt
-    import sqlite3 as _sqlite3
     import time as _time
     from pathlib import Path
 
@@ -341,12 +346,7 @@ def cmd_delete(args) -> int:
             print("refusing: a hard delete needs BOTH --apply and --yes.", file=sys.stderr)
             return 3
 
-        stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        bak = Path(config.db_path()).with_name(f"app.backup-pre-delete-{stamp}.db")
-        dst = _sqlite3.connect(str(bak))
-        with dst:
-            conn.backup(dst)
-        dst.close()
+        bak = _backup_db(conn, "pre-delete")
 
         res = db.delete_items(conn, **selectors, apply=True, max_rows=args.max)
         res["backup"] = str(bak)
