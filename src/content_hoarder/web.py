@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import mimetypes
 import os
 import re
@@ -12,6 +13,7 @@ import subprocess
 import tempfile
 import time
 from contextlib import closing
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -61,6 +63,19 @@ def create_app(db_path: str | None = None) -> Flask:
 
     def conn():
         return closing(db.connect(app.config["DB_PATH"]))
+
+    # Async unsave trickle: a Done enqueues instantly (db.set_status); this background drainer
+    # flushes a small capped batch once triage settles (idle debounce). Opt-in via
+    # reddit_unsave_on_done + bounded (small cap, jitter, audit) — that's the consent, not a
+    # per-fire prompt. The big-blast bulk drain keeps its --live --yes gate. See reddit_trickle.
+    from content_hoarder import reddit_trickle
+    _unsave_audit_path = Path(app.config["DB_PATH"]).with_name("unsave-audit.jsonl")
+
+    def _unsave_audit(rec):
+        with _unsave_audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    _trickle = reddit_trickle.TrickleDrainer(conn, audit=_unsave_audit)
 
     @app.before_request
     def _same_origin_guard():
@@ -234,10 +249,17 @@ def create_app(db_path: str | None = None) -> Flask:
         try:
             with conn() as c:
                 item = db.set_status(c, fullname, status)
+                # Arm the unsave trickle when a reddit item is Done and unsave-on-done is opted in;
+                # read the flag on this same conn (no extra connection in the hot path).
+                arm_trickle = (item is not None and status == "done"
+                               and fullname.startswith("reddit:")
+                               and db.get_setting(c, "reddit_unsave_on_done", "0") == "1")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         if item is None:
             return jsonify({"error": "not found"}), 404
+        if arm_trickle:                       # (re)arm the idle debounce; returns immediately
+            _trickle.note_enqueue()
         return jsonify(item)
 
     @app.post("/items/<path:fullname>/undo")
