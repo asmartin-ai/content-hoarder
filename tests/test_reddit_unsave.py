@@ -249,6 +249,35 @@ def test_resave_prefers_oauth_when_configured(conn, monkeypatch):
     assert conn.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_a'").fetchone()[0] == 1
 
 
+# --- money-action gate: dry-run scope + audit trail (Phase 3) --------------
+
+def test_drain_dry_run_lists_scope_and_sends_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    res = ru.drain(conn, dry_run=True)               # no post/getf — sends nothing
+    assert res["dry_run"] is True and res["selected"] == 2
+    assert len(res["sample"]) == 2 and res["by_subreddit"]      # scope surface populated
+    assert all(st == "pending" for st in _queue(conn).values())  # nothing flipped to done
+
+
+def test_drain_audit_records_each_live_unsave(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    recs = []
+    ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None, audit=recs.append)
+    assert [r["fullname"] for r in recs] == ["reddit:t3_a", "reddit:t3_b"]
+    assert all(r["transport"] == "cookie" and r["reddit_id"] and "ts" in r for r in recs)
+
+
+def test_drain_audit_not_called_for_failures(conn):
+    _seed_pending(conn, "t3_a")
+    ru.set_auth(conn, session_cookie="ck")
+    recs = []
+    ru.drain(conn, post=_Post(decide=lambda f: (404, {})), getf=_ok_me,
+             sleep=lambda s: None, audit=recs.append)
+    assert recs == []                                # only successful unsaves are audited
+
+
 # --- schema idempotency ----------------------------------------------------
 
 def test_enqueue_existing_done_backfill(conn):
