@@ -392,11 +392,11 @@ $("#dice").addEventListener("click", surprise);
 
 /* ---- tabs / rail / chips (locked #2/#7) ---- */
 function paintTabs() {
-  $$(".folder, .spill:not(.navbtn)").forEach((t) => {
+  $$(".folder, .spill").forEach((t) => {
     t.setAttribute("aria-selected", String((t.dataset.status ?? "") === state.status));
   });
 }
-$$(".folder, .spill:not(.navbtn)").forEach((t) => t.addEventListener("click", () => {
+$$(".folder, .spill").forEach((t) => t.addEventListener("click", () => {
   if (t.dataset.status === undefined) return;
   state.status = t.dataset.status;
   paintTabs(); refreshRail(); loadItems(true); loadCounts();

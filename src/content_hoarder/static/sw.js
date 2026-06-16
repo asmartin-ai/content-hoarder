@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v16";  // v16: mobile "Jump" drawer replaces the #tags sheet
+const CACHE = "ch-shell-v17";  // v17: Jump trigger moved to a top-left header hamburger (mobile)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
