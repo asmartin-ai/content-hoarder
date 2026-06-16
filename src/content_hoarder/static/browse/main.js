@@ -586,7 +586,15 @@ function facetRows(kind) {
     return facets.sources.map((s) => ({ kind, value: s.id, label: s.label, count: s.count, color: s.badge_color }));
   if (kind === "category")
     return facets.categories.map((c) => ({ kind, value: c.id, label: c.label, count: c.count }));
-  return facets.tags.map((t) => ({ kind, value: t.id, label: t.label, count: t.count }));
+  // Categories are folded into the tag system, so /tags echoes the category names
+  // (listenable/watch/wotagei/unknown) back as tags. They have their own Categories
+  // group above, so drop them here — each facet should appear exactly once in the
+  // drawer. (Drawer-local: the desktop .rail reads facets.tags directly and has no
+  // Categories group, so it still surfaces these as its only way to reach them.)
+  const catIds = new Set(facets.categories.map((c) => String(c.id).toLowerCase()));
+  return facets.tags
+    .filter((t) => !catIds.has(String(t.id).toLowerCase()))
+    .map((t) => ({ kind, value: t.id, label: t.label, count: t.count }));
 }
 const pinKey = (r) => r.kind + ":" + r.value;
 function isActive(r) {
