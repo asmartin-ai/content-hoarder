@@ -119,10 +119,15 @@ def _classify_media(meta: dict, raw_url, permalink: str, body: str, kind: str) -
     return perma_url
 
 
-def child_to_item(ch: dict):
+def child_to_item(ch: dict, *, saved_seen_utc: int | None = None):
     """A Reddit API listing child (``{"kind": "t1"/"t3", "data": {...}}``) → a normalized
     content-hoarder item dict, or ``None`` if unusable. Shared by the JSON importer and the
-    cookie sync so both shape items identically (subreddit/score/over_18/media in metadata)."""
+    cookie sync so both shape items identically (subreddit/score/over_18/media in metadata).
+
+    ``saved_seen_utc`` (set by the cookie sync, an authoritative current-saved snapshot) stamps
+    the ``metadata.saved_seen_utc`` provenance marker so ``db.reconcile_reddit_saves`` can treat
+    the row as a delta-reconcile candidate. The bulk JSON importer leaves it ``None`` — those
+    dumps are not authoritative saved-lists, so their rows stay un-reconcilable."""
     d = ch.get("data", ch) if isinstance(ch, dict) else {}
     if not isinstance(d, dict):
         return None
@@ -144,6 +149,8 @@ def child_to_item(ch: dict):
     kind = "comment" if str(sid).startswith("t1_") else "post"
     body = d.get("selftext") or d.get("body") or ""
     url = _classify_media(meta, d.get("url"), permalink, body, kind)
+    if saved_seen_utc is not None:
+        meta["saved_seen_utc"] = saved_seen_utc
     return new_item(
         source="reddit",
         source_id=sid,
@@ -395,7 +402,7 @@ class RedditConnector(BaseConnector):
             return
         rows = _parse_html_table(text)
         if rows:
-            yield from self._rows_to_items(rows, saved_order_anchor=int(time.time()))
+            yield from self._rows_to_items(rows, snapshot_utc=int(time.time()))
 
     def _from_db(self, p: Path):
         con = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
@@ -434,13 +441,14 @@ class RedditConnector(BaseConnector):
             metadata=meta,
         )
 
-    def _rows_to_items(self, reader, *, saved_order_anchor: int | None = None):
-        """Normalize CSV/table row dicts into items. ``saved_order_anchor`` (an epoch ts):
-        when set and a row has no explicit ``saved_utc``, synthesize ``saved_utc = anchor - i``
-        from the row index so a later "sort by saved_utc desc" reproduces the export's save
-        order (newest-saved first). It's a RELATIVE ordering anchored at import time, not a real
-        wall-clock save time (Reddit exposes no per-item saved timestamp)."""
-        for i, raw in enumerate(reader):
+    def _rows_to_items(self, reader, *, snapshot_utc: int | None = None):
+        """Normalize CSV/table row dicts into items. ``snapshot_utc`` (an epoch ts), when set,
+        marks each row as belonging to an authoritative saved-list SNAPSHOT — it stamps
+        ``metadata.saved_seen_utc`` so ``db.reconcile_reddit_saves`` may delta-reconcile the row.
+        saved_utc is NOT synthesized here: the pipeline assigns a monotonic synthetic rank from
+        row order across imports (Reddit exposes no per-item save time). A real ``saved_utc``
+        column, if the export carries one, is preserved."""
+        for raw in reader:
             row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
             permalink = row.get("permalink") or ""
             sid = row.get("fullname") or ""
@@ -472,18 +480,14 @@ class RedditConnector(BaseConnector):
             kind = "comment" if str(sid).startswith("t1_") else "post"
             body = row.get("body") or row.get("selftext") or ""
             url = _classify_media(meta, row.get("url"), permalink, body, kind)
-            saved_explicit = _epoch_int(row.get("saved_utc") or row.get("savedutc"))
-            if saved_explicit:
-                saved_utc = saved_explicit
-            elif saved_order_anchor is not None:
-                saved_utc = saved_order_anchor - i
-            else:
-                saved_utc = 0
-            if saved_order_anchor is not None:
+            # Keep a real saved time if the export carries one; otherwise leave it 0 — the
+            # pipeline assigns the monotonic synthetic rank from row order (it owns ordering).
+            saved_utc = _epoch_int(row.get("saved_utc") or row.get("savedutc")) or 0
+            if snapshot_utc is not None:
                 # Provenance marker: this item was confirmed present in a saved-list snapshot.
                 # db.reconcile_reddit_saves only ever un-saves MARKED items (delta reconcile),
                 # so bulk-imported rows that were never in a real saved list are never touched.
-                meta["saved_seen_utc"] = saved_order_anchor
+                meta["saved_seen_utc"] = snapshot_utc
             # A comment carries no title of its own. DON'T synthesize a permalink-slug title: it
             # would overlay (merge_upsert _OVERLAY_FIELDS) and CLOBBER a real submission_title set
             # by backfill_titles_local on a later re-import. Leave it empty so the backfill owns it.
@@ -502,10 +506,14 @@ class RedditConnector(BaseConnector):
             )
 
     def _from_csv(self, p: Path):
+        # A CSV (saveddit export or an extracted GDPR saved_*.csv) is a saved-list snapshot:
+        # anchor it like _from_html_table so rows carry the saved_seen_utc reconcile marker.
         with open(p, "r", encoding="utf-8", errors="ignore", newline="") as fh:
-            yield from self._rows_to_items(csv.DictReader(fh))
+            yield from self._rows_to_items(csv.DictReader(fh),
+                                           snapshot_utc=int(time.time()))
 
     def _from_gdpr_zip(self, p: Path):
+        anchor = int(time.time())  # one saved-list snapshot per GDPR export
         with zipfile.ZipFile(p) as zf:
             for info in zf.infolist():
                 if Path(info.filename).name not in ("saved_posts.csv", "saved_comments.csv"):
@@ -514,7 +522,7 @@ class RedditConnector(BaseConnector):
                     with zf.open(info) as stream:
                         text = io.TextIOWrapper(stream, encoding="utf-8-sig", newline="")
                         reader = csv.DictReader(text)
-                        yield from self._rows_to_items(reader)
+                        yield from self._rows_to_items(reader, snapshot_utc=anchor)
                 except Exception:
                     continue
 

@@ -101,10 +101,12 @@ def sync_saved_cookie(
     result["username"] = username
 
     from content_hoarder.connectors.reddit import child_to_item
+    snapshot_utc = int(time.time())  # provenance marker for this saved-list snapshot
 
     marks = _load_mark(db.get_setting(conn, _MARK_KEY))
     mark_set = set(marks)
     top_names: list[str] = []  # current top of the listing, in order — becomes the next mark
+    synced: list[str] = []     # fullnames upserted this run, newest-first (for monotonic saved_utc)
     base = SAVED_URL.format(user=urllib.parse.quote(username))
     after = ""
     hit_mark = False
@@ -138,7 +140,7 @@ def sync_saved_cookie(
             if mark_set and name in mark_set:  # reached where the last sync left off
                 hit_mark = True
                 break
-            item = child_to_item(ch)
+            item = child_to_item(ch, saved_seen_utc=snapshot_utc)
             if not item:
                 continue
             result["fetched"] += 1
@@ -149,6 +151,7 @@ def sync_saved_cookie(
                 page_new += 1
             else:
                 result["updated"] += 1
+            synced.append(item["fullname"])
         conn.commit()
         if progress:
             progress(f"page {page + 1}: +{page_new} new ({len(children)} items)")
@@ -175,6 +178,15 @@ def sync_saved_cookie(
     # be new items BELOW what we fetched but ABOVE the old mark; advancing past them here
     # would skip them on every future sync (silent data gap). The very first sync (no mark
     # yet) sets the initial baseline — run `reddit-sync --full` for a thorough first catch-up.
+    # Synthesize a monotonic saved_utc for this snapshot's items (newest-first), sharing the same
+    # persistent counter as file imports so "sort by saved newest" is coherent across BOTH ingest
+    # paths — child_to_item leaves saved_utc=0, so without this a fresh sync would sort oldest.
+    # Folded into the final commit below (atomic with the mark advance).
+    if synced:
+        top = db.allocate_saved_order(conn, len(synced), commit=False)
+        for i, fn in enumerate(synced):
+            conn.execute("UPDATE items SET saved_utc=? WHERE fullname=?", (top - i, fn))
     if top_names and (not marks or result["stopped"] in ("caught_up", "exhausted", "all_known")):
-        db.set_setting(conn, _MARK_KEY, json.dumps(top_names))
+        db.set_setting(conn, _MARK_KEY, json.dumps(top_names), commit=False)
+    conn.commit()
     return result

@@ -112,6 +112,40 @@ def test_sync_keeps_mark_on_max_pages_truncation(conn):
     assert db.get_setting(conn, "reddit_sync_newest") == "t3_old"  # unchanged — no gap
 
 
+def test_sync_stamps_saved_seen_utc_marker(conn):
+    """Cookie sync is an authoritative saved-list snapshot, so its rows carry the
+    metadata.saved_seen_utc provenance marker reconcile_reddit_saves requires."""
+    _auth(conn)
+    reddit_sync.sync_saved_cookie(
+        conn, getf=make_getf([([child("t3_a")], None)]), user_agent="ua")
+    seen = conn.execute(
+        "SELECT json_extract(metadata, '$.saved_seen_utc') FROM items "
+        "WHERE fullname='reddit:t3_a'").fetchone()[0]
+    assert seen is not None and seen > 0
+
+
+def test_sync_assigns_monotonic_saved_utc_newest_first(conn):
+    """Cookie sync (child_to_item leaves saved_utc=0) must assign a monotonic saved_utc so fresh
+    saves sort NEWEST, not oldest — sharing the same counter as file imports."""
+    _auth(conn)
+    # listing is newest-first: t3_a is the most recently saved
+    reddit_sync.sync_saved_cookie(
+        conn, getf=make_getf([([child("t3_a"), child("t3_b"), child("t3_c")], None)]),
+        user_agent="ua")
+
+    def s(sid):
+        return conn.execute("SELECT saved_utc FROM items WHERE fullname=?",
+                            (f"reddit:{sid}",)).fetchone()[0]
+
+    assert s("t3_a") > s("t3_b") > s("t3_c") > 0   # newest-first, none stuck at 0
+
+    # a later sync's items sit ABOVE the first batch (monotonic across syncs)
+    db.set_setting(conn, "reddit_sync_newest", "")  # clear mark so the next batch is all-new
+    reddit_sync.sync_saved_cookie(
+        conn, getf=make_getf([([child("t3_z")], None)]), user_agent="ua")
+    assert s("t3_z") > s("t3_a")
+
+
 def test_sync_auth_error_without_cookie(conn):
     res = reddit_sync.sync_saved_cookie(conn, getf=make_getf([]), user_agent="ua")
     assert res["auth_error"] is True and res["stopped"] == "auth_error"
