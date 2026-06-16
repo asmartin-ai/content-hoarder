@@ -16,6 +16,7 @@ from __future__ import annotations
 import random
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 _RETRY_JITTER_CAP = 60.0  # seconds; full-jitter backoff never waits longer than this
@@ -95,6 +96,26 @@ def _opener():
     return urllib.request.urlopen
 
 
+def _ascii_safe_url(url: str) -> str:
+    """Percent-encode a URL's path + query so urllib can send it.
+
+    ``http.client`` encodes the request line as ASCII and raises ``UnicodeEncodeError`` on any
+    non-ASCII char in the URL — e.g. a unicode slug in a legacy Reddit permalink
+    (``/r/x/comments/abc/café/``). We transform the URL **only when it isn't already ASCII**, so
+    every existing (ASCII) URL is returned byte-for-byte unchanged and no current behavior moves.
+    The broad ``safe`` sets include ``%``, preserving any pre-existing ``%xx`` escapes (no
+    double-encoding) and the query's ``=&`` structure. The host is assumed ASCII (true for our
+    endpoints); a non-ASCII host would need IDNA, which no caller hits."""
+    try:
+        url.encode("ascii")
+        return url                       # common case: already ASCII -> unchanged
+    except UnicodeEncodeError:
+        p = urllib.parse.urlsplit(url)
+        path = urllib.parse.quote(p.path, safe="/%:@-._~!$&'()*+,;=")
+        query = urllib.parse.quote(p.query, safe="=&%:@-._~!$'()*+,;/?")
+        return urllib.parse.urlunsplit((p.scheme, p.netloc, path, query, p.fragment))
+
+
 def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
             retries=0, backoff=2.0, sleep=time.sleep, user_agent=None,
             jitter=False, rng=random.random) -> tuple[int, dict, bytes]:
@@ -114,7 +135,8 @@ def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
     req_headers = dict(headers or {})
     if user_agent is not None:
         req_headers.setdefault("User-Agent", user_agent)
-    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+    req = urllib.request.Request(_ascii_safe_url(url), data=data, headers=req_headers,
+                                 method=method)
 
     delay = backoff
     for attempt in range(retries + 1):
