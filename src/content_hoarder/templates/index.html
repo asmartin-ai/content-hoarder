@@ -217,6 +217,28 @@
     </div>
   </aside>
 
+  <!-- inline Reddit reader — full-screen sheet (post + collapsible comment thread).
+       Opens on tapping a saved Reddit item instead of the external Firefox/Relay
+       handoff; "open original" stays as the escape hatch. Behaviour: browse/reader.js. -->
+  <section class="reader" id="reader" aria-label="Reddit post reader" aria-hidden="true">
+    <header class="rd-head">
+      <span class="led" aria-hidden="true"></span>
+      <span class="rd-sub" id="reader-sub"></span>
+      <a class="rd-oo" id="reader-open-original" href="#" target="_blank" rel="noopener"
+         aria-label="Open the original on Reddit">open original &#8599;</a>
+      <button type="button" class="rd-x" id="reader-close" aria-label="Back to feed">&#10005;</button>
+    </header>
+    <div class="rd-scroll">
+      <article class="rd-post" id="reader-post"><!-- rendered by reader.js --></article>
+      <div class="rd-comments" id="reader-comments"><!-- rendered by reader.js --></div>
+    </div>
+    <div class="rd-foot">
+      <button type="button" class="rd-act a" data-act="archived">Archive</button>
+      <button type="button" class="rd-act d" data-act="done">Done</button>
+      <button type="button" class="rd-act k" data-act="keep">Keep</button>
+    </div>
+  </section>
+
   <div class="kbd-sheet" id="kbd" role="dialog" aria-label="Keyboard shortcuts">
     <h2>One hand on the keys</h2>
     <p class="sub">Left-hand cluster &mdash; coffee stays in the right.</p>
