@@ -436,6 +436,26 @@ def cmd_reddit_unsave(args) -> int:
             n = db.enqueue_existing_done(conn)
             print(f"queued {n} existing 'done' reddit item(s) for unsaving")
             return 0
+        if args.trickle:
+            # Opted-in continuous lane: bounded auto-drain, no --live --yes (consent = the enable
+            # toggle + the small cap + the audit trail). Refuses when unsave-on-done is OFF.
+            from content_hoarder import reddit_trickle
+            if db.get_setting(conn, "reddit_unsave_on_done", "0") != "1":
+                print("trickle skipped: unsave-on-done is OFF — run `reddit-unsave --enable` first.",
+                      file=sys.stderr)
+                return 0
+            cap = args.limit if args.limit is not None else reddit_trickle.DEFAULT_CAP
+            audit_path = Path(config.db_path()).with_name("unsave-audit.jsonl")
+
+            def _t_audit(rec):
+                with audit_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+            res = ru.drain(conn, limit=cap, throttle=args.throttle, audit=_t_audit,
+                           progress=lambda m: print(m, file=sys.stderr))
+            res["audit_log"] = str(audit_path)
+            print(json.dumps(res, indent=2))
+            return 1 if (res.get("auth_error") or res.get("network_error")) else 0
         if args.drain:
             # Money-action gate: execute ONLY with --live --yes (and not --dry-run). Anything else
             # is a dry run that lists the scope and sends nothing — the confirmation surface.
@@ -825,6 +845,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="With --drain --live: the explicit go-ahead to mutate Reddit.")
     pu.add_argument("--dry-run", action="store_true",
                     help="With --drain: force the dry-run plan even if --live/--yes are present.")
+    pu.add_argument("--trickle", action="store_true",
+                    help="Bounded, non-interactive drain for a scheduled job (the opted-in "
+                         "continuous lane): drains up to a small cap (default 25) WITHOUT "
+                         "--live --yes, but ONLY when unsave-on-done is enabled — that opt-in + the "
+                         "cap + the audit log is the consent. Use this for scheduled runs, not the "
+                         "big-blast bulk `--drain --live --yes`.")
     pu.add_argument("--enqueue-existing", action="store_true",
                     help="One-time backfill: queue all reddit items already marked 'done'.")
     pu.add_argument("--limit", type=int, default=None, help="Max items to unsave this drain run.")
