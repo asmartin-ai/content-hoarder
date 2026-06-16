@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import secrets
 import time
 import urllib.parse
@@ -90,7 +91,7 @@ def status(conn) -> dict:
     """Inspect summary for the CLI (no secrets in it)."""
     row = _row(conn)
     return {
-        "configured": is_configured(conn),
+        "configured": bool(row and row["refresh_token"]),   # reuse row (don't re-query)
         "client_id_set": bool(client_id()),
         "username": row["username"] if row else None,
         "redirect_uri": redirect_uri(),
@@ -158,9 +159,12 @@ def parse_redirect(redirect: str, *, expected_state: str) -> str:
         if params.get("state") != expected_state:
             raise RedditOAuthError("state mismatch — possible CSRF; restart `reddit-oauth --login`.")
         return params["code"]
-    if s and "=" not in s and "&" not in s:   # user pasted just the code
+    # Fallback: the user pasted just the code. Reddit codes are [A-Za-z0-9_-]; this rejects a
+    # mis-pasted URL/query (which would otherwise be sent verbatim and 400 confusingly). Note
+    # there is no state to validate here — pasting the FULL redirect URL is the CSRF-checked path.
+    if re.fullmatch(r"[A-Za-z0-9_-]+", s):
         return s
-    raise RedditOAuthError("no authorization code found in the pasted redirect.")
+    raise RedditOAuthError("no authorization code found — paste the full redirected URL.")
 
 
 # ---------------------------------------------------------------------------
