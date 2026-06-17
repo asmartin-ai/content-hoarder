@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import mimetypes
 import os
 import re
@@ -13,7 +12,6 @@ import subprocess
 import tempfile
 import time
 from contextlib import closing
-from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -68,13 +66,8 @@ def create_app(db_path: str | None = None) -> Flask:
     # flushes a small capped batch once triage settles (idle debounce). Opt-in via
     # reddit_unsave_on_done + bounded (small cap, jitter, audit) — that's the consent, not a
     # per-fire prompt. The big-blast bulk drain keeps its --live --yes gate. See reddit_trickle.
-    from content_hoarder import reddit_trickle
-    _unsave_audit_path = Path(app.config["DB_PATH"]).with_name("unsave-audit.jsonl")
-
-    def _unsave_audit(rec):
-        with _unsave_audit_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
+    from content_hoarder import reddit_trickle, reddit_unsave
+    _unsave_audit, _unsave_audit_path = reddit_unsave.audit_appender(app.config["DB_PATH"])
     _trickle = reddit_trickle.TrickleDrainer(conn, audit=_unsave_audit)
 
     @app.before_request
@@ -398,7 +391,9 @@ def create_app(db_path: str | None = None) -> Flask:
         # loop; the CLI/scheduled job is the right tool for bulk drains.
         limit = min(max(_int(body.get("max"), 50), 1), 500)
         with conn() as c:
-            res = ru.drain(c, limit=limit)
+            # Pass the shared audit appender: a web-initiated live drain is a real money-action and
+            # must leave the same reconstructable unsave-audit.jsonl trail as the CLI/trickle paths.
+            res = ru.drain(c, limit=limit, audit=_unsave_audit)
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/resave")

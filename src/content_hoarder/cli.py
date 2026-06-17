@@ -445,12 +445,7 @@ def cmd_reddit_unsave(args) -> int:
                       file=sys.stderr)
                 return 0
             cap = args.limit if args.limit is not None else reddit_trickle.DEFAULT_CAP
-            audit_path = Path(config.db_path()).with_name("unsave-audit.jsonl")
-
-            def _t_audit(rec):
-                with audit_path.open("a", encoding="utf-8") as f:
-                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
+            _t_audit, audit_path = ru.audit_appender(config.db_path())
             res = ru.drain(conn, limit=cap, throttle=args.throttle, audit=_t_audit,
                            progress=lambda m: print(m, file=sys.stderr))
             res["audit_log"] = str(audit_path)
@@ -472,12 +467,7 @@ def cmd_reddit_unsave(args) -> int:
                       f"--live --yes to execute.", file=sys.stderr)
                 return 0
             # --- live execution path ---
-            audit_path = Path(config.db_path()).with_name("unsave-audit.jsonl")
-
-            def _audit(rec):  # append each live unsave before the next one (reconstructable trail)
-                with audit_path.open("a", encoding="utf-8") as f:
-                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
+            _audit, audit_path = ru.audit_appender(config.db_path())
             res = ru.drain(conn, limit=args.limit, throttle=args.throttle, audit=_audit,
                            progress=lambda m: print(m, file=sys.stderr))
             res["audit_log"] = str(audit_path)

@@ -93,12 +93,19 @@ def sync_saved(
     if getf is None and reddit_oauth.is_configured(conn):
         tok = reddit_oauth.access_token(conn)        # None on a permanent refresh failure
         if tok:
-            uname = reddit_oauth.status(conn).get("username") or reddit_oauth._fetch_username(tok)
+            uname = reddit_oauth.status(conn).get("username") or reddit_oauth.fetch_username(tok)
             if uname:                                # need the username to address the listing
                 oauth_token, username = tok, uname
                 ua = reddit_oauth.oauth_user_agent(conn, username=uname)
                 base = "https://oauth.reddit.com/user/" + urllib.parse.quote(uname) + "/saved"
                 result["transport"] = "oauth"
+            elif not get_auth(conn):
+                # OAuth token is valid but the username couldn't be resolved to address
+                # /user/<me>/saved, and there's no cookie to fall back to. Report the REAL cause
+                # (OAuth) rather than letting the cookie branch below mislabel it 'cookie expired'.
+                result["auth_error"] = True
+                result["stopped"] = "auth_error"
+                return result
 
     if not oauth_token:                              # cookie path (also the OAuth fallback)
         ua = user_agent
@@ -153,7 +160,15 @@ def sync_saved(
             result["network_error"] = True
             result["stopped"] = "network_error"
             break
-        data = body.get("data") or {}
+        data = body.get("data")
+        if data is None:
+            # The {} sentinel from oauth_get/_http_get means 401/403 — the token/cookie is invalid.
+            # A real saved listing (even an empty one) always carries a "data" envelope, so a missing
+            # "data" is a DEAD SESSION, not "no saved items". Surface auth_error (and don't advance
+            # the mark) instead of silently reporting 'empty'/'exhausted' on a green run.
+            result["auth_error"] = True
+            result["stopped"] = "auth_error"
+            break
         children = data.get("children") or []
         if not children:
             result["stopped"] = "empty" if page == 0 else "exhausted"

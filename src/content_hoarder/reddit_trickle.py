@@ -22,9 +22,12 @@ threads or network:
 
 from __future__ import annotations
 
+import logging
 import threading
 
 from content_hoarder import db as _db, reddit_unsave as _ru
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_IDLE_SECONDS = 30.0   # fire ~30s after the last Done — past a triage burst, not during it
 DEFAULT_CAP = 25              # small per-fire cap (matches the bulk-hydrate cap); resumable anyway
@@ -73,6 +76,15 @@ class TrickleDrainer:
                 res = self._drain_fn(conn, limit=self._cap, audit=self._audit)
         finally:
             self._run_lock.release()
+        # Surface auth/network failures: fire() runs on a daemon timer thread with no user in the
+        # loop, so an error buried in the result dict would otherwise vanish silently (the queue
+        # just stops draining). Log it so a dead token/cookie or connectivity blip is visible.
+        if isinstance(res, dict) and (res.get("auth_error") or res.get("network_error")):
+            kind = "auth" if res.get("auth_error") else "network"
+            logger.warning(
+                "unsave trickle halted (%s error): %d unsaved, %d remaining — "
+                "re-authenticate or check connectivity",
+                kind, res.get("unsaved", 0), res.get("remaining", 0))
         # Keep trickling while idle until the backlog clears: re-arm only if this fire made progress
         # (unsaved > 0) AND items remain. The unsaved>0 guard stops a stuck/auth-failed queue from
         # looping forever (a dead cookie returns unsaved=0). Each fire still honors the small cap.
