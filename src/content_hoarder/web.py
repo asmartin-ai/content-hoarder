@@ -209,7 +209,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 score_max=parsed.score_max,
                 exact=parsed.exact,
                 exclude=parsed.exclude,
-                open_in_firefox=a.get("open_in_firefox") in ("1", "true"),
+                open_in_firefox=parsed.open_in_firefox or a.get("open_in_firefox") in ("1", "true"),
                 # Fuzzy by default (Epic 12, user decision): bare terms are typo-tolerant;
                 # "quoted phrases" are always exact (parser routes them to exact=);
                 # ?exact=1 (the repurposed checkbox) forces the exact FTS path.
