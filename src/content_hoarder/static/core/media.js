@@ -32,10 +32,14 @@ export const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.
 
 /* Full image URL to open in a lightbox (direct images / i.redd.it), else "". */
 export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
+const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
 export const imageUrl = (item) => {
   const m = item.metadata || {};
-  const u = item.url || "";
-  if (IMG_EXT.test(u) || /i\.redd\.it\//i.test(u)) return u;
+  if (_directImg(item.url)) return item.url;
+  // Epic 13:344 (harvested from feat/reddit-media-v13): recognize images by media_url
+  // SHAPE, not the media_type label — unlocks ~25.8k i.redd.it posts stuck in the
+  // reddit_media catch-all with item.url = permalink.
+  if (_directImg(m.media_url)) return m.media_url;
   return m.media_type === "image" ? (m.media_url || "") : "";
 };
 
@@ -48,6 +52,10 @@ export const mediaType = (item) => {
   // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
   if (((item.metadata || {}).media_url || "").includes("v.redd.it"))
     return { cls: "video", icon: "🎬", label: "Video" };
+  // Image evidence in metadata.media_url (harvested from feat/reddit-media-v13): the
+  // ~25.8k reddit_media-catch-all posts whose item.url is the permalink, not the image.
+  if (_directImg((item.metadata || {}).media_url))
+    return { cls: "image", icon: "🖼️", label: "Image" };
   const url = (item.url || "").toLowerCase();
   if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com"))
     return { cls: "image", icon: "🖼️", label: "Image" };
