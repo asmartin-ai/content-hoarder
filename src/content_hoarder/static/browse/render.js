@@ -6,7 +6,7 @@
 import { esc, ago } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import {
-  CH_SOURCES, srcAccent, itemUrl, metaAnchor, ageMeta, consumeMeta, tagChips,
+  CH_SOURCES, srcAccent, itemUrl, metaAnchor, ageMeta, consumeMeta, tagChips, articleChip,
 } from "../core/render.js";
 import { thumb, ytFallback, mediaType } from "../core/media.js";
 
@@ -50,7 +50,8 @@ const metaHtml = (item) => {
   if (Number.isFinite(m.score)) bits.push(Math.round(m.score) + " pts");
   bits.push(ageMeta(item));
   const consume = consumeMeta(item);
-  return bits.join(" · ") + (consume ? " " + consume : "");
+  const chip = articleChip(item);
+  return bits.join(" · ") + (consume ? " " + consume : "") + (chip ? " " + chip : "");
 };
 
 const snippet = (item) => {

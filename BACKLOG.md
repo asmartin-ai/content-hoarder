@@ -479,15 +479,18 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P2 — Tap subreddit → open the subreddit; tap user → open the user page.**~~ Shipped (design-v2
   round 2; user-verified): meta-line `r/<sub>` / `by <author>` link to Reddit (new tab) without triggering
   row open/select.
-- [ ] **P2 — Reddit image-link → open the comments thread, not the raw image URL.** (Open.)
+- [x] ~~**P2 — Reddit image-link → open the comments thread, not the raw image URL.**~~ Shipped (PR #4):
+  a reddit item whose media classifies as an image routes the tap to the in-app reader (image + thread).
 - [x] ~~**P2 — Hacker News item → open the HN discussion thread, not the linked article.**~~ Shipped
   (user-verified).
-- [ ] **P2 — Hacker News author → open the HN user profile** (`news.ycombinator.com/user?id=<author>`),
-  mirroring the Reddit user link.
-- [ ] **P2 — HN: chip to open the linked article/story URL directly.** The item opens the discussion, so
-  add a separate chip for the external article link.
-- [ ] **P3 — (Optional) Fetch article thumbnails for HN items.** Show a preview image on HN rows/cards
-  via an OG-image fetch/enrich pass (gate like other enrich passes). *(User: "optional epic".)*
+- [x] ~~**P2 — Hacker News author → open the HN user profile** (`news.ycombinator.com/user?id=<author>`),
+  mirroring the Reddit user link.~~ Shipped (PR #3).
+- [x] ~~**P2 — HN: chip to open the linked article/story URL directly.**~~ Shipped: an "Article ↗" pill
+  in the meta line links to `item.url` (omitted on Ask/Show-HN self-posts, where the title already opens
+  the discussion).
+- [x] ~~**P3 — (Optional) Fetch article thumbnails for HN items.**~~ Shipped: `HNConnector.enrich()` now
+  fetches the linked article's og:image into `metadata.og_image` (best-effort, idempotent, gated like
+  other enrich passes); `thumb()` renders it in the HN monitor slot.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
