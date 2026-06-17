@@ -43,6 +43,11 @@ export const imageUrl = (item) => {
    native-embed pass: galleries/video from archived metadata, no reddit iframe). */
 export const mediaType = (item) => {
   if (item.kind === "comment") return { cls: "comment", icon: "💬", label: "Comment" };
+  // Reddit-hosted video: item.url is the permalink (→ "text" below), so the v.redd.it
+  // evidence lives in metadata.media_url. Trust it directly (the archive signal the
+  // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
+  if (((item.metadata || {}).media_url || "").includes("v.redd.it"))
+    return { cls: "video", icon: "🎬", label: "Video" };
   const url = (item.url || "").toLowerCase();
   if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com"))
     return { cls: "image", icon: "🖼️", label: "Image" };
@@ -72,6 +77,32 @@ export const redditEmbedUrl = (permalink) => {
   return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
 };
 
+/* ---- v.redd.it audio (Epic 13 P2) ----
+   Stored reddit-video media_url is the bare https://v.redd.it/<id> (or a video-only
+   .../DASH_NNN.mp4 fallback) — neither carries audio, which reddit splits into a
+   separate HLS/DASH track. The combined stream is the HLS manifest below; play that
+   instead. "" for non-v.redd.it sources (keep the plain <video src>). */
+export const hlsManifestUrl = (srcUrl) => {
+  const m = (srcUrl || "").match(/https?:\/\/v\.redd\.it\/([A-Za-z0-9]+)/);
+  return m ? "https://v.redd.it/" + m[1] + "/HLSPlaylist.m3u8" : "";
+};
+
+/* Lazy-load the vendored hls.js once (only when a v.redd.it video is opened on a
+   browser without native HLS). Resolves to window.Hls, or null if it fails to load. */
+let _hlsPromise = null;
+const loadHls = () => {
+  if (typeof window !== "undefined" && window.Hls) return Promise.resolve(window.Hls);
+  if (_hlsPromise) return _hlsPromise;
+  _hlsPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "/static/vendor/hls.min.js";
+    s.onload = () => resolve(window.Hls || null);
+    s.onerror = () => { _hlsPromise = null; resolve(null); };
+    document.head.appendChild(s);
+  });
+  return _hlsPromise;
+};
+
 /* ---- lightbox ----
    createLightbox({modal, body}) — modal: the overlay element (with `hidden`),
    body: the content container inside it. Esc + backdrop-click close built in. */
@@ -79,8 +110,10 @@ export function createLightbox(opts) {
   const modal = typeof opts.modal === "string" ? document.querySelector(opts.modal) : opts.modal;
   const body = typeof opts.body === "string" ? document.querySelector(opts.body) : opts.body;
 
+  let activeHls = null;  // the hls.js instance for an open v.redd.it video, if any
   const close = () => {
     modal.hidden = true;
+    if (activeHls) { activeHls.destroy(); activeHls = null; }  // stop hls buffering
     body.innerHTML = "";  // stop playback
   };
   modal.addEventListener("click", (e) => {
@@ -115,14 +148,41 @@ export function createLightbox(opts) {
         imgs.map((u) => '<img class="media-img gallery-img" loading="lazy" src="' + esc(u) + '" alt="">').join("") +
         '</div><p class="media-fallback">' + imgs.length + " images</p>");
     },
-    /* Archived reddit video → native <video> (Epic 13:344 — no reddit iframe when
-       the archive captured a playable media_url; iframe stays the fallback). */
+    /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored
+       url has no audio, so we play the HLS manifest (audio+video): native HLS where
+       supported (Safari/iOS), else lazy-loaded hls.js; a non-v.redd.it direct file
+       keeps the plain <video src>. */
     openVideo(srcUrl, posterUrl) {
       if (!safeUrl(srcUrl)) return;
-      open('<video class="media-video" controls playsinline preload="metadata"' +
-        (posterUrl && safeUrl(posterUrl) ? ' poster="' + esc(posterUrl) + '"' : "") +
-        ' src="' + esc(srcUrl) + '"></video>' +
-        '<a class="media-fallback" href="' + esc(srcUrl) + '" target="_blank" rel="noopener">Open original ↗</a>');
+      const poster = posterUrl && safeUrl(posterUrl) ? ' poster="' + esc(posterUrl) + '"' : "";
+      const hls = hlsManifestUrl(srcUrl);
+      const fallback = '<a class="media-fallback" href="' + esc(srcUrl) +
+        '" target="_blank" rel="noopener">Open original ↗</a>';
+      if (!hls) {
+        open('<video class="media-video" controls playsinline preload="metadata"' + poster +
+          ' src="' + esc(srcUrl) + '"></video>' + fallback);
+        return;
+      }
+      open('<video class="media-video" controls playsinline preload="metadata"' + poster +
+        '></video>' + fallback);
+      const video = body.querySelector("video.media-video");
+      if (!video) return;
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = hls;  // native HLS (Safari/iOS) — plays the muxed audio+video
+        return;
+      }
+      loadHls().then((Hls) => {
+        // a later close() may have torn the element down before the script arrived
+        if (!Hls || !document.body.contains(video)) return;
+        if (Hls.isSupported()) {
+          const h = new Hls();
+          activeHls = h;
+          h.loadSource(hls);
+          h.attachMedia(video);
+        } else {
+          video.src = srcUrl;  // last-ditch: video-only, but at least shows the clip
+        }
+      });
     },
   };
 }
