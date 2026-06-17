@@ -404,7 +404,7 @@ def cmd_reddit_sync(args) -> int:
     from content_hoarder import reddit_sync
     max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
     with _connect() as conn:
-        res = reddit_sync.sync_saved_cookie(
+        res = reddit_sync.sync_saved(
             conn, max_pages=max_pages, stop_on_known=not args.full,
             progress=lambda m: print(m, file=sys.stderr),
         )
@@ -436,9 +436,41 @@ def cmd_reddit_unsave(args) -> int:
             n = db.enqueue_existing_done(conn)
             print(f"queued {n} existing 'done' reddit item(s) for unsaving")
             return 0
-        if args.drain:
-            res = ru.drain(conn, limit=args.limit, throttle=args.throttle,
+        if args.trickle:
+            # Opted-in continuous lane: bounded auto-drain, no --live --yes (consent = the enable
+            # toggle + the small cap + the audit trail). Refuses when unsave-on-done is OFF.
+            from content_hoarder import reddit_trickle
+            if db.get_setting(conn, "reddit_unsave_on_done", "0") != "1":
+                print("trickle skipped: unsave-on-done is OFF — run `reddit-unsave --enable` first.",
+                      file=sys.stderr)
+                return 0
+            cap = args.limit if args.limit is not None else reddit_trickle.DEFAULT_CAP
+            _t_audit, audit_path = ru.audit_appender(config.db_path())
+            res = ru.drain(conn, limit=cap, throttle=args.throttle, audit=_t_audit,
                            progress=lambda m: print(m, file=sys.stderr))
+            res["audit_log"] = str(audit_path)
+            print(json.dumps(res, indent=2))
+            return 1 if (res.get("auth_error") or res.get("network_error")) else 0
+        if args.drain:
+            # Money-action gate: execute ONLY with --live --yes (and not --dry-run). Anything else
+            # is a dry run that lists the scope and sends nothing — the confirmation surface.
+            execute = args.live and args.yes and not args.dry_run
+            if not execute:
+                plan = ru.drain(conn, limit=args.limit, dry_run=True)
+                print(json.dumps(plan, indent=2))
+                if args.live and not args.yes and not args.dry_run:
+                    print("\nrefusing: --live needs --yes too. The plan above is a DRY RUN — nothing "
+                          "was sent. Re-run with --live --yes to unsave for real.", file=sys.stderr)
+                    return 2
+                print(f"\n[dry run] {plan['selected']} item(s) would be unsaved from your REAL "
+                      f"Reddit Saved list (reversible via the undo/re-save). Re-run with "
+                      f"--live --yes to execute.", file=sys.stderr)
+                return 0
+            # --- live execution path ---
+            _audit, audit_path = ru.audit_appender(config.db_path())
+            res = ru.drain(conn, limit=args.limit, throttle=args.throttle, audit=_audit,
+                           progress=lambda m: print(m, file=sys.stderr))
+            res["audit_log"] = str(audit_path)
             print(json.dumps(res, indent=2))
             # Non-zero for network errors too (scheduled-run visibility); the printed JSON
             # distinguishes auth_error (re-paste cookie) from network_error (retry later).
@@ -472,7 +504,10 @@ def cmd_reddit_oauth(args) -> int:
             return 2
         state = reddit_oauth.new_state()
         url = reddit_oauth.build_authorize_url(state=state)
-        print("Reddit read-only OAuth — one-time setup:\n")
+        print("Reddit OAuth — one-time setup:\n")
+        print("   (The consent screen will request read + history + identity + save permissions —")
+        print("    that's RedReader's standard scope set. Reads work immediately; save/unsave stays")
+        print("    dormant until you enable it, and bulk unsave needs an explicit --live --yes.)\n")
         print("1) Open this URL in your browser and click 'Allow':\n")
         print("   " + url + "\n")
         print("2) The browser then redirects to a 'redreader://rr_oauth_redir?...' URL it CANNOT")
@@ -497,8 +532,9 @@ def cmd_reddit_oauth(args) -> int:
             print(f"network error talking to Reddit: {exc}", file=sys.stderr)
             return 1
         who = f" as u/{username}" if username else ""
-        print(f"\nOAuth configured{who}. Hydration now uses the sanctioned read-only OAuth "
-              f"transport (the cookie stays as a fallback).")
+        print(f"\nOAuth configured{who}. Hydration now uses the sanctioned OAuth transport "
+              f"(the cookie stays as a fallback). The grant also carries history + save scopes "
+              f"for the saved-list sync and unsave writes (activated separately).")
         return 0
 
 
@@ -790,8 +826,24 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--enable", action="store_true", help="Turn unsave-on-done ON.")
     pu.add_argument("--disable", action="store_true", help="Turn unsave-on-done OFF.")
     pu.add_argument("--drain", action="store_true",
-                    help="Unsave queued items now (the scheduled job runs this). "
-                         "Exits non-zero if the cookie has expired.")
+                    help="Unsave queued items. SAFE BY DEFAULT: a bare --drain is a DRY RUN that "
+                         "lists the scope and sends nothing. Add --live --yes to execute (it "
+                         "MUTATES your real Reddit Saved list). Exits non-zero on an expired auth.")
+    pu.add_argument("--live", action="store_true",
+                    help="With --drain: actually send. Requires --yes too (--live alone refuses).")
+    pu.add_argument("--yes", action="store_true",
+                    help="With --drain --live: the explicit go-ahead to mutate Reddit.")
+    pu.add_argument("--dry-run", action="store_true",
+                    help="With --drain: force the dry-run plan even if --live/--yes are present.")
+    pu.add_argument("--trickle", action="store_true",
+                    help="Bounded, non-interactive drain for a scheduled job (the opted-in "
+                         "continuous lane): drains up to a small cap (default 25) WITHOUT "
+                         "--live --yes, but ONLY when unsave-on-done is enabled — that opt-in + the "
+                         "cap + the audit log is the consent. Use this for scheduled runs, not the "
+                         "big-blast bulk `--drain --live --yes`.")
+    pu.add_argument("--status", action="store_true",
+                    help="Print status (configured? enabled? pending/failed counts) — also the "
+                         "default when no flag is given.")
     pu.add_argument("--enqueue-existing", action="store_true",
                     help="One-time backfill: queue all reddit items already marked 'done'.")
     pu.add_argument("--limit", type=int, default=None, help="Max items to unsave this drain run.")
@@ -801,8 +853,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     po = sub.add_parser(
         "reddit-oauth",
-        help="Set up / inspect the sanctioned read-only Reddit OAuth transport (installed-app, "
-             "no client secret). No args = status; --login authorizes (one-time, interactive).")
+        help="Set up / inspect the sanctioned Reddit OAuth transport (installed-app, no client "
+             "secret; read + history + identity + save scopes). No args = status; --login "
+             "authorizes (one-time, interactive).")
     po.add_argument("--login", action="store_true",
                     help="Interactive one-time authorization: prints an authorize URL, then takes "
                          "the redirected URL/code. Needs REDDIT_OAUTH_CLIENT_ID set.")

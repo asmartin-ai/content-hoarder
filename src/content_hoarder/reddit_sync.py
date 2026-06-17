@@ -1,7 +1,9 @@
-"""Incremental sync of the user's Reddit *saved* list via reddit_session-cookie auth.
+"""Incremental sync of the user's Reddit *saved* list.
 
-No OAuth: GET ``https://www.reddit.com/user/<username>/saved.json`` with the same cookie the
-unsave queue uses. Reddit returns the saved listing **newest-saved-first**, so we walk from the
+Prefers the sanctioned OAuth read path (``oauth.reddit.com/user/<me>/saved``, ``history`` scope)
+when it's configured, else the ``reddit_session`` cookie
+(``www.reddit.com/user/<username>/saved.json``) — the same transport selection as
+``reddit_hydrate.hydrate_one``. Reddit returns the saved listing **newest-saved-first**, so we walk from the
 top and stop the moment we re-reach an item from the previous sync's **high-water mark** — the
 newest ``_MARK_DEPTH`` fullnames, stored as a JSON list in ``settings['reddit_sync_newest']``.
 The mark is a *list*, not a single name, because the unsave drain (and the user, on reddit.com)
@@ -22,7 +24,7 @@ import json
 import time
 import urllib.parse
 
-from content_hoarder import _http, db
+from content_hoarder import _http, db, reddit_oauth
 from content_hoarder.reddit_unsave import (
     RedditAuthError,
     RedditNetworkError,
@@ -51,7 +53,7 @@ def _load_mark(value) -> list[str]:
     return [s]
 
 
-def sync_saved_cookie(
+def sync_saved(
     conn,
     *,
     max_pages: int = 3,
@@ -72,34 +74,62 @@ def sync_saved_cookie(
     (``caught_up``/``all_known``/``exhausted``) or it's the first sync (no mark yet) — never on
     a ``max_pages`` truncation, which could otherwise skip the items below the cutoff forever.
     """
-    getf = getf or _http_get
+    # NOTE: do NOT reassign ``getf`` here — the transport selector below tests ``getf is None``
+    # to decide cookie-vs-OAuth (an injected getf forces the cookie path, keeping every existing
+    # test on it). The cookie branch falls back to ``_http_get`` at the call site instead.
     sleep = sleep or time.sleep
     user_agent = user_agent or cookie_user_agent()
     throttle = max(throttle, _http.MIN_THROTTLE)
     result = {"fetched": 0, "new": 0, "updated": 0, "pages": 0,
               "stopped": None, "auth_error": False, "network_error": False,
-              "username": None}
+              "username": None, "transport": None}
 
-    auth = get_auth(conn)
-    if not auth:
-        result["auth_error"] = True
-        result["stopped"] = "auth_error"
-        return result
+    # Transport selection (mirrors reddit_hydrate.hydrate_one): prefer the sanctioned OAuth read
+    # path when it's configured (refresh token present + an access token mintable + a username to
+    # address /user/<me>/saved) AND the caller injected no cookie getf. Otherwise the cookie path,
+    # which also serves as the OAuth fallback. OAuth ships DORMANT — is_configured stays False
+    # until `reddit-oauth --login`, so until then this is the cookie path byte-for-byte.
+    oauth_token = None
+    if getf is None and reddit_oauth.is_configured(conn):
+        tok = reddit_oauth.access_token(conn)        # None on a permanent refresh failure
+        if tok:
+            uname = reddit_oauth.status(conn).get("username") or reddit_oauth.fetch_username(tok)
+            if uname:                                # need the username to address the listing
+                oauth_token, username = tok, uname
+                ua = reddit_oauth.oauth_user_agent(conn, username=uname)
+                base = "https://oauth.reddit.com/user/" + urllib.parse.quote(uname) + "/saved"
+                result["transport"] = "oauth"
+            elif not get_auth(conn):
+                # OAuth token is valid but the username couldn't be resolved to address
+                # /user/<me>/saved, and there's no cookie to fall back to. Report the REAL cause
+                # (OAuth) rather than letting the cookie branch below mislabel it 'cookie expired'.
+                result["auth_error"] = True
+                result["stopped"] = "auth_error"
+                return result
 
-    username = auth.get("username")
-    if not username:  # learn it from /api/me.json if the stored row predates it
-        try:
-            _modhash, username = _refresh_modhash(
-                auth["session_cookie"], user_agent=user_agent, getf=getf
-            )
-        except RedditAuthError:
+    if not oauth_token:                              # cookie path (also the OAuth fallback)
+        ua = user_agent
+        auth = get_auth(conn)
+        if not auth:
             result["auth_error"] = True
             result["stopped"] = "auth_error"
             return result
-        except RedditNetworkError:
-            result["network_error"] = True
-            result["stopped"] = "network_error"
-            return result
+        username = auth.get("username")
+        if not username:  # learn it from /api/me.json if the stored row predates it
+            try:
+                _modhash, username = _refresh_modhash(
+                    auth["session_cookie"], user_agent=ua, getf=getf
+                )
+            except RedditAuthError:
+                result["auth_error"] = True
+                result["stopped"] = "auth_error"
+                return result
+            except RedditNetworkError:
+                result["network_error"] = True
+                result["stopped"] = "network_error"
+                return result
+        base = SAVED_URL.format(user=urllib.parse.quote(username))
+        result["transport"] = "cookie"
     result["username"] = username
 
     from content_hoarder.connectors.reddit import child_to_item
@@ -109,7 +139,6 @@ def sync_saved_cookie(
     mark_set = set(marks)
     top_names: list[str] = []  # current top of the listing, in order — becomes the next mark
     synced: list[str] = []     # fullnames upserted this run, newest-first (for monotonic saved_utc)
-    base = SAVED_URL.format(user=urllib.parse.quote(username))
     after = ""
     hit_mark = False
 
@@ -119,15 +148,27 @@ def sync_saved_cookie(
         params = {"limit": per_page, "raw_json": 1}
         if after:
             params["after"] = after
+        url = base + "?" + urllib.parse.urlencode(params)
         try:
-            body = getf(base + "?" + urllib.parse.urlencode(params),
-                        session_cookie=auth["session_cookie"], user_agent=user_agent) or {}
+            if oauth_token:
+                body = reddit_oauth.oauth_get(url, bearer=oauth_token, user_agent=ua) or {}
+            else:
+                body = (getf or _http_get)(
+                    url, session_cookie=auth["session_cookie"], user_agent=ua) or {}
         except RedditNetworkError:
             # Not a real boundary — never advances the mark (unlike empty/exhausted).
             result["network_error"] = True
             result["stopped"] = "network_error"
             break
-        data = body.get("data") or {}
+        data = body.get("data")
+        if data is None:
+            # The {} sentinel from oauth_get/_http_get means 401/403 — the token/cookie is invalid.
+            # A real saved listing (even an empty one) always carries a "data" envelope, so a missing
+            # "data" is a DEAD SESSION, not "no saved items". Surface auth_error (and don't advance
+            # the mark) instead of silently reporting 'empty'/'exhausted' on a green run.
+            result["auth_error"] = True
+            result["stopped"] = "auth_error"
+            break
         children = data.get("children") or []
         if not children:
             result["stopped"] = "empty" if page == 0 else "exhausted"
@@ -192,3 +233,9 @@ def sync_saved_cookie(
         db.set_setting(conn, _MARK_KEY, json.dumps(top_names), commit=False)
     conn.commit()
     return result
+
+
+# Backward-compatible name: this was cookie-only before the OAuth read path was added. The public
+# entry point is now ``sync_saved`` (transport-aware); the old name stays as an alias so existing
+# callers/tests keep working. With an injected ``getf`` it is the cookie path, unchanged.
+sync_saved_cookie = sync_saved

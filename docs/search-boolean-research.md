@@ -2,7 +2,7 @@
 
 Date: 2026-06-12 (overnight research run, unattended)
 Scope: Epic 12 — `source:reddit AND source:youtube` does nothing useful today (an item has ONE source; bare `AND` is free text).
-Grounding: `K:\Projects\ch-score\src\content_hoarder\search_query.py` (read-only worktree, main branch) read in full this session.
+Grounding: `src\content_hoarder\search_query.py` on `main` (read in full this session via the read-only `ch-score` worktree, since removed 2026-06-16).
 Quote discipline: every verbatim quote below was fetched this session and re-verified against the raw downloaded HTML of the cited page. Anything not in quotes is paraphrase. One claim is explicitly marked as community-observed (not in official docs).
 
 ---
