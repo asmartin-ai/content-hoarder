@@ -329,6 +329,11 @@ def _fetch_username(token: str, *, getf=None) -> str | None:
     return (me.get("name") or None) if isinstance(me, dict) else None
 
 
+# Public name for callers outside this module (e.g. reddit_sync) so they don't reach into the
+# underscore-private helper. Same best-effort contract: returns the authed username or None.
+fetch_username = _fetch_username
+
+
 def login(conn, redirect_response: str, *, expected_state: str, post=None, getf=None,
           now=None) -> str:
     """Complete the one-time flow: validate + exchange the pasted redirect, fetch the username for

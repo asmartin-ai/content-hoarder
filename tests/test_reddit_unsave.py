@@ -469,3 +469,57 @@ def test_http_get_401_returns_empty_no_retry(monkeypatch):
 
 def test_cookie_user_agent_is_browser_like():
     assert ru.cookie_user_agent().startswith("Mozilla/")
+
+
+# --- limit=0 must drain NOTHING, not the whole queue (footgun fix) -----------
+
+def test_drain_limit_zero_sends_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post()
+    res = ru.drain(conn, limit=0, post=post, getf=_ok_me, sleep=lambda s: None)
+    assert res["selected"] == 0 and res["unsaved"] == 0  # LIMIT 0 selects no rows
+    assert post.calls == []
+    assert all(st == "pending" for st in _queue(conn).values())  # nothing drained
+
+
+def test_drain_plan_limit_zero_selects_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    assert ru.drain(conn, limit=0, dry_run=True)["selected"] == 0
+
+
+# --- OAuth 401 halts like cookie 403 (auth_error, not a per-item failure) ----
+
+def test_drain_oauth_401_halts_as_auth_error(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post(decide=lambda f: (401, {}))           # bearer revoked/expired
+    res = ru.drain(conn, post=post, getf=_ok_me, sleep=lambda s: None)
+    assert res["auth_error"] is True and res["unsaved"] == 0
+    assert all(st == "pending" for st in _queue(conn).values())  # NOT burned to 'failed'
+
+
+# --- OAuth bearer re-minted per item so a long drain can't outlive the TTL ----
+
+def test_drain_oauth_remints_bearer_per_item(conn, monkeypatch):
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a", "t3_b")
+    _configure_oauth(conn)
+    n = {"i": 0}
+
+    def fake_access(c, **kw):           # a fresh token each mint (simulates a refresh mid-drain)
+        n["i"] += 1
+        return f"AT{n['i']}"
+
+    bearers = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        bearers.append(bearer)
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "access_token", fake_access)
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    res = ru.drain(conn, sleep=lambda s: None)
+    assert res["unsaved"] == 2
+    assert len(set(bearers)) == 2 and bearers[0] != bearers[1]  # each item re-minted, not stale
