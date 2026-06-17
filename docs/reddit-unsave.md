@@ -10,10 +10,20 @@ modhash CSRF token read from `/api/me.json`.
 1. **Done enqueues, locally and instantly.** When `reddit_unsave_on_done` is enabled, marking a reddit
    post/comment Done inserts a row into the `reddit_unsave` queue table (in the same commit as the status
    change). Triage never waits on the network and never fails because Reddit is unreachable.
-2. **A drain does the throttled network work**, on demand: a scheduled job (`reddit-unsave --drain`), the
-   "Reddit sync" button on the Browse page, or "Sync now" in the triage menu. The drain refreshes the
-   modhash once, then POSTs `/api/unsave` ~1/sec with 429 backoff. On success it marks the row `done` and
-   sets `items.is_saved = 0`.
+2. **A drain does the throttled network work.** Three ways it runs:
+   - **Async trickle (automatic).** While the app is running, a background drainer flushes a small
+     capped batch (~25) shortly after triage activity *settles* (a ~30s idle debounce), so processing
+     the inbox quietly shrinks your real Saved list. Opt-in via the enable toggle; bounded by the cap +
+     jitter + the audit log — that's the consent, not a per-item prompt.
+   - **Scheduled job (`reddit-unsave --trickle`).** The same bounded, non-interactive drain for an OS
+     scheduler (phone-triage → PC-drain). Skips itself unless unsave-on-done is enabled.
+   - **Bulk manual (`reddit-unsave --drain --live --yes`).** The big-blast "flush everything" path —
+     **dry-run by default**, executes only with both flags (money-action gate). Plus the "Reddit sync"
+     button / "Sync now" in the triage menu.
+
+   All paths refresh the modhash once (or use the OAuth `save` scope when configured), then POST
+   `/api/unsave` with jittered throttle + 429 backoff; on success they mark the row `done`, set
+   `items.is_saved = 0`, and append to `data/unsave-audit.jsonl`.
 3. **Idempotent.** Unsaving an item that isn't actually saved is a harmless Reddit no-op, so the queue
    never trusts the local `is_saved` flag — it just attempts the unsave.
 4. **Undo:** undoing a Done *before* the drain runs removes the queued row (nothing is sent). Undoing
@@ -45,15 +55,19 @@ shows a "session expired" banner), re-run `--login` / re-paste the cookie.
 
 ## Draining on a schedule (recommended)
 
-Triage on your phone enqueues; let your PC drain when it's on. Windows Task Scheduler example (every 30 min):
+Triage on your phone enqueues; let your PC drain when it's on. Use **`--trickle`** (the bounded,
+non-interactive lane) for scheduled runs — **not** `--drain`, which is now dry-run unless you pass
+`--live --yes` (the bulk money-action gate, wrong for an unattended job). Windows Task Scheduler
+example (every 30 min):
 
 ```
 schtasks /Create /TN "content-hoarder reddit unsave" /SC MINUTE /MO 30 /TR ^
-  "/path/to/content-hoarder/.venv/Scripts/python.exe -m content_hoarder reddit-unsave --drain --limit 200"
+  "/path/to/content-hoarder/.venv/Scripts/python.exe -m content_hoarder reddit-unsave --trickle --limit 200"
 ```
 
-`--drain` prints a JSON summary (`{selected, unsaved, failed, auth_error, remaining}`) and exits non-zero
-on `auth_error` so a scheduled run can alert you.
+`--trickle` prints a JSON summary (`{selected, unsaved, failed, auth_error, remaining, transport,
+audit_log}`), skips itself (exit 0) when unsave-on-done is disabled, and exits non-zero on `auth_error`
+so a scheduled run can alert you.
 
 ## End-to-end verification (do this on a COPY of the DB first)
 

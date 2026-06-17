@@ -62,6 +62,14 @@ def create_app(db_path: str | None = None) -> Flask:
     def conn():
         return closing(db.connect(app.config["DB_PATH"]))
 
+    # Async unsave trickle: a Done enqueues instantly (db.set_status); this background drainer
+    # flushes a small capped batch once triage settles (idle debounce). Opt-in via
+    # reddit_unsave_on_done + bounded (small cap, jitter, audit) — that's the consent, not a
+    # per-fire prompt. The big-blast bulk drain keeps its --live --yes gate. See reddit_trickle.
+    from content_hoarder import reddit_trickle, reddit_unsave
+    _unsave_audit, _unsave_audit_path = reddit_unsave.audit_appender(app.config["DB_PATH"])
+    _trickle = reddit_trickle.TrickleDrainer(conn, audit=_unsave_audit)
+
     @app.before_request
     def _same_origin_guard():
         # CSRF / DNS-rebinding guard. The app holds a live reddit_session cookie and some
@@ -234,10 +242,17 @@ def create_app(db_path: str | None = None) -> Flask:
         try:
             with conn() as c:
                 item = db.set_status(c, fullname, status)
+                # Arm the unsave trickle when a reddit item is Done and unsave-on-done is opted in;
+                # read the flag on this same conn (no extra connection in the hot path).
+                arm_trickle = (item is not None and status == "done"
+                               and fullname.startswith("reddit:")
+                               and db.get_setting(c, "reddit_unsave_on_done", "0") == "1")
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         if item is None:
             return jsonify({"error": "not found"}), 404
+        if arm_trickle:                       # (re)arm the idle debounce; returns immediately
+            _trickle.note_enqueue()
         return jsonify(item)
 
     @app.post("/items/<path:fullname>/undo")
@@ -376,7 +391,9 @@ def create_app(db_path: str | None = None) -> Flask:
         # loop; the CLI/scheduled job is the right tool for bulk drains.
         limit = min(max(_int(body.get("max"), 50), 1), 500)
         with conn() as c:
-            res = ru.drain(c, limit=limit)
+            # Pass the shared audit appender: a web-initiated live drain is a real money-action and
+            # must leave the same reconstructable unsave-audit.jsonl trail as the CLI/trickle paths.
+            res = ru.drain(c, limit=limit, audit=_unsave_audit)
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/resave")
@@ -558,7 +575,7 @@ def create_app(db_path: str | None = None) -> Flask:
             max_pages = 50 if full else 3
         max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
-            res = reddit_sync.sync_saved_cookie(c, max_pages=max_pages, stop_on_known=not full)
+            res = reddit_sync.sync_saved(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
 
     @app.get("/sources")

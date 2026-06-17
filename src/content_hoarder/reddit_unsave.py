@@ -18,6 +18,9 @@ from content_hoarder import _http, config
 UNSAVE_URL = "https://www.reddit.com/api/unsave"
 SAVE_URL = "https://www.reddit.com/api/save"
 ME_URL = "https://www.reddit.com/api/me.json"
+# OAuth write endpoints (oauth.reddit.com) — used when the sanctioned save-scope path is configured.
+OAUTH_UNSAVE_URL = "https://oauth.reddit.com/api/unsave"
+OAUTH_SAVE_URL = "https://oauth.reddit.com/api/save"
 
 # Per-row drain-failure cap: a permanently-erroring item (e.g. Reddit answers 400 for it
 # forever) flips to state='failed' instead of re-consuming the ~1 req/s throttle every run.
@@ -213,8 +216,11 @@ def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, mod
         )
         if status in (200, 201):
             return True, None
-        if status == 403:
-            raise RedditAuthError("Reddit returned 403 — cookie/modhash likely expired")
+        if status in (401, 403):
+            # 403 = cookie/modhash expired (web path); 401 = bearer invalid/revoked (OAuth path).
+            # Both are auth failures that must HALT the drain (so it doesn't burn every row to
+            # state='failed') and surface as auth_error so the caller re-authenticates.
+            raise RedditAuthError(f"Reddit returned {status} — auth (cookie/modhash or OAuth token) expired")
         if status == 429 and attempt < max_retries:
             ra = _retry_after_seconds(headers)
             sleep(ra if ra is not None else delay)
@@ -224,45 +230,146 @@ def _send_with_retry(post, url: str, reddit_id: str, *, session_cookie: str, mod
     return False, "rate limited (max retries)"
 
 
+def _oauth_write_transport(conn):
+    """If OAuth is configured with a mintable access token, return a write transport tuple
+    ``(post, user_agent)`` for the sanctioned save-scope path; else ``None`` (caller uses the
+    cookie). The returned ``post`` matches ``_http_post``'s signature so ``_send_with_retry`` stays
+    transport-agnostic — it ignores the cookie/modhash kwargs and authorizes with the bearer
+    (which is also the CSRF token, so no modhash). Imported lazily: ``reddit_oauth`` imports from
+    this module, so a top-level import would be circular.
+
+    WRITES are the elevated-risk lane, so the OAuth path (Reddit's sanctioned programmatic budget)
+    is strictly preferable to scripting the logged-in web endpoints with the session cookie."""
+    from content_hoarder import reddit_oauth
+    if not reddit_oauth.is_configured(conn):
+        return None
+    bearer = reddit_oauth.access_token(conn)          # None on a permanent refresh failure
+    if not bearer:
+        return None
+    ua = reddit_oauth.oauth_user_agent(conn)
+
+    def post(url, fields, *, session_cookie=None, modhash=None, user_agent=None):
+        # Re-mint per call so a drain that outlives the ~1h access-token TTL refreshes
+        # transparently: access_token() returns the cached token until the refresh window, then
+        # mints once. Fall back to the bearer resolved above if a transient refresh yields nothing.
+        token = reddit_oauth.access_token(conn) or bearer
+        return reddit_oauth.oauth_post(url, {"id": fields["id"]}, bearer=token,
+                                       user_agent=user_agent or ua)
+
+    return post, ua
+
+
+def _select_write_transport(conn, *, injected, post, getf, user_agent, oauth_url, cookie_url):
+    """Resolve the write transport shared by ``drain`` and ``resave`` (was copy-pasted in both).
+
+    On success returns ``{send_post, url, session_cookie, modhash, ua, transport}``; on a cookie-path
+    failure returns ``{"error": "auth"}`` or ``{"error": "network"}`` for the caller to map to its own
+    result shape. OAuth (the sanctioned save scope) is preferred when configured AND nothing was
+    injected — an injected ``post``/``getf`` forces the cookie golden path. The cookie branch refreshes
+    the modhash and persists it (``set_auth``) so a later call reuses a fresh token."""
+    oauth = None if injected else _oauth_write_transport(conn)
+    if oauth:
+        send_post, ua = oauth
+        return {"send_post": send_post, "url": oauth_url, "session_cookie": "",
+                "modhash": "", "ua": ua, "transport": "oauth"}
+    send_post = post or _http_post
+    getf = getf or _http_get
+    auth = get_auth(conn)
+    if not auth:
+        return {"error": "auth"}
+    try:
+        modhash, username = _refresh_modhash(auth["session_cookie"], user_agent=user_agent, getf=getf)
+    except RedditAuthError:
+        return {"error": "auth"}
+    except RedditNetworkError:
+        return {"error": "network"}
+    set_auth(conn, session_cookie=auth["session_cookie"], modhash=modhash, username=username)
+    return {"send_post": send_post, "url": cookie_url, "session_cookie": auth["session_cookie"],
+            "modhash": modhash, "ua": user_agent, "transport": "cookie"}
+
+
 # ---------------------------------------------------------------------------
 # Drain (batch, throttled, resumable) + undo re-save
 # ---------------------------------------------------------------------------
 
+def audit_appender(db_path):
+    """Return ``(append, path)``: ``append(rec)`` writes one JSON record per line to
+    ``unsave-audit.jsonl`` beside the DB, and ``path`` is that file. Shared by the CLI drain,
+    the CLI trickle, and the web app so the money-action audit trail has ONE format + location
+    (this was copy-pasted into three call sites)."""
+    from pathlib import Path
+    path = Path(db_path).with_name("unsave-audit.jsonl")
+
+    def append(rec):
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    return append, path
+
+def _drain_plan(conn, limit: int | None = None) -> dict:
+    """The dry-run scope of an unsave drain (money-action-safety §1): which pending items WOULD be
+    unsaved, with per-subreddit counts + a sample. No network, no writes — this is the confirmation
+    surface the user reviews before passing --live --yes."""
+    sql = ("SELECT u.fullname, u.reddit_id, i.title, "
+           "json_extract(i.metadata, '$.subreddit') AS subreddit "
+           "FROM reddit_unsave u LEFT JOIN items i ON i.fullname = u.fullname "
+           "WHERE u.state='pending' ORDER BY u.enqueued_utc")
+    rows = (conn.execute(sql + " LIMIT ?", (limit,)) if limit is not None
+            else conn.execute(sql)).fetchall()
+    by_sub: dict = {}
+    for r in rows:
+        by_sub[r["subreddit"] or "?"] = by_sub.get(r["subreddit"] or "?", 0) + 1
+    return {
+        "dry_run": True,
+        "selected": len(rows),
+        "by_subreddit": dict(sorted(by_sub.items(), key=lambda kv: -kv[1])),
+        "sample": [{"fullname": r["fullname"], "subreddit": r["subreddit"],
+                    "title": (r["title"] or "")[:80]} for r in rows[:20]],
+    }
+
+
 def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.sleep,
-          post=None, getf=None, user_agent: str | None = None, progress=None) -> dict:
+          post=None, getf=None, user_agent: str | None = None, progress=None,
+          dry_run: bool = False, audit=None) -> dict:
     """Unsave pending queue rows on Reddit. Refreshes the modhash once up front and fails fast
     (auth_error, nothing sent) on a dead cookie. Returns a summary dict.
+
+    ``dry_run=True`` returns the scope plan (``_drain_plan``) with NO network/writes — the
+    money-action confirmation surface. ``audit`` (optional callable) is invoked with a record per
+    successful unsave (ts, fullname, reddit_id, transport) so every live write is reconstructable.
 
     Elevated-risk path (de-risking feature 6): programmatic WRITES are what Reddit's automated
     enforcement actually targets, so this is treated more cautiously than reads — it stays behind
     the approve-scope gate (``reddit_unsave_on_done`` + the enqueue step), paces with a *jittered*
     throttle floored at the global rate cap (no exact-interval fingerprint, never above ~100 QPM),
     honors ``Retry-After``, and 403-halts. Keep drains modest rather than mass-draining in one run."""
-    post = post or _http_post
-    getf = getf or _http_get
+    # An injected post/getf (the cookie golden tests) forces the cookie path; check BEFORE the
+    # `or _http_*` fallbacks reassign them. OAuth ships DORMANT — engages only after `--login`.
+    injected = post is not None or getf is not None
     user_agent = user_agent or cookie_user_agent()
     throttle = max(throttle, _http.MIN_THROTTLE)
     result = {"selected": 0, "unsaved": 0, "failed": 0, "auth_error": False,
-              "network_error": False, "remaining": count_pending(conn)}
+              "network_error": False, "transport": None, "remaining": count_pending(conn)}
 
-    auth = get_auth(conn)
-    if not auth:
+    if dry_run:                          # safe-by-default: list the scope, send nothing
+        return _drain_plan(conn, limit)
+
+    t = _select_write_transport(conn, injected=injected, post=post, getf=getf,
+                                user_agent=user_agent, oauth_url=OAUTH_UNSAVE_URL,
+                                cookie_url=UNSAVE_URL)
+    if t.get("error") == "auth":
         result["auth_error"] = True
         return result
-    try:
-        modhash, username = _refresh_modhash(
-            auth["session_cookie"], user_agent=user_agent, getf=getf
-        )
-    except RedditAuthError:
-        result["auth_error"] = True
+    if t.get("error") == "network":
+        result["network_error"] = True   # Reddit unreachable — queue intact, retry later
         return result
-    except RedditNetworkError:
-        result["network_error"] = True  # Reddit unreachable — queue intact, retry later
-        return result
-    set_auth(conn, session_cookie=auth["session_cookie"], modhash=modhash, username=username)
+    send_post, unsave_url = t["send_post"], t["url"]
+    session_cookie, modhash, ua = t["session_cookie"], t["modhash"], t["ua"]
+    result["transport"] = t["transport"]
 
     sql = "SELECT fullname, reddit_id FROM reddit_unsave WHERE state='pending' ORDER BY enqueued_utc"
-    rows = (conn.execute(sql + " LIMIT ?", (limit,)) if limit else conn.execute(sql)).fetchall()
+    rows = (conn.execute(sql + " LIMIT ?", (limit,)) if limit is not None
+            else conn.execute(sql)).fetchall()
     result["selected"] = len(rows)
 
     for i, row in enumerate(rows):
@@ -271,8 +378,8 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
         fullname, reddit_id = row["fullname"], row["reddit_id"]
         try:
             ok, err = _send_with_retry(
-                post, UNSAVE_URL, reddit_id, session_cookie=auth["session_cookie"],
-                modhash=modhash, user_agent=user_agent, sleep=sleep,
+                send_post, unsave_url, reddit_id, session_cookie=session_cookie,
+                modhash=modhash, user_agent=ua, sleep=sleep,
             )
         except RedditAuthError:
             result["auth_error"] = True
@@ -284,6 +391,9 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
             conn.execute("UPDATE items SET is_saved=0 WHERE fullname=?", (fullname,))
             conn.commit()
             result["unsaved"] += 1
+            if audit:  # append-before-continue: every live write is reconstructable (safety §7)
+                audit({"ts": now, "fullname": fullname, "reddit_id": reddit_id,
+                       "transport": result["transport"]})
             if progress:
                 progress(f"unsaved {reddit_id}")
         else:
@@ -302,12 +412,8 @@ def drain(conn, *, limit: int | None = None, throttle: float = 1.0, sleep=time.s
 
 def resave(conn, fullname: str, *, post=None, getf=None, user_agent: str | None = None) -> bool:
     """Best-effort re-save (undo of a drained 'done'). Returns True if Reddit accepted the save."""
-    post = post or _http_post
-    getf = getf or _http_get
     user_agent = user_agent or cookie_user_agent()
-    auth = get_auth(conn)
-    if not auth:
-        return False
+    injected = post is not None or getf is not None
 
     row = conn.execute(
         "SELECT reddit_id FROM reddit_unsave WHERE fullname=?", (fullname,)
@@ -322,16 +428,20 @@ def resave(conn, fullname: str, *, post=None, getf=None, user_agent: str | None 
             return False
         reddit_id = item["source_id"]
 
-    try:
-        modhash, username = _refresh_modhash(
-            auth["session_cookie"], user_agent=user_agent, getf=getf
-        )
-    except (RedditAuthError, RedditNetworkError):
+    # Same transport selection as drain (re-save over OAuth when configured so undo works for an
+    # OAuth-only setup, else the cookie); an injected post/getf forces the cookie path (golden).
+    t = _select_write_transport(conn, injected=injected, post=post, getf=getf,
+                                user_agent=user_agent, oauth_url=OAUTH_SAVE_URL,
+                                cookie_url=SAVE_URL)
+    if "error" in t:                     # no auth (cookie missing / expired / unreachable) -> no undo
         return False
+    send_post, save_url = t["send_post"], t["url"]
+    session_cookie, modhash, ua = t["session_cookie"], t["modhash"], t["ua"]
+
     try:
         ok, _err = _send_with_retry(
-            post, SAVE_URL, reddit_id, session_cookie=auth["session_cookie"],
-            modhash=modhash, user_agent=user_agent, sleep=time.sleep,
+            send_post, save_url, reddit_id, session_cookie=session_cookie,
+            modhash=modhash, user_agent=ua, sleep=time.sleep,
         )
     except RedditAuthError:
         return False
