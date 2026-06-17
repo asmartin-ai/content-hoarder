@@ -209,11 +209,11 @@ itemsEl.addEventListener("click", (e) => {
       const v = media.querySelector(".veil"); if (v) v.remove();
       return;
     }
-    // A Reddit image post opens the in-app reader (image + comment thread), like the
-    // native app — not the bare image lightbox. The reader renders the image inline and
-    // its own media tile still opens the raw lightbox (onMedia → openMediaFor). Video/
-    // gallery keep their dedicated viewers.
-    if (item.source === "reddit" && mediaType(item).cls === "image") { readerUI.open(item); return; }
+    // A Reddit image/video post opens the in-app reader (media + comment thread), like the
+    // native app — not the bare lightbox. The reader renders the media tile, which still
+    // opens the raw player/lightbox on tap (onMedia → openMediaFor). Galleries keep their
+    // dedicated stacked viewer.
+    if (item.source === "reddit" && ["image", "video"].includes(mediaType(item).cls)) { readerUI.open(item); return; }
     openMediaFor(item);
     return;
   }

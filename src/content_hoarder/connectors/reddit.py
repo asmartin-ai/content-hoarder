@@ -88,6 +88,22 @@ def _media_type_from_url(url: str) -> str:
     return "link"
 
 
+def preview_thumb(rec: dict) -> str:
+    """A poster/thumbnail image URL from a Reddit submission dict: the hi-res preview
+    image (HTML-unescaped), else the ``thumbnail`` field when it's a real URL (skips the
+    self/default/nsfw/spoiler sentinels). "" when none — used to give v.redd.it videos
+    (which carry no media_url poster) a thumbnail. Mirrors archival.providers._thumb."""
+    if not isinstance(rec, dict):
+        return ""
+    images = (rec.get("preview") or {}).get("images")
+    if isinstance(images, list) and images and isinstance(images[0], dict):
+        src = (images[0].get("source") or {}).get("url")
+        if src:
+            return unescape(src)
+    t = rec.get("thumbnail") or ""
+    return t if isinstance(t, str) and t.startswith("http") else ""
+
+
 def _classify_media(meta: dict, raw_url, permalink: str, body: str, kind: str) -> str:
     """Annotate ``meta['media_type']`` (+ ``media_url``) and return the canonical click URL.
 
@@ -149,6 +165,9 @@ def child_to_item(ch: dict, *, saved_seen_utc: int | None = None):
     kind = "comment" if str(sid).startswith("t1_") else "post"
     body = d.get("selftext") or d.get("body") or ""
     url = _classify_media(meta, d.get("url"), permalink, body, kind)
+    thumb = preview_thumb(d)  # poster for v.redd.it videos (no media_url image) + link/image posts
+    if thumb:
+        meta["thumbnail"] = thumb
     if saved_seen_utc is not None:
         meta["saved_seen_utc"] = saved_seen_utc
     return new_item(
