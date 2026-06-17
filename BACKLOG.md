@@ -140,11 +140,10 @@ false positives.*
   ALREADY fully imported in a prior session (the "only 1 sample" premise was stale; 2,269 firefox +
   promoted YouTube items already present). Confirmed idempotent + non-destructive (total/saved/non-inbox
   counts unchanged, 0 errors, DB intact). Backup retained.
-- [ ] **P2 — Re-surface the Firefox-tabs filter (regression).** The **"📑 Firefox tabs"**
-  (`open_in_firefox=1`) filter referenced above has **no UI control** in the v2 layout — it was lost in
-  the redesign (no `open_in_firefox` toggle in `app.js`/`index.html`). Re-add a way to filter to
-  open-in-Firefox items (incl. the YouTube-promoted tabs); the Firefox **source tab** only filters by
-  source, not this finer flag.
+- [x] ~~**P2 — Re-surface the Firefox-tabs filter (regression).**~~ Shipped (2026-06-17): the v3-native
+  **`is:firefox-tab`** search operator (alias `is:firefoxtab`) filters to `metadata.open_in_firefox=1`,
+  including the YouTube-promoted tabs that `source:firefox` misses. `search_query.ParsedQuery.open_in_firefox`
+  + `web.py` items() wiring + `operators.js` autocomplete hint + spec line; parse test added.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 - [ ] **P2 — Fetch HN saved/favorited items directly (drop the manual Materialistic export).**
