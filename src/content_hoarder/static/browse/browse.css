@@ -333,6 +333,9 @@ body.focus .batchstrip{display:flex}
   letter-spacing:.1em;color:#ffd9bd;background:rgba(12,8,14,.4);z-index:2}
 /* media-less rows reserve the slot invisibly — actions never move (v2 invariant) */
 .monitor.empty{background:transparent;border-color:transparent;cursor:default}
+/* video/gallery with no stored thumbnail — a centered play glyph IS the tap target */
+.monitor.noimg{display:flex;align-items:center;justify-content:center}
+.monitor.noimg .mglyph{position:static;font-size:1.5rem;background:transparent;padding:0;opacity:.85}
 
 /* ===================== PINBOARD ===================== */
 .items.density-card{columns:2;column-gap:var(--sp-4);padding:var(--sp-4)}
