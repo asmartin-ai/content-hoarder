@@ -101,6 +101,7 @@
     var bits = [];
     if (item.author) {
       if (item.source === "reddit") bits.push("by " + metaAnchor("https://www.reddit.com/user/" + encodeURIComponent(item.author), item.author));
+      else if (item.source === "hackernews") bits.push("by " + metaAnchor("https://news.ycombinator.com/user?id=" + encodeURIComponent(item.author), item.author));
       else bits.push("by " + esc(item.author));
     }
     if (m.subreddit) bits.push(metaAnchor("https://www.reddit.com/r/" + encodeURIComponent(m.subreddit), "r/" + m.subreddit));
