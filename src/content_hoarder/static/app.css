@@ -1383,6 +1383,14 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 }
 .comp-link:hover { color: var(--accent); border-color: var(--accent); }
 
+/* HN "Article ↗" chip — comp-link pill, tinted toward the HN source accent so it
+   reads as a distinct outbound action next to the (discussion-opening) title. */
+.art-chip { margin-left: 0.15rem; vertical-align: baseline; }
+.art-chip:hover {
+    color: var(--source-hackernews, var(--accent));
+    border-color: var(--source-hackernews, var(--accent));
+}
+
 .side-section {
     border-top: 1px solid var(--border);
     padding-top: 0.85rem;

@@ -113,6 +113,7 @@ def test_hackernews_import_and_enrich(fixtures, monkeypatch):
     monkeypatch.setattr(c, "_fetch", lambda sid: {
         "type": "story", "title": f"Story {sid}", "url": "http://e/" + str(sid),
         "by": "u", "time": 111, "score": 5, "descendants": 3})
+    monkeypatch.setattr(c, "_fetch_og_image", lambda url: "")  # keep enrich hermetic (no network)
     enriched = c.enrich(its)
     assert len(enriched) == 2
     e = enriched[0]

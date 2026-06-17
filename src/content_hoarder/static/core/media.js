@@ -11,6 +11,7 @@ import { esc, safeUrl } from "./util.js";
 export const thumb = (item, density) => {
   const m = item.metadata || {};
   let t = m.thumbnail || "";
+  if (!t && item.source === "hackernews") t = m.og_image || "";  // article preview (Epic 15 P3)
   if (!t) {
     const url = item.url || "";
     if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
