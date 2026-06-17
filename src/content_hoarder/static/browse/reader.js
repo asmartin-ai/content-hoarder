@@ -95,7 +95,14 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
     const img = imageUrl(item) || m.thumbnail;
-    if (!img) return "";
+    // video/gallery with no poster (thumbnail-less v.redd.it) still gets a glyph-only play
+    // tile so it's tappable; an image with no URL has nothing to show.
+    if (!img) {
+      if (mt.cls === "image") return "";
+      return '<button type="button" class="rd-media noimg" data-media="1" aria-label="' +
+        esc(mt.label || "media") + '"><span class="rd-mglyph" aria-hidden="true">' + mt.icon +
+        "</span></button>";
+    }
     const blur = isNsfw(item) && !revealed;
     return '<button type="button" class="rd-media' + (blur ? " nsfw" : "") +
       '" data-media="1" aria-label="' + esc(mt.label || "media") + '">' +

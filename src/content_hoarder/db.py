@@ -329,6 +329,36 @@ def _update_metadata(conn: sqlite3.Connection, row: dict, metadata: dict) -> Non
     )
 
 
+def patch_item_metadata(
+    conn: sqlite3.Connection, fullname: str, updates: dict, *, only_if_missing: bool = False
+) -> bool:
+    """Shallow-merge ``updates`` into an item's metadata (+ rebuild search_text) WITHOUT
+    touching last_seen_utc, so a background backfill (e.g. lazy thumbnail capture) never
+    reorders the feed. Skips falsy values; ``only_if_missing`` skips keys already set
+    truthy. Returns True iff a write happened. Caller commits."""
+    row = conn.execute("SELECT * FROM items WHERE fullname=?", (fullname,)).fetchone()
+    if row is None:
+        return False
+    md = parse_metadata(dict(row).get("metadata"))
+    changed = False
+    for k, v in updates.items():
+        if v in (None, "", [], {}):
+            continue
+        if only_if_missing and md.get(k):
+            continue
+        if md.get(k) != v:
+            md[k] = v
+            changed = True
+    if not changed:
+        return False
+    item = dict(row)
+    conn.execute(
+        "UPDATE items SET metadata=?, search_text=? WHERE fullname=?",
+        (json.dumps(md, ensure_ascii=False), build_search_text(item, md), fullname),
+    )
+    return True
+
+
 def set_category(conn: sqlite3.Connection, fullname: str, category: str) -> bool:
     """Set metadata.category and keep the processing-area tag mirror in sync."""
     row = get_item(conn, fullname)

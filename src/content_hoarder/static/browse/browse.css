@@ -721,6 +721,9 @@ html.reader-lock{overflow:hidden}
 .rd-media img{display:block;width:100%;max-height:58vh;object-fit:contain}
 .rd-media.nsfw img{filter:blur(26px)}
 .rd-mglyph{position:absolute;left:8px;bottom:8px;font-size:1.1rem}
+/* poster-less video/gallery in the reader — a centered play glyph IS the tap target */
+.rd-media.noimg{display:flex;align-items:center;justify-content:center;min-height:140px}
+.rd-media.noimg .rd-mglyph{position:static;font-size:2rem;opacity:.85}
 .rd-veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font:var(--fw-bold) var(--fs-xs)/1 var(--font-mono);letter-spacing:.08em;color:var(--text-body);
   background:rgba(8,6,12,.42)}

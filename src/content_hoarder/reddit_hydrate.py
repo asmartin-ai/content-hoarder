@@ -227,7 +227,58 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
         comments = 0
 
     db.set_reddit_thread(conn, fullname, json.dumps(data), commit=True)
+    # Lazy thumbnail backfill: the just-fetched submission carries the preview/poster the
+    # initial sync dropped — capture it for the row's feed thumbnail (only if missing).
+    thumb = _thumb_from_thread(data)
+    if thumb and db.patch_item_metadata(conn, fullname, {"thumbnail": thumb}, only_if_missing=True):
+        conn.commit()
     return {"status": "hydrated", "fullname": fullname, "comments": comments}
+
+
+def _thumb_from_thread(data) -> str:
+    """The submission poster from a raw thread payload (``[post-listing, comments]``), or
+    "". Reused by the lazy hydrate capture and the offline backfill."""
+    from content_hoarder.connectors.reddit import preview_thumb
+
+    try:
+        sub = data[0]["data"]["children"][0]["data"]
+    except (KeyError, IndexError, TypeError):
+        return ""
+    return preview_thumb(sub)
+
+
+def backfill_thumbnails(conn, *, apply: bool = False, limit: int | None = None) -> dict:
+    """Offline pass: for reddit items missing ``metadata.thumbnail`` that already have a
+    cached thread blob, extract the submission poster from that blob and patch it in —
+    ZERO network. Dry-run by default; ``apply`` writes. Returns {scanned, eligible, patched}."""
+    rows = conn.execute(
+        "SELECT i.fullname FROM items i JOIN reddit_threads t ON t.fullname = i.fullname "
+        "WHERE i.source='reddit'"
+    ).fetchall()
+    scanned = eligible = patched = 0
+    for r in rows:
+        if limit is not None and scanned >= limit:
+            break
+        scanned += 1
+        fullname = r[0]
+        item = db.get_item(conn, fullname)  # metadata is a raw JSON string here
+        if item is None or models.parse_metadata(item.get("metadata")).get("thumbnail"):
+            continue
+        cached = db.get_reddit_thread(conn, fullname)
+        if not cached:
+            continue
+        try:
+            thumb = _thumb_from_thread(json.loads(cached["thread_json"]))
+        except (ValueError, TypeError):
+            thumb = ""
+        if not thumb:
+            continue
+        eligible += 1
+        if apply and db.patch_item_metadata(conn, fullname, {"thumbnail": thumb}, only_if_missing=True):
+            patched += 1
+    if apply:
+        conn.commit()
+    return {"scanned": scanned, "eligible": eligible, "patched": patched}
 
 
 _HYDRATE_FAIL_TTL = 7 * 24 * 3600  # seconds; retry a terminally-failed hydration after a week
