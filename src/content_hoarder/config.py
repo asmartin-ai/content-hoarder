@@ -24,7 +24,7 @@ _DEFAULTS = {
     # .env with YOUR actual browser's UA string for the closest blend. See docs/reddit-derisking.md.
     "REDDIT_BROWSER_USER_AGENT":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0",
-    # Reddit OAuth (installed-app, read-only). Client id is a PUBLIC installed-app id (e.g.
+    # Reddit OAuth (installed-app; read + history + identity + save scopes). Client id is a PUBLIC installed-app id (e.g.
     # RedReader's) — there is no client secret. The redirect URI must match that app's
     # registered one (RedReader = redreader://rr_oauth_redir). Blank client id = cookie-only.
     "REDDIT_OAUTH_CLIENT_ID": "",

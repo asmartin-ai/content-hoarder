@@ -865,6 +865,94 @@ def enqueue_existing_done(conn: sqlite3.Connection) -> int:
     return after - before
 
 
+def repair_reddit_comment_prefixes(conn: sqlite3.Connection) -> int:
+    """Heal saved COMMENTS that were ingested (pre-fix) with a ``t3_`` (link) prefix instead of
+    ``t1_`` (comment). Reddit's write endpoints 400 on the wrong thing-type, so an unsave of such a
+    row fails forever and parks as ``state='failed'``.
+
+    The correct id is derived from the item's permalink (a comment permalink carries a second id
+    segment: ``/comments/<post>/<slug>/<comment>/``) via the SAME parser the importer uses, so this
+    can't disagree with ingest. Rewrites every place the wrong id lives so a later re-sync can't
+    re-insert a ``t1_`` duplicate of the same comment: ``items.source_id`` **and** the
+    ``fullname`` primary key (``reddit:t3_x`` -> ``reddit:t1_x``), plus the dependent
+    ``reddit_unsave`` (fullname + reddit_id) and ``reddit_threads`` (fullname) rows. ``items_fts`` is
+    kept in sync by the items AFTER UPDATE trigger. A row whose corrected fullname already exists is
+    skipped (no PK collision). Idempotent (fixed rows no longer match ``t3_``). Returns the number of
+    items corrected; commits."""
+    from content_hoarder.connectors.reddit import _sid_from_permalink
+    rows = conn.execute(
+        "SELECT fullname, source_id, json_extract(metadata, '$.permalink') AS permalink "
+        "FROM items WHERE source='reddit' AND source_id LIKE 't3\\_%' ESCAPE '\\'"
+    ).fetchall()
+    fixed = 0
+    for r in rows:
+        correct = _sid_from_permalink(r["permalink"] or "")
+        # Only act when the permalink resolves to a COMMENT for this exact id (same bare base36,
+        # t1_ prefix). A real link/post (correct[:3]=='t3_') or a mismatch is left untouched.
+        if not (correct.startswith("t1_") and correct[3:] == r["source_id"][3:]):
+            continue
+        old_fullname = r["fullname"]
+        new_fullname = "reddit:" + correct
+        if conn.execute("SELECT 1 FROM items WHERE fullname=?", (new_fullname,)).fetchone():
+            continue                       # corrected row already exists — don't collide the PK
+        conn.execute("UPDATE items SET source_id=?, fullname=? WHERE fullname=?",
+                     (correct, new_fullname, old_fullname))
+        conn.execute("UPDATE reddit_unsave SET fullname=?, reddit_id=? WHERE fullname=?",
+                     (new_fullname, correct, old_fullname))
+        conn.execute("UPDATE reddit_threads SET fullname=? WHERE fullname=?",
+                     (new_fullname, old_fullname))
+        fixed += 1
+    conn.commit()
+    return fixed
+
+
+def dedupe_reddit_comment_twins(conn: sqlite3.Connection) -> dict:
+    """Remove phantom ``t3_`` duplicates of saved COMMENTS that ALSO exist (correctly) as ``t1_``.
+
+    A pre-fix ingest recorded some saved comments under BOTH the right id (``reddit:t1_x``) and a
+    wrong link-typed id (``reddit:t3_x``). The ``t3_`` twin is bogus: it shows as a duplicate inbox
+    item and 400s on unsave (Reddit rejects the wrong thing-type). This collapses each pair onto the
+    canonical ``t1_`` row:
+
+    * if the canonical row is still ``inbox`` and the phantom carries a real triage decision, that
+      decision is moved to the canonical row (``set_status``) so a done/archived made on the
+      duplicate isn't lost;
+    * if the phantom was queued for unsave, the REAL comment is queued instead (so the originally
+      intended unsave finally targets a valid id);
+    * the phantom's ``items`` row (``items_fts`` auto-cleaned by the AFTER DELETE trigger),
+      ``reddit_unsave`` row, and ``reddit_threads`` row are deleted.
+
+    Distinct from :func:`repair_reddit_comment_prefixes`, which RENAMES a t3_ comment that has NO
+    t1_ twin. Idempotent. Returns ``{"removed", "status_moved", "requeued"}``; commits."""
+    from content_hoarder.connectors.reddit import _sid_from_permalink
+    rows = conn.execute(
+        "SELECT fullname, source_id, status, json_extract(metadata,'$.permalink') AS permalink "
+        "FROM items WHERE source='reddit' AND source_id LIKE 't3\\_%' ESCAPE '\\'"
+    ).fetchall()
+    removed = status_moved = requeued = 0
+    for r in rows:
+        correct = _sid_from_permalink(r["permalink"] or "")
+        if not (correct.startswith("t1_") and correct[3:] == r["source_id"][3:]):
+            continue
+        twin_fullname = "reddit:" + correct
+        twin = conn.execute("SELECT status FROM items WHERE fullname=?", (twin_fullname,)).fetchone()
+        if not twin:
+            continue                       # no twin -> a true orphan; repair_reddit_comment_prefixes
+        phantom = r["fullname"]
+        if twin["status"] == "inbox" and r["status"] != "inbox":
+            set_status(conn, twin_fullname, r["status"])   # move the only triage signal onto the real row
+            status_moved += 1
+        if conn.execute("SELECT 1 FROM reddit_unsave WHERE fullname=?", (phantom,)).fetchone():
+            enqueue_unsave(conn, twin_fullname)            # queue the REAL comment (valid id)
+            requeued += 1
+        conn.execute("DELETE FROM reddit_unsave WHERE fullname=?", (phantom,))
+        conn.execute("DELETE FROM reddit_threads WHERE fullname=?", (phantom,))
+        conn.execute("DELETE FROM items WHERE fullname=?", (phantom,))
+        removed += 1
+    conn.commit()
+    return {"removed": removed, "status_moved": status_moved, "requeued": requeued}
+
+
 def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> int:
     """Queue every still-saved reddit item carrying *tag* for unsaving.
 

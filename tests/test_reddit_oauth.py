@@ -20,7 +20,7 @@ def test_build_authorize_url_has_required_params():
     q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
     assert q == {"client_id": "CID", "response_type": "code", "state": "ST",
                  "redirect_uri": "redreader://rr_oauth_redir",
-                 "duration": "permanent", "scope": "read"}
+                 "duration": "permanent", "scope": "read history identity save"}
 
 
 def test_build_authorize_url_requires_client_id(monkeypatch):
@@ -220,6 +220,25 @@ def test_oauth_get_429_exhausts_to_network_error(monkeypatch):
     with pytest.raises(ru.RedditNetworkError):
         reddit_oauth.oauth_get("http://x", bearer="AT", user_agent="ua", sleep=slept.append)
     assert len(calls) == 5 and len(slept) == 4
+
+
+# ---------- oauth_post (bearer POST) ----------
+
+def test_oauth_post_sends_bearer_and_returns_status(monkeypatch):
+    calls = _install_opener(monkeypatch, lambda req, n: _Resp(status=200, body=b"{}"))
+    status, _headers = reddit_oauth.oauth_post(
+        "http://x", {"id": "t3_a"}, bearer="AT", user_agent="ua")
+    assert status == 200
+    assert calls[0].get_header("Authorization") == "bearer AT"
+    assert calls[0].get_method() == "POST"
+
+
+def test_oauth_post_http_error_returns_status_not_raise(monkeypatch):
+    # A 403/429 is data the caller's retry/halt logic acts on, not an exception.
+    _install_opener(monkeypatch, lambda req, n: _herror(403))
+    status, _headers = reddit_oauth.oauth_post(
+        "http://x", {"id": "t3_a"}, bearer="AT", user_agent="ua")
+    assert status == 403
 
 
 # ---------- transport selection in hydrate_one ----------

@@ -60,10 +60,11 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
-| `reddit-sync` | Pull new saved Reddit items via the `reddit_session` cookie (newest-first, stop-on-overlap; set the cookie with `reddit-unsave --login`). |
-| `reddit-unsave [--enable\|--disable] [--drain] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit over the cookie (rate-limited, 429 backoff). Run against a DB copy first — it mutates real Reddit state. |
-| `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **read-only OAuth** hydration transport (installed-app, no client secret; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
+| `reddit-sync` | Pull new saved Reddit items (newest-first, stop-on-overlap). Prefers the OAuth `history` scope when configured, else the `reddit_session` cookie (set it with `reddit-unsave --login`). |
+| `reddit-unsave [--enable\|--disable] [--drain [--live --yes]] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit. **`--drain` is a DRY RUN by default** (lists the scope, sends nothing); add `--live --yes` to execute — it MUTATES your real Reddit Saved list (reversible via re-save), is jittered + rate-limited with 429 backoff, prefers the sanctioned OAuth `save` scope when configured (else the cookie), and appends every unsave to `data/unsave-audit.jsonl`. |
+| `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **OAuth** transport (installed-app, no client secret; requests read + history + identity + save scopes; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads (hydration, saved-list sync) **and** writes (unsave) — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
 | `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item (OAuth if configured, else cookie), `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (jittered throttle, small cap, resumable; safe-by-default — needs `--yes` to fetch). |
+| `reddit-hydrate-titles [--network] [--dry-run] [--limit N]` | Backfill real titles for saved Reddit **comments** that imported as "(untitled)" — the saved row is the comment, so the title is its submission's title. Default fills from already-cached thread JSON (offline); `--network` recovers the rest via PullPush/Arctic-Shift. |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |
@@ -72,6 +73,37 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
 | `export --out FILE [--format csv\|json] [--tag T...] [--status S]` | Dump matching items to CSV/JSON (permalink-oriented, for re-saving elsewhere). Same filters live at `GET /export`. |
 | `promote [--status keep] [--dry-run]` | (Opt-in) push items you've marked **keep** to a stock Karakeep instance via its API. |
+
+### Reddit hydration & recovery — worked examples
+"Hydration" caches a saved post's full comment thread so the **inline reader** can show it offline.
+Reads are low-risk; the app pushes them lower with jittered throttling, 429/Retry-After backoff, a
+browser-blending User-Agent, and an optional sanctioned read-only OAuth transport — background and
+rationale in [docs/reddit-derisking.md](docs/reddit-derisking.md).
+
+```bash
+# (Optional, recommended) one-time: switch hydration onto the sanctioned read-only OAuth lane.
+# Set REDDIT_OAUTH_CLIENT_ID in .env first (see .env.example), then authorize interactively:
+python -m content_hoarder reddit-oauth --login      # paste the redirected URL back when prompted
+python -m content_hoarder reddit-oauth --status      # confirm it's configured (else cookie is used)
+
+# Hydrate one thread on demand (OAuth if configured, else the reddit_session cookie):
+python -m content_hoarder reddit-hydrate t3_abc123
+
+# Hydrate offline from a local BDFR archive — lossless, no network, no account exposure:
+python -m content_hoarder reddit-hydrate --from "K:\path\to\bdfr_export"
+
+# Bulk-hydrate the prioritized backlog. Safe-by-default: a bare --batch is a dry-run preview;
+# add --yes to actually fetch (jittered throttle, small cap (25), resumable):
+python -m content_hoarder reddit-hydrate --batch              # preview what would be fetched
+python -m content_hoarder reddit-hydrate --batch --yes        # fetch for real
+
+# Backfill real titles for saved Reddit COMMENTS that imported as "(untitled)":
+python -m content_hoarder reddit-hydrate-titles               # offline: fill from cached threads
+python -m content_hoarder reddit-hydrate-titles --network     # recover the rest via PullPush/Arctic
+
+# Recover [removed]/[deleted] Reddit posts & un-hydrated saved comments from archive mirrors:
+python -m content_hoarder enrich --source reddit --archives
+```
 
 ## Mobile access
 The app is a responsive PWA you can install via **Add to Home Screen** (on Firefox for Android, use

@@ -161,3 +161,17 @@ Two **distinct** mechanisms — don't conflate them:
   cookie-path UA/throttle changes + `reddit-oauth` CLI). +32 offline unit tests; full suite 453
   passed. See "Implementation notes" for as-built decisions. OAuth ships dormant pending a one-time
   `reddit-oauth --login`.
+- 2026-06-16 (later, branch `feat/reddit-oauth-write`) — **extended OAuth from read-only to the full
+  RedReader scope set** (`read history identity save`; Reddit grants scopes per-authorize-request, so
+  the public installed-app id can request them all — one re-login covers everything). Built on top:
+  (Phase 1) OAuth-preferred **saved-list sync** over `oauth.reddit.com/user/<me>/saved`; (Phase 2)
+  OAuth **write transport** (`oauth_post`) routing `reddit_unsave.drain`/`resave` through the
+  sanctioned `save` scope when configured (cookie fallback); (Phase 3) a **money-action gate** on bulk
+  `reddit-unsave --drain` — dry-run by default, `--live --yes` to execute, every unsave appended to
+  `data/unsave-audit.jsonl`. Rationale: scripting the logged-in web endpoints with the cookie is the
+  against-ToS pattern *regardless of volume*, so moving writes onto OAuth is a risk REDUCTION, not an
+  increase. OAuth still ships dormant (engages only after `reddit-oauth --login`). Offline-tested;
+  full suite 464 passed. **DEFERRED** (needs a design call): trickle-unsave-on-process — the module
+  intentionally decouples enqueue-on-done (instant) from drain (background) so triage stays instant
+  and a flaky auth never blocks a "Done"; a synchronous per-tap unsave would violate that, so the
+  sync-vs-async choice is left to the user.

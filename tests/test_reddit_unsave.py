@@ -196,6 +196,88 @@ def test_resave_auth_dead_returns_false(conn):
     assert ok is False
 
 
+# --- OAuth write transport (Phase 2: prefer the sanctioned save scope) -----
+
+def _configure_oauth(conn, username="me"):
+    from content_hoarder import reddit_oauth
+    reddit_oauth._store(conn, refresh_token="RT", access_token="AT", username=username)
+
+
+def test_drain_prefers_oauth_when_configured(conn, monkeypatch):
+    """With OAuth configured and NOTHING injected, the drain writes over oauth.reddit.com with a
+    bearer (no cookie, no modhash) and labels the transport — mirroring hydrate_one/sync_saved."""
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a", "t3_b")
+    _configure_oauth(conn)                              # note: NO cookie set
+    calls = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        calls.append((url, fields["id"], bearer))
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    res = ru.drain(conn, sleep=lambda s: None)          # no post=/getf= -> OAuth path
+    assert res["transport"] == "oauth" and res["unsaved"] == 2 and res["auth_error"] is False
+    assert calls == [(ru.OAUTH_UNSAVE_URL, "t3_a", "AT"), (ru.OAUTH_UNSAVE_URL, "t3_b", "AT")]
+    assert conn.execute("SELECT COUNT(*) FROM items WHERE is_saved=0").fetchone()[0] == 2
+
+
+def test_drain_injected_post_stays_cookie(conn):
+    """The cookie golden path is unchanged: an injected post forces transport='cookie' even if
+    OAuth happens to be configured."""
+    _seed_pending(conn, "t3_a")
+    _configure_oauth(conn)
+    ru.set_auth(conn, session_cookie="ck")
+    res = ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None)
+    assert res["transport"] == "cookie" and res["unsaved"] == 1
+
+
+def test_resave_prefers_oauth_when_configured(conn, monkeypatch):
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a")
+    _configure_oauth(conn)
+    posts = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        posts.append(url)
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    ru.drain(conn, sleep=lambda s: None)                # OAuth unsave -> done + is_saved=0
+    ok = ru.resave(conn, "reddit:t3_a")                 # OAuth re-save (undo)
+    assert ok is True and posts[-1] == ru.OAUTH_SAVE_URL
+    assert conn.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_a'").fetchone()[0] == 1
+
+
+# --- money-action gate: dry-run scope + audit trail (Phase 3) --------------
+
+def test_drain_dry_run_lists_scope_and_sends_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    res = ru.drain(conn, dry_run=True)               # no post/getf — sends nothing
+    assert res["dry_run"] is True and res["selected"] == 2
+    assert len(res["sample"]) == 2 and res["by_subreddit"]      # scope surface populated
+    assert all(st == "pending" for st in _queue(conn).values())  # nothing flipped to done
+
+
+def test_drain_audit_records_each_live_unsave(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    recs = []
+    ru.drain(conn, post=_Post(), getf=_ok_me, sleep=lambda s: None, audit=recs.append)
+    assert [r["fullname"] for r in recs] == ["reddit:t3_a", "reddit:t3_b"]
+    assert all(r["transport"] == "cookie" and r["reddit_id"] and "ts" in r for r in recs)
+
+
+def test_drain_audit_not_called_for_failures(conn):
+    _seed_pending(conn, "t3_a")
+    ru.set_auth(conn, session_cookie="ck")
+    recs = []
+    ru.drain(conn, post=_Post(decide=lambda f: (404, {})), getf=_ok_me,
+             sleep=lambda s: None, audit=recs.append)
+    assert recs == []                                # only successful unsaves are audited
+
+
 # --- schema idempotency ----------------------------------------------------
 
 def test_enqueue_existing_done_backfill(conn):
@@ -387,3 +469,57 @@ def test_http_get_401_returns_empty_no_retry(monkeypatch):
 
 def test_cookie_user_agent_is_browser_like():
     assert ru.cookie_user_agent().startswith("Mozilla/")
+
+
+# --- limit=0 must drain NOTHING, not the whole queue (footgun fix) -----------
+
+def test_drain_limit_zero_sends_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post()
+    res = ru.drain(conn, limit=0, post=post, getf=_ok_me, sleep=lambda s: None)
+    assert res["selected"] == 0 and res["unsaved"] == 0  # LIMIT 0 selects no rows
+    assert post.calls == []
+    assert all(st == "pending" for st in _queue(conn).values())  # nothing drained
+
+
+def test_drain_plan_limit_zero_selects_nothing(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    assert ru.drain(conn, limit=0, dry_run=True)["selected"] == 0
+
+
+# --- OAuth 401 halts like cookie 403 (auth_error, not a per-item failure) ----
+
+def test_drain_oauth_401_halts_as_auth_error(conn):
+    _seed_pending(conn, "t3_a", "t3_b")
+    ru.set_auth(conn, session_cookie="ck")
+    post = _Post(decide=lambda f: (401, {}))           # bearer revoked/expired
+    res = ru.drain(conn, post=post, getf=_ok_me, sleep=lambda s: None)
+    assert res["auth_error"] is True and res["unsaved"] == 0
+    assert all(st == "pending" for st in _queue(conn).values())  # NOT burned to 'failed'
+
+
+# --- OAuth bearer re-minted per item so a long drain can't outlive the TTL ----
+
+def test_drain_oauth_remints_bearer_per_item(conn, monkeypatch):
+    from content_hoarder import reddit_oauth
+    _seed_pending(conn, "t3_a", "t3_b")
+    _configure_oauth(conn)
+    n = {"i": 0}
+
+    def fake_access(c, **kw):           # a fresh token each mint (simulates a refresh mid-drain)
+        n["i"] += 1
+        return f"AT{n['i']}"
+
+    bearers = []
+
+    def fake_oauth_post(url, fields, *, bearer, user_agent):
+        bearers.append(bearer)
+        return 200, {}
+
+    monkeypatch.setattr(reddit_oauth, "access_token", fake_access)
+    monkeypatch.setattr(reddit_oauth, "oauth_post", fake_oauth_post)
+    res = ru.drain(conn, sleep=lambda s: None)
+    assert res["unsaved"] == 2
+    assert len(set(bearers)) == 2 and bearers[0] != bearers[1]  # each item re-minted, not stale

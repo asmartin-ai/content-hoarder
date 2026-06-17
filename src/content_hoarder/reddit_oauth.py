@@ -1,9 +1,12 @@
-"""Reddit OAuth2 read-only transport (installed-app, no client secret).
+"""Reddit OAuth2 transport (installed-app, no client secret).
 
 The sanctioned + durable + lower-risk alternative to scripting a logged-in browser session
 (de-risking feature 5). Uses an *installed app* client id — a PUBLIC id such as RedReader's,
-configured via ``REDDIT_OAUTH_CLIENT_ID`` — with the read-only ``read`` scope and a permanent
-refresh token. There is **no client secret**.
+configured via ``REDDIT_OAUTH_CLIENT_ID`` — and a permanent refresh token. There is **no client
+secret**. The grant requests RedReader's scope set (``read history identity save``): ``read`` for
+hydration, ``history`` for the saved-list sync, ``identity`` for the compliant-UA username, and
+``save`` for unsave writes. NOTE: this module's live transport is GET-only (``oauth_get``) until
+the write path lands; ``save`` is granted ahead of it so re-authorization isn't needed twice.
 
 One-time setup (interactive, via ``reddit-oauth --login``): we print an authorize URL; the user
 approves it in a browser; Reddit redirects to the app's registered redirect URI (which a local
@@ -35,7 +38,10 @@ ACCESS_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"  # noqa: S105 (p
 OAUTH_API_BASE = "https://oauth.reddit.com"
 ME_URL = OAUTH_API_BASE + "/api/v1/me"
 DEFAULT_REDIRECT_URI = "redreader://rr_oauth_redir"  # RedReader's registered installed-app URI
-SCOPE = "read"
+# RedReader's installed-app grant: read=hydration, history=saved-list sync, identity=UA
+# username, save=unsave writes. Reddit grants scopes per-authorize-request (not per app), so
+# the public client id can request all four. Widen here = one re-login covers every OAuth feature.
+SCOPE = "read history identity save"
 
 _SERVICE = "reddit_oauth"
 _ACCESS_TTL = 3600    # Reddit access tokens live ~1h
@@ -262,6 +268,33 @@ def oauth_get(url: str, *, bearer: str, user_agent: str, sleep=time.sleep) -> di
         raise RedditNetworkError("unparseable response") from e
 
 
+def oauth_post(url: str, fields: dict, *, bearer: str, user_agent: str) -> tuple[int, dict]:
+    """POST form-encoded ``fields`` to an oauth.reddit.com write endpoint (e.g. /api/unsave) with a
+    bearer token. Returns ``(status_code, response_headers)``; status 0 = a true transport failure.
+
+    Deliberately mirrors ``reddit_unsave._http_post``'s contract (status+headers, no internal
+    retry) so the shared ``_send_with_retry`` stays transport-agnostic: a 403 halts the drain, a
+    429's ``Retry-After`` is honored by the caller. No modhash — OAuth uses the bearer for CSRF."""
+    data = urllib.parse.urlencode(fields).encode("utf-8")
+    try:
+        status, headers, _raw = _http.request(
+            url, method="POST", data=data,
+            headers={
+                "Authorization": f"bearer {bearer}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": user_agent,
+            },
+            timeout=20,
+        )
+        return status, headers
+    except _http.HttpError as e:
+        # An HTTP error response is data here, not a failure (403 halts, 429 carries Retry-After).
+        # Only a true transport failure (no status) collapses to the (0, {}) sentinel.
+        if e.status is not None:
+            return e.status, e.headers
+        return 0, {}
+
+
 def access_token(conn, *, post=None, now=None) -> str | None:
     """Return a valid bearer access token, refreshing on (near-)expiry. ``None`` when not
     configured or a refresh permanently fails (the caller then falls back to the cookie). A
@@ -296,6 +329,11 @@ def _fetch_username(token: str, *, getf=None) -> str | None:
     return (me.get("name") or None) if isinstance(me, dict) else None
 
 
+# Public name for callers outside this module (e.g. reddit_sync) so they don't reach into the
+# underscore-private helper. Same best-effort contract: returns the authed username or None.
+fetch_username = _fetch_username
+
+
 def login(conn, redirect_response: str, *, expected_state: str, post=None, getf=None,
           now=None) -> str:
     """Complete the one-time flow: validate + exchange the pasted redirect, fetch the username for
@@ -306,7 +344,7 @@ def login(conn, redirect_response: str, *, expected_state: str, post=None, getf=
     access = tok.get("access_token")
     if not refresh or not access:
         raise RedditOAuthError(
-            "token response missing a refresh/access token — request duration=permanent + scope=read.")
+            "token response missing a refresh/access token — request duration=permanent + a non-empty scope.")
     username = _fetch_username(access, getf=getf)
     _store(conn, refresh_token=refresh, access_token=access, username=username, now=now)
     return username or ""
