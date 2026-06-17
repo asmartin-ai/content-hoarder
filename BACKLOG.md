@@ -144,6 +144,17 @@ false positives.*
   **`is:firefox-tab`** search operator (alias `is:firefoxtab`) filters to `metadata.open_in_firefox=1`,
   including the YouTube-promoted tabs that `source:firefox` misses. `search_query.ParsedQuery.open_in_firefox`
   + `web.py` items() wiring + `operators.js` autocomplete hint + spec line; parse test added.
+- [ ] **P3 — Live Firefox tab integration (optional manual input ramp).** *(User idea 2026-06-17.)*
+  Today Firefox tabs enter only via the manual "Export Tabs URLs (Rich format)" .txt → `import --source
+  firefox` flow. Add an *optional*, lower-friction way to push the **currently-open tabs** into
+  content-hoarder on demand — explicitly a **manual ramp** (user-triggered, not background scraping).
+  Candidate shapes to investigate (none chosen): (a) a tiny WebExtension with a "Send tabs to
+  content-hoarder" button that POSTs the active window's tabs to a local ingest endpoint
+  (`POST /import/firefox-tabs` → reuse the firefox connector's parser + YouTube-promotion); (b) read the
+  live `sessionstore`/`recovery.jsonlz4` on demand (no extension, but format-fragile — already noted as
+  "future" on the connector); (c) a bookmarklet/native-messaging bridge. Reuses the existing
+  `firefox:<url-hash>` shaping, de-dup, and `open_in_firefox` flag (browse via `is:firefox-tab`). Keep it
+  opt-in and manual — no always-on capture (the project's zero-new-friction guardrail).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 - [ ] **P2 — Fetch HN saved/favorited items directly (drop the manual Materialistic export).**
