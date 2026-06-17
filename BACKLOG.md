@@ -147,6 +147,24 @@ false positives.*
   source, not this finer flag.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
+- [ ] **P2 — Fetch HN saved/favorited items directly (drop the manual Materialistic export).**
+  *(User-requested 2026-06-17; execution TBD — "we'll figure it out".)* Today HN items only arrive via a
+  manual Materialistic Android-app DB export (`adb backup` → `favorite`/`saved`/`read` tables; see
+  `connectors/hackernews.py` + `docs/IMPORTING.md`) or hand-fed id-list/HTML. Goal: pull the user's
+  saved HN items **without** that per-device dance — ideally an incremental sync like reddit's saved-sync.
+  **Open question is HOW** (HN has no official "my saved" API — the Firebase API is per-item only, no
+  user-list endpoint). Candidate paths to investigate (none verified yet):
+  - (a) the **public favorites page** `news.ycombinator.com/favorites?id=<user>` (paginated `&p=N`,
+    keyless, plain HTML the connector's existing `item?id=`/`athing` parsers can already read) — but this
+    only covers items the user explicitly *favorited*, which may differ from Materialistic-local "saved".
+  - (b) **`/upvoted?id=<user>`** — requires being logged in as that user (HN session cookie), mirroring
+    the reddit cookie path; covers upvoted, still not "saved".
+  - (c) automate/parse the Materialistic export so it's not a manual step.
+
+  Needs the user's HN username (+ a login cookie for b). Decide scope (favorites vs upvoted vs both) and
+  whether HN "favorite" is the right proxy for "saved" before building; once ids land, the connector's
+  `enrich()` already hydrates titles/scores/author and (Epic 15) og:image thumbnails. Mirror the
+  analogous reddit saved-sync shape (`reddit-oauth` / `connectors/reddit.py`, Epic 9).
 - [x] ~~**Differentiate posted / added-in-source / synced dates (UI).**~~ Shipped: the triage card and
   the browse list now label **posted** (`created_utc`), **added in source** (`saved_utc` — shown only
   when a source actually provides a real save timestamp; today HN/Obsidian/Keep do, Reddit/YouTube
