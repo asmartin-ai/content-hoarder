@@ -264,6 +264,15 @@ body.focus .batchstrip{display:flex}
 .meta b,.meta .meta-link{font-weight:var(--fw-semibold);color:var(--text-body)}
 .meta a{color:inherit;text-decoration:none}
 .meta a:hover{color:var(--accent-strong)}
+/* HN "Article ↗" outbound chip — a pill distinct from the title (which opens the
+   discussion). Selector outweighs `.meta a` so the pill chrome + HN-orange hover
+   win. (app.css carries the equivalent for the legacy triage page.) */
+.meta .art-chip{display:inline-flex;align-items:center;white-space:nowrap;
+  margin-left:.25rem;padding:0 .42rem;line-height:1.5;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+  font-weight:var(--fw-semibold)}
+.meta .art-chip:hover{color:var(--source-hackernews,var(--accent));
+  border-color:var(--source-hackernews,var(--accent))}
 .nsfw-tag{font:var(--fw-bold) .6rem/1 var(--font-mono);color:var(--accent);
   border:1px solid var(--accent);border-radius:4px;padding:1px 4px;margin-right:6px;
   vertical-align:1px}

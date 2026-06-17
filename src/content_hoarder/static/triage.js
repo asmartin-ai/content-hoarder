@@ -109,6 +109,13 @@
     if (m.playlist) bits.push(esc(m.playlist));
     if (item.kind) bits.push(esc(item.kind));
     if (typeof m.score === "number") bits.push(m.score + " pts");
+    // HN: a pill straight to the linked article (the title opens the discussion).
+    // Self/Ask-HN posts store the thread URL in item.url, so they get no chip.
+    var au = item.source === "hackernews" ? (item.url || "").trim() : "";
+    if (au && !/news\.ycombinator\.com\/item\?id=/i.test(au) && safeUrl(au)) {
+      bits.push('<a class="comp-link art-chip" href="' + esc(safeUrl(au)) +
+        '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Article ↗</a>');
+    }
     return bits.join(" · ");
   }
 
@@ -195,6 +202,7 @@
         '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
     }
     var thumb = m.thumbnail || "";
+    if (!thumb && item.source === "hackernews") thumb = m.og_image || "";  // article preview (Epic 15 P3)
     if (!thumb && item.url) {
       if (/\.(png|jpe?g|gif|webp)$/i.test(item.url)) thumb = item.url;
       var yt = (item.url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/) || [])[1];
