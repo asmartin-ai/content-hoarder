@@ -185,6 +185,27 @@ def test_sync_cookie_transport_labeled(conn):
     assert res["transport"] == "cookie" and res["new"] == 1
 
 
+def test_sync_oauth_dead_token_is_auth_error_not_empty(conn, monkeypatch):
+    """A dead OAuth token makes oauth_get return its {} sentinel (401/403). Sync must report
+    auth_error — NOT a silent 'empty' success that hides the broken auth from a scheduled job."""
+    from content_hoarder import reddit_oauth
+    reddit_oauth._store(conn, refresh_token="RT", access_token="AT", username="alice")
+    monkeypatch.setattr(reddit_oauth, "oauth_get", lambda url, **kw: {})   # token-invalid sentinel
+    res = reddit_sync.sync_saved(conn)
+    assert res["auth_error"] is True and res["stopped"] == "auth_error" and res["new"] == 0
+
+
+def test_sync_oauth_no_username_no_cookie_is_auth_error(conn, monkeypatch):
+    """OAuth token valid but the username can't be resolved AND there's no cookie to fall back to →
+    report the real cause (auth_error), not a misleading 'cookie expired' from the cookie branch."""
+    from content_hoarder import reddit_oauth
+    reddit_oauth._store(conn, refresh_token="RT", access_token="AT", username=None)
+    monkeypatch.setattr(reddit_oauth, "fetch_username", lambda tok, **kw: None)  # lookup blips
+    res = reddit_sync.sync_saved(conn)                  # no cookie configured
+    assert res["auth_error"] is True and res["stopped"] == "auth_error"
+    assert res["transport"] is None                     # never committed to OAuth nor cookie
+
+
 def test_sync_network_error_keeps_mark(conn):
     """A transport failure must not read as 'cookie expired' and must not move the mark."""
     _auth(conn)
