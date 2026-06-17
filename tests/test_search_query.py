@@ -72,6 +72,17 @@ def test_parse_is_decayed_and_swept():
     assert search_query.parse("is:sweeped").text == "is:sweeped"
 
 
+def test_parse_is_firefox_tab():
+    p = search_query.parse("is:firefox-tab")
+    assert p.open_in_firefox is True and p.text == ""
+    # alias without the hyphen
+    assert search_query.parse("is:firefoxtab").open_in_firefox is True
+    # default false; composes with another operator
+    p = search_query.parse("is:firefox-tab source:youtube")
+    assert p.open_in_firefox is True and p.source == "youtube"
+    assert search_query.parse("cats").open_in_firefox is False
+
+
 def test_parse_has_media():
     p = search_query.parse("has:video cats")
     assert p.has == "video" and p.text == "cats"

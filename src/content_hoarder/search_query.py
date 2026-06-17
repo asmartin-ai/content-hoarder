@@ -37,6 +37,7 @@ class ParsedQuery:
     nsfw: bool = False
     decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
     swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
+    open_in_firefox: bool = False  # is:firefox-tab — metadata.open_in_firefox (incl. promoted YT tabs)
     has: str | list[str] | None = None  # has:video|image|gallery — metadata.media_type facet
 
     before: int | None = None  # unix seconds (UTC)
@@ -152,6 +153,7 @@ def parse(q: str) -> ParsedQuery:
     is_saved: int | None = None
     nsfw = False
     decayed = swept = False
+    open_in_firefox = False
     has_groups: list[list[str]] = []
     before = after = None
     score_min = score_max = None
@@ -229,6 +231,9 @@ def parse(q: str) -> ParsedQuery:
                 continue
             if v == "swept":
                 swept = True
+                continue
+            if v in ("firefox-tab", "firefoxtab"):
+                open_in_firefox = True
                 continue
             text_terms.append(t)
             continue
@@ -317,6 +322,7 @@ def parse(q: str) -> ParsedQuery:
         nsfw=nsfw,
         decayed=decayed,
         swept=swept,
+        open_in_firefox=open_in_firefox,
         has=has,
         before=before,
         after=after,
