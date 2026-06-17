@@ -10,13 +10,16 @@ from the free, no-auth HN Firebase API.
 
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 import sqlite3
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from content_hoarder import _http
 from content_hoarder.connectors.base import BaseConnector
 from content_hoarder.models import new_item
 
@@ -25,6 +28,39 @@ _ATHING = re.compile(r"class=['\"]athing[^'\"]*['\"][^>]*id=['\"](\d+)['\"]")
 _BARE_ID = re.compile(r"\b(\d{4,})\b")
 _FIREBASE = "https://hacker-news.firebaseio.com/v0/item/{}.json"
 _FAVORITE_TABLES = ("favorite", "favorites", "saved")
+
+# Open Graph thumbnail extraction (Epic 15 P3). We parse only the document <head>
+# from a capped slice of the body, preferring og:image and falling back to
+# twitter:image. Attribute order varies wildly across sites, so we tokenize each
+# <meta> tag's attributes rather than matching a fixed property→content order.
+_META_TAG = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
+_META_ATTR = re.compile(
+    r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
+_OG_KEYS = ("og:image", "og:image:url", "og:image:secure_url",
+            "twitter:image", "twitter:image:src")
+_OG_FETCH_CAP = 262144  # bytes of body to parse for <head> (256 KiB is plenty)
+
+
+def _is_hn_thread(url: str) -> bool:
+    return "news.ycombinator.com/item?id=" in (url or "").lower()
+
+
+def _og_image(html_text: str, base_url: str) -> str:
+    """First og:image (then twitter:image) in ``html_text``, absolutized against
+    ``base_url``. "" when none is present."""
+    found: dict[str, str] = {}
+    for tag in _META_TAG.findall(html_text):
+        attrs: dict[str, str] = {}
+        for m in _META_ATTR.finditer(tag):
+            attrs[m.group(1).lower()] = m.group(2) or m.group(3) or m.group(4) or ""
+        key = (attrs.get("property") or attrs.get("name") or "").lower()
+        content = (attrs.get("content") or "").strip()
+        if key in _OG_KEYS and content:
+            found.setdefault(key, content)
+    for k in _OG_KEYS:
+        if found.get(k):
+            return urllib.parse.urljoin(base_url, _html.unescape(found[k]))
+    return ""
 
 
 def _favorites_table(path: Path):
@@ -181,6 +217,22 @@ class HNConnector(BaseConnector):
                 meta["score"] = data["score"]
             if data.get("descendants") is not None:
                 meta["descendants"] = data["descendants"]
+            # Article thumbnail (Epic 15 P3): fetch the linked story's og:image, but
+            # only for an external article and only once — merge_upsert keeps a prior
+            # og_image, so re-enriching (`--all`) won't refetch article pages.
+            art = (data.get("url") or it.get("url") or "").strip()
+            existing = it.get("metadata") or {}
+            if isinstance(existing, str):  # rows can arrive with metadata still a JSON string
+                try:
+                    existing = json.loads(existing)
+                except (ValueError, TypeError):
+                    existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            if art and not _is_hn_thread(art) and not existing.get("og_image"):
+                og = self._fetch_og_image(art)
+                if og:
+                    meta["og_image"] = og
             out.append(
                 new_item(
                     source="hackernews", source_id=str(sid),
@@ -207,3 +259,22 @@ class HNConnector(BaseConnector):
                 return json.loads(resp.read().decode("utf-8"))
         except Exception:
             return None
+
+    def _fetch_og_image(self, url: str) -> str:
+        """Best-effort og:image for an external article URL; "" on any failure
+        (network, non-HTML, no tag) so a flaky article never breaks the enrich pass."""
+        from content_hoarder import config
+
+        try:
+            _status, headers, raw = _http.request(
+                url, timeout=10.0, retries=1, backoff=2.0, jitter=True,
+                user_agent=config.get("USER_AGENT"),
+                headers={"Accept": "text/html,application/xhtml+xml"},
+            )
+        except _http.HttpError:
+            return ""
+        ctype = next((v for k, v in headers.items() if k.lower() == "content-type"), "")
+        if "html" not in ctype.lower():
+            return ""
+        text = raw[:_OG_FETCH_CAP].decode("utf-8", errors="replace")
+        return _og_image(text.split("</head>", 1)[0], url)

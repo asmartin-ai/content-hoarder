@@ -35,6 +35,23 @@ export const itemUrl = (item) =>
   : item.source === "reddit" ? (redditUrl((item.metadata || {}).permalink) || item.url || "")
   : (item.url || "");
 
+/* The external article an HN story links to (item.url), but only when it's a real
+   outbound link — Ask/Show-HN self-posts store the thread URL in item.url, so those
+   get "" (no chip). The title already opens the discussion via itemUrl. */
+export const hnArticleUrl = (item) => {
+  if (!item || item.source !== "hackernews") return "";
+  const u = (item.url || "").trim();
+  if (!u || /news\.ycombinator\.com\/item\?id=/i.test(u)) return "";
+  return safeUrl(u) || "";
+};
+
+/* A pill chip linking straight to the linked article (reuses the .comp-link look). */
+export const articleChip = (item) => {
+  const u = hnArticleUrl(item);
+  return u ? '<a class="comp-link art-chip" href="' + esc(u) +
+    '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Article ↗</a>' : "";
+};
+
 export const metaAnchor = (href, label, cls) => {
   const url = safeUrl(href);
   if (!url) return esc(label);
@@ -78,7 +95,8 @@ export const metaLine = (item, opts) => {
   if (item.kind) parts.push(esc(item.kind));
   if (m.category && m.category !== "unknown") parts.push("🏷 " + esc(m.category));
   if (Number.isFinite(m.score)) parts.push(Math.round(m.score) + " pts");
-  return parts.join(" · ");
+  const chip = articleChip(item);
+  return parts.join(" · ") + (chip ? " " + chip : "");
 };
 
 /* Posted (created_utc) / added-in-source (saved_utc) / synced (first_seen_utc),
