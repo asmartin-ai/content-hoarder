@@ -574,6 +574,19 @@ def cmd_reddit_hydrate(args) -> int:
     return 0 if res.get("status") == "hydrated" else 1
 
 
+def cmd_reddit_thumbnails(args) -> int:
+    """Backfill metadata.thumbnail for reddit items from their already-cached thread blobs
+    (the submission poster the initial sync dropped). Zero network; dry-run by default."""
+    from content_hoarder import reddit_hydrate
+    with _connect() as conn:
+        res = reddit_hydrate.backfill_thumbnails(conn, apply=args.apply, limit=args.limit)
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(f"\n[dry run] {res['eligible']} item(s) could get a thumbnail from cached threads. "
+              f"Re-run with --apply to write (no network).", file=sys.stderr)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="content_hoarder", description="Local triage-first content manager.")
     sub = p.add_subparsers(dest="command", required=True)
@@ -665,6 +678,15 @@ def build_parser() -> argparse.ArgumentParser:
                     help="--batch: actually hit Reddit. Without it, --batch only lists the scope "
                          "(safe-by-default gate; be conservative with Reddit requests).")
     ph.set_defaults(func=cmd_reddit_hydrate)
+
+    pt = sub.add_parser("reddit-thumbnails",
+                        help="Backfill reddit thumbnails (esp. v.redd.it video posters) from "
+                             "already-cached thread blobs — zero network. Dry-run by default.")
+    pt.add_argument("--apply", action="store_true",
+                    help="Write the thumbnails (default just reports how many would be filled).")
+    pt.add_argument("--limit", type=int, default=None,
+                    help="Cap how many cached threads to scan this run.")
+    pt.set_defaults(func=cmd_reddit_thumbnails)
 
     pd = sub.add_parser("dedup", help="Flag possible-duplicate items (non-destructive) or resolve.")
     pd.add_argument("--by", choices=("url", "title"), default="url",
