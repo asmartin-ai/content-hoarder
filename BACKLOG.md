@@ -493,6 +493,13 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P3 — "Swipe only on mobile" → now a decision (see Epic 16).**~~ ✅ v3: implemented — `swipe.js:37` ignores mouse pointers, `attachSwipe` is touch-only by default (no toggle). Orig: Inbox swipe is mobile/touch-only by
   default, not a toggle.
 - [x] ~~**P3 — Hide the Stats button under settings.**~~ ✅ v3: Stats is the `#statsheet` panel inside the settings menu (GET /stats), per the 2026-06-12 parallel session. De-cluttered.
+- [ ] **P2 — NSFW toggle in settings (hide/show NSFW posts AND nsfw_* tags).** *(User-requested
+  2026-06-17.)* A persisted toggle in the settings sheet that, when OFF (default), hides NSFW content
+  everywhere: the feed already supports it via the `safe=1` query param (`web.py` `hide_nsfw`), so wire
+  the toggle to that; AND hide the NSFW tag facets (`nsfw_erotic`, `nsfw_other`, `nsfw_talk`) from the
+  sidebar tag rail so they're not even listed while NSFW is off. When ON, show NSFW posts (blur-on-tap
+  reveal already exists, Epic 16) and surface the nsfw_* tags. Mirror the `is:nsfw` operator semantics
+  (Epic 12) and the curated NSFW tag set from `nsfw_rules.json` (Epic 9). Persist like density/theme.
 
 ## Epic 15 — Reddit / HN as-app navigation  (`enhancement`, `area:reddit`)
 *Make saved items behave like the native apps when tapped.*
@@ -512,6 +519,26 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P3 — (Optional) Fetch article thumbnails for HN items.**~~ Shipped: `HNConnector.enrich()` now
   fetches the linked article's og:image into `metadata.og_image` (best-effort, idempotent, gated like
   other enrich passes); `thumb()` renders it in the HN monitor slot.
+- [x] ~~**P2 — Reddit video → open the in-app reader (video + comments), not the bare lightbox.**~~
+  Shipped (2026-06-17): extends the image→reader routing to v.redd.it video; the reader's media tile
+  plays the HLS stream (Epic 13 P2), with poster backfill (sync/lazy/offline `reddit-thumbnails`).
+- [ ] **P2 — Markdown formatting in the reader's comment + post bodies.** *(User-requested 2026-06-17.)*
+  The inline reader currently renders comment/self-text as **plain escaped text** (`reader.js`
+  `renderThread` → `helpers.esc(c.body)`; `paragraphs()` only splits on blank lines). Reddit bodies are
+  **markdown** — links, **bold**/*italic*, `>` quotes, lists, code, and bare URLs (incl. **giphy** +
+  external links). Render a safe subset to HTML (escape first, then linkify + apply markdown; no raw
+  HTML injection — XSS-safe). Reuse one renderer for both the post self-text and comments. Keep it pure
+  so it stays node-testable like the other reader helpers.
+- [ ] **P3 — Inline media playback inside the reader's comment thread.** *(User idea 2026-06-17.)* Once
+  comment markdown linkifies (above), detect media links in comments — **giphy**, `i.redd.it`/imgur
+  images, `v.redd.it`/gfycat/redgifs/streamable video — and render them inline (image thumb → lightbox;
+  video → the same HLS/`<video>` path) instead of a bare link. Gate behind a tap/expander to avoid
+  auto-loading a wall of media; respect the NSFW reveal. Builds on `mediaType`/`hlsManifestUrl`/the
+  lightbox already in `core/media.js`.
+  **When tackling this:** the user will provide Reddit Enhancement Suite (RES) UI screenshots as a
+  design reference — analyze them AND the RES repo (https://github.com/honestbleeps/Reddit-Enhancement-Suite,
+  esp. its inline-expando / media-host modules) for how RES inlines comment media, then adapt the
+  patterns that fit our reader. Don't start until the screenshots are in hand.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
