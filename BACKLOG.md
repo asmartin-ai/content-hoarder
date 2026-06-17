@@ -393,11 +393,14 @@ need separate filter controls.*
   `<video src=media_url>` plays the video-only stream without audio on browsers lacking native HLS;
   the doc's "ship (c/a), revisit after a week" upgrade. Needs a real-browser audio check + possibly
   feature-detected HLS. Tracked as Epic 13 P2 ▸ "reddit_video audio" below.
-- [ ] **P2 — reddit_video audio (HLS/DASH) — follow-up to the shipped media pass.** `openVideo` sets
-  `<video src=media_url>`; `v.redd.it` separates audio into a DASH/HLS track, so audio is silent where
-  native HLS isn't supported (Chrome/Firefox). Per `docs/reddit-media-rendering.md` §4.3: feature-detect
-  `canPlayType('application/vnd.apple.mpegurl')`, prefer the HLS manifest when supported, keep the MP4
-  fallback otherwise; revisit hls.js only if real use demands it. Verify audio on a real device first.
+- [x] ~~**P2 — reddit_video audio (HLS/DASH) — follow-up to the shipped media pass.**~~ Shipped: the
+  stored `media_url` is the bare `https://v.redd.it/<id>` (audio-less / non-playable), so `openVideo`
+  now derives the HLS manifest (`/HLSPlaylist.m3u8`, muxed audio+video) and plays it via native HLS
+  where supported, else a lazy-loaded **vendored hls.js** (`static/vendor/hls.min.js`, full build —
+  the light build omits the separate-audio rendition v.redd.it uses). `mediaType()` gained a
+  `metadata.media_url`-based branch so reddit videos (whose `url` is the permalink) route to the player
+  instead of the iframe, and the comfortable-density monitor now shows a play tile for thumbnail-less
+  videos. Verified in-browser: both native-HLS and hls.js paths decode audio+video.
 - [x] ~~**P2 — Card density visual rework.**~~ ✅ v3: card density ("Pinboard") uses natural height — `.pin .screen img{width:100%;object-fit:contain;max-height:430px}` (`browse.css:335`), no forced 16:9 `cover` crop, so tall text-screenshots render fully. Orig: The cards layout is structurally correct but reads poorly.
   **Root cause (from screenshot, 2026-06-08):** many Reddit posts are **tall text-screenshots** (e.g.
   r/BlueskySkeets) and the fixed **16:9 `object-fit:cover` hero crops the text off** — "image difficult
