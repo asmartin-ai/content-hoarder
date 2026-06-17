@@ -105,6 +105,18 @@ def test_fire_does_not_rearm_without_progress(conn):
     assert sched.calls == []                       # no progress -> no re-arm (loop guard)
 
 
+def test_fire_logs_on_auth_error(conn, caplog):
+    # The trickle runs on a daemon timer thread with no user in the loop — an auth/network error
+    # in the result dict must be logged, not silently dropped (the queue would just stop draining).
+    import logging
+    db.set_setting(conn, "reddit_unsave_on_done", "1")
+    d = TrickleDrainer(_factory(conn),
+                       drain_fn=_make_drain(result={"unsaved": 0, "remaining": 5, "auth_error": True}))
+    with caplog.at_level(logging.WARNING, logger="content_hoarder.reddit_trickle"):
+        d.fire()
+    assert any("trickle halted" in r.message and "auth" in r.message for r in caplog.records)
+
+
 def test_fire_single_flight_skips_when_already_running(conn):
     db.set_setting(conn, "reddit_unsave_on_done", "1")
     drain = _make_drain()
