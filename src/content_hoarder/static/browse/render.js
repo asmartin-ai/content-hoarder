@@ -62,8 +62,15 @@ const snippet = (item) => {
 /* monitor: the fixed thumb slot. NSFW gets the box-constrained blur + veil. */
 const monitorHtml = (item, nsfwRevealed) => {
   const t = thumb(item, "list");
-  if (!t) return '<div class="monitor empty" aria-hidden="true"></div>';
   const mt = mediaType(item);
+  if (!t) {
+    // playable media with no stored preview (many v.redd.it videos have no thumbnail)
+    // still needs a tap target — a glyph-only play tile instead of a dead empty box.
+    if (mt.cls === "video" || mt.cls === "gallery")
+      return '<button type="button" class="monitor noimg" data-media="1" aria-label="' +
+        esc(mt.label) + '"><span class="mglyph" aria-hidden="true">' + mt.icon + "</span></button>";
+    return '<div class="monitor empty" aria-hidden="true"></div>';
+  }
   const m = item.metadata || {};
   const blur = isNsfw(item) && !nsfwRevealed;
   const dur = item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
