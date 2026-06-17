@@ -25,6 +25,11 @@ export const hnThreadUrl = (item) => {
   const id = (item && item.source === "hackernews" && item.source_id) ? String(item.source_id).trim() : "";
   return id ? "https://news.ycombinator.com/item?id=" + encodeURIComponent(id) : "";
 };
+/* HN user profile (mirrors the Reddit /user/ author link). "" when no author. */
+export const hnUserUrl = (author) => {
+  const a = (author || "").trim();
+  return a ? "https://news.ycombinator.com/user?id=" + encodeURIComponent(a) : "";
+};
 export const itemUrl = (item) =>
   item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "")
   : item.source === "reddit" ? (redditUrl((item.metadata || {}).permalink) || item.url || "")
@@ -61,6 +66,7 @@ export const metaLine = (item, opts) => {
   const parts = [];
   if (item.author) {
     if (item.source === "reddit") parts.push("by " + metaAnchor("https://www.reddit.com/user/" + encodeURIComponent(item.author), item.author, "meta-link"));
+    else if (item.source === "hackernews") parts.push("by " + metaAnchor(hnUserUrl(item.author), item.author, "meta-link"));
     else parts.push("by " + esc(item.author));
   }
   if (!hideSub) {
