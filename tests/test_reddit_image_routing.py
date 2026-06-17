@@ -61,3 +61,26 @@ def test_reddit_text_post_is_not_image():
         "console.log(mediaType({ url: 'https://www.reddit.com/r/sub/comments/abc/title/' }).cls);"
     )
     assert out == "text"
+
+
+def test_image_detected_by_media_url_when_url_is_permalink():
+    # Harvested from feat/reddit-media-v13: the ~25.8k catch-all posts whose item.url is
+    # the permalink but whose image lives in metadata.media_url must classify as image
+    # (so they route to the reader) and imageUrl() must return the media_url for the lightbox.
+    out = _node_eval(
+        "import { mediaType, imageUrl } from './core/media.js';"
+        "const it = { url: 'https://www.reddit.com/r/pics/comments/abc/t/',"
+        "  metadata: { media_url: 'https://i.redd.it/xyz.jpg', media_type: 'reddit_media' } };"
+        "console.log(JSON.stringify([mediaType(it).cls, imageUrl(it)]));"
+    )
+    assert json.loads(out) == ["image", "https://i.redd.it/xyz.jpg"]
+
+
+def test_media_url_video_still_wins_over_image_branch():
+    # parity guard: a v.redd.it media_url is video, not image (video branch is first).
+    out = _node_eval(
+        "import { mediaType } from './core/media.js';"
+        "console.log(mediaType({ url: 'https://www.reddit.com/r/x/comments/a/t/',"
+        "  metadata: { media_url: 'https://v.redd.it/xyz' } }).cls);"
+    )
+    assert out == "video"
