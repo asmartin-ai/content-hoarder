@@ -91,7 +91,7 @@ def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool 
 REDDIT_TAGS = (
     "nsfw_erotic", "nsfw_talk", "nsfw_other", "vtubers", "coding", "japan",
     "anime", "memes", "minecraft", "defense", "science", "tips",
-    "esports", "gaming", "ephemeral",
+    "esports", "gaming", "investing", "ephemeral",
 )
 
 # The curated vocabulary the browse tag-rail filters on: the reddit topic/NSFW tags plus the
@@ -443,6 +443,83 @@ def youtube_tags(item) -> list[str]:
     # Keyword pass only if channel pass produced nothing
     if not tags:
         for tag_name, pattern in _YOUTUBE_KEYWORD_TAGS:
+            if pattern.search(title):
+                if tag_name not in tags:
+                    tags.append(tag_name)
+
+    return tags
+
+
+# ---------------------------------------------------------------------------
+# Firefox / HackerNews tagging — host + keyword heuristics (F14).
+# Mirrors youtube_tags structure: host-map pass, then keyword fallback.
+# ---------------------------------------------------------------------------
+
+def _extract_host(url: str) -> str:
+    """Extract lowercased hostname from a URL (empty string on failure)."""
+    m = re.match(r"https?://([^/]+)", url or "", re.I)
+    return m.group(1).lower() if m else ""
+
+# Domain substring (lowercase) -> tags. Checked with `key in domain`.
+_BROWSER_HOST_TAGS = {
+    "steampowered": ["gaming"],
+    "defensenews": ["defense"],
+    "bloomberg": ["investing"],
+    "marketwatch": ["investing"],
+    "wsj": ["investing"],
+    "cnbc": ["investing"],
+}
+
+# Title keywords (word-bounded), applied ONLY when the host map produced no tag.
+_BROWSER_KEYWORD_TAGS = [
+    ("gaming", re.compile(r"\bsteam\b|\bvideo\s+game\b", re.IGNORECASE)),
+    ("defense", re.compile(r"\bmilitary\b", re.IGNORECASE)),
+    ("investing", re.compile(
+        r"\bstock\b|\bstocks\b|\bearnings\b|\binvesting\b|\bmarket\b|\bmarkets\b",
+        re.IGNORECASE)),
+]
+
+
+def firefox_tags(item: dict) -> list[str]:
+    """Return ordered de-duped topic tags for a Firefox-tab item."""
+    md = item.get("metadata") or {}
+    domain = md.get("domain") or _extract_host(item.get("url") or "")
+    title = item.get("title") or ""
+    tags: list[str] = []
+
+    # Host pass
+    for key, key_tags in _BROWSER_HOST_TAGS.items():
+        if key in domain:
+            for t in key_tags:
+                if t not in tags:
+                    tags.append(t)
+
+    # Keyword pass only if host pass produced nothing
+    if not tags:
+        for tag_name, pattern in _BROWSER_KEYWORD_TAGS:
+            if pattern.search(title):
+                if tag_name not in tags:
+                    tags.append(tag_name)
+
+    return tags
+
+
+def hackernews_tags(item: dict) -> list[str]:
+    """Return ordered de-duped topic tags for a Hacker News item."""
+    domain = _extract_host(item.get("url") or "")
+    title = item.get("title") or ""
+    tags: list[str] = []
+
+    # Host pass
+    for key, key_tags in _BROWSER_HOST_TAGS.items():
+        if key in domain:
+            for t in key_tags:
+                if t not in tags:
+                    tags.append(t)
+
+    # Keyword pass only if host pass produced nothing
+    if not tags:
+        for tag_name, pattern in _BROWSER_KEYWORD_TAGS:
             if pattern.search(title):
                 if tag_name not in tags:
                     tags.append(tag_name)
