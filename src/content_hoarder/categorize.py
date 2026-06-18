@@ -286,7 +286,9 @@ def _load_nsfw_rules(path: str) -> dict:
     except (OSError, ValueError):
         raw = {}
     low = lambda xs: frozenset(str(x).lower() for x in (xs or []))  # noqa: E731
-    kws = [str(k) for k in (raw.get("erotic_keywords") or [])]
+    # Drop blank/whitespace keywords: a "" entry would make "|".join(kws) an empty
+    # regex alternative that matches every subreddit → the whole corpus mis-tagged nsfw_erotic.
+    kws = [s for k in (raw.get("erotic_keywords") or []) if (s := str(k).strip())]
     return {
         "talk": low(raw.get("talk_subs")),
         "erotic": low(raw.get("erotic_subs")),
