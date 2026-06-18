@@ -418,6 +418,27 @@ need separate filter controls.*
   2026-06-17.)* Clicking the **Exact-only** checkbox in the search bar dismisses the `#oppop` suggestions. The
   toggle shouldn't blur/close the popover — keep suggestions open so the user can keep building the query.
   Touches `operators.js` (popover open/close on focus/blur) + the exact-checkbox handler.
+- [ ] **P3 — Image text search via OCR.** *(User-requested 2026-06-17.)* Make text *inside* images
+  searchable — screenshots, infographics, memes with captions, slide/diagram images — so a bare query
+  matches words that only appear in the picture, not the title/body. Two halves:
+  - **OCR enrich pass** (the real work): a new opt-in pass (e.g. `enrich --source <s> --ocr` or a dedicated
+    `ocr` CLI) that runs OCR over an item's image(s), stores the extracted text on `metadata.ocr_text`, and
+    stamps an `ocr_at` timestamp so it's skip-if-present + resumable (mirror the existing enrich/recovery
+    passes: `--limit`, dry-run, chunked). Covers reddit image/gallery posts, HN/firefox link previews, and
+    any item with a stored image; gallery items OCR each frame. **Open: engine** — Tesseract via
+    `pytesseract` (needs the Tesseract binary on PATH; no cloud, fits the local-first rule) vs. a local
+    vision model over the `local-llm-bridge` (the user has the GPU for it; better on stylized/meme text) —
+    pick after a small accuracy spot-check. **Open: image bytes source** — reuse already-cached
+    thumbnails/media where present (offline, cheap) vs. fetch full-res on demand (network, rate-limited like
+    the other recovery passes). Mind volume (thousands of images) and junk output (threshold on confidence;
+    skip tiny/again-decorative images).
+  - **Search wiring** (small): fold `metadata.ocr_text` into the item's `search_text` / `items_fts` (so the
+    existing fuzzy+FTS path finds it with zero new query syntax — see `db.build_search_text` +
+    `items_fts` triggers), and optionally add a `has:text` / `is:ocr` operator to filter to items that have
+    OCR'd text. Keep OCR text out of the visible card (search-only) unless the user wants a "text found in
+    image" affordance.
+  Relates to Epic 4 (media/recovery enrich passes) and Epic 2 (enrich infra). Sizable — sequence the engine
+  spot-check + enrich pass first, the FTS/operator wiring second.
 
 ### Icebox — operator naming *(Epic 12)*
 - [ ] **P3 — Revisit operator names for intuitiveness (Icebox).** *(User idea 2026-06-17.)* The current
