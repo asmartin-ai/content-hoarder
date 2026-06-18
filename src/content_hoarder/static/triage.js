@@ -626,7 +626,12 @@
   updateUndoBtn();
 
   // ---- boot ----
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js").catch(function (err) {
+    // Service workers (and therefore PWA install) only work in a secure context:
+    // HTTPS, or localhost/127.0.0.1. Plain HTTP over a LAN or Tailscale IP fails
+    // here silently — surface it so the cause is visible. See docs/MOBILE_TAILSCALE.md.
+    console.warn("Service worker registration failed (needs HTTPS or localhost):", err);
+  });
   // Today's clears (shared with browse) so the header shows accumulating wins across batches.
   fetchJSON("/pulse").then(function (p) { todayCleared = (p && p.cleared_today) || 0; updateProgress(); }).catch(function () {});
   fetchJSON("/sources").then(function (data) {
