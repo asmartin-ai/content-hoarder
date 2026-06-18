@@ -79,8 +79,8 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
       News** item opens the **HN thread** — without triggering row-open/select. ⬛
 - [ ] **Dates** — rows show *posted* / *added in source* (when available) / *synced here*, with an
       absolute-date tooltip. ⬛
-- [ ] **Firefox tabs filter** (📑) shows only `open_in_firefox` items. *(Known regression — see
-      BACKLOG Epic 7.)* ⬛
+- [ ] **Firefox tabs filter** — the `is:firefox-tab` operator shows only `open_in_firefox` items
+      (re-surfaced as a search operator; BACKLOG Epic 7). ⬛
 - [x] **Empty states** — searching with no matches / an empty status show the right message. ⬛
 
 ## 5. Search & operators (`#q`)  ⬛
@@ -167,7 +167,6 @@ These are driven by CLI/data passes; confirm the UI reflects them.
 - **Comfortable density** layout is intentionally unsatisfactory and slated for rework (Epic 13 /
   Epic 20 frontend v3).
 - **Tag-chip overload** on enriched YouTube cards (a wall of raw keyword chips) — display fix pending.
-- **Search operators have no UI hint / autocomplete / chips** yet — power-user feature for now.
 - **Mobile:** tap-thumbnail-opens-modal, long-press group-select, swipe physics/feel, and a swipe-only
       mode are still open (Epic 16). Verify whether a row-swipe ever side-scrolls the page (should not).
 - Some Epic 15 tappable-link and Epic 16 NSFW/scroll items may already be live from the design-v2 pass

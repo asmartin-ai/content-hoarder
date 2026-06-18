@@ -1,8 +1,9 @@
 # Reddit unsave-on-Done
 
 Marking a Reddit item **Done** in content-hoarder can also **unsave it from your Reddit *Saved* list**,
-so processing the inbox here shrinks your real Reddit backlog. No OAuth app is needed — it uses the same
-web endpoint your browser uses (`POST /api/unsave`), authenticated by your `reddit_session` cookie + a
+so processing the inbox here shrinks your real Reddit backlog. It runs over the sanctioned OAuth `save`
+scope when configured (installed-app id, no client secret); otherwise it falls back to the same web
+endpoint your browser uses (`POST /api/unsave`), authenticated by your `reddit_session` cookie + a
 modhash CSRF token read from `/api/me.json`.
 
 ## How it works
