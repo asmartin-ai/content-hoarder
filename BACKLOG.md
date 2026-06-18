@@ -294,14 +294,15 @@ false positives.*
   `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
-- [ ] **P2 — Extend tagging to Firefox tabs + Hacker News.** *(User-requested 2026-06-17.)* Tagging shipped
-  for reddit + youtube; Firefox-tab and HN items are still largely untagged but many are clearly bucketable
-  (gaming / defense / **investing** / coding …). Add `firefox_tags()` / `hackernews_tags()` (or fold into the
-  existing `categorize --topics` pass) using URL/host + title-keyword heuristics — mirror `youtube_tags()`
-  (conservative seed maps, preserve processing tags, never touch `metadata.category`). **New bucket needed:
-  `investing`** (confirm it doesn't exist; gaming/defense already do). Firefox-tab YouTube items already
-  promote to youtube items (Epic 7) so they inherit youtube tagging; this targets the non-YouTube Firefox
-  tabs + HN. Optional local-LLM assist for the tail (Epic 1 pattern). Relates to Epic 26 (taxonomy).
+- [x] ~~**P2 — Extend tagging to Firefox tabs + Hacker News.**~~ ✅ Shipped 2026-06-17 (F14 bakeoff,
+  GLM-5.1/Aider Arm B + review fixes). `firefox_tags()` / `hackernews_tags()` in `categorize.py` (shared
+  `_browser_bucket_tags()` core: host map + word-bounded title keywords), the new **`investing`** bucket
+  (added to `REDDIT_TAGS`/`FILTER_TAGS`), and pipeline wiring `tag_browser_source()` exposed via
+  `categorize --source firefox|hackernews [--dry-run] [--all]`. Never touches `metadata.category`. Live
+  dry-run preview: firefox 60/2269 tagged (gaming 55 / investing 3 / defense 2), HN 163/9042 (investing 127 /
+  gaming 27 / defense 9). 18 tests (10 oracle + 8 wiring). **Open:** run `--apply` on the live DB is a
+  user-gated data op (review the dry-run first); the bloomberg/cnbc host map over-tags general business
+  stories as `investing` — tighten the seed maps if precision proves too loose. Relates to Epic 26 (taxonomy).
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
@@ -408,13 +409,11 @@ need separate filter controls.*
   user-approved): bare terms fuzzy (trgm), quoted phrases exact (FTS), checkbox repurposed
   to **Exact** (`?exact=1`) on both views; sw.js shell cache v13. Caveat kept: a query
   mixing bare + quoted terms takes the exact path entirely (documented degrade).
-- [ ] **P2 — Bare `r/<sub>` (and `u/<user>`) as subreddit/author shorthand.** *(User-requested 2026-06-17.)*
-  Typing `r/tankporn` in the search bar should be equivalent to `subreddit:tankporn`. Recognize the bare
-  `r/<sub>` token (case-insensitive, COLLATE NOCASE like the existing operator) in `search_query.py` and map it
-  to the subreddit filter; likewise consider `u/<user>` → author. **User suggestion: maybe replace the
-  `subreddit:` operator entirely with `r/`** — decide whether `r/` is an *alias* (both work) or the
-  *canonical* form (deprecate `subreddit:`). Mind collision with free text containing `r/…` — only treat a
-  leading/standalone token as the operator.
+- [x] ~~**P2 — Bare `r/<sub>` as subreddit shorthand.**~~ ✅ Shipped 2026-06-17 (F9 bakeoff). A standalone
+  `^r/<sub>$` token in `search_query.parse` now maps to the subreddit filter, equivalent to
+  `subreddit:<sub>` (matched COLLATE NOCASE downstream). Resolved as an **alias** — `subreddit:` is
+  unchanged, not deprecated. Anchored to a standalone token so reddit URLs / mid-text `r/…` aren't captured.
+  5 tests. **Still open (deferred):** `u/<user>` → author shorthand, and the operator-rename pass (Icebox below).
 - [ ] **P3 — `Exact` checkbox shouldn't close the operator suggestions popover.** *(User-reported
   2026-06-17.)* Clicking the **Exact-only** checkbox in the search bar dismisses the `#oppop` suggestions. The
   toggle shouldn't blur/close the popover — keep suggestions open so the user can keep building the query.
