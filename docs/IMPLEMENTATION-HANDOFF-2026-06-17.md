@@ -30,6 +30,7 @@ Conventions used here: **P1** soon · **P2** next · **P3** someday. "Seam" = th
 3. [Features to implement](#3-features-to-implement) — scoped, grouped by area
 4. [Decisions locked this session](#4-decisions-locked-this-session) — read before building the features they gate
 5. [Architecture quick-reference](#5-architecture-quick-reference)
+6. [Delegation suitability (GLM/qwen bakeoff)](#6-delegation-suitability-glmqwen-bakeoff) — which items to offload, with oracle scope
 
 ---
 
@@ -372,4 +373,71 @@ Read these before building the features they gate — they reflect explicit user
   configured; the `reddit_session` cookie is the automatic fallback. Lightbox/media: `static/core/media.js`
   (`mediaType`, `openImage`/`openGallery`/`openVideo`, HLS via vendored `hls.min.js`).
 - **Tests:** all offline, deterministic, `:memory:` SQLite, synthetic fixtures, no network. Keep them so.
-- **Verify before "done":** run `./.venv/Scripts/python.exe -m pytest` and diff against **524 passed**.
+- **Verify before "done":** run `./.venv/Scripts/python.exe -m pytest` and diff against **547 passed**
+  (was 524 at write time; F9 + F14 added tests since).
+
+---
+
+## 6. Delegation suitability (GLM/qwen bakeoff)
+
+*Added 2026-06-18. Which open items suit the oracle-driven offload bakeoff (red pytest oracle →
+local model implements Arm B → human reviews + integrity-gates vs. oracle-gaming), the way F9 + F14
+were built. **The other chat decides whether to actually delegate** — this section only scopes the
+candidates so it can pick one up cold.*
+
+**The fit criterion (all three must hold):** the item is (1) pure **backend / Python**, (2) expressible
+as a **deterministic pytest oracle** (the oracle *is* the spec), and (3) free of **visual/preview
+judgment**. UI/CSS/JS-interaction work fails (2)+(3) — it can't be pytest'd and needs the preview; for
+those, the oracle costs more than the fix, or can't be written at all → **do them inline, don't delegate.**
+
+**Model lane** *(per the Batch-4 bakeoff conclusion + memory):* **qwen3p7-plus** = the adopted
+single-shot implementer (cheaper; use for a clean single-file fix); **GLM-5.1** = the agentic/fallback
+lane (use when the change is multi-touch or qwen's Arm fails). Tooling/protocol: the `aider-headless-delegate`
+skill (run-branch isolation + the integrity gate that catches a silently-failed run or a rewritten oracle).
+
+| Item | Verdict | Lane |
+|------|---------|------|
+| **B1** decay-undo collision | ✅ delegate (strong) | qwen single-shot |
+| **F15** Done auto-delete retention | ✅ delegate (strong) | GLM (multi-touch + safety guard) |
+| **B2** reconcile-cap truncation flag | 🟡 borderline | GLM (crosses sync/import seam) |
+| **B4** import temp-file leak | 🟡 borderline | qwen (small; oracle ≈ fix size) |
+| B5, I1, I2, I3, F1–F8, F10–F13, F16–F19, OCR | ❌ don't delegate | inline — UI/preview/design-gated, or not oracle-shaped |
+
+### Scoped candidates (oracle spec for a fresh chat)
+
+**B1 — decay-undo wave collision** · ✅ strong · qwen single-shot
+- **Oracle (RED):** `letgo(A)` then `letgo(B)` on two different clusters with a **frozen identical `now`**
+  (inject it), then `undo_letgo(A)` → only A's rows return to inbox; B's stay decayed. Today both return
+  (the undo selects on a 1-second `decayed_at` window, not a wave id).
+- **Seam:** `resurface.py:152` (`letgo`) / `:166` (`undo_letgo`) + `db.decay` / `db.undecay` (`db.py:~1233`).
+- **Fix shape (anti-gaming):** make the wave id **unique per call** — preferred (a): `db.decay` allocates a
+  monotonic wave id (mirror `db.allocate_saved_order`) and returns it; `undo_letgo` selects on that id, not a
+  time window. Pure-additive: existing single-wave undo stays green; the new test pins the two-wave case.
+- **Constraint:** must NOT route through `bulk_set_status` (decay-safety invariant — no Reddit unsave on decay).
+
+**F15 — Done items auto-delete after a retention window** · ✅ strong · GLM
+- **Oracle (RED):** (a) a Done item whose age > window is purged on the sweep; (b) **a test that the purge
+  path does NOT enqueue a Reddit unsave** (the hard constraint — assert the `reddit_unsave` table stays empty
+  after a purge); (c) the window is configurable (settings); (d) a pre-purge backup is written.
+- **Seam:** builds on the Epic 21 `delete` machinery + `db.decay` guards. Needs a `done_at`/status-transition
+  timestamp to age from — **confirm `processed_utc` is stamped specifically on the Done transition**, else add
+  the stamp (that's its own small oracle).
+- **Fix shape (anti-gaming):** use the **direct-delete path**, never `bulk_set_status` (mirror the decay
+  guard). Reuse the `delete` CLI's auto-backup + `data/delete-audit.jsonl`. Add as a new sweep entrypoint so
+  existing delete/decay tests stay byte-identical.
+- **Why GLM not qwen:** multi-touch (settings + timestamp + sweep + safety guard) — fits the agentic lane.
+
+**B2 — reconcile cap uses `len(present) >= cap`** · 🟡 borderline · GLM
+- **Oracle (RED):** a sync that exhausted the listing (`after` ran out) at exactly `cap` saved items still
+  reconciles genuine unsaves; a truncated listing (stopped on a page cap) still skips reconciliation. Pin both
+  via an explicit `truncated_by_kind` flag, not the row count.
+- **Seam:** `db.py:~1040` + the sync/import layer that knows exhaustion-vs-page-cap.
+- **Borderline because:** threads a new flag from the caller through to `db` — crosses files, so it's more
+  agentic than a single-file oracle. Fails safe today (never an *erroneous* unsave), so low urgency.
+
+**B4 — `/import/prepare` temp-file leak** · 🟡 borderline · qwen
+- **Oracle (RED):** an item previewed (`/import/prepare`) but never committed and with no subsequent prepare
+  has its temp file cleaned up (on teardown or a timer), not left until the 1-hour TTL.
+- **Seam:** `web.py:~763` (`/import/prepare`) / `:~833` (`/import/commit`) / `:~718` (`_cleanup_prepared`).
+- **Borderline because:** the fix is small enough that writing the oracle ≈ writing the fix — delegate only if
+  batching it with another web-layer item; otherwise inline.
