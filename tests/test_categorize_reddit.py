@@ -40,6 +40,19 @@ def test_nsfw_tags_from_external_rules(tmp_path, monkeypatch):
     assert rt(_item(sub="plainsub")) == []                         # unknown -> no nsfw tag
 
 
+def test_nsfw_blank_keyword_does_not_match_everything(tmp_path, monkeypatch):
+    # A stray "" (or whitespace) in erotic_keywords must NOT become an empty regex
+    # alternative that matches every subreddit and mis-tags the whole corpus nsfw_erotic.
+    rules = {"erotic_subs": ["realerotic"], "erotic_keywords": ["", "  ", "xtoken"]}
+    p = tmp_path / "nsfw_blank.json"
+    p.write_text(json.dumps(rules), encoding="utf-8")
+    monkeypatch.setenv("CONTENT_HOARDER_NSFW_RULES", str(p))
+    rt = categorize.reddit_tags
+    assert rt(_item(sub="totally_unrelated")) == []        # blank keyword must not catch-all
+    assert rt(_item(sub="realerotic")) == ["nsfw_erotic"]  # real allowlist still works
+    assert rt(_item(sub="some_xtoken_sub")) == ["nsfw_erotic"]  # real keyword still works
+
+
 def test_nsfw_disabled_without_rules_file(tmp_path, monkeypatch):
     # No rules file -> erotic/talk classification is silently off (graceful for a fresh clone);
     # the over_18 residual is built-in (not rules-driven), so it still applies.
