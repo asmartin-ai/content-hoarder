@@ -51,6 +51,7 @@ class ParsedQuery:
 
 
 _OP_RE = re.compile(r"^(?P<neg>-?)(?P<key>\w+):(?P<val>.+)$", re.UNICODE)
+_R_SUB_RE = re.compile(r"^r/(\w+)$", re.UNICODE)
 
 
 def _tokenize(q: str) -> list[tuple[str, bool]]:
@@ -175,6 +176,10 @@ def parse(q: str) -> ParsedQuery:
 
         m = _OP_RE.match(t)
         if not m:
+            r_sub = _R_SUB_RE.match(t)
+            if r_sub:
+                subreddit_groups.append([r_sub.group(1)])
+                continue
             text_terms.append(t)
             continue
 
