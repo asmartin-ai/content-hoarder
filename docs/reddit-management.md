@@ -29,7 +29,8 @@ separate DB); Reddit-specific fields live in each item's `metadata` blob and are
 - **Routes** (`web.py`): `GET /reddit` (page), `/reddit/items`, `/reddit/subreddits`, `/reddit/stats`,
   `/reddit/items/<fn>/thread`, `POST /reddit/items/<fn>/unsave` (enqueues + optimistically flips
   `is_saved=0`), `POST /reddit/items/<fn>/undo` (cancels a still-pending unsave locally, or live
-  re-saves one already drained to Reddit).
+  re-saves one already drained to Reddit). Plus `POST /reddit/sync`, `/reddit/items/<fn>/hydrate`, and
+  the `/reddit/unsave/{status,auth,enable,drain,enqueue-by-tag}` family (see `web.py` for the full list).
 - **Frontend**: `templates/reddit.html` + `static/reddit.js` + `static/reddit.css`, reskinned from RSM
   to content-hoarder's palette.
 
@@ -45,10 +46,10 @@ Reads the RSM DB read-only and copies non-empty `thread_json` into `reddit_threa
 `dedup` (URL dedup is safe + reversible; title dedup is looser — review before resolving).
 
 ## Syncing new saves
-content-hoarder has **no Reddit API key**, so live OAuth sync is **unbuilt** (rebuild it when a key
-arrives — the old `feat/reddit-oauth` branch no longer exists). The default is a **cookie-based
-incremental sync** — implemented in `reddit_sync.py`, exposed as the `reddit-sync` CLI and a
-**"Sync newest"** button on `/reddit`:
+Live sync is built on two transports. The sanctioned **OAuth** lane (installed-app / RedReader client
+id, no API key needed; `reddit_oauth.py`) is preferred for the saved-list pull when configured; the
+default fallback is a **cookie-based incremental sync** — implemented in `reddit_sync.py`, exposed as
+the `reddit-sync` CLI and a **"Sync newest"** button on `/reddit`:
 
 - It GETs `https://www.reddit.com/user/<username>/saved.json` with your `reddit_session` cookie
   (set once via `reddit-unsave --login --cookie "<value>"` — shared with the unsave queue),

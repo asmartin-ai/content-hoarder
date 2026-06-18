@@ -98,11 +98,17 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [ ] **P2 — Categories in the sidebar / as a tag type.** Move the category facet into the left rail
   (like status + tags); consider modeling "processing areas" as a reserved tag namespace so one filter
   UI covers both. Touches `categorize.py` buckets + the rail + `search_items`.
+  **→ folded into Epic 26 (tag & category taxonomy reorganization, 2026-06-17).**
 - [ ] **P3 — Zoom into the image / gallery modal.** Scroll/pinch-to-zoom (+ pan) in the media lightbox
   and gallery viewer (`openImage`/`openGallery` in `app.js`).
 - [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
   J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new
   mapping for review. (The `?` cheatsheet already ships.)
+- [ ] **P2 — Share button on items.** *(User-requested 2026-06-17.)* Add a Share affordance to the item
+  (row/card + reader). **Open scope:** native Web Share API (`navigator.share` — works on the mobile PWA,
+  falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
+  source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
+  Web-Share-with-clipboard-fallback so it works on the Pixel-6 target.
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
@@ -206,6 +212,13 @@ false positives.*
 - [x] ~~**P3 — README mobile quickstart.**~~ Shipped (overnight 2026-06-10): step-by-step
   Tailscale quickstart in README "Mobile access"; CLI table updated with decay / delete /
   export / learn-triage.
+- [ ] **P2 — Predictive prefetch cache for the top of each sort.** *(User-requested 2026-06-17.)* Warm a
+  small cache so switching sort/source is instant instead of a fresh fetch. Prefetch the **first ~10 items
+  per source** for the **top** of each sort: **newest**, **oldest**, **SHUFFLE·MIX** (shipped, Epic 10), and
+  **shuffle-likely** (the smart/likely-done sort — gated on `feat/triage-score` integration, Epic 10). User
+  note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
+  **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
+  new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
 
 ## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
@@ -281,6 +294,14 @@ false positives.*
   `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
+- [ ] **P2 — Extend tagging to Firefox tabs + Hacker News.** *(User-requested 2026-06-17.)* Tagging shipped
+  for reddit + youtube; Firefox-tab and HN items are still largely untagged but many are clearly bucketable
+  (gaming / defense / **investing** / coding …). Add `firefox_tags()` / `hackernews_tags()` (or fold into the
+  existing `categorize --topics` pass) using URL/host + title-keyword heuristics — mirror `youtube_tags()`
+  (conservative seed maps, preserve processing tags, never touch `metadata.category`). **New bucket needed:
+  `investing`** (confirm it doesn't exist; gaming/defense already do). Firefox-tab YouTube items already
+  promote to youtube items (Epic 7) so they inherit youtube tagging; this targets the non-YouTube Firefox
+  tabs + HN. Optional local-LLM assist for the tail (Epic 1 pattern). Relates to Epic 26 (taxonomy).
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
@@ -387,10 +408,51 @@ need separate filter controls.*
   user-approved): bare terms fuzzy (trgm), quoted phrases exact (FTS), checkbox repurposed
   to **Exact** (`?exact=1`) on both views; sw.js shell cache v13. Caveat kept: a query
   mixing bare + quoted terms takes the exact path entirely (documented degrade).
+- [ ] **P2 — Bare `r/<sub>` (and `u/<user>`) as subreddit/author shorthand.** *(User-requested 2026-06-17.)*
+  Typing `r/tankporn` in the search bar should be equivalent to `subreddit:tankporn`. Recognize the bare
+  `r/<sub>` token (case-insensitive, COLLATE NOCASE like the existing operator) in `search_query.py` and map it
+  to the subreddit filter; likewise consider `u/<user>` → author. **User suggestion: maybe replace the
+  `subreddit:` operator entirely with `r/`** — decide whether `r/` is an *alias* (both work) or the
+  *canonical* form (deprecate `subreddit:`). Mind collision with free text containing `r/…` — only treat a
+  leading/standalone token as the operator.
+- [ ] **P3 — `Exact` checkbox shouldn't close the operator suggestions popover.** *(User-reported
+  2026-06-17.)* Clicking the **Exact-only** checkbox in the search bar dismisses the `#oppop` suggestions. The
+  toggle shouldn't blur/close the popover — keep suggestions open so the user can keep building the query.
+  Touches `operators.js` (popover open/close on focus/blur) + the exact-checkbox handler.
+
+### Icebox — operator naming *(Epic 12)*
+- [ ] **P3 — Revisit operator names for intuitiveness (Icebox).** *(User idea 2026-06-17.)* The current
+  vocabulary (`source:`/`kind:`/`status:`/`subreddit:`/`tag:`/`is:`/`has:`/`before:`/`after:`/`score:`) should
+  be revisited for names that read more intuitively. Pairs with the bare-`r/` shorthand above. Gather the
+  rename list before touching `search_query.py` + `operators.js` (keep old names as aliases for a transition).
+  Reactivate when the user has a concrete naming preference.
 
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
+- [ ] **P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.** *(User-requested 2026-06-17.)*
+  Give the main-view status tabs (`#status-nav`) per-status color accents — reuse the existing
+  `--status-keep/-archive/-done` tokens, pick accents for **Inbox** + **All** — so the active section is
+  visually distinct. Styling only (`browse.css` status-nav).
+- [ ] **P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**
+  *(User-requested 2026-06-17.)* In the browse **log/comfortable** density the media thumbnail doesn't fill
+  its slot — stretch it to the full width of the preview box (respect the fixed row height + `object-fit`) so
+  the row reads better. Touches `.items.density-comfortable .item-fg` / the monitor thumb box (`browse.css`).
+- [ ] **P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).** *(User-reported
+  2026-06-17.)* Repro item:
+  `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/` — the gallery card
+  shows no thumbnail. Likely the archive fetch didn't populate `metadata.gallery`/`thumbnail` for this item
+  (or the thumb URL 404s). Check the gallery extraction (`providers._gallery`, Epic 4) for this post + the
+  thumbnail fallback when `media_metadata` is missing. Verify against the live row before fixing.
+- [ ] **P3 — Pinboard portrait images anchored top-left (visual polish).** *(User-reported 2026-06-17.)* In
+  the **card / "Pinboard"** density, portrait (tall) images sit anchored top-left in their slot instead of
+  centered/filled, reading poorly. Improve `object-position`/sizing for portrait media in `.pin .screen img`
+  (`browse.css:335`) — relates to the earlier per-aspect media handling.
+- [ ] **P2 — `Ctrl+Y` redo (mirror `Ctrl+Z` undo).** *(User-requested 2026-06-17.)* Undo exists (per-item +
+  bulk snackbar, `api.bulkUndo`); add a **redo** that replays the last undone action. Needs a small undo/redo
+  **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
+  redo — confirm `Ctrl+Z` is actually keyboard-bound today, not snackbar-only. Relates to the Epic 5 keyboard
+  rework.
 - [x] ~~**P2 — Rework the comfortable density layout.**~~ ✅ Shipped on v3 (2026-06-13 audit): `.items.density-comfortable .item-fg` is locked to `height:100px` (browse.css:290) with the thumb constrained to the fixed monitor box; adaptive height is cards-only. Orig: **User spec (2026-06-08):** positioning is good,
   but make **every comfortable row a uniform fixed height (~100px)** — adaptive/dynamic height should
   apply to **cards density only**. Constrain the thumbnail within that fixed height (`object-fit: cover`)
@@ -549,6 +611,23 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   design reference — analyze them AND the RES repo (https://github.com/honestbleeps/Reddit-Enhancement-Suite,
   esp. its inline-expando / media-host modules) for how RES inlines comment media, then adapt the
   patterns that fit our reader. Don't start until the screenshots are in hand.
+- [ ] **P2 — Thumbnail tap = quick media peek (lightbox); title/body opens the thread.** *(User-requested
+  2026-06-17.)* Refines the Epic 15 tap routing: in the inbox/browse list, tapping the **media thumbnail**
+  opens a **lightbox peek of the media only** (fast preview, no thread); tapping the **title / the rest of the
+  row** opens the in-app reader (media + thread). **Exclude HN article thumbnails** — those keep their current
+  behavior (don't peek). Splits today's single tap target (an image/video thumb currently routes straight to
+  the reader). Touches the `[data-media]` dispatch (`browse/main.js`) vs. the title `<a>` handler.
+- [ ] **P2 — Video plays inline in the reader (no lightbox).** *(User-requested 2026-06-17.)* In
+  `section#reader` a video currently opens the lightbox; play it **inline in the reader's media tile** instead
+  (reuse the HLS/`<video>` path from `core/media.js`). The lightbox stays for the browse-list peek (above);
+  this is reader-only.
+- [ ] **P3 — Reposition the reader's media preview (takes too much vertical space at top).** *(User-requested
+  2026-06-17.)* In `section#reader` the post-media tile dominates the top of the view; shrink/reposition it so
+  the post + thread are reachable with less scrolling (cap its height, or make it a collapsible/cover-fit
+  tile). Reader layout only.
+- [ ] **P3 — Reader triage buttons show their hotkey shortcuts.** *(User-requested 2026-06-17.)* The triage
+  action buttons at the bottom of the reader should display their keyboard shortcuts (Keep/Archive/Done hints),
+  mirroring the `?` cheatsheet. Relates to the Epic 5 keyboard rework.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
@@ -696,6 +775,11 @@ Stage C design gate:*
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
   **Design locked 2026-06-11** (06: same ambient slot, never both cards, + ⚄ dice for
   user-pulled); build in Stage C.
+- [ ] **P3 — "Surprise me" card: render media + open → reader.** *(User-requested 2026-06-17.)* The
+  surprise-me ambient card needs better rendering: when the dealt item **has an image**, render the image on
+  the card (not just title/meta); and its **"Open" action should route into `section#reader`** (the same
+  in-app reader a normal post open uses), not an external tab or bare lightbox. Builds on `surprise()`
+  (`browse/main.js:358`) + the Epic 15 reader routing.
 
 ## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
 *From the PKMS research handoff (2026-06-10; evidence in
@@ -757,6 +841,13 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   `--also-unsave` enqueues into the unsave queue BEFORE rows vanish, and without it stale
   pending queue rows are purged so a later drain can't unsave a local-only delete. Deletes
   the `reddit_threads` cache rows too. 8 tests.
+- [ ] **P2 — Done items auto-delete after a retention window (Gmail-trash style).** *(User-requested
+  2026-06-17.)* Items marked **Done** stay in the Done bucket for **X days** (default ~30, like Gmail trash —
+  make it configurable), then the entry is auto-deleted. **Unsave must be unaffected** — the auto-delete must
+  NOT enqueue a Reddit unsave (use the direct-delete path, never `bulk_set_status`, mirroring the decay-design
+  guard; the `delete` CLI's auto-backup + `delete-audit.jsonl` apply). Needs a `done_at`/status-transition
+  timestamp to age from (confirm one exists, else stamp it). Reversible until the purge runs; surface the
+  window in settings. Builds on the P3 hard-delete pathway above + the decay machinery.
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.
 - [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
@@ -764,6 +855,8 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   export only when PKMS Phase 3 starts. Don't build capture/promote here before then.
   Related open question (PKMS side, Kenja decides later): whether the PKMS mobile `/capture`
   endpoint lives inside this Flask app (same tailnet host) or as a sibling service.
+  **UI surface (user idea 2026-06-17):** the eventual trigger is a per-item **"Move to PKMS" button** in
+  content-hoarder — deferred with this item (don't build the button before the promote pipeline exists).
 - [ ] **P3 — LLM identity-vs-actionable classifier (Icebox).** v1 approximates it with tag
   buckets (memes/vtubers = identity; tips/coding/science = actionable); reactivate when the
   resurfacing card (Epic 20) needs better candidates. Reuses the Epic 1/10 local-LLM lane.
@@ -914,3 +1007,30 @@ there, not here. All 7 features SHIPPED + merged to main 2026-06-16 (`282a0d8`):
   + occasional long pause = the real browsing rhythm); (c) empirical "copy me" — log real thread-open
   gaps from the `/reddit/items/<fn>/thread` route into a small table, then sample (caveat: truncate the
   long read-pauses so it stays human-*shaped* without being bot-pointlessly slow).
+
+## Epic 26 — Tag & category taxonomy reorganization  (`enhancement`, `area:tags`)
+*User direction (2026-06-17): an overall reorganization of how **categories** and **tags** are modeled and
+surfaced. Today categories (`metadata.category`: listenable/watch/wotagei) and tags (`metadata.tags`: the
+multi-label buckets) are two separate systems with overlapping rail UI. Unify the model and give the rail a
+parent→child structure. Overlaps + absorbs Epic 5 P2 (categories in the sidebar / as a reserved tag
+namespace) and builds on Epic 9 (tagging).*
+
+- [ ] **P2 — Parent/child tag grouping in the rail (visual).** *(User-requested 2026-06-17.)* Group the flat
+  tag list under **parent tags** (e.g. **Humorous**, **Educational**, **Trivial**, **Gaming**) with the
+  sub-tags **indented** under their parent. Selecting a parent **highlights + selects all of its sub-tags**
+  (OR-filter across the children). Scope per user: **visual grouping** — the underlying tags stay flat for
+  FTS/search; this is rail UX + a parent→children map. Touches the sidebar rail + `db.tag_counts` /
+  `categorize.FILTER_TAGS`.
+- [ ] **P2 — Source-aware tag rail.** *(User idea 2026-06-17.)* The tag rail should **adapt to the active
+  source**. Tags aren't source-exclusive, but most cluster to one source in practice (defense/anime → reddit;
+  channel topics → youtube). When a source tab is active, surface the tags actually present for that source
+  (volume-sorted) instead of the global vocabulary. Reuses the cross-filtered-counts pattern
+  (`/sources?status=` style, Epic 5). Open question: how to treat shared/cross-source tags (always show vs.
+  fold under an "all sources" group).
+- [ ] **P2 — Overall categories↔tags model reorg (decision gate first).** *(User direction 2026-06-17.)*
+  Decide + implement the unified taxonomy: whether the processing **categories** (listenable/watch/wotagei)
+  become a reserved **tag namespace** (one filter UI + one rail covers both — Epic 5 P2's idea), how
+  parent/child relationships are stored (a static parent→children map vs. a real hierarchy on `metadata`), and
+  how `categorize.py`'s buckets map onto the parents above. **Sketch the model before** refactoring
+  `categorize.py` + `search_items` + the rail. Large — sequence the two visual-grouping items above as the
+  near-term wins, this reorg as the structural follow-up.
