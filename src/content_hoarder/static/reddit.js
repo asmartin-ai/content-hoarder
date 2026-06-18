@@ -674,7 +674,8 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   /* [ARCHIVAL] begin — remove this block (and the renderArchiveLinks call above) to drop archive support */
