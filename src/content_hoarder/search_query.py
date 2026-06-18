@@ -27,6 +27,7 @@ class ParsedQuery:
     kind: str | list[str] | None = None
     status: str | list[str] | None = None
     subreddit: str | list[str] | None = None
+    author: str | list[str] | None = None
 
     tags: list[str] = field(default_factory=list)
     # When true: tags are AND-ed (one required-membership check per tag).
@@ -52,6 +53,9 @@ class ParsedQuery:
 
 _OP_RE = re.compile(r"^(?P<neg>-?)(?P<key>\w+):(?P<val>.+)$", re.UNICODE)
 _R_SUB_RE = re.compile(r"^r/(\w+)$", re.UNICODE)
+# Reddit usernames are [A-Za-z0-9_-]; anchored so a bare ``u/<name>`` token is
+# the author-operator shorthand but a reddit profile URL token is NOT captured.
+_U_USER_RE = re.compile(r"^u/([\w-]+)$", re.UNICODE)
 
 
 def _tokenize(q: str) -> list[tuple[str, bool]]:
@@ -150,6 +154,7 @@ def parse(q: str) -> ParsedQuery:
     kind_groups: list[list[str]] = []
     status_groups: list[list[str]] = []
     subreddit_groups: list[list[str]] = []
+    author_groups: list[list[str]] = []
     tags_groups: list[list[str]] = []  # each token's group; later collapsed to tags/tags_all
     is_saved: int | None = None
     nsfw = False
@@ -180,6 +185,10 @@ def parse(q: str) -> ParsedQuery:
             if r_sub:
                 subreddit_groups.append([r_sub.group(1)])
                 continue
+            u_user = _U_USER_RE.match(t)
+            if u_user:
+                author_groups.append([u_user.group(1)])
+                continue
             text_terms.append(t)
             continue
 
@@ -191,7 +200,7 @@ def parse(q: str) -> ParsedQuery:
         key = (m.group("key") or "").strip().lower()
         val = (m.group("val") or "").strip()
 
-        if key in {"source", "kind", "status", "subreddit"}:
+        if key in {"source", "kind", "status", "subreddit", "author"}:
             if not val:
                 text_terms.append(t)
                 continue
@@ -201,7 +210,7 @@ def parse(q: str) -> ParsedQuery:
                 continue
             # source/kind/status are stored canonical-lowercase, so normalize the typed
             # value (e.g. `source:YouTube` -> `youtube`) or it would silently match nothing.
-            # subreddit is left as-typed (search_items matches it COLLATE NOCASE).
+            # subreddit/author are left as-typed (search_items matches them COLLATE NOCASE).
             if key == "source":
                 source_groups.append([p.lower() for p in parts])
             elif key == "kind":
@@ -210,6 +219,8 @@ def parse(q: str) -> ParsedQuery:
                 status_groups.append([p.lower() for p in parts])
             elif key == "subreddit":
                 subreddit_groups.append(parts)
+            elif key == "author":
+                author_groups.append(parts)
             continue
 
         if key == "tag":
@@ -294,6 +305,7 @@ def parse(q: str) -> ParsedQuery:
     kind = _collapse(kind_groups)
     status = _collapse(status_groups)
     subreddit = _collapse(subreddit_groups)
+    author = _collapse(author_groups)
     has = _collapse(has_groups)
 
     # Collapse tag groups into the simple API requested by the spec.
@@ -321,6 +333,7 @@ def parse(q: str) -> ParsedQuery:
         kind=kind,
         status=status,
         subreddit=subreddit,
+        author=author,
         tags=tags,
         tags_all=tags_all,
         is_saved=is_saved,
