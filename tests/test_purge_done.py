@@ -65,3 +65,48 @@ def test_purge_done_dryrun_reports_window_and_sample(conn):
     assert res["retention_days"] == 30
     assert res["cutoff"] == NOW - 30 * DAY
     assert any("t3_a" in s for s in res["sample"])
+
+
+def test_purge_done_cutoff_is_strict(conn):
+    # pins the strict `<` boundary: an item processed EXACTLY at the cutoff is kept;
+    # one a second older is purged. Guards a silent `<` -> `<=` regression.
+    at = _seed_done(conn, "t3_at_cutoff", age_days=30)            # processed_utc == cutoff
+    over = _seed_done(conn, "t3_over_cutoff", age_days=30)
+    conn.execute("UPDATE items SET processed_utc=? WHERE fullname=?",
+                 (NOW - 30 * DAY - 1, over))                      # one second past the cutoff
+    conn.commit()
+    assert db.purge_done(conn, now=NOW, apply=False)["total"] == 1   # only the over-cutoff one
+    db.purge_done(conn, now=NOW, apply=True)
+    assert db.get_item(conn, at) is not None     # exactly at cutoff -> kept
+    assert db.get_item(conn, over) is None       # past cutoff -> purged
+
+
+def test_purge_done_excludes_null_dated_done(conn):
+    # a status='done' row with processed_utc IS NULL must never be purged (undated -> excluded).
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_null", kind="post", title="x"))
+    conn.execute("UPDATE items SET status='done', processed_utc=NULL WHERE fullname='reddit:t3_null'")
+    conn.commit()
+    assert db.purge_done(conn, now=NOW, apply=False)["total"] == 0
+    db.purge_done(conn, now=NOW, apply=True)
+    assert db.get_item(conn, "reddit:t3_null") is not None
+
+
+def test_purge_done_never_touches_non_done(conn):
+    # the contract names inbox/keep/archived as untouched — pin archived too (oracle covers inbox/keep).
+    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_arch", kind="post", title="a"))
+    conn.execute("UPDATE items SET status='archived', processed_utc=? WHERE fullname='reddit:t3_arch'",
+                 (NOW - 40 * DAY,))
+    conn.commit()
+    db.purge_done(conn, now=NOW, apply=True)
+    assert db.get_item(conn, "reddit:t3_arch") is not None
+
+
+def test_purge_done_deletes_cached_thread(conn):
+    # the reddit_threads cascade + threads_deleted count are otherwise unverified.
+    fn = _seed_done(conn, "t3_hyd", age_days=40)
+    conn.execute("INSERT INTO reddit_threads(fullname, thread_json, hydrated_at) VALUES (?,?,?)",
+                 (fn, "{}", NOW))
+    conn.commit()
+    res = db.purge_done(conn, now=NOW, apply=True)
+    assert res["threads_deleted"] == 1
+    assert conn.execute("SELECT COUNT(*) FROM reddit_threads WHERE fullname=?", (fn,)).fetchone()[0] == 0
