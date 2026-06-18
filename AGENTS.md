@@ -5,17 +5,21 @@ you don't reintroduce known bugs.
 
 ## What this is
 A local-first, **triage-first** manager for saved content from many sources. Thesis: **process and
-reduce, not just aggregate**. Phase 1 = import + search + a usable triage UI. Phase 2 = polish (swipe
-animations, metrics, LLM assist, Obsidian export, optional Karakeep push). The offline PWA (service
-worker + manifest) already ships.
+reduce, not just aggregate**. Phase 1 = import + search + a usable triage UI. Several Phase-2 items now
+ship too: LLM assist (`assist/llm.py`, `suggest` / `categorize --llm`), Obsidian export
+(`export-obsidian`), and the optional Karakeep push (`promote`). The offline PWA (service worker +
+manifest) already ships.
 
 ## Stack & run
 - Python 3.12, Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
 - `yt-dlp` is optional (YouTube only, **lazy-imported**). `adb` is an external CLI the user runs.
-- Run: `python -m content_hoarder <cmd>` (`init-db`, `import`, `enrich`, `serve`, `stats`, `sources`,
-  `bankruptcy`, `promote`, `categorize`, `dedup`, `decay`, `reddit-sync`, `reddit-unsave`,
-  `reddit-hydrate`). Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` is an offline
-  local-archive thread hydrate; `--batch` is the cookie-based, rate-limited, resumable backfill.)
+- Run: `python -m content_hoarder <cmd>`. Full command set (see the README CLI table for flags):
+  `init-db`, `import`, `enrich`, `categorize`, `dedup`, `consolidate`, `serve`, `stats`, `sources`,
+  `bankruptcy`, `decay`, `delete`, `export`, `export-obsidian`, `promote`, `suggest`, `learn-triage`,
+  `migrate-rsm-threads`, `migrate-firefox-tabs`, `reddit-sync`, `reddit-unsave`, `reddit-oauth`,
+  `reddit-hydrate`, `reddit-hydrate-titles`, `reddit-thumbnails`. Web default `127.0.0.1:8788`.
+  (`reddit-hydrate --from <bdfr-dir>` is an offline local-archive thread hydrate; `--batch` is the
+  rate-limited, resumable backfill — OAuth-preferred when configured, else the cookie.)
 - Tests: `python -m pytest` — all offline, `:memory:` SQLite, tiny synthetic fixtures, **no network**.
 
 ## Layout
@@ -33,7 +37,7 @@ src/content_hoarder/
   assist/       llm.py (optional local-LLM suggestions; Phase 2)
   templates/     index.html (v3 browse) + triage.html + reddit.html + manifest.webmanifest
   static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
-  static/browse/ v3 browse shell: main.js, render.js, operators.js, palette.js + browse.css
+  static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js + browse.css
   static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
                  (the v2 app.js + swipe.js were deleted 2026-06-13)
 ```
@@ -107,8 +111,10 @@ Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved*
 - **Decoupled queue, drained on demand.** `db.set_status`/`bulk_set_status` enqueue a row into the
   `reddit_unsave` table (gated on the `settings` flag `reddit_unsave_on_done`, **off by default**);
   `undo_status` dequeues a still-`pending` row. The local Done stays instant and never blocks on Reddit.
-- **Transport: session cookie + modhash** (no OAuth). Cookie/modhash/username live in the `auth_tokens`
-  row `service='reddit_web'` (access_token=cookie, refresh_token=modhash). Stdlib `urllib` only.
+- **Transport:** the sanctioned OAuth `save` scope when configured, else the **session cookie + modhash**
+  fallback. Cookie/modhash/username live in the `auth_tokens` row `service='reddit_web'`
+  (access_token=cookie, refresh_token=modhash); OAuth tokens live in their own `auth_tokens` row.
+  Stdlib `urllib` only.
 - **`drain()`** (CLI `reddit-unsave --drain`, the "Sync now" button, or a scheduled task) refreshes the
   modhash once, then POSTs `/api/unsave` ~1/sec with 429 backoff. All network is injectable
   (`post=`/`getf=`/`sleep=`) → tests are offline. A dead cookie → `auth_error` (loud), nothing sent.
@@ -127,14 +133,17 @@ The RSM interface folded in over the generic `items` table. Full notes: `docs/re
 - **One-time thread migration:** `migrate-rsm-threads --from <RSM app.db>` (`rsm_threads.py`) reads RSM
   read-only and re-keys `t3_x`→`reddit:t3_x`. It writes via db helpers (like `firefox_youtube.migrate`),
   so it's exempt from the "connectors never touch the DB" rule — it is NOT a connector.
-- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,items/<fn>/thread,items/<fn>/unsave,items/<fn>/undo}`.
+- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,sync}`, `/reddit/items/<fn>/{thread,unsave,undo,hydrate}`,
+  and `/reddit/unsave/{status,auth,enable,drain,enqueue-by-tag}` (see `web.py` for the authoritative list).
   Unsave enqueues + optimistically flips `is_saved=0`; undo cancels a still-pending unsave locally or live
   re-saves a drained one (the generic `/items/<fn>/resave` primitive still exists). Frontend =
   `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed to `/reddit/*`; OAuth/import/export/archival
   controls dropped via JS null-guards).
-- **Auth:** cookie-based incremental sync (newest-first, stop-on-overlap) is implemented and is the
-  default — `reddit_sync.py`, the `reddit-sync` CLI, and `POST /reddit/sync` (needs a `reddit_session`
-  cookie). OAuth is unbuilt (the old `feat/reddit-oauth` branch is gone); rebuild it if a Reddit API key arrives.
+- **Auth:** OAuth is built — `reddit_oauth.py` + the `reddit-oauth` CLI (installed-app / RedReader client
+  id, no secret; `read history identity save` scopes). It ships dormant and is activated once via
+  `reddit-oauth --login`; once configured it's preferred over the cookie for reads (hydration, saved-list
+  sync) and writes (unsave). The cookie path (`reddit_sync.py`, the `reddit-sync` CLI, `POST /reddit/sync`;
+  needs a `reddit_session` cookie) remains the automatic fallback. See `docs/reddit-derisking.md`.
 
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.

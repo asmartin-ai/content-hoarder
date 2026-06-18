@@ -59,12 +59,15 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `categorize [--source youtube] [--all] [--limit N]` | Tag items *listenable* / *watch* / *wotagei* by heuristics (duration, channel allowlist, title keyword); stored on `metadata.category`. |
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
+| `consolidate [--apply] [--undo]` | Fold a Reddit post / HN story / Firefox tab that links to a YouTube video into one canonical `youtube:<id>` item (companions linked). Re-runnable; dry-run by default; reversible. |
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
+| `migrate-firefox-tabs [--apply]` | One-time: promote Firefox YouTube tabs imported before auto-promotion into `youtube:<id>` items and collapse duplicates (dry-run by default; run against a DB copy first). |
 | `reddit-sync` | Pull new saved Reddit items (newest-first, stop-on-overlap). Prefers the OAuth `history` scope when configured, else the `reddit_session` cookie (set it with `reddit-unsave --login`). |
 | `reddit-unsave [--enable\|--disable] [--drain [--live --yes]] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit. **`--drain` is a DRY RUN by default** (lists the scope, sends nothing); add `--live --yes` to execute — it MUTATES your real Reddit Saved list (reversible via re-save), is jittered + rate-limited with 429 backoff, prefers the sanctioned OAuth `save` scope when configured (else the cookie), and appends every unsave to `data/unsave-audit.jsonl`. |
 | `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **OAuth** transport (installed-app, no client secret; requests read + history + identity + save scopes; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads (hydration, saved-list sync) **and** writes (unsave) — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
 | `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item (OAuth if configured, else cookie), `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (jittered throttle, small cap, resumable; safe-by-default — needs `--yes` to fetch). |
 | `reddit-hydrate-titles [--network] [--dry-run] [--limit N]` | Backfill real titles for saved Reddit **comments** that imported as "(untitled)" — the saved row is the comment, so the title is its submission's title. Default fills from already-cached thread JSON (offline); `--network` recovers the rest via PullPush/Arctic-Shift. |
+| `reddit-thumbnails [--apply] [--limit N]` | Backfill Reddit thumbnails (esp. `v.redd.it` video posters) from already-cached thread blobs — zero network. Dry-run by default. |
 | `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
 | `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
 | `sources` | List the available source connectors. |
@@ -73,6 +76,9 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
 | `export --out FILE [--format csv\|json] [--tag T...] [--status S]` | Dump matching items to CSV/JSON (permalink-oriented, for re-saving elsewhere). Same filters live at `GET /export`. |
 | `promote [--status keep] [--dry-run]` | (Opt-in) push items you've marked **keep** to a stock Karakeep instance via its API. |
+| `export-obsidian --vault DIR [--status keep]` | Write items (default: `keep`) to an Obsidian vault as Markdown notes. |
+| `suggest [--source ID] [--limit N]` | Annotate inbox items with local-LLM keep/skip suggestions (optional; Phase 2 assist). |
+| `learn-triage [--apply] [--min-support N] [--alpha F] [--limit N]` | Fit the transparent likely-to-process model from triage history and score inbox items (`metadata.triage_score` + why; "smart" batches use it). Dry-run by default. |
 
 ### Reddit hydration & recovery — worked examples
 "Hydration" caches a saved post's full comment thread so the **inline reader** can show it offline.
