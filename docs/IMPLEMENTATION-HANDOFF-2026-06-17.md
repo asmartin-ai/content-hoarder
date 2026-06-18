@@ -3,6 +3,11 @@
 > Snapshot as of 2026-06-17. Volatile facts (line numbers, `file:line` refs, "open" status) are
 > point-in-time — verify against the repo before acting. Supersede with a newer dated handoff rather
 > than editing in place. **Correction (same day): B3 is NOT a bug — see §1.**
+>
+> **Shipped since this handoff (2026-06-17, bakeoff merge):** **F9** (bare `r/<sub>` subreddit shorthand —
+> alias, `subreddit:` kept) and **F14** (Firefox/HN topic tagging + `investing` bucket, wired as
+> `categorize --source firefox|hackernews`). B0a/B0b were already fixed. Everything else below is still open.
+> Test floor is now **547 passed** (was 524 at write time).
 
 A self-contained work queue produced from a desktop-testing session + a repo sweep. It is meant to be
 handed to a fresh chat with **no memory of the originating conversation**, so each item carries its own
