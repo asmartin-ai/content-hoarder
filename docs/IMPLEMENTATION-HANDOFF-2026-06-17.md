@@ -4,10 +4,11 @@
 > point-in-time — verify against the repo before acting. Supersede with a newer dated handoff rather
 > than editing in place. **Correction (same day): B3 is NOT a bug — see §1.**
 >
-> **Shipped since this handoff (2026-06-17, bakeoff merge):** **F9** (bare `r/<sub>` subreddit shorthand —
-> alias, `subreddit:` kept) and **F14** (Firefox/HN topic tagging + `investing` bucket, wired as
-> `categorize --source firefox|hackernews`). B0a/B0b were already fixed. Everything else below is still open.
-> Test floor is now **547 passed** (was 524 at write time).
+> **Shipped since this handoff (2026-06-17/18, bakeoff merges):** **F9** (bare `r/<sub>` subreddit shorthand —
+> alias, `subreddit:` kept), **F14** (Firefox/HN topic tagging + `investing` bucket, wired as
+> `categorize --source firefox|hackernews`), and **F15 DB primitive** (`db.purge_done` retention sweep —
+> glm-5p2 arm; the CLI/sweep + settings UI half is still open, see §3E / Epic 21). B0a/B0b were already
+> fixed. Everything else below is still open. Test floor is now **555 passed** (was 524 at write time).
 
 A self-contained work queue produced from a desktop-testing session + a repo sweep. It is meant to be
 handed to a fresh chat with **no memory of the originating conversation**, so each item carries its own
@@ -398,7 +399,7 @@ skill (run-branch isolation + the integrity gate that catches a silently-failed 
 | Item | Verdict | Lane |
 |------|---------|------|
 | **B1** decay-undo collision | ✅ delegate (strong) | qwen single-shot |
-| **F15** Done auto-delete retention | ✅ delegate (strong) | GLM (multi-touch + safety guard) |
+| ~~**F15** Done auto-delete retention~~ | ✅ **DONE** 2026-06-18 (glm-5p2 arm) | DB primitive merged; CLI/sweep half remains |
 | **B2** reconcile-cap truncation flag | 🟡 borderline | GLM (crosses sync/import seam) |
 | **B4** import temp-file leak | 🟡 borderline | qwen (small; oracle ≈ fix size) |
 | B5, I1, I2, I3, F1–F8, F10–F13, F16–F19, OCR | ❌ don't delegate | inline — UI/preview/design-gated, or not oracle-shaped |

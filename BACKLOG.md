@@ -862,12 +862,15 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   pending queue rows are purged so a later drain can't unsave a local-only delete. Deletes
   the `reddit_threads` cache rows too. 8 tests.
 - [ ] **P2 — Done items auto-delete after a retention window (Gmail-trash style).** *(User-requested
-  2026-06-17.)* Items marked **Done** stay in the Done bucket for **X days** (default ~30, like Gmail trash —
-  make it configurable), then the entry is auto-deleted. **Unsave must be unaffected** — the auto-delete must
-  NOT enqueue a Reddit unsave (use the direct-delete path, never `bulk_set_status`, mirroring the decay-design
-  guard; the `delete` CLI's auto-backup + `delete-audit.jsonl` apply). Needs a `done_at`/status-transition
-  timestamp to age from (confirm one exists, else stamp it). Reversible until the purge runs; surface the
-  window in settings. Builds on the P3 hard-delete pathway above + the decay machinery.
+  2026-06-17.)* **DB primitive SHIPPED 2026-06-18 (F15 bakeoff, glm-5p2 arm + review fixes):**
+  `db.purge_done(conn, *, now, apply, max_rows)` permanently purges `status='done'` items older than
+  setting `done_retention_days` (default 30), aging from `processed_utc` (NULL excluded). Direct-delete —
+  never routes through `bulk_set_status`/`enqueue_unsave`, so a purge **cannot enqueue a Reddit unsave**
+  (mirrors the decay invariant, oracle-pinned); cleans pending `reddit_unsave` + `reddit_threads` rows;
+  `max_rows` blast cap. 8 tests. **REMAINING (the user-facing half):** a CLI / scheduled-sweep entrypoint
+  wrapping it in the `delete` CLI's **auto-backup + `delete-audit.jsonl` + confirmation gate**, and a
+  **settings UI** for the window. `processed_utc` confirmed as the Done-transition timestamp (no schema
+  change needed). Builds on the P3 hard-delete pathway above + the decay machinery.
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.
 - [ ] **P3 — PKMS promote-pipeline export wrapper (Icebox).** The read path already exists
