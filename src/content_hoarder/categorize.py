@@ -471,20 +471,20 @@ _BROWSER_HOST_TAGS = {
 }
 
 # Title keywords (word-bounded), applied ONLY when the host map produced no tag.
+# Kept deliberately tight for precision: bare "market(s)" is excluded (it catches
+# housing/job/farmers market); investing keys on stock(s)/earnings/invest*/stock-market.
 _BROWSER_KEYWORD_TAGS = [
     ("gaming", re.compile(r"\bsteam\b|\bvideo\s+game\b", re.IGNORECASE)),
     ("defense", re.compile(r"\bmilitary\b", re.IGNORECASE)),
     ("investing", re.compile(
-        r"\bstock\b|\bstocks\b|\bearnings\b|\binvesting\b|\bmarket\b|\bmarkets\b",
+        r"\bstocks?\b|\bearnings\b|\binvest(?:ing|or|ors)?\b|\bstock\s+markets?\b",
         re.IGNORECASE)),
 ]
 
 
-def firefox_tags(item: dict) -> list[str]:
-    """Return ordered de-duped topic tags for a Firefox-tab item."""
-    md = item.get("metadata") or {}
-    domain = md.get("domain") or _extract_host(item.get("url") or "")
-    title = item.get("title") or ""
+def _browser_bucket_tags(domain: str, title: str) -> list[str]:
+    """Core host+keyword bucket assignment shared by firefox_tags / hackernews_tags."""
+    domain = (domain or "").lower()
     tags: list[str] = []
 
     # Host pass
@@ -494,37 +494,87 @@ def firefox_tags(item: dict) -> list[str]:
                 if t not in tags:
                     tags.append(t)
 
-    # Keyword pass only if host pass produced nothing
+    # Keyword pass only if the host pass produced nothing
     if not tags:
         for tag_name, pattern in _BROWSER_KEYWORD_TAGS:
-            if pattern.search(title):
-                if tag_name not in tags:
-                    tags.append(tag_name)
+            if pattern.search(title or "") and tag_name not in tags:
+                tags.append(tag_name)
 
     return tags
+
+
+def firefox_tags(item: dict) -> list[str]:
+    """Return ordered de-duped topic tags for a Firefox-tab item (F14)."""
+    md = item.get("metadata") or {}
+    domain = md.get("domain") or _extract_host(item.get("url") or "")
+    return _browser_bucket_tags(domain, item.get("title") or "")
 
 
 def hackernews_tags(item: dict) -> list[str]:
-    """Return ordered de-duped topic tags for a Hacker News item."""
-    domain = _extract_host(item.get("url") or "")
-    title = item.get("title") or ""
-    tags: list[str] = []
+    """Return ordered de-duped topic tags for a Hacker News item (F14)."""
+    return _browser_bucket_tags(_extract_host(item.get("url") or ""), item.get("title") or "")
 
-    # Host pass
-    for key, key_tags in _BROWSER_HOST_TAGS.items():
-        if key in domain:
-            for t in key_tags:
-                if t not in tags:
-                    tags.append(t)
 
-    # Keyword pass only if host pass produced nothing
-    if not tags:
-        for tag_name, pattern in _BROWSER_KEYWORD_TAGS:
-            if pattern.search(title):
-                if tag_name not in tags:
-                    tags.append(tag_name)
+def tag_browser_source(conn, source: str, *, limit=None, retry: bool = False,
+                       dry_run: bool = False, samples: int = 6) -> dict:
+    """Multi-label tag Firefox-tab / Hacker-News items into ``metadata.tags`` (F14).
 
-    return tags
+    Mirrors :func:`tag_reddit_source`: ``dry_run`` previews without writing (returning
+    per-tag counts + sample titles + an ``untagged`` count so accuracy can be validated
+    before committing); a real run skips already-tagged items unless ``retry`` is set.
+    ``metadata.category`` is never touched.
+    """
+    tagger = {"firefox": firefox_tags, "hackernews": hackernews_tags}.get(source)
+    if tagger is None:
+        raise ValueError(f"tag_browser_source: unsupported source {source!r}")
+
+    where = ["source = ?"]
+    params: list = [source]
+    if not retry and not dry_run:
+        where.append("json_extract(metadata, '$.tags') IS NULL")
+    sql = ("SELECT fullname, title, url, metadata FROM items WHERE "
+           + " AND ".join(where) + " ORDER BY last_seen_utc DESC")
+    if limit:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+    rows = conn.execute(sql, params).fetchall()
+
+    by_tag: dict = {}
+    sample: dict = {}
+    untagged = 0
+    untagged_sample: list = []
+    now = int(time.time())
+
+    for r in rows:
+        md = parse_metadata(r["metadata"])
+        tags = tagger({"title": r["title"], "url": r["url"], "metadata": md})
+        label = (r["title"] or "")[:70]
+        if tags:
+            for t in tags:
+                by_tag[t] = by_tag.get(t, 0) + 1
+                sample.setdefault(t, [])
+                if len(sample[t]) < samples:
+                    sample[t].append(label)
+            if not dry_run:
+                db.merge_upsert(conn, {"fullname": r["fullname"],
+                                       "metadata": {"tags": tags}, "last_seen_utc": now})
+        else:
+            untagged += 1
+            if len(untagged_sample) < samples * 2:
+                untagged_sample.append(label)
+    if not dry_run:
+        conn.commit()
+
+    return {
+        "source": source,
+        "selected": len(rows),
+        "dry_run": dry_run,
+        "tagged": len(rows) - untagged,
+        "untagged": untagged,
+        "by_tag": by_tag,
+        "samples": sample,
+        "untagged_sample": untagged_sample,
+    }
 
 
 def tag_youtube_source(conn, *, limit=None, retry: bool = False,
