@@ -1470,6 +1470,72 @@ def delete_items(
     return res
 
 
+def purge_done(
+    conn: sqlite3.Connection,
+    *,
+    now: int | None = None,
+    apply: bool = False,
+    max_rows: int = 5000,
+) -> dict:
+    """Permanently purge ``status='done'`` items older than a retention window (Gmail-trash; F15).
+
+    Items left Done longer than ``done_retention_days`` (setting, default 30) are permanently
+    deleted. Age is measured from ``processed_utc`` (when the item entered Done — there is no
+    separate done_at column): an item qualifies when ``processed_utc < now - retention*86400``.
+    ``processed_utc IS NULL`` rows are excluded so an undated Done item is never purged.
+
+    Like ``decay`` and ``delete_items``, this is a DIRECT delete — never routed through
+    ``bulk_set_status``/``enqueue_unsave`` — so a retention purge MUST NOT enqueue a Reddit
+    unsave. Only ``status='done'`` rows are ever selected; inbox/keep/archived are untouched.
+    Pending ``reddit_unsave`` rows for purged items are removed (a local purge should not let a
+    later drain unsave something the user only deleted locally); drained history rows are kept
+    as audit. ``apply=True`` refuses to delete more than ``max_rows`` (blast-radius cap, mirrors
+    ``delete_items`` — guards a misconfigured 0-day retention). Dry-run (default) changes nothing.
+    Returns ``{"total", "applied", "retention_days", "cutoff", "threads_deleted", "sample"}``.
+    """
+    now = int(now if now is not None else time.time())
+    retention_days = int(get_setting(conn, "done_retention_days", 30) or 30)
+    cutoff = now - retention_days * 86400
+    where = "status='done' AND processed_utc IS NOT NULL AND processed_utc < ?"
+    params: list = [cutoff]
+
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    sample = [
+        f"{r[0]}: {(r[1] or '')[:60]}"
+        for r in conn.execute(
+            f"SELECT source, title FROM items WHERE {where} ORDER BY processed_utc LIMIT 5",
+            params,
+        ).fetchall()
+    ]
+    res = {"total": total, "applied": False, "retention_days": retention_days,
+           "cutoff": cutoff, "threads_deleted": 0, "sample": sample}
+    if not apply:
+        return res
+    if total > max_rows:
+        raise ValueError(
+            f"refusing to purge {total} done rows (> max_rows={max_rows}); "
+            f"raise max_rows deliberately if this is intended")
+    res["applied"] = True
+    if not total:
+        return res
+
+    victims = [r[0] for r in conn.execute(
+        f"SELECT fullname FROM items WHERE {where}", params).fetchall()]
+    threads = 0
+    for i in range(0, len(victims), 500):  # chunk IN lists under SQLite's variable cap
+        chunk = victims[i:i + 500]
+        ph = ",".join("?" for _ in chunk)
+        cur = conn.execute(f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk)
+        threads += cur.rowcount
+        conn.execute(
+            f"DELETE FROM reddit_unsave WHERE fullname IN ({ph}) AND state='pending'",
+            chunk)
+        conn.execute(f"DELETE FROM items WHERE fullname IN ({ph})", chunk)
+    conn.commit()
+    res["threads_deleted"] = threads
+    return res
+
+
 def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
     row = conn.execute("SELECT * FROM items WHERE fullname=?", (fullname,)).fetchone()
     return _row_to_public(row) if row else None
