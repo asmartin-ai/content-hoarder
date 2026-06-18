@@ -116,6 +116,11 @@ def cmd_categorize(args) -> int:
             # Reddit gets multi-label tags (metadata.tags); --dry-run previews accuracy.
             res = cat_mod.tag_reddit_source(conn, limit=args.limit, retry=args.all,
                                             dry_run=args.dry_run)
+        elif (args.source or "").lower() in ("firefox", "hackernews"):
+            # Firefox-tab / HN items get the same multi-label topic tags (F14).
+            res = cat_mod.tag_browser_source(conn, (args.source or "").lower(),
+                                             limit=args.limit, retry=args.all,
+                                             dry_run=args.dry_run)
         elif args.topics:
             res = cat_mod.tag_youtube_source(conn, limit=args.limit, retry=args.all,
                                              dry_run=args.dry_run)
@@ -635,12 +640,13 @@ def build_parser() -> argparse.ArgumentParser:
     pe.set_defaults(func=cmd_enrich)
 
     pc = sub.add_parser("categorize",
-                        help="Tag items: YouTube → listenable/watch/wotagei; Reddit → multi-label tags.")
-    pc.add_argument("--source", default="youtube", help="Source to categorize (default: youtube).")
+                        help="Tag items: YouTube → listenable/watch/wotagei; Reddit/Firefox/HN → multi-label tags.")
+    pc.add_argument("--source", default="youtube",
+                    help="Source to categorize: youtube (default), reddit, firefox, hackernews.")
     pc.add_argument("--all", action="store_true", help="Re-categorize items that already have one.")
     pc.add_argument("--limit", type=int, default=None, help="Max items to categorize.")
     pc.add_argument("--dry-run", action="store_true",
-                    help="Preview tag assignment without writing (reddit multi-label tagging).")
+                    help="Preview tag assignment without writing (reddit/firefox/hackernews multi-label).")
     pc.add_argument("--topics", action="store_true", help="YouTube: multi-label topic tags instead of processing areas.")
     pc.add_argument("--llm", action="store_true",
                     help="Classify with an LLM (assist/llm.py) instead of heuristics; "
