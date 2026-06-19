@@ -748,6 +748,24 @@ mobile-friendly".*
   touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
 - [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
 
+### Icebox — non-Chromium standalone install (GeckoView wrapper) *(Epic 16)*
+- [ ] **P3 — ICEBOX: ship content-hoarder as a Gecko-rendered standalone Android app.** *(Researched +
+  decision 2026-06-19.)* Goal: a real standalone app on the Pixel **without a Chromium engine** (user
+  prefers Firefox/no-Chrome). **Findings:** Firefox Android can't make a true install (no WebAPK; "Add app
+  to Home screen" = shortcut-class with the URL bar). WebAPK minting is Chromium+Google-Play-Services only,
+  so every turnkey route (TWA/Bubblewrap, WebView wrappers like Hermit/Native Alpha) is Chromium. The only
+  Gecko paths are: **(a)** a **custom GeckoView wrapper** — a ~50-line Java Android app bundling Mozilla's
+  official GeckoView that loads the `.ts.net` URL full-screen (smallest trust surface = you + Mozilla; cost =
+  *you* own quarterly engine-security rebuilds); **(b)** **Nira** (GeckoView browser w/ one-tap PWA install)
+  — vetted **alpha / solo-dev / sideload-only / no community track record**, so NOT trusted for years of
+  personal data; **(c)** a full **native Kotlin/Compose** rewrite — rejected (forks the web UI you actively
+  maintain → permanent dual upkeep). A scaffold plan for (a) was drafted (Java, "minimal+", reuses
+  `static/icon-512.png` + `#0f1115`/`#f2a97e` theme; GeckoView needs **no** assetlinks/Digital-Asset-Links).
+  **Reactivation condition:** revisit as an **experimental separate branch or new repo** if the user tires of
+  the current project / wants an Android side-project — NOT as in-place work here. **For now:** use the
+  Chromium **WebAPK via Chrome "Install app"** (the only mainstream path; auto-updates its engine). See
+  [[inline-reddit-reader]] (prior "Firefox is the culprit" note) and [[content-hoarder]].
+
 ## Epic 17 — Unify the Reddit and Inbox/Triage surfaces  (`enhancement`, `area:ui`)
 - [ ] **P2 — One unified surface.** Fold the dedicated `/reddit` view's capabilities (subreddit rail,
   table/grid, thread viewer) into the main inbox + triage so there aren't two UIs to maintain. Large;
