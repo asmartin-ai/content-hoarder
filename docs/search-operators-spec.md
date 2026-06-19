@@ -119,9 +119,18 @@ needs no change — it already sends raw `q`).
 
 ---
 
+## Added after ship
+
+- **Bare `r/<sub>` shorthand** (F9, 2026-06-17): a standalone `^r/<sub>$` token is an alias for
+  `subreddit:<sub>`. `subreddit:` is unchanged, not deprecated.
+- **`author:` operator + bare `u/<user>` shorthand** (Epic 12): `author:<name>` filters on the
+  first-class `author` column (matched COLLATE NOCASE, like `subreddit:`); a standalone `^u/<user>$`
+  token is its alias (`u/spez` == `author:spez`). Anchored so a reddit profile URL token is NOT
+  captured. Composes with free text and the other operators; comma/pipe = OR, repeat = OR.
+
 ## Acceptance criteria
 
-- `source:`, `kind:`, `status:`, `subreddit:`, `tag:` (AND + OR forms), `is:saved`, `is:nsfw`,
+- `source:`, `kind:`, `status:`, `subreddit:`, `author:`, `tag:` (AND + OR forms), `is:saved`, `is:nsfw`,
   `before:`, `after:`, `score:>N` / `score:<N` / `score:N`, quoted `"exact"`, and `-negation` all work
   from the search bar and compose with each other **and** with the existing dropdown filters.
 - Unknown/malformed operators degrade to free text without 500ing.

@@ -18,6 +18,7 @@ const KEYS = [
   { key: "has:", hint: "media type", vals: ["video", "image", "gallery"] },
   { key: "tag:", hint: "by tag", dyn: "tags" },
   { key: "subreddit:", hint: "by subreddit", dyn: "subs" },
+  { key: "author:", hint: "by author (or u/name)" },
   { key: "before:", hint: "date YYYY-MM-DD" },
   { key: "after:", hint: "date YYYY-MM-DD" },
   { key: "score:", hint: "e.g. score:>100" },
