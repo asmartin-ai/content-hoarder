@@ -109,6 +109,18 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
   source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
   Web-Share-with-clipboard-fallback so it works on the Pixel-6 target.
+- [ ] **P2 — Defer/Skip as a first-class triage action.** *(User-requested 2026-06-19.)* A "decide later"
+  action available everywhere triage happens (triage card + browse row + reader), not just a swipe gesture —
+  surfaced as a button + keyboard key alongside Keep/Archive/Done, and reversible like the other actions.
+  **Two distinct behaviors to decide between (or ship both):** (a) **Skip** = a no-decision "pass, show me the
+  next" that just advances within the current batch without changing status or persisting anything; (b)
+  **Defer/Snooze** = a *timed* deferral that hides the item from triage batches for a window
+  (`metadata.snoozed_until`) then quietly resurfaces it. Honors the project guardrails: friction-asymmetry
+  (defer is priced above Done/Archive, never the cheapest gesture), no guilt mechanics (no "snoozed 3×!"
+  badges), and after N defers an item flows into the Epic 21 guilt-free decay path. **Unify with — don't
+  duplicate —** the Epic 20 P2 "4-way swipe: Snooze on the unassigned long-left" item (that's the *gesture*
+  binding of this same action) and the Epic 21 snooze-decay escalation. Relates to Epic 5 keyboard rework +
+  Epic 10 (a skipped/deferred item is a weak training signal — decide whether it counts).
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
@@ -219,6 +231,20 @@ false positives.*
   note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
   **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
   new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
+- [ ] **P3 — Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review).**
+  *(User idea 2026-06-19.)* GLM already wins several of our *code* bakeoff arms (5.1/5p2); the research says
+  **design is GLM-5.2's standout strength** — #1 on **Design Arena** (Elo ~1360, blind human-preference design
+  tasks, ahead of Claude Fable 5 / GPT-5.5), #2 on **Code Arena: Frontend** (+29 over Claude Opus 4.7
+  Thinking), and **94.8 vs 77.3** (Claude Opus 4.6) on **Design2Code** for the GLM-5V vision variant — and it's
+  open-weights + multimodal (screenshot→code). **Trial scope:** hand it (a) a *greenfield/exploratory* design
+  task (where it's strongest) and (b) a "build this from a screenshot/Figma" task (Design2Code), **both
+  constrained by the `frontend-design` skill** so it respects the v3 tokens/design language, and **run through
+  the normal human design-approval gate** (design can't be oracle-tested like code — visual review IS the
+  oracle). **Caveats to watch:** benchmark wins are *greenfield aesthetics*, NOT adherence to our locked design
+  system — the within-an-existing-system polish tasks (Epic 13 P3 CSS) are the harder taste-consistency test
+  before trusting it broadly; and 5.2 launched with thin official benchmark tables, so trust our own bakeoff
+  results over the marketing. Good first real targets: the screenshot-driven items (Epic 15 inline-media,
+  the mobile-nav redesign). Relates to Epic 23 (design-language) + the `frontend-design` skill.
 
 ## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
@@ -373,6 +399,24 @@ to its companion discussion threads.*
 - [x] ~~**Precedence + matching.**~~ Honored: match key = canonical YouTube video id (`firefox.youtube_id`)
   from any source's link; YouTube is always the survivor. Firefox-tab→YouTube is still promoted at import
   (`firefox_youtube.py`); Reddit link-post→YouTube and HN story→YouTube fold here.
+- [ ] **P2 — Promote standalone YouTube-link notes (Keep + Obsidian) → YouTube items.** *(User-requested
+  2026-06-19.)* Extend the link→video promotion to **Keep notes** and **Obsidian markdown files** whose body
+  **is essentially just a YouTube link** (no real surrounding prose). Treat them like the Firefox-tab
+  promotion: fold into a canonical `youtube:<id>` item (create a keyless one if none exists, `promoted_by`),
+  keeping the note as a reversible companion. **Decisions (user 2026-06-19):** standalone → promote; runs
+  **both at import** (like `firefox_youtube.py`) **and** re-runnably via the reversible `consolidate` pass
+  (dry-run + `--undo`). **Connector prerequisites (URL extraction):**
+  - **Obsidian** scans **nothing** in the body today — `url` comes only from frontmatter (`obsidian.py:116`);
+    add body-URL extraction.
+  - **Keep** captures only the **first** URL (`keep.py:90`); capture all, so a non-first YouTube link is seen.
+  - Handle markdown link forms (`[text](url)`, `![](url)` embeds) + bare URLs; normalize via
+    `connectors.firefox.youtube_id` (`youtu.be`/`shorts`/`watch?v=`).
+  - **Standalone-vs-document heuristic** (shared with the Epic 15 note-reader items): after stripping the
+    YouTube URL(s) + the title, is there meaningful remaining body text? Below a threshold → standalone
+    (promote); otherwise it's a **document** → hand off to the note-with-video reader (Epic 15), do NOT
+    convert (the note text is the irreplaceable thing). **Open: the exact threshold** — pick after sampling
+    real notes. A note with **multiple** YouTube links is never "standalone" (→ Epic 15 multi-video reader).
+  Relates to Epic 7 (connectors) + Epic 15 (note reader).
 
 ## Epic 12 — Search operators in the search bar  (`enhancement`, `area:search`)
 *Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
@@ -648,6 +692,43 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [ ] **P3 — Reader triage buttons show their hotkey shortcuts.** *(User-requested 2026-06-17.)* The triage
   action buttons at the bottom of the reader should display their keyboard shortcuts (Keep/Archive/Done hints),
   mirroring the `?` cheatsheet. Relates to the Epic 5 keyboard rework.
+- [ ] **P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.** *(User-requested
+  2026-06-19.)* When a note has **real content AND a single YouTube link**, do NOT promote/convert it (Epic 11
+  leaves these alone) — the note text is the irreplaceable thing. Instead keep it as a `keep:`/`obsidian:`
+  item and open it in the inline reader **exactly like the Reddit comment reader**: the **YouTube video plays
+  at the top** (where the post media sits) and **the note's own content renders below, where the comment thread
+  would be**. Needs: (a) the video id(s) extracted onto the note (`metadata.youtube_ids`, the same extraction
+  the Epic 11 heuristic uses); (b) a note mode in `reader.js` — embed the YouTube player (iframe) up top, render
+  the note body below (**Obsidian** = markdown, reuse the reader-markdown renderer above; **Keep** = text +
+  checklist); (c) Epic 15 tap-routing so a note-with-video opens this reader. Builds on the inline reader +
+  `core/media.js`. Relates to Epic 11 (id extraction) + the reader-markdown item above.
+- [ ] **P3 — Multi-video note reader: embed several YouTube videos from one note.** *(User idea 2026-06-19.)*
+  A note containing **multiple YouTube links** is a collection, not a single video — never promote it to one
+  video item. Build a reader view that **embeds all of the note's YouTube videos** (a playlist/grid of players)
+  alongside the note content. **Open scope:** layout (stacked players vs. a list with one active player),
+  lazy-load the iframes (don't auto-load a wall of embeds), and reuse the Epic 11 `metadata.youtube_ids`
+  extraction. Builds on the note-with-video reader above.
+- [ ] **P2 — Edit note bodies as raw markdown, in the reader.** *(User-requested 2026-06-19.)* Let the reader
+  edit a note's body as **raw markdown** (a textarea + rendered live preview reusing the reader's markdown
+  renderer above) — **reuse the reader view**, not a separate editor surface. Backend: a `POST /items/<fn>/body`
+  endpoint updating `body` + rebuilding `search_text`/FTS (precedented by `/recover` + `/category`), re-deriving
+  Obsidian inline `#tags` + `[[wikilinks]]`. **Re-import durability (the crux — `merge_upsert` overlays the
+  incoming body, db.py:417):** stamp `metadata.body_edited_at` and skip the body overlay for dirty rows so a
+  later vault/Takeout re-import can't clobber the edit; for **Obsidian** optionally also write the edit back to
+  the `.md` on disk (needs the absolute vault root persisted — today only the vault *name* + a relative
+  `source_id` are stored, obsidian.py:118/131). **Keep** edits are DB-only (Takeout is a dead export, no live
+  target) and its body is plain text + a structured `listContent` checklist, so Keep editing is
+  plain-text/checklist, not markdown. Scope note: this nudges content-hoarder from triage/consumption toward
+  authoring — the alternative for rich editing is deep-linking out to Obsidian (`obsidian://`). Relates to
+  Epic 11 (note items) + the reader-markdown renderer.
+
+### Icebox — true WYSIWYG markdown editing *(Epic 15)*
+- [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
+  Live-preview rich editing rather than the raw-markdown textarea above. **High effort + fidelity risk:** the
+  no-build-step constraint means vendoring a CodeMirror/ProseMirror-class editor; markdown↔rich-text
+  round-tripping loses fidelity; and Obsidian's superset (`[[wikilinks]]`, `![[embeds]]`, callouts,
+  frontmatter, Dataview) gets corrupted by a generic WYSIWYG. Reactivate only if raw-markdown editing proves
+  insufficient — otherwise prefer deep-linking out to Obsidian for rich editing.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
