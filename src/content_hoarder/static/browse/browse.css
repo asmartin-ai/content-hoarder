@@ -112,6 +112,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
   font-variant-numeric:tabular-nums}
 .spill[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .spill[aria-selected="true"] .n{color:var(--accent-ink);opacity:.75}
+
+/* per-status color accents so the active section reads at a glance — reuse the
+   triage status tokens; Inbox = brand accent, All = neutral muted */
+.folder[data-status="inbox"],.spill[data-status="inbox"]{--tab:var(--accent)}
+.folder[data-status="keep"],.spill[data-status="keep"]{--tab:var(--status-keep)}
+.folder[data-status="archived"],.spill[data-status="archived"]{--tab:var(--status-archive)}
+.folder[data-status="done"],.spill[data-status="done"]{--tab:var(--status-done)}
+.folder[data-status=""],.spill[data-status=""]{--tab:var(--text-muted)}
+/* desktop tabs: a top accent bar + status-tinted count when active (inset shadow
+   so the tab doesn't shift) */
+.folder[aria-selected="true"]{box-shadow:inset 0 2px 0 var(--tab)}
+.folder[aria-selected="true"] .n{color:var(--tab)}
+/* mobile pills: status-tinted fill when active */
+.spill[data-status="keep"][aria-selected="true"]{background:var(--status-keep);border-color:var(--status-keep);color:var(--keep-ink)}
+.spill[data-status="archived"][aria-selected="true"]{background:var(--status-archive);border-color:var(--status-archive);color:var(--archive-ink)}
+.spill[data-status="done"][aria-selected="true"]{background:var(--status-done);border-color:var(--status-done);color:var(--done-ink)}
+.spill[data-status=""][aria-selected="true"]{background:var(--text-muted);border-color:var(--text-muted);color:var(--surface-card)}
+.spill[aria-selected="true"] .n{color:inherit;opacity:.75}
+
 /* the Jump drawer's trigger lives top-left in the header on mobile (desktop uses the rail) */
 .nav-burger{display:none}
 
@@ -322,6 +341,9 @@ body.focus .batchstrip{display:flex}
   position:relative;overflow:hidden;border:1px solid var(--border-hairline);flex:none;
   cursor:pointer;padding:0}
 .monitor img{width:100%;height:100%;object-fit:contain;display:block}
+/* comfortable/log density: fill the fixed monitor box edge-to-edge instead of
+   letterboxing narrow thumbs — the row height is fixed, so cover (crop) reads better */
+.items.density-comfortable .monitor img{object-fit:cover}
 .monitor .dur{position:absolute;bottom:5px;right:5px;font:var(--fw-bold) .6rem/1 var(--font-mono);
   color:#ffe3cd;background:rgba(10,8,12,.75);border-radius:5px;padding:3px 5px}
 .monitor .mglyph{position:absolute;top:5px;right:5px;font-size:.7rem;
@@ -346,7 +368,7 @@ body.focus .batchstrip{display:flex}
 .pin:hover{border-color:var(--border-control)}
 .pin.leaving{transition:opacity var(--dur-slow) var(--ease);opacity:0}
 .pin .screen{position:relative;background:var(--tile-fill);cursor:pointer}
-.pin .screen img{width:100%;display:block;max-height:430px;object-fit:contain;position:relative;z-index:1}
+.pin .screen img{width:100%;display:block;max-height:430px;object-fit:contain;object-position:center top;position:relative;z-index:1}
 .pin .screen .bloom{position:absolute;inset:0;background-size:cover;background-position:center;
   filter:blur(30px) brightness(.5);transform:scale(1.3)}
 .pin .badge{position:absolute;z-index:2;font:var(--fw-bold) .62rem/1 var(--font-mono);color:#ffe3cd;
