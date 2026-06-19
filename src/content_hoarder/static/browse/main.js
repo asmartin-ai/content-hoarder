@@ -949,7 +949,12 @@ loadAmbient();
 loadItems(true);
 
 if ("serviceWorker" in navigator)
-  navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/static/sw.js").catch((err) => {
+    // Service workers (and therefore PWA install) only work in a secure context:
+    // HTTPS, or localhost/127.0.0.1. Plain HTTP over a LAN or Tailscale IP fails
+    // here silently — surface it so the cause is visible. See docs/MOBILE_TAILSCALE.md.
+    console.warn("Service worker registration failed (needs HTTPS or localhost):", err);
+  });
 
 /* ---- command palette (locked Epic 20: ">" flips search to command mode) ---- */
 initPalette(qInput, [
