@@ -682,6 +682,27 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   alongside the note content. **Open scope:** layout (stacked players vs. a list with one active player),
   lazy-load the iframes (don't auto-load a wall of embeds), and reuse the Epic 11 `metadata.youtube_ids`
   extraction. Builds on the note-with-video reader above.
+- [ ] **P2 — Edit note bodies as raw markdown, in the reader.** *(User-requested 2026-06-19.)* Let the reader
+  edit a note's body as **raw markdown** (a textarea + rendered live preview reusing the reader's markdown
+  renderer above) — **reuse the reader view**, not a separate editor surface. Backend: a `POST /items/<fn>/body`
+  endpoint updating `body` + rebuilding `search_text`/FTS (precedented by `/recover` + `/category`), re-deriving
+  Obsidian inline `#tags` + `[[wikilinks]]`. **Re-import durability (the crux — `merge_upsert` overlays the
+  incoming body, db.py:417):** stamp `metadata.body_edited_at` and skip the body overlay for dirty rows so a
+  later vault/Takeout re-import can't clobber the edit; for **Obsidian** optionally also write the edit back to
+  the `.md` on disk (needs the absolute vault root persisted — today only the vault *name* + a relative
+  `source_id` are stored, obsidian.py:118/131). **Keep** edits are DB-only (Takeout is a dead export, no live
+  target) and its body is plain text + a structured `listContent` checklist, so Keep editing is
+  plain-text/checklist, not markdown. Scope note: this nudges content-hoarder from triage/consumption toward
+  authoring — the alternative for rich editing is deep-linking out to Obsidian (`obsidian://`). Relates to
+  Epic 11 (note items) + the reader-markdown renderer.
+
+### Icebox — true WYSIWYG markdown editing *(Epic 15)*
+- [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
+  Live-preview rich editing rather than the raw-markdown textarea above. **High effort + fidelity risk:** the
+  no-build-step constraint means vendoring a CodeMirror/ProseMirror-class editor; markdown↔rich-text
+  round-tripping loses fidelity; and Obsidian's superset (`[[wikilinks]]`, `![[embeds]]`, callouts,
+  frontmatter, Dataview) gets corrupted by a generic WYSIWYG. Reactivate only if raw-markdown editing proves
+  insufficient — otherwise prefer deep-linking out to Obsidian for rich editing.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
