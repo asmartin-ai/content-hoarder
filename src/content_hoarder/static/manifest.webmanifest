@@ -2,7 +2,7 @@
   "name": "content-hoarder",
   "short_name": "Hoarder",
   "description": "Triage your saved content — process and reduce, not just hoard.",
-  "start_url": "/triage",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
