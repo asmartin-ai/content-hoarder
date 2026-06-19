@@ -552,6 +552,7 @@ def search_items(
     tags: list[str] | None = None,
     tags_all: bool = False,
     subreddit: str | list[str] | None = None,
+    author: str | list[str] | None = None,
     is_saved: int | None = None,
     nsfw: bool = False,
     hide_nsfw: bool = False,
@@ -669,6 +670,16 @@ def search_items(
             else:
                 filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
                 params.append(subreddit)
+        if author:
+            # author is a first-class column (filled for reddit/HN); matched case-insensitively
+            # to mirror subreddit. Drives the `author:` operator + the bare `u/<user>` shorthand.
+            if isinstance(author, list):
+                ph = ",".join("?" for _ in author)
+                filters.append(f"{a}author IN ({ph}) COLLATE NOCASE")
+                params.extend(author)
+            else:
+                filters.append(f"{a}author = ? COLLATE NOCASE")
+                params.append(author)
         if before is not None or after is not None:
             # created_utc=0 means "unknown" for many sparse imports; avoid treating 0 as
             # "ancient" when date filters are active.
