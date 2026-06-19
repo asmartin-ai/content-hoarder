@@ -305,6 +305,13 @@ false positives.*
   winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
   new = created_utc, best = cached order), `?sort=` validated at the route, `#thread-sort`
   select persisted to localStorage. 7 tests.
+- [ ] **P2 — Surface "sort by top upvoted" in the reader (re-requested).** *(User-requested 2026-06-19.)*
+  The user wants comment sorting **other than best — by top up-voted**. The backend + an inbox-thread
+  `#thread-sort` select already ship this (best/top/new, **top = score**, item above) — so this is a **surface +
+  verify** task, not new sort logic. The inline **`browse/reader.js`** thread (the mobile reader path) appears
+  to have **no sort control**, so on mobile you're stuck on `best`. Add the best/top/new selector to the reader
+  thread header (reuse the validated `?sort=`/`renderThread` sibling-group sort + the persisted preference) and
+  confirm **top** orders siblings by `score` desc. Verify on the Pixel-6/Firefox target.
 - [x] ~~**P2 — Extend tagging beyond Reddit (YouTube, etc.).**~~ Shipped (2026-06-12, trio
   batch 1, winner Kimi K2.6): `youtube_tags()` (16-channel seed map + title-keyword fallback
   into existing buckets) + `tag_youtube_source()` (dry-run/retry, preserves processing tags,
@@ -508,6 +515,11 @@ need separate filter controls.*
   shows no thumbnail. Likely the archive fetch didn't populate `metadata.gallery`/`thumbnail` for this item
   (or the thumb URL 404s). Check the gallery extraction (`providers._gallery`, Epic 4) for this post + the
   thumbnail fallback when `media_metadata` is missing. Verify against the live row before fixing.
+  **Re-reported 2026-06-19 (same post):** the user also reports it **doesn't render properly** in the reader
+  (beyond the missing thumbnail) — but suspects it **may already be fixed** since. **Double-check the live row
+  first:** confirm whether the gallery now renders/opens correctly, and only then chase (a) the still-missing
+  card thumbnail and (b) any remaining render glitch. May already be partly resolved by the shipped gallery
+  lightbox (Epic 13 P1 / Epic 4 inline-gallery).
 - [ ] **P3 — Pinboard portrait images anchored top-left (visual polish).** *(User-reported 2026-06-17.)* In
   the **card / "Pinboard"** density, portrait (tall) images sit anchored top-left in their slot instead of
   centered/filled, reading poorly. Improve `object-position`/sizing for portrait media in `.pin .screen img`
@@ -722,6 +734,14 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   authoring — the alternative for rich editing is deep-linking out to Obsidian (`obsidian://`). Relates to
   Epic 11 (note items) + the reader-markdown renderer.
 
+- [ ] **P2 — Highlight the OP's comments in the reader thread.** *(User-requested 2026-06-19.)* On a Reddit
+  thread the comments written by the **original poster** should stand out visually. A bare **"OP" badge already
+  renders** (`browse/reader.js:50`, guarded by `helpers.opAuthor` derived at reader.js:156) — this asks for
+  actual **highlighting** of those comments (e.g. an accent left-border / tinted background on the OP comment
+  block, mirroring the `r/<sub>`-app convention), not just the inline tag. Styling on the `.rd-op` comment
+  (`.rd-c` carrying the OP author) in `reddit.css`; the `opAuthor` plumbing is already in place so no new data
+  is needed.
+
 ### Icebox — true WYSIWYG markdown editing *(Epic 15)*
 - [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
   Live-preview rich editing rather than the raw-markdown textarea above. **High effort + fidelity risk:** the
@@ -747,6 +767,20 @@ mobile-friendly".*
 - [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
   touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
 - [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
+- [ ] **P1 — Closing the reader must stop playing media (back-gesture keeps the video running).**
+  *(User-reported 2026-06-19.)* On mobile, pressing **back** on the online embedded reader view leaves the
+  video playing — you can still hear the audio after the feed is back on screen. `closeReader`
+  (`browse/reader.js:201`) only removes the `.show` class + the `reader-lock`; it **never clears or pauses the
+  media tile**, so an embedded `<video>`/HLS player or media iframe keeps running. The lightbox already solves
+  this by blanking its body on close (`core/media.js`, Epic 13). Fix: in `closeReader` (both the close-button
+  path and the **popstate/back-gesture** path, reader.js:209/212) stop playback — pause + reset any `<video>`,
+  and blank the `.rd-media` embed/iframe `src` — so closing/leaving the reader silences it.
+- [ ] **P2 — Maintain the feed scroll position after opening + closing the reader.** *(User-requested
+  2026-06-19.)* On mobile, opening the reader and returning loses your place in the list — the feed jumps back
+  to the top instead of restoring where you were. Likely the `reader-lock` overflow toggle on `documentElement`
+  (reader.js:195/207) resets the underlying scroll. Capture the feed `scrollTop` on `openReader` and restore it
+  on `closeReader` (incl. the popstate/back path), or lock the body without discarding its scroll offset
+  (position-fixed-with-saved-top pattern). Verify on the Pixel-6/Firefox target.
 
 ### Icebox — non-Chromium standalone install (GeckoView wrapper) *(Epic 16)*
 - [ ] **P3 — ICEBOX: ship content-hoarder as a Gecko-rendered standalone Android app.** *(Researched +
@@ -1156,3 +1190,31 @@ namespace) and builds on Epic 9 (tagging).*
   how `categorize.py`'s buckets map onto the parents above. **Sketch the model before** refactoring
   `categorize.py` + `search_items` + the rail. Large — sequence the two visual-grouping items above as the
   near-term wins, this reorg as the structural follow-up.
+- [ ] **P2 — Manual tagging + user-created tags.** *(User-requested 2026-06-19.)* Today tags are applied
+  **only by the pipeline** (`categorize.py` heuristics + the optional LLM pass) from a **fixed curated
+  vocabulary** (`REDDIT_TAGS`/`FILTER_TAGS`). Let the user **manually tag any item** from the UI **and create a
+  new tag on the fly** when none fits. Needs: a tag editor on the item (triage card + reader + browse row — a
+  chip-add/remove affordance, precedented by the `POST /items/<fn>/category` chip-row); a `POST /items/<fn>/tags`
+  endpoint that mutates `metadata.tags` non-destructively + rebuilds `search_text`/FTS; and a place for
+  **user-defined tags** to live so they (i) appear in the rail/filters alongside the curated set and (ii)
+  **survive re-import** (`merge_upsert` overlays — stamp manual tags like the Epic 15 body-edit `*_edited_at`
+  pattern so a re-sync can't clobber them). Decide where user tags are stored (a `user_tags` table / a settings
+  list vs. inline on `metadata`) as part of the model reorg above.
+- [ ] **P2 — Rule-based + AI-based tagging and new-tag suggestions.** *(User-requested 2026-06-19.)* Two
+  engines feeding the tag set, plus a **suggestion** surface. **Rule-based** largely exists — `categorize.py`'s
+  subreddit/host maps + word-bounded title keywords — so expose it as **user-editable rules** (add a
+  subreddit→tag / keyword→tag mapping from the UI, persisted like the gitignored `nsfw_rules.json` precedent)
+  rather than code-only seed maps. **AI-based** builds on the local-LLM classify path (Epic 1 / Epic 9(d)): run
+  it over the untagged tail to **propose** tags. Crucially, both should be able to **suggest *new* tags** (not
+  just pick from the fixed vocabulary) — the LLM/clustering proposes a candidate tag + items, and the user
+  **accepts/renames/rejects** it into the user-tag vocabulary (item above). Keep suggestions **non-destructive
+  + reviewable** (a queue/inbox of proposed tags, never auto-applied). Sequence after the manual-tagging
+  primitive; relates to Epic 9 (tagging) + Epic 1 (LLM classify).
+- [ ] **P2 — Create folders when saving posts.** *(User-requested 2026-06-19.)* Let the user **create a folder**
+  (and file the item into it) **at save time**, introducing a **folder** primitive alongside categories + tags.
+  **Decision gate (fold into the model reorg above):** are folders just a **reserved single-select tag
+  namespace** (one item lives in one folder, reuse the tag rail + filters) or a **separate first-class field** on
+  the item (`metadata.folder`)? Single-select + user-creatable distinguishes them from the multi-label tags.
+  Scope: a folder picker/creator in the save/import flow (and likely a move-to-folder action post-hoc), folders
+  in the left rail as a filter, persistence that survives re-import, and how folders coexist with the
+  parent/child tag grouping. Sketch the model with the taxonomy reorg before building.
