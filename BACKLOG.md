@@ -373,6 +373,24 @@ to its companion discussion threads.*
 - [x] ~~**Precedence + matching.**~~ Honored: match key = canonical YouTube video id (`firefox.youtube_id`)
   from any source's link; YouTube is always the survivor. Firefox-tab→YouTube is still promoted at import
   (`firefox_youtube.py`); Reddit link-post→YouTube and HN story→YouTube fold here.
+- [ ] **P2 — Promote standalone YouTube-link notes (Keep + Obsidian) → YouTube items.** *(User-requested
+  2026-06-19.)* Extend the link→video promotion to **Keep notes** and **Obsidian markdown files** whose body
+  **is essentially just a YouTube link** (no real surrounding prose). Treat them like the Firefox-tab
+  promotion: fold into a canonical `youtube:<id>` item (create a keyless one if none exists, `promoted_by`),
+  keeping the note as a reversible companion. **Decisions (user 2026-06-19):** standalone → promote; runs
+  **both at import** (like `firefox_youtube.py`) **and** re-runnably via the reversible `consolidate` pass
+  (dry-run + `--undo`). **Connector prerequisites (URL extraction):**
+  - **Obsidian** scans **nothing** in the body today — `url` comes only from frontmatter (`obsidian.py:116`);
+    add body-URL extraction.
+  - **Keep** captures only the **first** URL (`keep.py:90`); capture all, so a non-first YouTube link is seen.
+  - Handle markdown link forms (`[text](url)`, `![](url)` embeds) + bare URLs; normalize via
+    `connectors.firefox.youtube_id` (`youtu.be`/`shorts`/`watch?v=`).
+  - **Standalone-vs-document heuristic** (shared with the Epic 15 note-reader items): after stripping the
+    YouTube URL(s) + the title, is there meaningful remaining body text? Below a threshold → standalone
+    (promote); otherwise it's a **document** → hand off to the note-with-video reader (Epic 15), do NOT
+    convert (the note text is the irreplaceable thing). **Open: the exact threshold** — pick after sampling
+    real notes. A note with **multiple** YouTube links is never "standalone" (→ Epic 15 multi-video reader).
+  Relates to Epic 7 (connectors) + Epic 15 (note reader).
 
 ## Epic 12 — Search operators in the search bar  (`enhancement`, `area:search`)
 *Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
@@ -648,6 +666,22 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [ ] **P3 — Reader triage buttons show their hotkey shortcuts.** *(User-requested 2026-06-17.)* The triage
   action buttons at the bottom of the reader should display their keyboard shortcuts (Keep/Archive/Done hints),
   mirroring the `?` cheatsheet. Relates to the Epic 5 keyboard rework.
+- [ ] **P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.** *(User-requested
+  2026-06-19.)* When a note has **real content AND a single YouTube link**, do NOT promote/convert it (Epic 11
+  leaves these alone) — the note text is the irreplaceable thing. Instead keep it as a `keep:`/`obsidian:`
+  item and open it in the inline reader **exactly like the Reddit comment reader**: the **YouTube video plays
+  at the top** (where the post media sits) and **the note's own content renders below, where the comment thread
+  would be**. Needs: (a) the video id(s) extracted onto the note (`metadata.youtube_ids`, the same extraction
+  the Epic 11 heuristic uses); (b) a note mode in `reader.js` — embed the YouTube player (iframe) up top, render
+  the note body below (**Obsidian** = markdown, reuse the reader-markdown renderer above; **Keep** = text +
+  checklist); (c) Epic 15 tap-routing so a note-with-video opens this reader. Builds on the inline reader +
+  `core/media.js`. Relates to Epic 11 (id extraction) + the reader-markdown item above.
+- [ ] **P3 — Multi-video note reader: embed several YouTube videos from one note.** *(User idea 2026-06-19.)*
+  A note containing **multiple YouTube links** is a collection, not a single video — never promote it to one
+  video item. Build a reader view that **embeds all of the note's YouTube videos** (a playlist/grid of players)
+  alongside the note content. **Open scope:** layout (stacked players vs. a list with one active player),
+  lazy-load the iframes (don't auto-load a wall of embeds), and reuse the Epic 11 `metadata.youtube_ids`
+  extraction. Builds on the note-with-video reader above.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
 *Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
