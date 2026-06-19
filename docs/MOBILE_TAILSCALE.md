@@ -21,6 +21,18 @@ python -m content_hoarder serve --host 0.0.0.0
 On the phone (Tailscale toggled on): browse to `http://<PC-tailscale-ip>:8788`.
 This works for browsing/triage, but **Firefox won't let you _install_ the PWA over plain HTTP.**
 
+> **Why plain HTTP only gives you "Add to home screen", never "Install".**
+> Installing a PWA requires a registered **service worker**, and service workers
+> only run in a **secure context**: HTTPS, or the loopback names `localhost` /
+> `127.0.0.1` / `::1`. A Tailscale `100.x.y.z` address is *not* loopback, so over
+> plain `http://` the browser refuses to register the worker. With no service
+> worker there's no installability, so Firefox offers only **"Add to home screen"**
+> — a plain bookmark shortcut that opens in a browser tab, not a standalone app.
+> (Chrome behaves the same way; what looks like an "install" over HTTP is the same
+> shortcut, not a real standalone WebAPK.) The registration failure is logged to the
+> browser console as *"Service worker registration failed (needs HTTPS or localhost)"*.
+> The fix is to serve over HTTPS — see 2b.
+
 ## 2b. Recommended — HTTPS via `tailscale serve` (enables install + offline)
 Tailscale can put a real TLS cert in front of your local app:
 ```bash
@@ -40,6 +52,21 @@ To stop sharing later: `tailscale serve --https=443 off`.
 - **Do NOT use `tailscale funnel`** — that publishes to the *public* internet. `tailscale serve`
   keeps it private to your devices. Never port-forward this app on your router.
 - The app holds years of personal content; keep it tailnet-only (or trusted LAN) always.
+
+## Troubleshooting install on Firefox for Android
+- **Firefox only shows "Add to home screen", not "Install".** You're on plain HTTP (2a).
+  Switch to the HTTPS `*.ts.net` URL from `tailscale serve` (2b). See the secure-context note above.
+- **Confirm you're actually on HTTPS.** The address bar must show `https://<pc>.<tailnet>.ts.net`
+  with a padlock — *not* `http://100.x.y.z:8788`. Opening the Tailscale IP URL will never be
+  installable, even while `tailscale serve` is running.
+- **First run needs an HTTPS cert.** Enable **HTTPS Certificates** for your tailnet in the
+  Tailscale admin console (DNS section) and keep **MagicDNS** on, or `tailscale serve` can't
+  provision a cert.
+- **Firefox never auto-prompts.** Unlike Chrome, there's no install banner and no
+  `beforeinstallprompt` event — installation is always manual via **⋮ menu → Install**.
+- **Check the console for the cause.** If install is missing, connect the phone to desktop
+  Firefox via `about:debugging` and look for *"Service worker registration failed
+  (needs HTTPS or localhost)"* — that confirms a secure-context problem.
 
 Sources: [Tailscale serve docs](https://tailscale.com/kb/1242/tailscale-serve) ·
 [Serve examples](https://tailscale.com/kb/1313/serve-examples)
