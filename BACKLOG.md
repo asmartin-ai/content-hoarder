@@ -109,6 +109,18 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
   source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
   Web-Share-with-clipboard-fallback so it works on the Pixel-6 target.
+- [ ] **P2 — Defer/Skip as a first-class triage action.** *(User-requested 2026-06-19.)* A "decide later"
+  action available everywhere triage happens (triage card + browse row + reader), not just a swipe gesture —
+  surfaced as a button + keyboard key alongside Keep/Archive/Done, and reversible like the other actions.
+  **Two distinct behaviors to decide between (or ship both):** (a) **Skip** = a no-decision "pass, show me the
+  next" that just advances within the current batch without changing status or persisting anything; (b)
+  **Defer/Snooze** = a *timed* deferral that hides the item from triage batches for a window
+  (`metadata.snoozed_until`) then quietly resurfaces it. Honors the project guardrails: friction-asymmetry
+  (defer is priced above Done/Archive, never the cheapest gesture), no guilt mechanics (no "snoozed 3×!"
+  badges), and after N defers an item flows into the Epic 21 guilt-free decay path. **Unify with — don't
+  duplicate —** the Epic 20 P2 "4-way swipe: Snooze on the unassigned long-left" item (that's the *gesture*
+  binding of this same action) and the Epic 21 snooze-decay escalation. Relates to Epic 5 keyboard rework +
+  Epic 10 (a skipped/deferred item is a weak training signal — decide whether it counts).
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
@@ -219,6 +231,20 @@ false positives.*
   note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
   **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
   new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
+- [ ] **P3 — Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review).**
+  *(User idea 2026-06-19.)* GLM already wins several of our *code* bakeoff arms (5.1/5p2); the research says
+  **design is GLM-5.2's standout strength** — #1 on **Design Arena** (Elo ~1360, blind human-preference design
+  tasks, ahead of Claude Fable 5 / GPT-5.5), #2 on **Code Arena: Frontend** (+29 over Claude Opus 4.7
+  Thinking), and **94.8 vs 77.3** (Claude Opus 4.6) on **Design2Code** for the GLM-5V vision variant — and it's
+  open-weights + multimodal (screenshot→code). **Trial scope:** hand it (a) a *greenfield/exploratory* design
+  task (where it's strongest) and (b) a "build this from a screenshot/Figma" task (Design2Code), **both
+  constrained by the `frontend-design` skill** so it respects the v3 tokens/design language, and **run through
+  the normal human design-approval gate** (design can't be oracle-tested like code — visual review IS the
+  oracle). **Caveats to watch:** benchmark wins are *greenfield aesthetics*, NOT adherence to our locked design
+  system — the within-an-existing-system polish tasks (Epic 13 P3 CSS) are the harder taste-consistency test
+  before trusting it broadly; and 5.2 launched with thin official benchmark tables, so trust our own bakeoff
+  results over the marketing. Good first real targets: the screenshot-driven items (Epic 15 inline-media,
+  the mobile-nav redesign). Relates to Epic 23 (design-language) + the `frontend-design` skill.
 
 ## Epic 9 — Reddit merge follow-ups  (`enhancement`, `area:reddit`)
 *The reddit-saved-manager interface is merged in as the `/reddit` view (see
