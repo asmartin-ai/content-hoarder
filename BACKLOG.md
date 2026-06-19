@@ -501,6 +501,13 @@ need separate filter controls.*
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
+- [ ] **P2 — Video not fetching properly.** *(User-reported 2026-06-19 — needs a repro.)* The report is terse:
+  a video isn't fetching/loading correctly. **Source + repro item TBD** — get a specific permalink from the user
+  before chasing it. Likely suspects to check once a repro is in hand: the `v.redd.it` media path — archive
+  fetch populating `metadata.media_url`/`is_video` (`providers`, Epic 4), the HLS manifest derivation in
+  `core/media.js` `openVideo` (`/HLSPlaylist.m3u8` + vendored `hls.min.js`), and the reader/lightbox video tile
+  (`browse/reader.js` + `core/media.js`). Could also be YouTube enrich (`yt-dlp --dump-single-json`) failing to
+  fetch. Pin down which source/post first.
 - [ ] **P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.** *(User-requested 2026-06-17.)*
   Give the main-view status tabs (`#status-nav`) per-status color accents — reuse the existing
   `--status-keep/-archive/-done` tokens, pick accents for **Inbox** + **All** — so the active section is
