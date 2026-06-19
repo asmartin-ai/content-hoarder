@@ -1,7 +1,7 @@
 # Spec 08 — Hydrate real titles for "(untitled)" Reddit comments
 
-> ⏸ **PLANNED — user-held 2026-06-14.** Diagnosed on live `data/app.db`; dry-run clean.
-> Not started. Branch `feat/reddit-title-hydration` (off `staging/session-2026-06-14`).
+> ✅ **SHIPPED 2026-06-15** (Phase 1 local backfill + Phase 2 network recovery; merges `5ef7c9b` + `0fda16f`,
+> on main). This doc is now the build record. Branch `feat/reddit-title-hydration` (off `staging/session-2026-06-14`).
 > Supersedes the body-snippet stopgap committed as `73e16ab`.
 
 BACKLOG: bug — inbox shows "(untitled)" Reddit items. Touches: `data/app.db` (one-time
