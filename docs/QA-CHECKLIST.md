@@ -163,12 +163,11 @@ These are driven by CLI/data passes; confirm the UI reflects them.
 
 ## 11. Known gaps / WIP (don't file these as new bugs)
 
-- **Reddit videos & galleries** don't play/render correctly in the inbox yet (Epic 13, P1 — open).
-- **Comfortable density** layout is intentionally unsatisfactory and slated for rework (Epic 13 /
-  Epic 20 frontend v3).
 - **Tag-chip overload** on enriched YouTube cards (a wall of raw keyword chips) — display fix pending.
-- **Mobile:** tap-thumbnail-opens-modal, long-press group-select, swipe physics/feel, and a swipe-only
-      mode are still open (Epic 16). Verify whether a row-swipe ever side-scrolls the page (should not).
+- **Mobile:** tap-thumbnail-opens-modal **shipped on v3**; still open — long-press group-select, swipe
+      physics/feel, and a swipe-only mode (Epic 16). Verify a row-swipe never side-scrolls the page (should not).
+- *(Resolved on v3 — no longer gaps: Reddit v.redd.it video plays with audio (HLS) + galleries render inline;
+  comfortable density is a fixed-height row.)*
 - Some Epic 15 tappable-link and Epic 16 NSFW/scroll items may already be live from the design-v2 pass
   but aren't ticked in the backlog — confirm and report which are actually working.
 

@@ -1,7 +1,8 @@
 # Inline Reddit reader — spec (v1)
 
-> Status: **design / brainstorm** (2026-06-15, branch `feat/frontend-v3`). Mockup built in
-> Fable v3 tokens via `show_widget` (loaded state). This doc covers what the static frame
+> Status: **✅ SHIPPED 2026-06-15** — live on main (`static/browse/reader.js`, commit `b676821`). This doc
+> is now the **design rationale + build record**, not a proposal. (2026-06-19: being extended with inline media.)
+> Originally built in Fable v3 tokens via `show_widget` (loaded state). This doc covers what the static frame
 > can't: the state machine, the content-type matrix, the reuse map, and the build plan.
 
 ## Context — why

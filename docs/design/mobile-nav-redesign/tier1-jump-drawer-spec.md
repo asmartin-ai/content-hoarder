@@ -1,6 +1,8 @@
 # Tier 1 — Mobile "Jump" drawer · design spec
 
-**Status:** approved direction (2026-06-15), prototype-validated (interactive mockup rendered in-session, v2).
+**Status:** **✅ SHIPPED 2026-06-15** — live on main (commits `5668a77` + `f07cce7`, merged `08ef79a`); the
+`.nav-burger` + `.navdrawer` are in `templates/index.html` + `static/browse/main.js` + `browse.css`. This doc
+is now the **design spec + build record** (the "build sequence" §10 and any open-question sections are historical).
 **Replaces:** the mobile **`# tags` pill** (`#open-tags-phone`, `.spill.tagsbtn`) + the **`#tagsheet`** bottom sheet.
 **Sources:** [`content-hoarder-recommendations.md`](content-hoarder-recommendations.md) (C1–C7), the Relay/Sync
 studies ([`relay-observations.md`](relay-observations.md), [`sync-observations.md`](sync-observations.md)).
