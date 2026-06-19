@@ -166,9 +166,23 @@ export function initOperators(input, pop, opts = {}) {
     render();
   }
 
+  // Close the popover only when focus truly leaves the search UI. The Exact-only
+  // checkbox (and fuzzy hint) live INSIDE #oppop, so clicking them blurs the input —
+  // guard on relatedTarget so toggling Exact keeps the suggestions open. focusout on
+  // the popover handles the reverse (focus leaving the checkbox to somewhere outside).
+  const stillInside = (el) => el && (pop.contains(el) || el === input);
+  const scheduleClose = () => setTimeout(() => pop.classList.remove("show"), 160);
+
   input.addEventListener("input", render);
   input.addEventListener("focus", render);
-  input.addEventListener("blur", () => setTimeout(() => pop.classList.remove("show"), 160));
+  input.addEventListener("blur", (e) => {
+    if (stillInside(e.relatedTarget)) return;
+    scheduleClose();
+  });
+  pop.addEventListener("focusout", (e) => {
+    if (stillInside(e.relatedTarget)) return;
+    scheduleClose();
+  });
 
   input.addEventListener("keydown", (e) => {
     if (inCommandMode() || !pop.classList.contains("show")) return;
