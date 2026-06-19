@@ -5,7 +5,9 @@ Built for an ADHD brain that over-saves everything: posts, videos, articles, and
 thesis is **process and reduce, not just aggregate** — this isn't a prettier hoarding machine; it's
 a dedicated workspace to sift through your backlog and actually deal with what you saved.
 
-Status: **Phase 1 (in development)**
+Status: **Phase 2 (in active development)** — Phase 1 (import + search + a usable triage UI) is complete;
+Phase-2 items shipped include the v3 browse UI, LLM assist, Obsidian export, Reddit OAuth + sync, and the
+inline reader. The offline PWA already ships.
 
 ## Features
 - Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep, and

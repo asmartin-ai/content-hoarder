@@ -8,7 +8,12 @@
 > alias, `subreddit:` kept), **F14** (Firefox/HN topic tagging + `investing` bucket, wired as
 > `categorize --source firefox|hackernews`), and **F15 DB primitive** (`db.purge_done` retention sweep —
 > glm-5p2 arm; the CLI/sweep + settings UI half is still open, see §3E / Epic 21). B0a/B0b were already
-> fixed. Everything else below is still open. Test floor is now **555 passed** (was 524 at write time).
+> fixed. Everything else below is still open. Test floor is now **570 passed** (was 524 at write time).
+>
+> **Also shipped before this snapshot (2026-06-15, design work — not in the F-numbering):** the inline Reddit
+> reader (`reader.js`, b676821) and the mobile "Jump" drawer (`08ef79a`) that replaced the tag-pill/#tagsheet.
+> Both live on main. (2026-06-18 also merged PRs #5–9: `author:`/`u/<user>` operators, the Exact-popover fix,
+> status-tab color accents, PWA docs.)
 
 A self-contained work queue produced from a desktop-testing session + a repo sweep. It is meant to be
 handed to a fresh chat with **no memory of the originating conversation**, so each item carries its own
@@ -374,7 +379,7 @@ Read these before building the features they gate — they reflect explicit user
   configured; the `reddit_session` cookie is the automatic fallback. Lightbox/media: `static/core/media.js`
   (`mediaType`, `openImage`/`openGallery`/`openVideo`, HLS via vendored `hls.min.js`).
 - **Tests:** all offline, deterministic, `:memory:` SQLite, synthetic fixtures, no network. Keep them so.
-- **Verify before "done":** run `./.venv/Scripts/python.exe -m pytest` and diff against **547 passed**
+- **Verify before "done":** run `./.venv/Scripts/python.exe -m pytest` and diff against **570 passed**
   (was 524 at write time; F9 + F14 added tests since).
 
 ---
