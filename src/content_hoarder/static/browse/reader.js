@@ -18,7 +18,7 @@
 import { esc, ago } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
-import { imageUrl, mediaType } from "../core/media.js";
+import { imageUrl, mediaType, mountVideo } from "../core/media.js";
 import { isNsfw } from "./render.js";
 
 /* ---- collapsible comment thread (pure; local-LLM generated, verified) ---- */
@@ -88,6 +88,8 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   let item = null, fullname = null, ooHref = "";
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
+  let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
+  let inlineVideoMounted = false;  // flag: a video is playing, don't clobber it on thread load
 
   /* ---- render ---- */
   function mediaTileHtml() {
@@ -154,7 +156,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   function applyThread(res, justHydrated) {
     comments = Array.isArray(res.comments) ? res.comments : [];
     opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
-    renderPost(res.post || null);
+    if (!inlineVideoMounted) renderPost(res.post || null);  // don't clobber a playing video
     setChip(res.archived ? "archived" : (justHydrated ? "hydrated" : "cached"));
     renderComments();
   }
@@ -201,6 +203,8 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   function closeReader(fromPop) {
     if (!isOpen) return;
     isOpen = false;
+    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
+    inlineVideoMounted = false;
     reader.classList.remove("show");
     reader.setAttribute("aria-hidden", "true");
     reader.style.transition = ""; reader.style.transform = "";
@@ -229,6 +233,22 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
       if (isNsfw(item) && !revealed) {                // first tap reveals, second opens
         revealed = true; med.classList.remove("nsfw");
         const v = med.querySelector(".rd-veil"); if (v) v.remove();
+        return;
+      }
+      /* Video items play inline in the reader; images/galleries use the lightbox. */
+      const mt = mediaType(item);
+      if (mt.cls === "video") {
+        const m = item.metadata || {};
+        const srcUrl = m.media_url || item.url;
+        const posterUrl = imageUrl(item) || m.thumbnail;
+        /* Replace the tile with a video container */
+        const wrap = document.createElement("div");
+        wrap.className = "rd-video-wrap";
+        med.replaceWith(wrap);
+        const { video, destroy } = mountVideo(wrap, srcUrl, posterUrl);
+        videoTeardown = destroy;
+        inlineVideoMounted = true;
+        if (video) video.play().catch(() => {});  // auto-start on tap (user gesture); guard rejection
         return;
       }
       if (typeof onMedia === "function") onMedia(item);
