@@ -95,13 +95,17 @@ export const hlsManifestUrl = (srcUrl) => {
   return m ? "https://v.redd.it/" + m[1] + "/HLSPlaylist.m3u8" : "";
 };
 
-/* mountVideo(container, srcUrl, posterUrl) — mount a <video> player into container.
+/* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.
    Handles v.redd.it HLS (native or hls.js) and plain direct video files.
-   Returns { video, destroy } where video is the <video> element and destroy is a
-   teardown function to call when done (stops HLS buffering). The destroy closure
-   reads the hls instance at call time, not at mount time, avoiding the async leak. */
-export function mountVideo(container, srcUrl, posterUrl) {
+   opts.autoplay: start playback as soon as THIS path's source is actually attached —
+   for the hls.js path that's inside the async .then(), so a synchronous play() by the
+   caller would no-op (the source isn't attached yet). Returns { video, destroy } where
+   video is the <video> element and destroy is a teardown function to call when done
+   (stops HLS buffering). The destroy closure reads the hls instance at call time, not at
+   mount time, avoiding the async leak. */
+export function mountVideo(container, srcUrl, posterUrl, opts) {
   if (!safeUrl(srcUrl)) return { video: null, destroy: null };
+  const autoplay = !!(opts && opts.autoplay);
   const hlsUrl = hlsManifestUrl(srcUrl);
   const poster = posterUrl && safeUrl(posterUrl) ? posterUrl : "";
   const fallbackUrl = esc(srcUrl);
@@ -114,12 +118,14 @@ export function mountVideo(container, srcUrl, posterUrl) {
   video.setAttribute("playsinline", "");
   video.setAttribute("preload", "metadata");
   if (poster) video.setAttribute("poster", poster);
+  const tryPlay = () => { if (autoplay) video.play().catch(() => {}); };  // guard rejection (no gesture)
 
   if (!hlsUrl) {
     video.src = srcUrl;
     container.innerHTML = "";
     container.appendChild(video);
     container.insertAdjacentHTML("beforeend", fallbackHtml);
+    tryPlay();
     return { video, destroy: null };
   }
 
@@ -129,6 +135,7 @@ export function mountVideo(container, srcUrl, posterUrl) {
 
   if (video.canPlayType("application/vnd.apple.mpegurl")) {
     video.src = hlsUrl;
+    tryPlay();
     return { video, destroy: null };
   }
 
@@ -143,6 +150,7 @@ export function mountVideo(container, srcUrl, posterUrl) {
     } else {
       video.src = srcUrl;
     }
+    tryPlay();  // play AFTER the source is attached (fixes the Chrome/Android tap-autoplay race)
   });
   const destroy = () => { if (activeHls) { activeHls.destroy(); activeHls = null; } };
   return { video, destroy };
