@@ -269,6 +269,26 @@ def allocate_saved_order(conn: sqlite3.Connection, n: int, *, commit: bool = Tru
     return top
 
 
+_DECAY_WAVE_KEY = "decay_wave_seq"  # highest decay-wave id allocated so far (monotonic)
+
+
+def _allocate_decay_wave(conn: sqlite3.Connection, *, now: int,
+                         commit: bool = False) -> int:
+    """Reserve a UNIQUE monotonic decay-wave id and return it (mirrors
+    ``allocate_saved_order``). Each ``decay`` apply gets a distinct id even when two
+    calls land in the same wall-clock second — ``max(now, last + 1)`` guarantees a
+    strictly increasing value — so a per-wave UNDO selects exactly one wave instead of
+    every wave sharing that second (the same-second collision bug). Stays ~wall-clock
+    (only rises above ``now`` when waves cluster within a second), so the value is still
+    usable as a "~when decayed" stamp for ``is:decayed`` / ``swept_recent``. ``commit=False``
+    folds the advance into the caller's transaction so the counter + the stamped rows
+    commit atomically."""
+    last = int(get_setting(conn, _DECAY_WAVE_KEY, 0) or 0)
+    wave = max(int(now), last + 1)
+    set_setting(conn, _DECAY_WAVE_KEY, str(wave), commit=commit)
+    return wave
+
+
 # ---------------------------------------------------------------------------
 # Row helpers
 # ---------------------------------------------------------------------------
@@ -1241,8 +1261,11 @@ def decay(
     The tag-aware successor to ``bankruptcy`` (PKMS-research adoption, Epic 21): selects
     ``status='inbox'`` items of ``source`` matching ANY of ``tags``/``subreddits`` (union),
     optionally older than ``before_utc`` (content age — Reddit exposes no save timestamps),
-    and archives them stamping ``metadata.decayed_at``. One stamp value per call = one
-    independently reversible "wave" (see ``undecay``). Refuses an unselected decay.
+    and archives them stamping ``metadata.decayed_at``. The stamp is a UNIQUE monotonic
+    wave id (``_allocate_decay_wave``), not bare ``now`` — so two decays in the same
+    wall-clock second still get distinct stamps and each is one independently reversible
+    "wave" (see ``undecay``); it stays ~wall-clock for ``is:decayed``/``swept_recent``.
+    Refuses an unselected decay.
     ``label`` additionally writes ``metadata.decay_label`` — e.g. the supervised initial
     backfill uses ``label='swept'`` so its items stay distinguishable from any future
     rolling decay (queryable via the ``is:swept`` search operator; ``is:decayed`` matches
@@ -1306,18 +1329,23 @@ def decay(
     if apply:
         res["applied"] = True
         if total:
+            # A unique monotonic wave id (not bare ``now``) so two decays in the same
+            # second get distinct stamps and UNDO reverses exactly one wave. For the
+            # first wave on a DB it equals ``now`` (counter starts at 0), so the stamp
+            # stays ~wall-clock; ``processed_utc`` keeps the real timestamp.
+            wave = _allocate_decay_wave(conn, now=now, commit=False)
             set_md = "json_set(metadata, '$.decayed_at', ?)"
-            md_params = [now]
+            md_params = [wave]
             if label:
                 set_md = "json_set(metadata, '$.decayed_at', ?, '$.decay_label', ?)"
-                md_params = [now, label]
+                md_params = [wave, label]
             cur = conn.execute(
                 f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
                 f"metadata={set_md} WHERE {where}",
                 [now] + md_params + params,
             )
             conn.commit()
-            res.update(total=cur.rowcount, decayed_at=now)
+            res.update(total=cur.rowcount, decayed_at=wave)
     return res
 
 
