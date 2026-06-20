@@ -749,12 +749,12 @@ html.reader-lock{overflow:hidden}
 .rd-media{display:block;width:100%;margin-top:var(--sp-3);padding:0;position:relative;
   border:1px solid var(--border-hairline);border-radius:var(--r-md);overflow:hidden;
   background:var(--tile-fill);cursor:pointer}
-.rd-media img{display:block;width:100%;max-height:58vh;object-fit:contain}
+.rd-media img{display:block;width:100%;max-height:42vh;object-fit:contain}
 .rd-media.nsfw img{filter:blur(26px)}
 .rd-mglyph{position:absolute;left:8px;bottom:8px;font-size:1.1rem}
 .rd-video-wrap{display:block;width:100%;margin-top:var(--sp-3);border:1px solid var(--border-hairline);
   border-radius:var(--r-md);overflow:hidden;background:var(--surface-inset)}
-.rd-video-wrap video.media-video{display:block;width:100%;max-height:70vh;
+.rd-video-wrap video.media-video{display:block;width:100%;max-height:52vh;
   background:var(--surface-inset)}
 .rd-video-wrap .media-fallback{display:block;padding:10px 14px;
   font:var(--fw-semibold) var(--fs-xs)/1 var(--font-mono);color:var(--text-muted);
