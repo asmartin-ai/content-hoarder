@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import ipaddress
 import mimetypes
 import os
@@ -728,6 +729,20 @@ def create_app(db_path: str | None = None) -> Flask:
                     pass
                 _prepared.pop(tok, None)
 
+    def _cleanup_all_prepared():
+        """Unlink every staged temp file regardless of age (B4). The TTL sweep above
+        only runs on the *next* /import/prepare, so a preview that's previewed-but-never-
+        committed would otherwise linger up to an hour; this runs on process exit so a
+        clean shutdown leaves no orphaned temp files."""
+        for tok in list(_prepared):
+            try:
+                os.unlink(_prepared[tok]["path"])
+            except OSError:
+                pass
+            _prepared.pop(tok, None)
+
+    atexit.register(_cleanup_all_prepared)
+
     def _count_existing(c, fullnames):
         existing = 0
         for i in range(0, len(fullnames), 500):  # chunk to stay under SQLite's var limit
@@ -837,4 +852,7 @@ def create_app(db_path: str | None = None) -> Flask:
             except OSError:
                 pass
 
+    # exposed for testing the B4 exit-cleanup (the atexit hook is otherwise unreachable)
+    app._prepared = _prepared
+    app._cleanup_all_prepared = _cleanup_all_prepared
     return app
