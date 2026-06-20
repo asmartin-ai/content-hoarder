@@ -147,12 +147,18 @@ function render() {
   paintBatch();
 }
 
-/* ---- actions: live clear + undo (locked #11) ---- */
+/* ---- actions: live clear + undo/redo (locked #11) ---- */
 function rowEl(fullname) {
   return itemsEl.querySelector('[data-fullname="' + CSS.escape(fullname) + '"]');
 }
 
+/* Single-level redo buffer: the last single-item action that was undone, so it can
+   be replayed. Mirrors the single-level snackbar undo (only the most recent action is
+   undoable, so only one is redoable). Any new act() clears it. */
+let lastUndone = null;
+
 async function act(fullname, status) {
+  lastUndone = null;                                // a fresh action invalidates the redo buffer
   if (window.chHaptic) window.chHaptic(status);   // tactile confirm on the decision (covers swipe + buttons)
   const row = rowEl(fullname);
   if (row && !row.classList.contains("leaving")) {
@@ -183,8 +189,16 @@ async function act(fullname, status) {
         state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
       }
       render();
+      lastUndone = { fullname, status };           // now redoable
     } catch (e) { toast("Undo failed."); }
   });
+}
+
+/* Redo: replay the last undone single-item action (re-applies the status + shows a
+   fresh undo snackbar). act() resets lastUndone, so it's a clean one-step toggle. */
+function redo() {
+  if (!lastUndone) { toast("Nothing to redo."); return; }
+  act(lastUndone.fullname, lastUndone.status);
 }
 
 /* the in-app Reddit reader — replaces the external Firefox/Relay handoff for
@@ -576,6 +590,12 @@ function cursorItem() {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { closeSheets(); return; }
   if (isTypingTarget(e.target)) return;
+  if (e.ctrlKey || e.metaKey) {                    // undo/redo chords; other modifier combos pass through to the browser
+    const c = e.key.toLowerCase();
+    if (c === "z" && !e.shiftKey && !e.altKey) { e.preventDefault(); const u = $("#toast .toast-undo"); if (u) u.click(); }
+    else if (!e.altKey && (c === "y" || (c === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
+    return;                                         // never fall through to single-key actions while a modifier is held
+  }
   const k = e.key.toLowerCase();
   if (k === "/") { e.preventDefault(); qInput.focus(); return; }
   if (e.key === "?") { toggleKbd(); return; }
@@ -589,6 +609,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "e" && it) { const u = it.url; if (u) window.open(u, "_blank", "noopener"); }
   else if (k === "q" && it) { const r = rowEl(it.fullname); if (r) toggleSelect(r); }
   else if (k === "z") { const u = $("#toast .toast-undo"); if (u) u.click(); }
+  else if (k === "y") { redo(); }
   else if (e.key === " " && it) { e.preventDefault(); openMediaFor(it); }
 });
 
