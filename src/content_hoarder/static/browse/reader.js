@@ -74,7 +74,7 @@ const absReddit = (p) => {
   return p.startsWith("/") ? "https://www.reddit.com" + p : p;
 };
 
-export function initReader({ onTriage, onMedia, closeSheets } = {}) {
+export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
   const $ = (s) => document.querySelector(s);
   const reader = $("#reader");
   if (!reader) return { open() {} };
@@ -237,6 +237,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     // restore the feed scroll the lock discarded (all close paths funnel here: button, Esc,
     // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
     if (feedScrollY) window.scrollTo(0, feedScrollY);
+    if (typeof onClose === "function") onClose(fullname);  // re-blur the feed thumbnail (Epic 13 P2)
     if (!fromPop) {
       try { if (history.state && history.state.chReader) history.back(); } catch (e) { /* no-op */ }
     }

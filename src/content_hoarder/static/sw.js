@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v34";  // v34: swipe gestures now register when starting on links/thumbnails (core/swipe.js + triage.js)
+const CACHE = "ch-shell-v35";  // v35: NSFW tap-reveal re-blurs when the reader/lightbox closes (Epic 13 P2)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
