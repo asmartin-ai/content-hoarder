@@ -295,6 +295,10 @@ body.focus .batchstrip{display:flex}
 .nsfw-tag{font:var(--fw-bold) .6rem/1 var(--font-mono);color:var(--accent);
   border:1px solid var(--accent);border-radius:4px;padding:1px 4px;margin-right:6px;
   vertical-align:1px}
+/* URL domain label (Relay-style: i.redd.it, youtube.com, etc.) */
+.url-domain{display:block;font:var(--fw-regular) .65rem/1 var(--font-mono);
+  color:var(--text-faded);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-transform:lowercase;letter-spacing:-.01em}
 
 /* consume-cost pill (locked #8) — core consumeMeta emits .consume.read|watch|listen */
 .consume{display:inline-flex;gap:4px;align-items:center;font:var(--fw-semibold) .66rem/1 var(--font-mono);
