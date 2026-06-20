@@ -473,6 +473,20 @@ body.focus .batchstrip{display:flex}
 .dock .fab{background:var(--accent);color:var(--accent-ink);min-width:84px;height:44px;
   font:var(--fw-bold) .68rem/1 var(--font-mono);letter-spacing:.05em}
 
+/* mobile floating scroll-to-top (Epic 13) — sits just above the dock on the right,
+   matches the dock's glass/border language, clears the dock height + safe-area inset.
+   Appears (.show, toggled by main.js) only after the feed is scrolled down. */
+.gotop{display:none;position:fixed;right:14px;z-index:38;width:46px;height:46px;
+  bottom:calc(84px + env(safe-area-inset-bottom));border-radius:var(--r-pill);
+  background:color-mix(in srgb,var(--surface-card) 94%,transparent);backdrop-filter:blur(12px);
+  border:1px solid var(--border-control);box-shadow:var(--shadow-pop);
+  color:var(--text-body);font-size:1.2rem;line-height:1;cursor:pointer;
+  opacity:0;transform:translateY(10px);pointer-events:none;
+  transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.gotop.show{opacity:1;transform:none;pointer-events:auto}
+.gotop.show:active{transform:scale(.9)}
+@media (max-width:700px){.gotop{display:flex;align-items:center;justify-content:center}}
+
 /* ===================== toast (core/toast owns #toast) ===================== */
 #toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:45;
   background:var(--surface-card);border:1px solid var(--border-control);border-radius:var(--r-pill);
