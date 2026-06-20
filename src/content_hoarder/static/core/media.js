@@ -95,6 +95,59 @@ export const hlsManifestUrl = (srcUrl) => {
   return m ? "https://v.redd.it/" + m[1] + "/HLSPlaylist.m3u8" : "";
 };
 
+/* mountVideo(container, srcUrl, posterUrl) — mount a <video> player into container.
+   Handles v.redd.it HLS (native or hls.js) and plain direct video files.
+   Returns { video, destroy } where video is the <video> element and destroy is a
+   teardown function to call when done (stops HLS buffering). The destroy closure
+   reads the hls instance at call time, not at mount time, avoiding the async leak. */
+export function mountVideo(container, srcUrl, posterUrl) {
+  if (!safeUrl(srcUrl)) return { video: null, destroy: null };
+  const hlsUrl = hlsManifestUrl(srcUrl);
+  const poster = posterUrl && safeUrl(posterUrl) ? posterUrl : "";
+  const fallbackUrl = esc(srcUrl);
+  const fallbackHtml = '<a class="media-fallback" href="' + fallbackUrl +
+    '" target="_blank" rel="noopener">Open original ↗</a>';
+
+  const video = document.createElement("video");
+  video.className = "media-video";
+  video.controls = true;
+  video.setAttribute("playsinline", "");
+  video.setAttribute("preload", "metadata");
+  if (poster) video.setAttribute("poster", poster);
+
+  if (!hlsUrl) {
+    video.src = srcUrl;
+    container.innerHTML = "";
+    container.appendChild(video);
+    container.insertAdjacentHTML("beforeend", fallbackHtml);
+    return { video, destroy: null };
+  }
+
+  container.innerHTML = "";
+  container.appendChild(video);
+  container.insertAdjacentHTML("beforeend", fallbackHtml);
+
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = hlsUrl;
+    return { video, destroy: null };
+  }
+
+  let activeHls = null;
+  loadHls().then((Hls) => {
+    if (!Hls || !document.body.contains(video)) return;
+    if (Hls.isSupported()) {
+      const h = new Hls();
+      activeHls = h;
+      h.loadSource(hlsUrl);
+      h.attachMedia(video);
+    } else {
+      video.src = srcUrl;
+    }
+  });
+  const destroy = () => { if (activeHls) { activeHls.destroy(); activeHls = null; } };
+  return { video, destroy };
+}
+
 /* Lazy-load the vendored hls.js once (only when a v.redd.it video is opened on a
    browser without native HLS). Resolves to window.Hls, or null if it fails to load. */
 let _hlsPromise = null;
@@ -118,11 +171,11 @@ export function createLightbox(opts) {
   const modal = typeof opts.modal === "string" ? document.querySelector(opts.modal) : opts.modal;
   const body = typeof opts.body === "string" ? document.querySelector(opts.body) : opts.body;
 
-  let activeHls = null;  // the hls.js instance for an open v.redd.it video, if any
+  let videoTeardown = null;  // teardown function for the open video's hls.js instance
   const close = () => {
-    modal.hidden = true;
-    if (activeHls) { activeHls.destroy(); activeHls = null; }  // stop hls buffering
+    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
     body.innerHTML = "";  // stop playback
+    modal.hidden = true;
   };
   modal.addEventListener("click", (e) => {
     if (e.target === modal || e.target.closest("[data-media-close]")) close();
@@ -162,35 +215,10 @@ export function createLightbox(opts) {
        keeps the plain <video src>. */
     openVideo(srcUrl, posterUrl) {
       if (!safeUrl(srcUrl)) return;
-      const poster = posterUrl && safeUrl(posterUrl) ? ' poster="' + esc(posterUrl) + '"' : "";
-      const hls = hlsManifestUrl(srcUrl);
-      const fallback = '<a class="media-fallback" href="' + esc(srcUrl) +
-        '" target="_blank" rel="noopener">Open original ↗</a>';
-      if (!hls) {
-        open('<video class="media-video" controls playsinline preload="metadata"' + poster +
-          ' src="' + esc(srcUrl) + '"></video>' + fallback);
-        return;
-      }
-      open('<video class="media-video" controls playsinline preload="metadata"' + poster +
-        '></video>' + fallback);
-      const video = body.querySelector("video.media-video");
+      open("");  // clear first and show (open() sets modal.hidden = false)
+      const { video, destroy } = mountVideo(body, srcUrl, posterUrl);
       if (!video) return;
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = hls;  // native HLS (Safari/iOS) — plays the muxed audio+video
-        return;
-      }
-      loadHls().then((Hls) => {
-        // a later close() may have torn the element down before the script arrived
-        if (!Hls || !document.body.contains(video)) return;
-        if (Hls.isSupported()) {
-          const h = new Hls();
-          activeHls = h;
-          h.loadSource(hls);
-          h.attachMedia(video);
-        } else {
-          video.src = srcUrl;  // last-ditch: video-only, but at least shows the clip
-        }
-      });
+      videoTeardown = destroy;
     },
   };
 }
