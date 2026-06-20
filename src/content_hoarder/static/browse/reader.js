@@ -91,6 +91,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
   let videoEl = null;          // the mounted <video> (also the "video is playing" flag); close pauses+resets it
+  let feedScrollY = 0;         // feed scroll position captured on open; restored on close (reader-lock resets it)
 
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
@@ -216,6 +217,9 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     reader.style.transition = ""; reader.style.transform = "";
     reader.classList.add("show");
     reader.setAttribute("aria-hidden", "false");
+    // capture the feed scroll BEFORE the overflow:hidden lock (which resets it) so we can
+    // restore the user's place on close (Epic 16 P2)
+    feedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.documentElement.classList.add("reader-lock");
     if (scrollEl) scrollEl.scrollTop = 0;
     isOpen = true;
@@ -230,6 +234,9 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     reader.setAttribute("aria-hidden", "true");
     reader.style.transition = ""; reader.style.transform = "";
     document.documentElement.classList.remove("reader-lock");
+    // restore the feed scroll the lock discarded (all close paths funnel here: button, Esc,
+    // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
+    if (feedScrollY) window.scrollTo(0, feedScrollY);
     if (!fromPop) {
       try { if (history.state && history.state.chReader) history.back(); } catch (e) { /* no-op */ }
     }
