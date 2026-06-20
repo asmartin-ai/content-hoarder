@@ -933,6 +933,26 @@ $$("#set-nsfw button").forEach((b) => b.addEventListener("click", () => {
   loadItems(true);
 }));
 
+/* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9) ---- */
+const syncBtn = $("#open-sync");
+if (syncBtn) syncBtn.addEventListener("click", async () => {
+  if (syncBtn.disabled) return;
+  const label = syncBtn.textContent;
+  syncBtn.disabled = true;
+  syncBtn.textContent = "Syncing newest…";
+  try {
+    const data = await api.postJSON("/reddit/sync", {});
+    if (data.auth_error) toast("Sync needs a reddit_session cookie — set it up first.");
+    else if (data.error) toast("Sync error: " + data.error);
+    else {
+      toast("+" + data.new + " new (" + data.fetched + " fetched · " + data.stopped + ").");
+      loadItems(true); loadCounts(); refreshRail(); refreshPulse();
+    }
+  } catch (e) { toast("Sync failed — network error."); }
+  syncBtn.textContent = label;
+  syncBtn.disabled = false;
+});
+
 /* reflect persisted settings into the panel */
 $$("#set-density button").forEach((b) =>
   b.setAttribute("aria-pressed", String(b.dataset.d === state.density)));
