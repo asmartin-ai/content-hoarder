@@ -89,7 +89,25 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
+  let videoEl = null;          // the mounted <video>, so close can pause+reset it
   let inlineVideoMounted = false;  // flag: a video is playing, don't clobber it on thread load
+
+  /* Stop and discard any inline video: tear down HLS, pause the element, drop its
+     src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
+     for direct/native-HLS playback (mountVideo returns destroy:null there), so the
+     pause+reset below is what actually silences those. */
+  function stopInlineVideo() {
+    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
+    if (videoEl) {
+      try {
+        videoEl.pause(); videoEl.removeAttribute("src"); videoEl.load();  // silence + abort fetch
+        const wrap = videoEl.closest(".rd-video-wrap") || videoEl;
+        wrap.remove();                                                    // blank the embed
+      } catch (e) { /* no-op */ }
+      videoEl = null;
+    }
+    inlineVideoMounted = false;
+  }
 
   /* ---- render ---- */
   function mediaTileHtml() {
@@ -203,8 +221,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   function closeReader(fromPop) {
     if (!isOpen) return;
     isOpen = false;
-    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
-    inlineVideoMounted = false;
+    stopInlineVideo();           // pause+reset+remove the <video> so audio doesn't bleed after close
     reader.classList.remove("show");
     reader.setAttribute("aria-hidden", "true");
     reader.style.transition = ""; reader.style.transform = "";
@@ -260,6 +277,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
         med.replaceWith(wrap);
         const { video, destroy } = mountVideo(wrap, srcUrl, posterUrl);
         videoTeardown = destroy;
+        videoEl = video;
         inlineVideoMounted = true;
         if (video) video.play().catch(() => {});  // auto-start on tap (user gesture); guard rejection
         return;
