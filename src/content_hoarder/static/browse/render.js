@@ -59,6 +59,20 @@ const snippet = (item) => {
   return body ? '<div class="snippet">' + esc(body.slice(0, 140)) + "</div>" : "";
 };
 
+/* Extract and format the URL domain for display (Relay-style: i.redd.it, youtube.com, etc.) */
+const urlDomain = (item) => {
+  const url = itemUrl(item) || "";
+  if (!url) return "";
+  try {
+    const d = new URL(url).hostname;
+    // Strip www. for readability, keep the rest
+    return d.replace(/^www\./, "");
+  } catch {
+    // Not a valid URL, might be a relative path or empty
+    return "";
+  }
+};
+
 /* monitor: the fixed thumb slot. NSFW gets the box-constrained blur + veil. */
 const monitorHtml = (item, nsfwRevealed) => {
   const t = thumb(item, "list");
@@ -96,6 +110,8 @@ const rowChips = (item, o) => tagChips(item, { curated: o.curated, max: 2, expan
 
 export const logRow = (item, opts) => {
   const o = opts || {};
+  const domain = urlDomain(item);
+  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
   return '<div class="row' + (item.status !== "inbox" && o.view === "" ? " seen" : "") +
     '" data-fullname="' + esc(item.fullname) + '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
     underlay +
@@ -105,6 +121,7 @@ export const logRow = (item, opts) => {
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
     '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
+    domainHtml +
     snippet(item) +
     "</div>" +
     '<div class="trail">' + monitorHtml(item, o.nsfwRevealed) + actsHtml(o.view) + "</div>" +
@@ -116,6 +133,8 @@ export const ledgerRow = (item, n, opts) => {
   const mt = mediaType(item);
   const play = (mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery")
     ? '<button type="button" class="playpill" data-media="1">' + mt.icon + " view</button>" : "";
+  const domain = urlDomain(item);
+  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
   return '<div class="row" data-fullname="' + esc(item.fullname) +
     '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
     underlay +
@@ -125,6 +144,7 @@ export const ledgerRow = (item, n, opts) => {
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
     '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
+    domainHtml +
     "</div>" +
     '<div class="trail">' + play + actsHtml(o.view) + "</div>" +
     "</div></div>";
@@ -136,6 +156,8 @@ export const pinCard = (item, opts) => {
   const m = item.metadata || {};
   const mt = mediaType(item);
   const blur = isNsfw(item) && !o.nsfwRevealed;
+  const domain = urlDomain(item);
+  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
   const screen = t
     ? '<button type="button" class="screen' + (blur ? " nsfw" : "") + '" data-media="1">' +
       (item.source === "youtube" ? '<div class="bloom" style="background-image:url(\'' + esc(t) + '\')"></div>' : "") +
@@ -154,6 +176,7 @@ export const pinCard = (item, opts) => {
     '" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
     '<span class="meta">' + metaHtml(item) + "</span></div>" +
     "<h3>" + titleLine(item) + "</h3>" +
+    domainHtml +
     snippet(item).replace('class="snippet"', 'class="snippet" style="display:block"') +
     '<div class="tagrow">' + tagChips(item, { curated: o.curated, max: 3 }) + actsHtml(o.view) + "</div>" +
     "</div></article>";
