@@ -236,6 +236,24 @@ def test_import_commit_expired_token(tmp_db):
     assert _client(tmp_db).post("/import/commit", json={"token": "nope"}).status_code == 400
 
 
+def test_import_prepare_temp_file_cleaned_on_exit(tmp_db):
+    """B4: a previewed-but-never-committed staged temp file is removed by the
+    process-exit cleanup, not just the next /import/prepare's 1-hour TTL sweep."""
+    import os
+
+    _seed(tmp_db)
+    app = create_app(tmp_db)
+    cl = app.test_client()
+    blob = json.dumps(_yt_playlist("abc123", "def456")).encode()
+    data = {"file": (io.BytesIO(blob), "wl.json")}
+    cl.post("/import/prepare", data=data, content_type="multipart/form-data")
+    paths = [v["path"] for v in app._prepared.values()]
+    assert paths and all(os.path.exists(p) for p in paths)  # staged, never committed
+    app._cleanup_all_prepared()
+    assert not app._prepared
+    assert all(not os.path.exists(p) for p in paths)
+
+
 def test_recover_route(tmp_db, monkeypatch):
     import content_hoarder.archival.service as svc
     monkeypatch.setattr(svc, "recover_one",
