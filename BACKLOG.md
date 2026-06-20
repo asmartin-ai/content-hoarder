@@ -508,14 +508,30 @@ need separate filter controls.*
   `core/media.js` `openVideo` (`/HLSPlaylist.m3u8` + vendored `hls.min.js`), and the reader/lightbox video tile
   (`browse/reader.js` + `core/media.js`). Could also be YouTube enrich (`yt-dlp --dump-single-json`) failing to
   fetch. Pin down which source/post first.
-- [ ] **P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.** *(User-requested 2026-06-17.)*
-  Give the main-view status tabs (`#status-nav`) per-status color accents — reuse the existing
-  `--status-keep/-archive/-done` tokens, pick accents for **Inbox** + **All** — so the active section is
-  visually distinct. Styling only (`browse.css` status-nav).
-- [ ] **P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**
-  *(User-requested 2026-06-17.)* In the browse **log/comfortable** density the media thumbnail doesn't fill
-  its slot — stretch it to the full width of the preview box (respect the fixed row height + `object-fit`) so
-  the row reads better. Touches `.items.density-comfortable .item-fg` / the monitor thumb box (`browse.css`).
+- [ ] **P2 — Inline-video tap-autoplay no-ops on Chrome/Android (hls.js race).** *(Found 2026-06-20, review of
+  the inline-video reader `c8c49a3`.)* In `browse/reader.js` the media-tile tap calls `video.play()` **synchronously**
+  right after `mountVideo()` returns, but for the **hls.js** path (Chrome/Android, no native HLS) the source isn't
+  attached yet — `loadHls().then(...)` resolves async and only then does `h.attachMedia(video)` (`core/media.js:136-146`).
+  So the eager `play()` runs against a source-less `<video>` and no-ops (the user's tap-to-play does nothing; they must
+  tap the controls again). **Fix:** kick off playback **after** attach — e.g. have `mountVideo` accept an autoplay
+  intent and call `play()` in the `then()` (and on the native-HLS/direct paths where it's already attached), or return
+  a "ready" promise the reader awaits before `play()`. Verify on the Pixel-6/Chrome target. Relates to Epic 15 inline
+  media + Epic 13 P2 video-fetch.
+- [ ] **P2 — External-video Reddit post → dead inline `<video src=item.url>` (no lightbox fallback).** *(Found
+  2026-06-20, same review.)* `mediaType()` classifies YouTube and other external-video URLs as `cls:"video"`
+  (`core/media.js:64,66`), so the reader's media-tile tap routes them through the **inline `<video>`** path
+  (`browse/reader.js`), setting `video.src = item.url`. A YouTube watch page / non-direct external video URL is **not a
+  playable media file**, so the `<video>` shows a broken/dead player instead of opening the source (the "Open original ↗"
+  fallback link is present but the player area is dead). **Fix:** in the reader's video branch, only mount an inline
+  `<video>` for **directly playable** sources (v.redd.it/HLS + `.mp4|.webm|.mov`); route YouTube / other external-video
+  items to the lightbox/`onMedia` open-original path instead (or embed the YouTube iframe — see the Epic 15 note-with-video
+  reader). Relates to Epic 11 (YouTube promotion) + Epic 15.
+- [x] ~~**P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.**~~ ✅ Already shipped in the
+  v3 status-nav (`browse.css:119-131`): `.folder`/`.spill[data-status=…]` carry `--tab:var(--status-keep/-archive/-done)`
+  with active-state tinting; Inbox/All (empty status) use `--text-muted`. *(User-requested 2026-06-17.)*
+- [x] ~~**P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**~~ ✅ Already
+  satisfied by the v3 comfortable-density rework (`browse.css:344,350`): the fixed 128×76 `.monitor` box +
+  `.items.density-comfortable .monitor img{object-fit:cover}` fill the slot width. *(User-requested 2026-06-17.)*
 - [ ] **P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).** *(User-reported
   2026-06-17.)* Repro item:
   `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/` — the gallery card
@@ -536,7 +552,8 @@ need separate filter controls.*
   **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
   redo — confirm `Ctrl+Z` is actually keyboard-bound today, not snackbar-only. Relates to the Epic 5 keyboard
   rework.
-- [ ] **P3 — Reader subreddit label clips descenders (`r/gaming` → the "g" tail is cut off).** *(User-reported
+- [x] ~~**P3 — Reader subreddit label clips descenders (`r/gaming` → the "g" tail is cut off).**~~ ✅ Shipped
+  (`b9c0bf0`): relaxed the `.rd-sub` line-height so descenders clear, keeping the one-line ellipsis truncation. *(User-reported
   2026-06-20.)* In the inline reader header the subreddit chip (`browse/reader.js:117` → `.rd-sub`,
   `browse/browse.css:717`) uses `line-height: 1` (`font:var(--fw-semibold) var(--fs-sm)/1 …`) together with
   `overflow:hidden` for the single-line ellipsis, so the em-box is ~cap-height and **descenders (g/j/p/q/y) are
@@ -715,9 +732,9 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   2026-06-17.)* In `section#reader` the post-media tile dominates the top of the view; shrink/reposition it so
   the post + thread are reachable with less scrolling (cap its height, or make it a collapsible/cover-fit
   tile). Reader layout only.
-- [ ] **P3 — Reader triage buttons show their hotkey shortcuts.** *(User-requested 2026-06-17.)* The triage
-  action buttons at the bottom of the reader should display their keyboard shortcuts (Keep/Archive/Done hints),
-  mirroring the `?` cheatsheet. Relates to the Epic 5 keyboard rework.
+- [x] ~~**P3 — Reader triage buttons show their hotkey shortcuts.**~~ ✅ Shipped (`4ff7126`): Keep/Archive/Done
+  buttons display their keys and the reader-scoped F/A/D keys are wired (capture-phase, triages the reader's own
+  item). *(User-requested 2026-06-17.)* Relates to the Epic 5 keyboard rework.
 - [ ] **P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.** *(User-requested
   2026-06-19.)* When a note has **real content AND a single YouTube link**, do NOT promote/convert it (Epic 11
   leaves these alone) — the note text is the irreplaceable thing. Instead keep it as a `keep:`/`obsidian:`
@@ -748,7 +765,8 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   authoring — the alternative for rich editing is deep-linking out to Obsidian (`obsidian://`). Relates to
   Epic 11 (note items) + the reader-markdown renderer.
 
-- [ ] **P2 — Highlight the OP's comments in the reader thread.** *(User-requested 2026-06-19.)* On a Reddit
+- [x] ~~**P2 — Highlight the OP's comments in the reader thread.**~~ ✅ Shipped (`a91b20e`): OP comments now
+  carry an accent left-border / tinted background, not just the inline badge. *(User-requested 2026-06-19.)* On a Reddit
   thread the comments written by the **original poster** should stand out visually. A bare **"OP" badge already
   renders** (`browse/reader.js:50`, guarded by `helpers.opAuthor` derived at reader.js:156) — this asks for
   actual **highlighting** of those comments (e.g. an accent left-border / tinted background on the OP comment
@@ -781,14 +799,16 @@ mobile-friendly".*
 - [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
   touch; optionally offer a swipe-only mode (no inline icons) for a cleaner mobile row.
 - [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
-- [ ] **P1 — Closing the reader must stop playing media (back-gesture keeps the video running).**
-  *(User-reported 2026-06-19.)* On mobile, pressing **back** on the online embedded reader view leaves the
-  video playing — you can still hear the audio after the feed is back on screen. `closeReader`
-  (`browse/reader.js:201`) only removes the `.show` class + the `reader-lock`; it **never clears or pauses the
-  media tile**, so an embedded `<video>`/HLS player or media iframe keeps running. The lightbox already solves
-  this by blanking its body on close (`core/media.js`, Epic 13). Fix: in `closeReader` (both the close-button
-  path and the **popstate/back-gesture** path, reader.js:209/212) stop playback — pause + reset any `<video>`,
-  and blank the `.rd-media` embed/iframe `src` — so closing/leaving the reader silences it.
+- [x] ~~**P1 — Closing the reader must stop playing media (back-gesture keeps the video running).**~~ ✅ Fixed
+  2026-06-20 (local, `frontend-staging`). *(User-reported 2026-06-19.)* On mobile, pressing **back** on the online
+  embedded reader view left the video playing — audio bled after the feed was back on screen. `closeReader`
+  (`browse/reader.js`) only removed the `.show` class + the `reader-lock`; the eager `videoTeardown()` was a
+  **no-op** for direct + native-HLS playback (`mountVideo` returns `destroy:null` there, `core/media.js:123,132`)
+  and the `<video>` element was never paused. **Fix:** added a `stopInlineVideo()` helper (tracks the mounted
+  `videoEl`, runs HLS teardown, then `pause()` + `removeAttribute("src")` + `load()` and removes the `.rd-video-wrap`)
+  called from `closeReader`. Since **all** close paths funnel through `closeReader` — close-button, popstate/back,
+  Esc, the F/A/D reader keys, and swipe-right — every exit now silences playback. DOM-API sequence verified in the
+  preview engine; full inline-video E2E not exercisable (no v.redd.it items in the live DB).
 - [ ] **P2 — Maintain the feed scroll position after opening + closing the reader.** *(User-requested
   2026-06-19.)* On mobile, opening the reader and returning loses your place in the list — the feed jumps back
   to the top instead of restoring where you were. Likely the `reader-lock` overflow toggle on `documentElement`
@@ -1005,13 +1025,13 @@ Stage C design gate:*
 `docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue (I1–I4). The v3 `static/core/` layer was created to
 kill exactly this duplication; the two non-module legacy pages (`/triage`, `/reddit`) still carry copies:*
 
-- [ ] **P2 — Dead duplicate `icons.js` + offline cache gap (I1).** `static/icons.js` (legacy self-executing
-  IIFE) and `static/core/icons.js` (ES-module export) hold the same icon set. Only `static/icons.js` is
-  referenced (`templates/triage.html:~97`); browse uses `core/icons.js`; reddit inlines SVG. **`static/icons.js`
-  is NOT in the `sw.js` SHELL cache array**, so on an offline cold-open of `/triage` icons can fail to render.
-  **Fix:** either (a) add `/static/icons.js` to the `sw.js` SHELL, or (b) delete `static/icons.js`, migrate
-  `triage.html` to the `core/icons.js` module (or inline like reddit.js), and drop the script tag — (b) is the
-  cleaner end-state. **Acceptance:** triage icons render offline; no duplicate icon source remains.
+- [~] **P2 — Dead duplicate `icons.js` + offline cache gap (I1) — offline gap FIXED via (a); dedup still open.**
+  `static/icons.js` (legacy self-executing IIFE) and `static/core/icons.js` (ES-module export) hold the same icon
+  set. Only `static/icons.js` is referenced (`templates/triage.html:~97`); browse uses `core/icons.js`; reddit
+  inlines SVG. **Shipped (`a35242e`): took fix (a)** — added `/static/icons.js` to the `sw.js` SHELL cache array so
+  `/triage` icons render on an offline cold-open. **Still open:** the cleaner (b) end-state — delete `static/icons.js`,
+  migrate `triage.html` to `core/icons.js` (or inline), drop the script tag — so no duplicate icon source remains.
+  (Bundled with the I2 legacy→ES-module migration; needs live `/triage` verification.)
 - [ ] **P2 — Helper duplication on the legacy pages (I2).** `triage.js` and `reddit.js` each define their own
   `esc` / `safeUrl` / `isTypingTarget` / `ago` / `fetchJSON`; `static/core/util.js` already exports the
   canonical versions. **Fix:** convert `triage.js`/`reddit.js` to ES modules importing from `core/util.js`, or
@@ -1021,11 +1041,11 @@ kill exactly this duplication; the two non-module legacy pages (`/triage`, `/red
   `/triage` page) has many unreferenced selectors (e.g. `.ai-*` suggest-UI classes), but confidence on
   individual selectors is medium. Defer to a triage redesign; don't bulk-delete without per-selector usage
   checks.
-- [ ] **P3 — Document the two token files (I4) — doc-only.** `static/tokens.css` (legacy dark/teal, used by
-  `/triage` + `/reddit`) and `static/core/tokens.css` (v3 "Log Book" apricot, used by browse) are **both live
-  and intentional** — not dead code. Add a one-line comment in each (and/or `sw.js`) noting which pages consume
-  which, to prevent a future "looks duplicated, delete one" mistake. Unify only when the legacy pages are
-  redesigned.
+- [x] ~~**P3 — Document the two token files (I4) — doc-only.**~~ ✅ Shipped (`1ff18bf`): each token file now
+  carries a header comment noting which pages consume it — `static/tokens.css` (legacy dark/teal, used by
+  `/triage` + `/reddit`) and `static/core/tokens.css` (v3 "Log Book" apricot, used by browse) — to prevent a
+  future "looks duplicated, delete one" mistake. Both are live and intentional; unify only when the legacy pages
+  are redesigned.
 
 ## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
 *From the PKMS research handoff (2026-06-10; evidence in
