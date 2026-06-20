@@ -1,5 +1,9 @@
 /* Triage focus mode: one card at a time, swipe / keyboard / buttons.
    Pixel-6 / Android gesture-nav safe: 30px edge deadzone + inset card + tap buttons. */
+import { esc, safeUrl, isTypingTarget, ago } from "./core/util.js";
+import { getJSON as fetchJSON } from "./core/api.js";
+import { chIcon, fillIcons } from "./core/icons.js";
+
 (function () {
   "use strict";
 
@@ -31,25 +35,7 @@
   var lastAction = null;       // {fullname, status} for undo
   var toastTimer = null;
 
-  // ---- helpers ----
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  }
-  function safeUrl(u) { return /^(https?:\/\/|\/)/i.test(u || "") ? u : ""; }
-  function isTypingTarget(el) { return /input|select|textarea/i.test((el && el.tagName) || ""); }
-  function ago(ts) {
-    if (!ts) return "";
-    var d = Math.floor(Date.now() / 1000) - ts;
-    if (d < 0) return "";
-    var u = [["y", 31536000], ["mo", 2592000], ["d", 86400], ["h", 3600], ["m", 60]];
-    for (var i = 0; i < u.length; i++) if (d >= u[i][1]) return Math.floor(d / u[i][1]) + u[i][0];
-    return "now";
-  }
-  function fetchJSON(url, opts) {
-    return fetch(url, opts).then(function (r) { return r.ok ? r.json() : Promise.reject(r); });
-  }
+  // ---- helpers: esc/safeUrl/isTypingTarget/ago/fetchJSON imported from core (see top of file) ----
 
   // Reddit retired its blockquote + platform.js embed (the script now 404s), so embed the
   // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
@@ -256,8 +242,8 @@
     var m = item.metadata || {};
     var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
-      '<span class="tcard-stamp stamp-arch">' + window.chIcon("archive") + ' Archive</span>' +
-      '<span class="tcard-stamp stamp-done">Done ' + window.chIcon("done") + '</span>' +
+      '<span class="tcard-stamp stamp-arch">' + chIcon("archive") + ' Archive</span>' +
+      '<span class="tcard-stamp stamp-done">Done ' + chIcon("done") + '</span>' +
       '<div class="tcard-head">' + badge(item) + "</div>" +
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
@@ -624,6 +610,7 @@
     if (e.target === mediaModal) closeMedia();
   });
   updateUndoBtn();
+  fillIcons(document);   // hydrate the static [data-ico] action-button glyphs (icons.js auto-fill retired)
 
   // ---- boot ----
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/static/sw.js").catch(function (err) {
