@@ -114,7 +114,9 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     const mt = mediaType(item);
     if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
-    const img = imageUrl(item) || m.thumbnail;
+    // a gallery's first full image is a crisper poster than the small reddit thumbnail (Epic 13 P2)
+    const gal = (Array.isArray(m.gallery) && m.gallery.length) ? m.gallery[0] : "";
+    const img = imageUrl(item) || gal || m.thumbnail;
     // video/gallery with no poster (thumbnail-less v.redd.it) still gets a glyph-only play
     // tile so it's tappable; an image with no URL has nothing to show.
     if (!img) {
