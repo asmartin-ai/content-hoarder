@@ -114,12 +114,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
 .spill[aria-selected="true"] .n{color:var(--accent-ink);opacity:.75}
 
 /* per-status color accents so the active section reads at a glance — reuse the
-   triage status tokens; Inbox = brand accent, All = neutral muted */
+   triage status tokens; Inbox = brand accent, All = solid neutral (distinct when
+   active without adding a clashing 5th hue to the catch-all view) */
 .folder[data-status="inbox"],.spill[data-status="inbox"]{--tab:var(--accent)}
 .folder[data-status="keep"],.spill[data-status="keep"]{--tab:var(--status-keep)}
 .folder[data-status="archived"],.spill[data-status="archived"]{--tab:var(--status-archive)}
 .folder[data-status="done"],.spill[data-status="done"]{--tab:var(--status-done)}
-.folder[data-status=""],.spill[data-status=""]{--tab:var(--text-muted)}
+.folder[data-status=""],.spill[data-status=""]{--tab:var(--text-body)}
 /* desktop tabs: a top accent bar + status-tinted count when active (inset shadow
    so the tab doesn't shift) */
 .folder[aria-selected="true"]{box-shadow:inset 0 2px 0 var(--tab)}
@@ -128,7 +129,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
 .spill[data-status="keep"][aria-selected="true"]{background:var(--status-keep);border-color:var(--status-keep);color:var(--keep-ink)}
 .spill[data-status="archived"][aria-selected="true"]{background:var(--status-archive);border-color:var(--status-archive);color:var(--archive-ink)}
 .spill[data-status="done"][aria-selected="true"]{background:var(--status-done);border-color:var(--status-done);color:var(--done-ink)}
-.spill[data-status=""][aria-selected="true"]{background:var(--text-muted);border-color:var(--text-muted);color:var(--surface-card)}
+.spill[data-status=""][aria-selected="true"]{background:var(--text-body);border-color:var(--text-body);color:var(--surface-card)}
 .spill[aria-selected="true"] .n{color:inherit;opacity:.75}
 
 /* the Jump drawer's trigger lives top-left in the header on mobile (desktop uses the rail) */
