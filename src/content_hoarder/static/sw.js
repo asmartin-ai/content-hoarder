@@ -2,18 +2,19 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v32";  // v32: cache /static/icons.js so /triage icons render offline (I1)
+const CACHE = "ch-shell-v33";  // v33: /triage now an ES module — cache core/icons.js, drop deleted static/icons.js (I1/I2)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
   "/static/theme.js", "/static/haptics.js", "/static/core/tokens.css",
   "/static/core/util.js", "/static/core/api.js", "/static/core/toast.js",
   "/static/core/media.js", "/static/core/swipe.js", "/static/core/render.js",
+  "/static/core/icons.js",
   "/static/browse/browse.css", "/static/browse/main.js", "/static/browse/render.js",
   "/static/browse/reader.js",
   "/static/browse/palette.js", "/static/browse/operators.js",
-  // /triage is still the v2 page
-  "/static/app.css", "/static/triage.js", "/static/icons.js",
+  // /triage now loads triage.js as an ES module (imports core/util, core/api, core/icons)
+  "/static/app.css", "/static/triage.js",
   "/static/icon.svg", "/static/icon-192.png", "/static/icon-512.png",
   "/manifest.webmanifest",
 ];
