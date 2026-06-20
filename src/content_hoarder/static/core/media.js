@@ -196,6 +196,7 @@ export function createLightbox(opts) {
     if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
     body.innerHTML = "";  // stop playback
     modal.hidden = true;
+    if (typeof opts.onClose === "function") opts.onClose();  // e.g. re-blur the source thumbnail (Epic 13 P2)
   };
   modal.addEventListener("click", (e) => {
     if (e.target === modal || e.target.closest("[data-media-close]")) close();

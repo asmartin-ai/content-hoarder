@@ -130,10 +130,7 @@ function render() {
   $$(".row, .pin").forEach((row) => {
     const fn = row.dataset.fullname;
     if (nsfwRevealed.has(fn)) {
-      row.querySelectorAll(".monitor.nsfw, .screen.nsfw").forEach((el) => {
-        el.classList.remove("nsfw");
-        const v = el.querySelector(".veil"); if (v) v.remove();
-      });
+      row.querySelectorAll(".monitor.nsfw, .screen.nsfw").forEach((el) => el.classList.remove("nsfw"));
     }
     if (row.classList.contains("row")) {
       attachSwipe(row, {
@@ -150,6 +147,18 @@ function render() {
 /* ---- actions: live clear + undo/redo (locked #11) ---- */
 function rowEl(fullname) {
   return itemsEl.querySelector('[data-fullname="' + CSS.escape(fullname) + '"]');
+}
+
+/* Re-blur an NSFW item's feed thumbnail — the reverse of the tap-reveal. Called when
+   the reader/lightbox opened for it closes, so a reveal doesn't persist across close
+   (Epic 13 P2). Idempotent and a no-op for non-NSFW items. */
+function reblur(fn) {
+  if (!fn) return;
+  nsfwRevealed.delete(fn);
+  const item = state.items.find((it) => it.fullname === fn);
+  if (!item || !isNsfw(item)) return;
+  const row = rowEl(fn);
+  if (row) row.querySelectorAll(".monitor, .screen").forEach((el) => el.classList.add("nsfw"));
 }
 
 /* Single-level redo buffer: the last single-item action that was undone, so it can
@@ -203,7 +212,7 @@ function redo() {
 
 /* the in-app Reddit reader — replaces the external Firefox/Relay handoff for
    reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
-const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets });
+const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur });
 
 /* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
@@ -219,8 +228,7 @@ itemsEl.addEventListener("click", (e) => {
     if (!item) return;
     if (isNsfw(item) && !nsfwRevealed.has(fn)) {  // first tap reveals, second opens
       nsfwRevealed.add(fn);
-      media.classList.remove("nsfw");
-      const v = media.querySelector(".veil"); if (v) v.remove();
+      media.classList.remove("nsfw");             // veil hidden by CSS; re-blurs on reader/lightbox close
       return;
     }
     // A Reddit image/video post opens the in-app reader (media + comment thread), like the
@@ -244,8 +252,10 @@ itemsEl.addEventListener("click", (e) => {
 });
 
 /* ---- media lightbox ---- */
-const lightbox = createLightbox({ modal: "#media-modal", body: "#media-body" });
+let lastMediaFn = null;   // item whose media is open in the lightbox → re-blurred on close
+const lightbox = createLightbox({ modal: "#media-modal", body: "#media-body", onClose: () => reblur(lastMediaFn) });
 function openMediaFor(item) {
+  lastMediaFn = item.fullname;
   const m = item.metadata || {};
   if (Array.isArray(m.gallery) && m.gallery.length) return lightbox.openGallery(m.gallery);
   const vsrc = playableVideoSrc(item);   // shared playability test (same as the reader's inline player)
