@@ -509,7 +509,10 @@ async function refreshRail() {
     // one fetch fills BOTH the desktop rail and the mobile drawer (shared facet data)
     facets.sources = src.sources || [];
     facets.categories = cats.categories || [];
-    facets.tags = Object.entries(tags.tags || {}).map(([id, count]) => ({ id, label: id, count }));
+    facets.tags = Object.entries(tags.tags || {})
+      .map(([id, count]) => ({ id, label: id, count }))
+      // hide the NSFW tag facets from the rail/drawer/autocomplete while "Hide NSFW" is on (Epic 14)
+      .filter((t) => !(state.safe && /^nsfw/i.test(t.id)));
     state.curated = new Set(facets.tags.map((t) => t.id));
     $("#rail-sources").innerHTML = facets.sources.map((s) =>
       railBtn(s.label, s.id, s.count, "source", s.badge_color)).join("");
@@ -926,6 +929,7 @@ $$("#set-nsfw button").forEach((b) => b.addEventListener("click", () => {
   state.safe = b.dataset.nsfw === "hide";
   localStorage.chSafe = state.safe ? "1" : "0";
   $$("#set-nsfw button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  refreshRail();   // surface/hide the nsfw_* facets to match the toggle (Epic 14)
   loadItems(true);
 }));
 
