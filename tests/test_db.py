@@ -228,6 +228,24 @@ def test_init_db_idempotent(conn):
     db.init_db(conn)
 
 
+def test_hide_nsfw_covers_over18_without_a_tag(conn):
+    # The UI blurs/badges on over_18 alone (render.js isNsfw); hide_nsfw must hide the SAME
+    # items, including an over_18 post that categorize never tagged (Epic 13 P2). A plain SFW
+    # row (over_18 absent) must NOT be hidden — guards the NOT(... OR ...) NULL-propagation.
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_tag", title="tagged",
+                             metadata={"tags": ["nsfw_erotic"], "subreddit": "x"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_o18", title="over18 only",
+                             metadata={"over_18": 1, "subreddit": "x"}))   # over_18, NO nsfw tag
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_sfw", title="clean",
+                             metadata={"subreddit": "x"}))                  # over_18 absent
+
+    hidden = {x["source_id"] for x in db.search_items(conn, "", hide_nsfw=True)}
+    assert hidden == {"t3_sfw"}            # SFW kept; tagged AND over_18-only both hidden
+
+    shown = {x["source_id"] for x in db.search_items(conn, "", nsfw=True)}
+    assert shown == {"t3_tag", "t3_o18"}   # is:nsfw includes the over_18-only item too
+
+
 def test_search_tags_all_or_nsfw_and_score_and_dates(conn):
     # Two reddit posts, one NSFW + high score, one SFW + low score.
     db.merge_upsert(conn, mk(

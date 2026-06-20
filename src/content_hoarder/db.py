@@ -650,19 +650,20 @@ def search_items(
                     f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
                 )
                 params.extend(tags)
-        if nsfw:
+        # An item is NSFW if it carries an NSFW tag OR Reddit flagged it over_18. The UI blurs/
+        # badges on over_18 alone (render.js isNsfw), but the over_18 flag is too sparse for
+        # categorize to reliably tag (gitignored subreddit rules), so a tag-only filter left
+        # over_18-but-untagged items visible under "Hide NSFW" (Epic 13 P2). COALESCE keeps an
+        # absent over_18 from NULL-propagating through `NOT (… OR …)` and hiding SFW rows.
+        if nsfw or hide_nsfw:
             ph = ",".join("?" for _ in NSFW_TAGS)
-            filters.append(
-                f"EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
-            )
+            pred = (f"(EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
+                    f" OR COALESCE(json_extract({a}metadata, '$.over_18'), 0) = 1)")
+        if nsfw:
+            filters.append(pred)
             params.extend(NSFW_TAGS)
         if hide_nsfw:
-            # the inverse of the nsfw include-filter: drop anything carrying an NSFW tag
-            # (over_18-flagged items are folded in as nsfw_other by categorize.py)
-            ph = ",".join("?" for _ in NSFW_TAGS)
-            filters.append(
-                f"NOT EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
-            )
+            filters.append("NOT " + pred)        # exact inverse of the include filter above
             params.extend(NSFW_TAGS)
         if has_media:
             # has:video|image|gallery — facet over metadata.media_type. "video" means
