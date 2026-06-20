@@ -1040,18 +1040,23 @@ Stage C design gate:*
 `docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue (I1–I4). The v3 `static/core/` layer was created to
 kill exactly this duplication; the two non-module legacy pages (`/triage`, `/reddit`) still carry copies:*
 
-- [~] **P2 — Dead duplicate `icons.js` + offline cache gap (I1) — offline gap FIXED via (a); dedup still open.**
-  `static/icons.js` (legacy self-executing IIFE) and `static/core/icons.js` (ES-module export) hold the same icon
-  set. Only `static/icons.js` is referenced (`templates/triage.html:~97`); browse uses `core/icons.js`; reddit
-  inlines SVG. **Shipped (`a35242e`): took fix (a)** — added `/static/icons.js` to the `sw.js` SHELL cache array so
-  `/triage` icons render on an offline cold-open. **Still open:** the cleaner (b) end-state — delete `static/icons.js`,
-  migrate `triage.html` to `core/icons.js` (or inline), drop the script tag — so no duplicate icon source remains.
-  (Bundled with the I2 legacy→ES-module migration; needs live `/triage` verification.)
-- [ ] **P2 — Helper duplication on the legacy pages (I2).** `triage.js` and `reddit.js` each define their own
-  `esc` / `safeUrl` / `isTypingTarget` / `ago` / `fetchJSON`; `static/core/util.js` already exports the
-  canonical versions. **Fix:** convert `triage.js`/`reddit.js` to ES modules importing from `core/util.js`, or
-  extract a shared non-module `util` that sets globals. Also permanently retires the B0a single-quote-escape
-  divergence (one `esc`, not three).
+- [x] ~~**P2 — Dead duplicate `icons.js` + offline cache gap (I1).**~~ ✅ Done 2026-06-20 (`frontend-staging`,
+  systematic-mode rework) via the cleaner (b) end-state. The interim (a) fix (`a35242e`, caching `/static/icons.js`)
+  was superseded: `/triage` now loads `triage.js` as an **ES module** importing `chIcon`/`fillIcons` from
+  `core/icons.js`, the `<script src="/static/icons.js">` tag is gone, and **`static/icons.js` is deleted**.
+  Discovery during the rework: `static/icons.js` was NOT dead — it was the **generator source** for `core/icons.js`
+  (`scripts/_gen_core_icons.py`); per user decision the one-shot generator was **retired** too, so `core/icons.js`
+  is now the single hand-maintained icon source (header updated). `sw.js` shell → v33: dropped `/static/icons.js`,
+  added `/static/core/icons.js` (so `/triage` icons render offline). **Verified:** `/static/icons.js` 404s,
+  `/triage` action icons + dynamic stamps render via `core/icons.js`, no console errors.
+- [x] ~~**P2 — Helper duplication on the legacy pages (I2).**~~ ✅ Done 2026-06-20 (`frontend-staging`). Converted
+  `triage.js` + `reddit.js` to **ES modules**: triage imports `esc`/`safeUrl`/`isTypingTarget`/`ago` from
+  `core/util.js` and `getJSON` (as `fetchJSON`) from `core/api.js`; reddit imports `esc`. Local copies removed →
+  one source of truth. Both files were already IIFE-wrapped (leaked no globals), and reddit's `window.doUnsave`/
+  `doUndo`/`openThread` (inline-onclick targets) are explicit `window.` assignments that survive module conversion —
+  **verified** by clicking a real onclick row (detail panel opened). Note: the B0a single-quote `esc` divergence was
+  already fixed in both files before this (now byte-identical), so the dedup is behavior-neutral except triage's
+  relative-time now matches the browse view (`ago`: `"42s"` vs the old `"now"` for <1min items).
 - [ ] **P3 — Unused `app.css` selectors (I3) — defer.** `app.css` (~2100 lines, consumed only by the legacy
   `/triage` page) has many unreferenced selectors (e.g. `.ai-*` suggest-UI classes), but confidence on
   individual selectors is medium. Defer to a triage redesign; don't bulk-delete without per-selector usage
