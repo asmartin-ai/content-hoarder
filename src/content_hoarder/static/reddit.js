@@ -1,4 +1,5 @@
 /* Reddit Saved Manager — vanilla JS frontend */
+import { esc } from "./core/util.js";
 
 (function () {
   'use strict';
@@ -667,16 +668,7 @@
     return { cls: 'link', icon: '🔗', label: 'External link' };
   }
 
-  // ── Escape helper ──────────────────────────────────────────────────────────
-  function esc(str) {
-    if (str == null) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  // ── Escape helper: esc imported from core/util.js (see top of file) ──────────
 
   /* [ARCHIVAL] begin — remove this block (and the renderArchiveLinks call above) to drop archive support */
   const btnHydrate = $('btn-hydrate');
