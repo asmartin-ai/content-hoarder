@@ -33,10 +33,22 @@ export function attachSwipe(el, opts) {
     stage2 = false;
   }
 
+  // After a horizontal swipe the browser still synthesizes a click on the original
+  // target (title <a>, thumbnail <button>, …). Swallow that one click so an
+  // archive-swipe starting on a link doesn't ALSO navigate / open the reader.
+  function suppressNextClick() {
+    const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener("click", swallow, true), 350);
+  }
+
   el.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" && !opts.mouse) return;   // touch-only by default
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.target.closest("a, button, input, select, textarea")) return;
+    // Only text-entry controls keep their native horizontal caret/selection; links and
+    // buttons no longer block the swipe — taps on them still work because we don't claim
+    // the gesture until it's decided horizontal (and clicks are delegated on itemsEl).
+    if (e.target.closest("input, select, textarea")) return;
     if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return;  // back-gesture zone
     dragging = true; decided = false; horizontal = false;
     startX = e.clientX; startY = e.clientY;
@@ -53,6 +65,7 @@ export function attachSwipe(el, opts) {
       if (horizontal) { try { el.setPointerCapture(e.pointerId); } catch (_e) {} }
     }
     if (!horizontal) return;                 // vertical → let the list scroll
+    if (e.cancelable) e.preventDefault();    // claim the gesture: block link activation / native drag
     fg.style.transform = "translateX(" + dx + "px)";
     el.classList.toggle("swipe-arch", dx > 40 && dx <= COMMIT2);  // right → archive
     el.classList.toggle("swipe-done", dx < -40);                  // left → done
@@ -68,6 +81,7 @@ export function attachSwipe(el, opts) {
     if (!dragging) return;
     dragging = false;
     const dx = e.clientX - startX;
+    if (horizontal) suppressNextClick();     // any decided h-swipe: don't let the trailing click fire
     if (horizontal && Math.abs(dx) >= COMMIT) {
       const dir = dx > 0 ? 1 : -1;
       fg.style.transition = "transform .2s ease-out";
