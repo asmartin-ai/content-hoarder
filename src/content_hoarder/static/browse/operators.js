@@ -171,7 +171,14 @@ export function initOperators(input, pop, opts = {}) {
   // guard on relatedTarget so toggling Exact keeps the suggestions open. focusout on
   // the popover handles the reverse (focus leaving the checkbox to somewhere outside).
   const stillInside = (el) => el && (pop.contains(el) || el === input);
-  const scheduleClose = () => setTimeout(() => pop.classList.remove("show"), 160);
+  // Re-check focus when the timer fires: clicking the in-popover Exact checkbox via its
+  // <label> blurs the input BEFORE focus lands on the checkbox, so relatedTarget is null
+  // at blur time; by the time this runs, document.activeElement is the checkbox (inside
+  // the popover), so the suggestions stay open.
+  const scheduleClose = () => setTimeout(() => {
+    if (stillInside(document.activeElement)) return;
+    pop.classList.remove("show");
+  }, 160);
 
   input.addEventListener("input", render);
   input.addEventListener("focus", render);
