@@ -375,6 +375,19 @@ new IntersectionObserver((entries) => {
   if (entries[0].isIntersecting && state.hasMore && !state.focus && !state.loading) loadItems(false);
 }, { rootMargin: "600px" }).observe($("#sentinel"));
 
+/* ---- mobile floating scroll-to-top (Epic 13) ---- */
+const gotop = $("#gotop");
+const GOTOP_AT = 700;            // px scrolled before the affordance appears
+let gotopTick = false;
+function syncGotop() {
+  gotopTick = false;
+  gotop.classList.toggle("show", window.scrollY > GOTOP_AT);
+}
+window.addEventListener("scroll", () => {          // rAF-throttled (60fps lane)
+  if (!gotopTick) { gotopTick = true; requestAnimationFrame(syncGotop); }
+}, { passive: true });
+gotop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
 const ambient = $("#ambient");
 function cardHtml(c) {
