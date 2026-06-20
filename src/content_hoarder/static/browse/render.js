@@ -73,6 +73,12 @@ const urlDomain = (item) => {
   }
 };
 
+/* The URL-domain chip markup, shared by logRow / ledgerRow / pinCard. */
+const urlDomainHtml = (item) => {
+  const d = urlDomain(item);
+  return d ? '<span class="url-domain">' + esc(d) + "</span>" : "";
+};
+
 /* monitor: the fixed thumb slot. NSFW gets the box-constrained blur + veil. */
 const monitorHtml = (item, nsfwRevealed) => {
   const t = thumb(item, "list");
@@ -110,8 +116,7 @@ const rowChips = (item, o) => tagChips(item, { curated: o.curated, max: 2, expan
 
 export const logRow = (item, opts) => {
   const o = opts || {};
-  const domain = urlDomain(item);
-  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
+  const domainHtml = urlDomainHtml(item);
   return '<div class="row' + (item.status !== "inbox" && o.view === "" ? " seen" : "") +
     '" data-fullname="' + esc(item.fullname) + '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
     underlay +
@@ -133,8 +138,7 @@ export const ledgerRow = (item, n, opts) => {
   const mt = mediaType(item);
   const play = (mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery")
     ? '<button type="button" class="playpill" data-media="1">' + mt.icon + " view</button>" : "";
-  const domain = urlDomain(item);
-  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
+  const domainHtml = urlDomainHtml(item);
   return '<div class="row" data-fullname="' + esc(item.fullname) +
     '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
     underlay +
@@ -156,8 +160,7 @@ export const pinCard = (item, opts) => {
   const m = item.metadata || {};
   const mt = mediaType(item);
   const blur = isNsfw(item) && !o.nsfwRevealed;
-  const domain = urlDomain(item);
-  const domainHtml = domain ? '<span class="url-domain">' + esc(domain) + "</span>" : "";
+  const domainHtml = urlDomainHtml(item);
   const screen = t
     ? '<button type="button" class="screen' + (blur ? " nsfw" : "") + '" data-media="1">' +
       (item.source === "youtube" ? '<div class="bloom" style="background-image:url(\'' + esc(t) + '\')"></div>' : "") +
