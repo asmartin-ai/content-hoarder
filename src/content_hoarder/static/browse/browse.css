@@ -355,9 +355,12 @@ body.focus .batchstrip{display:flex}
   background:rgba(10,8,12,.75);border-radius:5px;padding:2px 4px}
 /* reddit-style NSFW blur, constrained to the thumb box */
 .monitor.nsfw img,.pin .screen.nsfw img{filter:blur(16px) saturate(.6);transform:scale(1.2)}
-.monitor.nsfw .veil,.pin .screen.nsfw .veil{position:absolute;inset:0;display:flex;
+.monitor .veil,.pin .screen .veil{position:absolute;inset:0;display:flex;
   align-items:center;justify-content:center;font:var(--fw-bold) .6rem/1 var(--font-mono);
   letter-spacing:.1em;color:#ffd9bd;background:rgba(12,8,14,.4);z-index:2}
+/* tap-reveal removes .nsfw (img unblurs); hide the veil then, and re-blur by re-adding
+   .nsfw when the reader/lightbox opened for the item closes (Epic 13 P2) */
+.monitor:not(.nsfw) .veil,.pin .screen:not(.nsfw) .veil{display:none}
 /* media-less rows reserve the slot invisibly — actions never move (v2 invariant) */
 .monitor.empty{background:transparent;border-color:transparent;cursor:default}
 /* video/gallery with no stored thumbnail — a centered play glyph IS the tap target */
