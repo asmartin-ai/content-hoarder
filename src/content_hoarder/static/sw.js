@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v30";  // v30: PWA start_url /triage -> / (installed app opens the v3 browse)
+const CACHE = "ch-shell-v31";  // v31: inline Reddit reader video (mountVideo helper, reader inline playback)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
