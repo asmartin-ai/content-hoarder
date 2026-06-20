@@ -88,6 +88,8 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   let item = null, fullname = null, ooHref = "";
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
+  let threadSort = localStorage.getItem("ch_reader_sort") || "best";
+  if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
   let videoEl = null;          // the mounted <video> (also the "video is playing" flag); close pauses+resets it
 
@@ -162,7 +164,11 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   }
   const commentsHead = (n) =>
     '<div class="rd-chead"><span class="rd-cn">' + n + "</span> " +
-    (n === 1 ? "comment" : "comments") + '<span class="rd-csort">best</span></div>';
+    (n === 1 ? "comment" : "comments") +
+    '<select class="rd-csort" aria-label="Sort comments">' +
+    ["best", "top", "new"].map((s) =>
+      '<option value="' + s + '"' + (s === threadSort ? " selected" : "") + ">" + s + "</option>").join("") +
+    "</select></div>";
   function renderComments() {
     cmtsEl.innerHTML = commentsHead(comments.length) +
       (comments.length
@@ -185,7 +191,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     const fn = fullname;
     cmtsEl.innerHTML = '<div class="rd-cmtstate">loading thread…</div>';
     let res;
-    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=best"); }
+    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + threadSort); }
     catch (e) { if (fullname === fn) failState(); return; }
     if (fullname !== fn) return;                       // closed / switched mid-fetch
     if (res && res.cached) { applyThread(res, false); return; }
@@ -193,7 +199,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     try { await api.postJSON("/reddit/items/" + encodeURIComponent(fn) + "/hydrate", {}); }
     catch (e) { if (fullname === fn) failState(); return; }   // 401 no-auth, 502 network, …
     if (fullname !== fn) return;
-    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=best"); }
+    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + threadSort); }
     catch (e) { if (fullname === fn) failState(); return; }
     if (fullname !== fn) return;
     if (res && res.cached) applyThread(res, true); else failState();
@@ -247,6 +253,15 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
       if (typeof onTriage === "function") onTriage(fn, status);
     }
   }, true);
+
+  /* comment-sort selector → reload the thread in the chosen order (server sorts via ?sort) */
+  cmtsEl.addEventListener("change", (e) => {
+    const sel = e.target.closest(".rd-csort");
+    if (!sel) return;
+    threadSort = sel.value;
+    localStorage.setItem("ch_reader_sort", threadSort);
+    load();
+  });
 
   /* ---- clicks: close, collapse toggle, media reveal/open ---- */
   reader.addEventListener("click", (e) => {
