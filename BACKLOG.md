@@ -531,14 +531,13 @@ need separate filter controls.*
 - [x] ~~**P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**~~ ✅ Already
   satisfied by the v3 comfortable-density rework (`browse.css:344,350`): the fixed 128×76 `.monitor` box +
   `.items.density-comfortable .monitor img{object-fit:cover}` fill the slot width. *(User-requested 2026-06-17.)*
-- [ ] **P3 — Shrink the row title in the ledger + log views.** *(User-requested 2026-06-20.)* The list-row titles
-  read too large. **Measured now (desktop):** log/comfortable `.items.density-comfortable .title` = **18.88px**
-  (`--fs-lg` 1.18rem, 2-line clamp); ledger/compact base `.title` = **15.52px** (`--fs-md` 0.97rem, single line).
-  **Chosen sizing (token-reuse, keeps the density hierarchy ledger < log < card):** drop **log → `--fs-md`**
-  (0.97rem ≈ 15.5px, ~18% smaller) and **ledger → `--fs-sm`** (0.85rem ≈ 13.6px, ~12% smaller). Touches
-  `browse.css:275` (base `.title`, used by ledger) + `browse.css:341` (`.items.density-comfortable .title`); note
-  the mobile override at `browse.css:667` already sets comfortable to `--fs-md`, so it becomes redundant (can drop
-  it). Card/Pinboard title (`.pin h3`, already `--fs-md`) stays as-is. Styling only.
+- [x] ~~**P3 — Shrink the row title in the ledger + log views.**~~ ✅ Done 2026-06-20 (`frontend-staging`).
+  *(User-requested 2026-06-20.)* The list-row titles read too large. **Was (desktop):** log/comfortable **18.88px**
+  (`--fs-lg`); ledger/compact **15.52px** (`--fs-md`). **Now:** log → **`--fs-md`** (15.52px, ~18% smaller),
+  ledger → **`--fs-sm`** (13.6px, ~12% smaller) — token-reuse, keeps the density hierarchy ledger < log < card.
+  Changed base `.title` (used by ledger) + `.items.density-comfortable .title`, and dropped the now-redundant mobile
+  override (comfortable was already `--fs-md` there). Card/Pinboard title (`.pin h3`) unchanged. Verified both
+  rendered sizes in the preview.
 - [ ] **P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).** *(User-reported
   2026-06-17.)* Repro item:
   `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/` — the gallery card
