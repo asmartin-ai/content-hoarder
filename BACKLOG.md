@@ -311,7 +311,7 @@ false positives.*
   winner GLM-5.1): best/top/new on the inline thread view — sibling-group sort (top = score,
   new = created_utc, best = cached order), `?sort=` validated at the route, `#thread-sort`
   select persisted to localStorage. 7 tests.
-- [ ] **P2 — Surface "sort by top upvoted" in the reader (re-requested).** *(User-requested 2026-06-19.)*
+- [x] ~~**P2 — Surface "sort by top upvoted" in the reader (re-requested).**~~ ✅ Done 2026-06-20 (Task A, `frontend-staging`): best/top/new `<select>` in the reader thread header wired to the existing `?sort`; persists in `localStorage`. *(User-requested 2026-06-19.)*
   The user wants comment sorting **other than best — by top up-voted**. The backend + an inbox-thread
   `#thread-sort` select already ship this (best/top/new, **top = score**, item above) — so this is a **surface +
   verify** task, not new sort logic. The inline **`browse/reader.js`** thread (the mobile reader path) appears
@@ -329,7 +329,7 @@ false positives.*
 - [ ] **P2 — Add incremental "Sync newest" to the main browse view.** *(User-requested 2026-06-08.)* The
   working `POST /reddit/sync` button lives only in `/reddit` (`reddit.html` `#btn-sync`); surface it in the
   main browse header/tools too.
-- [ ] **P2 — Disambiguate the "Sync now" label.** The browse/triage "Sync now" buttons (`#ru-sync`,
+- [x] ~~**P2 — Disambiguate the "Sync now" label.**~~ ✅ Done 2026-06-20 (Task D): triage's `#ru-sync-triage` relabelled "Unsave queued (N)" + title; browse had no such button (the `#ru-sync` ref was stale). The browse/triage "Sync now" buttons (`#ru-sync`,
   `#ru-sync-triage`) actually **drain the unsave queue** (`/reddit/unsave/drain`), not sync — and are
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
@@ -471,7 +471,7 @@ need separate filter controls.*
   `subreddit:<sub>` (matched COLLATE NOCASE downstream). Resolved as an **alias** — `subreddit:` is
   unchanged, not deprecated. Anchored to a standalone token so reddit URLs / mid-text `r/…` aren't captured.
   5 tests. **Still open (deferred):** `u/<user>` → author shorthand, and the operator-rename pass (Icebox below).
-- [ ] **P3 — `Exact` checkbox shouldn't close the operator suggestions popover.** *(User-reported
+- [x] ~~**P3 — `Exact` checkbox shouldn't close the operator suggestions popover.**~~ ✅ Done 2026-06-20 (Task C): `scheduleClose` now re-checks `document.activeElement` when the timer fires (clicking the in-popover checkbox blurs the input with a null `relatedTarget`). *(User-reported
   2026-06-17.)* Clicking the **Exact-only** checkbox in the search bar dismisses the `#oppop` suggestions. The
   toggle shouldn't blur/close the popover — keep suggestions open so the user can keep building the query.
   Touches `operators.js` (popover open/close on focus/blur) + the exact-checkbox handler.
@@ -558,7 +558,8 @@ need separate filter controls.*
   representative URLs. Relates to Epic 11 (YouTube promotion) + Epic 15.
 - [x] ~~**P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.**~~ ✅ Already shipped in the
   v3 status-nav (`browse.css:119-131`): `.folder`/`.spill[data-status=…]` carry `--tab:var(--status-keep/-archive/-done)`
-  with active-state tinting; Inbox/All (empty status) use `--text-muted`. *(User-requested 2026-06-17.)*
+  with active-state tinting; Inbox = `--accent`. **Updated 2026-06-20 (Task F):** "All" was neutral `--text-muted`
+  (not distinct when active) → now `--text-body` (solid neutral, no clashing 5th hue). *(User-requested 2026-06-17.)*
 - [x] ~~**P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**~~ ✅ Already
   satisfied by the v3 comfortable-density rework (`browse.css:344,350`): the fixed 128×76 `.monitor` box +
   `.items.density-comfortable .monitor img{object-fit:cover}` fill the slot width. *(User-requested 2026-06-17.)*
@@ -593,7 +594,7 @@ need separate filter controls.*
   (wide cards);** at 2-column widths nothing reaches the cap. **Trade-off:** very tall images crop rather than
   shrink-to-fit (reverses the v3 contain decision) — user-accepted. Verified computed styles applied; geometry
   diagnosed on real rows (live re-capture flaky this session — remote thumbnail load).
-- [ ] **P2 — `Ctrl+Y` redo (mirror `Ctrl+Z` undo).** *(User-requested 2026-06-17.)* Undo exists (per-item +
+- [x] ~~**P2 — `Ctrl+Y` redo (mirror `Ctrl+Z` undo).**~~ ✅ Done 2026-06-20 (Task E): single-level redo (`lastUndone`, replays the last undone act, mirrors the single-level snackbar undo); bound Ctrl+Z/bare-z → undo, Ctrl+Y/Ctrl+Shift+Z/bare-y → redo; modifier chords now stop falling through to single-key actions. *(User-requested 2026-06-17.)* Undo exists (per-item +
   bulk snackbar, `api.bulkUndo`); add a **redo** that replays the last undone action. Needs a small undo/redo
   **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
   redo — confirm `Ctrl+Z` is actually keyboard-bound today, not snackbar-only. Relates to the Epic 5 keyboard
@@ -774,7 +775,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   `section#reader` a video currently opens the lightbox; play it **inline in the reader's media tile** instead
   (reuse the HLS/`<video>` path from `core/media.js`). The lightbox stays for the browse-list peek (above);
   this is reader-only.
-- [ ] **P3 — Reposition the reader's media preview (takes too much vertical space at top).** *(User-requested
+- [x] ~~**P3 — Reposition the reader's media preview (takes too much vertical space at top).**~~ ✅ Done 2026-06-20 (Task B): capped `.rd-media img` to 42vh and inline video to 52vh (was 58/70vh; kept `contain`, tap still opens the full lightbox). *(User-requested
   2026-06-17.)* In `section#reader` the post-media tile dominates the top of the view; shrink/reposition it so
   the post + thread are reachable with less scrolling (cap its height, or make it a collapsible/cover-fit
   tile). Reader layout only.
