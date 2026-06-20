@@ -18,7 +18,7 @@
 import { esc, ago, isTypingTarget } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
-import { imageUrl, mediaType, mountVideo, hlsManifestUrl } from "../core/media.js";
+import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
 import { isNsfw } from "./render.js";
 
 /* ---- collapsible comment thread (pure; local-LLM generated, verified) ---- */
@@ -89,8 +89,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
-  let videoEl = null;          // the mounted <video>, so close can pause+reset it
-  let inlineVideoMounted = false;  // flag: a video is playing, don't clobber it on thread load
+  let videoEl = null;          // the mounted <video> (also the "video is playing" flag); close pauses+resets it
 
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
@@ -106,7 +105,6 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
       } catch (e) { /* no-op */ }
       videoEl = null;
     }
-    inlineVideoMounted = false;
   }
 
   /* ---- render ---- */
@@ -174,7 +172,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   function applyThread(res, justHydrated) {
     comments = Array.isArray(res.comments) ? res.comments : [];
     opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
-    if (!inlineVideoMounted) renderPost(res.post || null);  // don't clobber a playing video
+    if (!videoEl) renderPost(res.post || null);  // don't clobber a playing inline video
     setChip(res.archived ? "archived" : (justHydrated ? "hydrated" : "cached"));
     renderComments();
   }
@@ -204,6 +202,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   /* ---- open / close (+ history so the system back-gesture returns to feed) ---- */
   function openReader(it) {
     if (typeof closeSheets === "function") closeSheets();
+    stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
     item = it; fullname = it.fullname;
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
     ooHref = absReddit(it.metadata && it.metadata.permalink) || it.url || "";
@@ -235,6 +234,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     if (!isOpen) return;
     if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeReader(false); return; }
     if (isTypingTarget(e.target)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;  // let browser shortcuts (Ctrl/⌘+F/A/D, …) through
     // Mirror the foot buttons so the reader's OWN item is triaged (not the list
     // item behind it). This is a capture-phase listener, so it runs before
     // main.js's bubble keydown; stopPropagation keeps that one from double-firing.
@@ -265,28 +265,21 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
         const v = med.querySelector(".rd-veil"); if (v) v.remove();
         return;
       }
-      /* Directly-playable video (v.redd.it/HLS or a .mp4/.webm/.mov file) plays inline;
-         external video (YouTube, gfycat/redgifs pages, …) isn't a playable media file, so
-         it would mount a dead <video> — route those to onMedia (lightbox / open-original)
-         like images/galleries. */
-      const mt = mediaType(item);
-      if (mt.cls === "video") {
+      /* Directly-playable video (v.redd.it/HLS or a .mp4/.webm/.mov file) plays inline.
+         External "video" (YouTube, gfycat/redgifs pages, …) has no playable src, so
+         playableVideoSrc() returns "" and it falls through to onMedia (lightbox /
+         open-original) like images/galleries — avoids mounting a dead <video>. */
+      const vsrc = playableVideoSrc(item);
+      if (vsrc) {
         const m = item.metadata || {};
-        const srcUrl = m.media_url || item.url;
-        const playable = !!hlsManifestUrl(srcUrl) || /\.(mp4|webm|mov)(\?|#|$)/i.test(srcUrl || "");
-        if (playable) {
-          const posterUrl = imageUrl(item) || m.thumbnail;
-          /* Replace the tile with a video container */
-          const wrap = document.createElement("div");
-          wrap.className = "rd-video-wrap";
-          med.replaceWith(wrap);
-          const { video, destroy } = mountVideo(wrap, srcUrl, posterUrl, { autoplay: true });
-          videoTeardown = destroy;
-          videoEl = video;
-          inlineVideoMounted = true;
-          return;
-        }
-        // external video → fall through to onMedia (open original)
+        const posterUrl = imageUrl(item) || m.thumbnail;
+        const wrap = document.createElement("div");   // replace the tile with a video container
+        wrap.className = "rd-video-wrap";
+        med.replaceWith(wrap);
+        const { video, destroy } = mountVideo(wrap, vsrc, posterUrl, { autoplay: true });
+        videoTeardown = destroy;
+        videoEl = video;
+        return;
       }
       if (typeof onMedia === "function") onMedia(item);
     }
