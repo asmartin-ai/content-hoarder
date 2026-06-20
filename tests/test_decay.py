@@ -64,6 +64,23 @@ def test_decay_apply_sets_stamp_status_processed(conn):
     assert other["status"] == "inbox" and "decayed_at" not in _md(conn, b)
 
 
+def test_decay_same_second_waves_undo_independently(conn, monkeypatch):
+    """B1: two decays in the SAME wall-clock second get distinct (monotonic) wave
+    stamps, so undoing one wave's window restores only its rows — not both."""
+    a = _seed(conn, "1", sub="gamedeals", tags=["ephemeral"])
+    b = _seed(conn, "2", sub="askscience", tags=["science"])
+    monkeypatch.setattr(db.time, "time", lambda: 1_700_000_000)  # freeze the clock
+    wave_a = db.decay(conn, tags=["ephemeral"], apply=True)["decayed_at"]
+    wave_b = db.decay(conn, tags=["science"], apply=True)["decayed_at"]
+    assert wave_a != wave_b  # distinct stamps despite the identical second
+    assert _md(conn, a)["decayed_at"] == wave_a
+    assert _md(conn, b)["decayed_at"] == wave_b
+    # undo only wave A's [wave, wave+1) window -> A returns, B stays decayed
+    db.undecay(conn, decayed_after=wave_a, decayed_before=wave_a + 1, apply=True)
+    assert db.get_item(conn, a)["status"] == "inbox"
+    assert db.get_item(conn, b)["status"] == "archived"
+
+
 def test_decay_subreddit_filter_case_insensitive(conn):
     a = _seed(conn, "1", sub="feedthebeast")
     res = db.decay(conn, subreddits=["FeedTheBeast"], apply=True)
