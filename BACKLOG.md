@@ -531,6 +531,14 @@ need separate filter controls.*
 - [x] ~~**P3 — Stretch the thumbnail to the preview-box width (browse "log"/comfortable density).**~~ ✅ Already
   satisfied by the v3 comfortable-density rework (`browse.css:344,350`): the fixed 128×76 `.monitor` box +
   `.items.density-comfortable .monitor img{object-fit:cover}` fill the slot width. *(User-requested 2026-06-17.)*
+- [ ] **P3 — Shrink the row title in the ledger + log views.** *(User-requested 2026-06-20.)* The list-row titles
+  read too large. **Measured now (desktop):** log/comfortable `.items.density-comfortable .title` = **18.88px**
+  (`--fs-lg` 1.18rem, 2-line clamp); ledger/compact base `.title` = **15.52px** (`--fs-md` 0.97rem, single line).
+  **Chosen sizing (token-reuse, keeps the density hierarchy ledger < log < card):** drop **log → `--fs-md`**
+  (0.97rem ≈ 15.5px, ~18% smaller) and **ledger → `--fs-sm`** (0.85rem ≈ 13.6px, ~12% smaller). Touches
+  `browse.css:275` (base `.title`, used by ledger) + `browse.css:341` (`.items.density-comfortable .title`); note
+  the mobile override at `browse.css:667` already sets comfortable to `--fs-md`, so it becomes redundant (can drop
+  it). Card/Pinboard title (`.pin h3`, already `--fs-md`) stays as-is. Styling only.
 - [ ] **P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).** *(User-reported
   2026-06-17.)* Repro item:
   `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/` — the gallery card
@@ -542,10 +550,14 @@ need separate filter controls.*
   first:** confirm whether the gallery now renders/opens correctly, and only then chase (a) the still-missing
   card thumbnail and (b) any remaining render glitch. May already be partly resolved by the shipped gallery
   lightbox (Epic 13 P1 / Epic 4 inline-gallery).
-- [ ] **P3 — Pinboard portrait images anchored top-left (visual polish).** *(User-reported 2026-06-17.)* In
-  the **card / "Pinboard"** density, portrait (tall) images sit anchored top-left in their slot instead of
-  centered/filled, reading poorly. Improve `object-position`/sizing for portrait media in `.pin .screen img`
-  (`browse.css:335`) — relates to the earlier per-aspect media handling.
+- [x] ~~**P3 — Pinboard portrait images anchored top-left (visual polish).**~~ ✅ Fixed 2026-06-20
+  (`frontend-staging`). *(User-reported 2026-06-17; **cover** chosen by the user 2026-06-20.)* In the **card /
+  "Pinboard"** density, portrait (tall) images were pillarboxed (`object-fit:contain` + `max-height:430px`
+  letterboxed them), reading poorly. **Fix:** `.pin .screen img` now uses `object-fit:cover` (kept
+  `object-position:center top`), so portrait images fill the slot width and crop past 430px, anchored at the top.
+  Landscape/YouTube thumbs never hit the 430px cap (cover == contain there → unchanged). **Trade-off:** very tall
+  text screenshots are now cropped rather than shrunk-to-fit (reverses the v3 contain decision, line above) — the
+  user accepted this. Verified `object-fit:cover` + box geometry on real portrait rows in the preview.
 - [ ] **P2 — `Ctrl+Y` redo (mirror `Ctrl+Z` undo).** *(User-requested 2026-06-17.)* Undo exists (per-item +
   bulk snackbar, `api.bulkUndo`); add a **redo** that replays the last undone action. Needs a small undo/redo
   **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
