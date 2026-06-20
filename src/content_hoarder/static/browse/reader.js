@@ -16,6 +16,7 @@
    inlining. Only addition over the generated form: the `c.author &&` OP guard. */
 
 import { esc, ago, isTypingTarget } from "../core/util.js";
+import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
 import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
@@ -52,7 +53,7 @@ export function renderThread(comments, collapsed, helpers) {
     html += '<span class="rd-cage">' + helpers.ago(c.created_utc) + "</span>";
     if (isC) html += '<span class="rd-hidden">' + subtreeLen(comments, i) + " replies</span>";
     html += "</div>";
-    if (!isC) html += '<div class="rd-ctext">' + helpers.esc(c.body) + "</div>";
+    if (!isC) html += '<div class="rd-ctext">' + helpers.md(c.body) + "</div>";
     html += "</div></div>";
   }
   return html;
@@ -64,8 +65,6 @@ const fmtScore = (n) => {
   const v = n / 1000;
   return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.round(v))) + "k";
 };
-const paragraphs = (t) =>
-  String(t).split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
 // Reddit permalinks are often stored RELATIVE ("/r/sub/comments/…"); an <a href> to a
 // relative path resolves against our own origin → a local 404. Absolutize before use.
 const absReddit = (p) => {
@@ -145,7 +144,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
     h += mediaTileHtml();
-    if (String(body).trim()) h += '<div class="rd-body">' + paragraphs(body) + "</div>";
+    if (String(body).trim()) h += '<div class="rd-body">' + renderMarkdown(body) + "</div>";
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     postEl.innerHTML = h;
   }
@@ -172,7 +171,7 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   function renderComments() {
     cmtsEl.innerHTML = commentsHead(comments.length) +
       (comments.length
-        ? renderThread(comments, collapsed, { esc, ago, opAuthor })
+        ? renderThread(comments, collapsed, { esc, md: renderMarkdown, ago, opAuthor })
         : '<div class="rd-cmtstate">No comments on this post.</div>');
   }
   function applyThread(res, justHydrated) {
