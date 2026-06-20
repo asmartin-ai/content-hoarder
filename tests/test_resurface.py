@@ -127,6 +127,25 @@ def test_letgo_decays_never_reasks_and_undo_restores(conn):
     assert card is not None
 
 
+def test_letgo_same_second_waves_undo_independently(conn, monkeypatch):
+    """B1 acceptance: letgo(A) then letgo(B) within the same wall-clock second, then
+    undo_letgo(A) -> only A's rows return to inbox; B's stay decayed."""
+    _seed_cluster(conn, sub="adhd", n=12, prefix="t3")
+    _seed_cluster(conn, tag="tips", n=12, prefix="tip")
+    monkeypatch.setattr(db.time, "time", lambda: NOW)  # frozen identical `now`
+    a = resurface.letgo(conn, "subreddit:adhd")
+    b = resurface.letgo(conn, "tag:tips")
+    assert a["decayed_at"] != b["decayed_at"]
+    resurface.undo_letgo(conn, "subreddit:adhd", a["decayed_at"])
+    adhd_inbox = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE status='inbox' AND "
+        "lower(json_extract(metadata,'$.subreddit'))='adhd'").fetchone()[0]
+    tips_archived = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE status='archived' AND EXISTS "
+        "(SELECT 1 FROM json_each(metadata,'$.tags') WHERE value='tips')").fetchone()[0]
+    assert adhd_inbox == 12 and tips_archived == 12
+
+
 def test_letgo_rejects_uncurated_cluster(conn):
     # the web layer must not be able to decay an arbitrary subreddit
     import pytest
