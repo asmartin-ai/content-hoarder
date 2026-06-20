@@ -569,6 +569,22 @@ need separate filter controls.*
   fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on
   the T4 cover work (`browse.css` `.pin .screen` / `.monitor`). Output: a short comparison + a concrete sizing
   proposal before touching CSS.
+- [ ] **P2 — Album/gallery lightbox loads extremely slowly.** *(User-reported 2026-06-20.)* Opening a reddit
+  gallery in the lightbox is very slow (noticed on mobile data, but the cause is structural, not just the link).
+  **Root cause:** `archival.providers._gallery` stores only the **full-resolution source** URLs
+  (`media_metadata[*].s.u`, often 2000px+/multi-MB each), and `core/media.js` `openGallery` renders **all** of them
+  at once (`<img loading="lazy">` in one stacked modal) — so a multi-image album pulls several full-size originals
+  simultaneously. The 2026-06-20 card-poster change compounds it on the feed (the card now uses `gallery[0]` at full
+  res). **Fix directions:** (a) **store + serve sized variants** — `media_metadata` also carries a pre-signed `p`
+  resolution array (108/216/320/640/960/1080px); persist those (or a chosen ~1080px variant) and have the lightbox
+  load the sized image first, fetching the full-res `s.u` only on tap/zoom; pre-signed `p` URLs sidestep the
+  preview.redd.it signature problem. (b) **progressive load** — render only the first image immediately, defer the
+  rest until scrolled into view (confirm the modal actually lazy-loads; in a stacked modal they may all sit near the
+  viewport), with explicit width/height (or a tiny blurhash/low-res placeholder) to avoid layout jank +
+  `decoding="async"`. (c) **card poster** — use a sized preview variant for the `gallery[0]` card thumbnail instead
+  of the full-res source (revisit `thumb()` density logic, `core/media.js`). Relates to Epic 4 (gallery metadata /
+  `_gallery`), Epic 1 P1 media-archiving (a locally-archived copy could be downscaled), and Epic 8 perf
+  (predictive prefetch / 60fps). Quick win first: (a) for the lightbox is the highest-leverage.
 - [x] ~~**P3 — Mobile "go to top" button.**~~ ✅ Done 2026-06-20 (commit 595e08f): rAF-throttled, mobile-only floating ↑ that clears the dock + safe-area and smooth-scrolls to top. *(User-requested 2026-06-20.)* A floating scroll-to-top affordance on
   mobile that appears after scrolling down the feed and jumps back to the top. Respect the dock / bottom-sheet
   layout + safe-area insets; reuse existing tokens/motion. Touches `browse/main.js` (scroll listener) + `browse.css`.
