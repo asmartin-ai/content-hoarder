@@ -36,12 +36,16 @@ def _apply_monotonic_saved_order(conn, items: list[dict]) -> None:
 def import_path(
     conn, path, *, source: str | None = None, enrich: bool = False,
     reconcile: bool = False, reconcile_dry_run: bool = False,
+    reconcile_complete: bool = False,
 ) -> ImportResult:
     """Import a file/dir into the DB. Returns counts + per-item errors.
 
     ``reconcile`` (or ``reconcile_dry_run``): treat this import as a fresh reddit saved-list
     snapshot and mark still-saved reddit items absent from it as un-saved (per-type cap-guarded;
     see ``db.reconcile_reddit_saves``). Only meaningful for a reddit saved-list export.
+    ``reconcile_complete`` asserts the export is the COMPLETE saved list (e.g. a GDPR data
+    export), so reconciliation runs even at/above the ~1000-per-type listing cap instead of
+    being skipped as possibly-truncated (B2). Leave it off for a possibly page-truncated dump.
     """
     p = Path(path)
     connector = connectors.get(source) if source else connectors.dispatch(p)
@@ -69,8 +73,9 @@ def import_path(
     if enrich and batch:
         _enrich_batch(conn, connector, batch, result)
     if do_reconcile and (present["post"] or present["comment"]):
+        truncated = {"post": False, "comment": False} if reconcile_complete else None
         result.reconcile = db.reconcile_reddit_saves(
-            conn, present, dry_run=reconcile_dry_run
+            conn, present, dry_run=reconcile_dry_run, truncated_by_kind=truncated
         )
     return result
 

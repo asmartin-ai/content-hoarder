@@ -1035,6 +1035,7 @@ def reconcile_reddit_saves(
     *,
     dry_run: bool = False,
     cap: int = 1000,
+    truncated_by_kind: dict | None = None,
 ) -> dict:
     """Flip ``is_saved`` to 0 for reddit items missing from a fresh saved-list export.
 
@@ -1056,6 +1057,14 @@ def reconcile_reddit_saves(
     fetched separately). A type whose export count reaches the cap may be *truncated*, so a
     missing item could be merely beyond the cap; that type is SKIPPED. Zero-row types are skipped.
 
+    ``truncated_by_kind`` lets the SYNC/IMPORT layer — which actually knows whether the listing
+    was exhausted (walked ``after`` to the end / a complete GDPR export) vs. stopped at a page
+    cap — override the row-count inference (B2). When a kind appears in it, its bool governs:
+    ``True`` skips that type (``skipped='source_truncated'``) regardless of count; ``False``
+    reconciles even AT/above ``cap`` (so a *complete* export of exactly ``cap`` items is no
+    longer mistaken for a truncated one). When ``None`` or a kind is absent, the legacy
+    ``len(present) >= cap`` inference is used — existing callers are unchanged.
+
     Returns ``{kind: {present, capped, skipped, unsaved, fullnames}}``. ``dry_run=True`` previews
     (computes the would-unsave set) without writing. This is a non-additive, destructive write —
     back up the DB first.
@@ -1064,14 +1073,19 @@ def reconcile_reddit_saves(
     any_write = False
     for kind in ("post", "comment"):
         present = present_by_kind.get(kind) or set()
-        info = {"present": len(present), "capped": False, "skipped": None,
+        cap_reached = len(present) >= cap
+        explicit = truncated_by_kind.get(kind) if truncated_by_kind else None
+        info = {"present": len(present), "capped": cap_reached, "skipped": None,
                 "unsaved": 0, "fullnames": []}
         if not present:
+            info["capped"] = False
             info["skipped"] = "no_export_rows"
-        elif len(present) >= cap:
-            info["capped"] = True
-            info["skipped"] = "cap_reached"
-        else:
+        elif explicit is True:
+            info["skipped"] = "source_truncated"           # caller knows the listing was cut off
+        elif explicit is None and cap_reached:
+            info["skipped"] = "cap_reached"                 # legacy row-count inference
+        # explicit is False -> reconcile even at/above cap (a known-complete export)
+        if not info["skipped"]:
             # Only previously-seen-in-a-snapshot rows are reconcile candidates (delta reconcile).
             rows = conn.execute(
                 "SELECT fullname, source_id FROM items "

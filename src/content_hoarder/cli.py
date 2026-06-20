@@ -46,6 +46,7 @@ def cmd_import(args) -> int:
         res = pipeline.import_path(
             conn, args.path, source=args.source, enrich=args.enrich,
             reconcile=args.reconcile, reconcile_dry_run=args.reconcile_dry_run,
+            reconcile_complete=args.reconcile_complete,
         )
     print(f"imported={res.imported} skipped={res.skipped} errors={len(res.errors)}")
     for err in res.errors[:10]:
@@ -665,6 +666,10 @@ def build_parser() -> argparse.ArgumentParser:
                          "baseline (un-saves nothing). Destructive — back up the DB first.")
     pi.add_argument("--reconcile-dry-run", action="store_true",
                     help="Preview --reconcile (count would-be un-saves) without writing.")
+    pi.add_argument("--reconcile-complete", action="store_true",
+                    help="Assert this is the COMPLETE saved list (e.g. a GDPR export) so "
+                         "reconcile runs even at/above the ~1000-per-type cap (B2). Omit for a "
+                         "possibly page-truncated dump.")
     pi.set_defaults(func=cmd_import)
 
     ph = sub.add_parser("reddit-hydrate-titles",
