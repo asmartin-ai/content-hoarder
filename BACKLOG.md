@@ -807,6 +807,30 @@ mobile-friendly".*
   Chromium **WebAPK via Chrome "Install app"** (the only mainstream path; auto-updates its engine). See
   [[inline-reddit-reader]] (prior "Firefox is the culprit" note) and [[content-hoarder]].
 
+### Icebox — remote-wake / always-on hosting *(Epic 16)*
+- [ ] **P3 — ICEBOX: remotely "turn on" the server from the phone.** *(Researched 2026-06-20.)* Problem: the
+  app is a **single Flask process + a SQLite file** (`content_hoarder serve`, `data/app.db`) on the home PC,
+  reached from the Pixel over Tailscale (`docs/MOBILE_TAILSCALE.md`). When the PC is off/asleep the inbox is
+  unreachable, so the user asked how to remotely command it on. **Two distinct layers:** **(B) host on, app not
+  running** — the easy half: don't remote-start it, run `serve` as an **auto-restarting managed service**
+  (Windows: NSSM / Task Scheduler "at startup"; Linux: a `systemd` unit with `Restart=always`); `tailscale serve
+  --bg` already persists the HTTPS front across reboots, so the app is up whenever the host is. **(A) host
+  powered off/asleep** — the hard half, with the key gotcha that **you can't wake a sleeping PC *through*
+  Tailscale** (its tailscaled sleeps too → it drops off the tailnet; Wake-on-LAN is a layer-2 LAN broadcast,
+  not routable over the WireGuard mesh). Every option therefore needs an **always-on device on the home LAN**:
+  options ranked — (1) **move the app to an always-on low-power host** (Raspberry Pi / NAS / mini-PC) so there's
+  nothing to wake — *recommended, collapses both layers*; (2) just keep the PC always-on; (3) **WoL via a LAN
+  relay** — an always-on tailnet+LAN box (Pi/NAS/Tailscale-capable router) exposes an authed "wake" endpoint
+  (`wakeonlan <MAC>`) the phone hits over Tailscale; needs BIOS WoL + NIC "wake on magic packet" + **Fast Startup
+  disabled** on Windows, reliable from sleep/hibernate, flaky from full-off; (4) **local-control smart plug**
+  (Tasmota/ESPHome) + BIOS "restore on AC power" — works from full-off but is a hard power-cycle. **Security
+  (app holds years of personal data):** keep the wake trigger **tailnet-only + authenticated** (Tailscale ACLs;
+  the magic packet itself is unauthenticated, so lock the thing that fires it), **never `tailscale funnel`** / no
+  port-forward, and **local-only** (not cloud) smart plugs. **Reactivation condition:** revisit if the user
+  wants the app off the big PC (host on a Pi/NAS — the recommended path) or specifically needs WoL because the
+  content must live on the Windows box (browser-cookie/Takeout pipeline). For now the PC stays on / started
+  manually. See [[content-hoarder]] and `docs/MOBILE_TAILSCALE.md`.
+
 ## Epic 17 — Unify the Reddit and Inbox/Triage surfaces  (`enhancement`, `area:ui`)
 - [ ] **P2 — One unified surface.** Fold the dedicated `/reddit` view's capabilities (subreddit rail,
   table/grid, thread viewer) into the main inbox + triage so there aren't two UIs to maintain. Large;
