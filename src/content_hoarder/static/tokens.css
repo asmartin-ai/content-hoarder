@@ -5,6 +5,11 @@
    color/type/space/radius/elevation/motion values.
    Set theme via data-theme="light"|"dark" on <html>;
    no attribute = dark (the product's native identity).
+
+   CONSUMERS: the legacy non-module pages ONLY — /triage + /reddit
+   (app.css, triage.js, reddit.css, reddit.js). The v3 browse page uses
+   static/core/tokens.css instead. Both files are live + intentional; do
+   NOT "dedupe" by deleting one (see static/core/tokens.css).
    ============================================================ */
 /* ============================================================
    content-hoarder · color tokens  (light + dark, themeable)
