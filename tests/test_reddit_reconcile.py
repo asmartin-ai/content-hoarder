@@ -49,6 +49,41 @@ def test_reconcile_cap_guard_skips_truncated_type(conn):
     assert db.get_item(conn, "reddit:t3_a")["is_saved"] == 1
 
 
+def test_reconcile_explicit_complete_reconciles_at_cap(conn):
+    """B2: a COMPLETE export of exactly `cap` items must still reconcile — the row-count
+    inference wrongly skipped it as truncated. truncated_by_kind={'post': False} overrides."""
+    _add(conn, "t3_gone", "post", seen=True)               # seen before, now absent -> un-save
+    present = {"post": {f"t3_{i}" for i in range(3)}, "comment": set()}  # exactly cap=3 present
+    summary = db.reconcile_reddit_saves(
+        conn, present, cap=3, truncated_by_kind={"post": False})
+    assert summary["post"]["skipped"] is None              # NOT skipped despite hitting the cap
+    assert summary["post"]["unsaved"] == 1
+    assert db.get_item(conn, "reddit:t3_gone")["is_saved"] == 0
+
+
+def test_reconcile_explicit_truncated_skips_below_cap(conn):
+    """B2: a caller that KNOWS the listing was cut short (e.g. a max_pages cookie sync) skips
+    even below the cap — the inference alone would have reconciled and wrongly un-saved."""
+    _add(conn, "t3_maybe_beyond", "post", seen=True)
+    present = {"post": {"t3_a", "t3_b"}, "comment": set()}  # only 2, well under cap
+    summary = db.reconcile_reddit_saves(
+        conn, present, truncated_by_kind={"post": True})
+    assert summary["post"]["skipped"] == "source_truncated"
+    assert summary["post"]["unsaved"] == 0
+    assert db.get_item(conn, "reddit:t3_maybe_beyond")["is_saved"] == 1  # protected
+
+
+def test_import_reconcile_complete_flag_threads_through(conn, tmp_path):
+    """The pipeline opt-in maps to truncated_by_kind={post,comment: False}."""
+    _add(conn, "t3_seen_old", "post", seen=True)           # snapshotted, absent from the export
+    f = tmp_path / "export.xls"
+    f.write_text(_ONE_POST, encoding="utf-8")
+    res = pipeline.import_path(conn, f, reconcile=True, reconcile_complete=True)
+    # the single imported post is present; the previously-seen one is gone -> un-saved
+    assert db.get_item(conn, "reddit:t3_seen_old")["is_saved"] == 0
+    assert res.reconcile["post"]["skipped"] is None
+
+
 def test_reconcile_dry_run_does_not_write(conn):
     _add(conn, "t3_a", "post", seen=True)
     summary = db.reconcile_reddit_saves(
