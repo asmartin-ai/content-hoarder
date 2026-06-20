@@ -373,6 +373,62 @@ def cmd_delete(args) -> int:
     return 0
 
 
+def cmd_purge_done(args) -> int:
+    """PERMANENT retention purge of long-Done items (Gmail-trash; Epic 21). Wraps the
+    db.purge_done primitive in the same money-action safety shape as `delete`: dry-run is
+    the default and the confirmation surface; --apply alone refuses (exit 3); --apply --yes
+    executes after an automatic backup, then appends to the shared audit log. --retention-days
+    persists the window setting (the eventual settings UI is the other entry point)."""
+    import time as _time
+    from pathlib import Path
+
+    from content_hoarder import config, db
+    with _connect() as conn:
+        if args.retention_days is not None:
+            db.set_setting(conn, "done_retention_days", str(int(args.retention_days)))
+        now = int(_time.time())
+        plan = db.purge_done(conn, now=now, apply=False, max_rows=args.max)
+        if not args.apply:
+            print(json.dumps(plan, indent=2))
+            print(f"(dry run — {plan['total']} done item(s) older than "
+                  f"{plan['retention_days']}d would be PERMANENTLY deleted; re-run with "
+                  f"--apply --yes. Irreversible except via the automatic backup.)",
+                  file=sys.stderr)
+            return 0
+        if not args.yes:
+            print(json.dumps(plan, indent=2))
+            print("refusing: a retention purge needs BOTH --apply and --yes.", file=sys.stderr)
+            return 3
+        if plan["total"] > args.max:
+            print(json.dumps(plan, indent=2))
+            print(f"refusing: {plan['total']} > --max {args.max} (blast-radius cap); "
+                  f"raise --max deliberately if intended.", file=sys.stderr)
+            return 4
+
+        # capture the victims for the audit BEFORE deleting (same cutoff + now)
+        victims = [
+            {"fullname": r[0], "source": r[1], "title": (r[2] or "")[:80]}
+            for r in conn.execute(
+                "SELECT fullname, source, title FROM items WHERE status='done' "
+                "AND processed_utc IS NOT NULL AND processed_utc < ? ORDER BY processed_utc",
+                (plan["cutoff"],),
+            ).fetchall()
+        ]
+        bak = _backup_db(conn, "pre-purge-done")
+        res = db.purge_done(conn, now=now, apply=True, max_rows=args.max)
+        res["backup"] = str(bak)
+
+        audit_path = Path(config.db_path()).with_name("delete-audit.jsonl")
+        audit = {"ts": int(_time.time()), "op": "purge_done",
+                 "retention_days": res["retention_days"], "cutoff": res["cutoff"],
+                 "total": res["total"], "threads_deleted": res["threads_deleted"],
+                 "backup": str(bak), "victims": victims[:200]}
+        with audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def cmd_export(args) -> int:
     from pathlib import Path
 
@@ -811,6 +867,22 @@ def build_parser() -> argparse.ArgumentParser:
     pdel.add_argument("--yes", action="store_true",
                       help="Second confirmation; --apply alone shows the plan and refuses.")
     pdel.set_defaults(func=cmd_delete)
+
+    ppd = sub.add_parser(
+        "purge-done",
+        help="PERMANENTLY purge Done items older than the retention window (Gmail-trash; "
+             "dry-run default; execution needs --apply AND --yes; auto backup + audit log).",
+    )
+    ppd.add_argument("--retention-days", type=int, default=None,
+                     help="Set + persist the done_retention_days window before purging "
+                          "(default: the stored setting, 30).")
+    ppd.add_argument("--max", type=int, default=5000,
+                     help="Refuse to purge more rows than this (blast-radius cap).")
+    ppd.add_argument("--apply", action="store_true",
+                     help="Execute (with --yes). Default: dry run.")
+    ppd.add_argument("--yes", action="store_true",
+                     help="Second confirmation; --apply alone shows the plan and refuses.")
+    ppd.set_defaults(func=cmd_purge_done)
 
     pex = sub.add_parser(
         "export",
