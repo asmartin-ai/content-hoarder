@@ -380,20 +380,36 @@ import { chIcon, fillIcons } from "./core/icons.js";
     card.style.transform = "translateX(" + (dir * 130) + "%) rotate(" + (dir * 12) + "deg)";
     card.style.opacity = "0";
   }
+  // Swallow the click the browser synthesizes after a horizontal swipe so a swipe
+  // starting on a link/button/gallery image doesn't ALSO navigate / open it.
+  function suppressNextClick() {
+    var swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(function () { window.removeEventListener("click", swallow, true); }, 350);
+  }
   function attachSwipe(card) {
     if (!card) return;
-    var startX = 0, dragging = false;
+    var startX = 0, startY = 0, dragging = false, decided = false, horizontal = false;
     card.addEventListener("pointerdown", function (e) {
       // Android back-gesture safety: ignore drags starting near a screen edge.
       if (e.clientX < EDGE_DEADZONE || e.clientX > window.innerWidth - EDGE_DEADZONE) return;
-      if (e.target.closest("a,button,.tcard-gallery-img")) return;      // let links/buttons/gallery work
-      dragging = true; startX = e.clientX;
-      card.setPointerCapture(e.pointerId);
+      // Links/buttons/gallery no longer block the swipe: we don't claim the gesture
+      // until it's decided horizontal, so taps on them still fire (delegated on stack).
+      dragging = true; decided = false; horizontal = false;
+      startX = e.clientX; startY = e.clientY;
       card.style.transition = "none";
     });
     card.addEventListener("pointermove", function (e) {
       if (!dragging) return;
-      var dx = e.clientX - startX;
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        horizontal = Math.abs(dx) > Math.abs(dy);
+        if (horizontal) { try { card.setPointerCapture(e.pointerId); } catch (_e) {} }
+      }
+      if (!horizontal) return;                 // not a horizontal swipe → leave the card be
+      if (e.cancelable) e.preventDefault();    // claim the gesture: block link activation / native drag
       card.style.transform = "translateX(" + dx + "px) rotate(" + (dx * 0.04) + "deg)";
       card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 320));
       card.classList.toggle("swipe-arch", dx > 40);
@@ -402,6 +418,8 @@ import { chIcon, fillIcons } from "./core/icons.js";
     function end(e) {
       if (!dragging) return;
       dragging = false;
+      if (horizontal) suppressNextClick();
+      if (!horizontal) return;                 // a tap or vertical move: let the click through
       var dx = e.clientX - startX;
       card.style.transition = "transform .2s ease-out, opacity .2s ease-out";
       if (Math.abs(dx) >= COMMIT_PX) {
