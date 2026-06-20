@@ -800,6 +800,10 @@ html.reader-lock{overflow:hidden}
 .rd-ctext{font:var(--fw-regular) var(--fs-sm)/1.55 var(--font-sans);color:var(--text-body);
   overflow-wrap:anywhere;white-space:pre-wrap}
 .rd-cmt.collapsed .rd-cmain{opacity:.82}
+/* the original poster's own comments stand out — an accent rail + faint tint
+   (matches the OP badge already in the byline; :has keys off it, no JS change) */
+.rd-cmt:has(.rd-op){border-left:2px solid var(--accent);padding-left:10px;
+  background:var(--accent-tint)}
 
 /* ---- foot triage (clears the Pixel 6 gesture bar via safe-area inset) ---- */
 .rd-foot{flex:none;display:flex;gap:8px;padding:var(--sp-3) var(--sp-3);
