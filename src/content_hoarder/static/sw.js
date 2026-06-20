@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v31";  // v31: inline Reddit reader video (mountVideo helper, reader inline playback)
+const CACHE = "ch-shell-v32";  // v32: cache /static/icons.js so /triage icons render offline (I1)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
@@ -13,7 +13,7 @@ const SHELL = [
   "/static/browse/reader.js",
   "/static/browse/palette.js", "/static/browse/operators.js",
   // /triage is still the v2 page
-  "/static/app.css", "/static/triage.js",
+  "/static/app.css", "/static/triage.js", "/static/icons.js",
   "/static/icon.svg", "/static/icon-192.png", "/static/icon-512.png",
   "/manifest.webmanifest",
 ];
