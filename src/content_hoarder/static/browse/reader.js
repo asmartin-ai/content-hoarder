@@ -15,7 +15,7 @@
    nesting, nested collapse, leaf collapse, escaping, OP badge, empty) before
    inlining. Only addition over the generated form: the `c.author &&` OP guard. */
 
-import { esc, ago } from "../core/util.js";
+import { esc, ago, isTypingTarget } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
 import { imageUrl, mediaType, mountVideo } from "../core/media.js";
@@ -215,7 +215,20 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
   }
   window.addEventListener("popstate", () => { if (isOpen) closeReader(true); });
   document.addEventListener("keydown", (e) => {
-    if (isOpen && e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeReader(false); }
+    if (!isOpen) return;
+    if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeReader(false); return; }
+    if (isTypingTarget(e.target)) return;
+    // Mirror the foot buttons so the reader's OWN item is triaged (not the list
+    // item behind it). This is a capture-phase listener, so it runs before
+    // main.js's bubble keydown; stopPropagation keeps that one from double-firing.
+    const k = e.key.toLowerCase();
+    const status = k === "f" ? "keep" : k === "a" ? "archived" : k === "d" ? "done" : null;
+    if (status) {
+      e.stopPropagation(); e.preventDefault();
+      const fn = fullname;
+      closeReader(false);
+      if (typeof onTriage === "function") onTriage(fn, status);
+    }
   }, true);
 
   /* ---- clicks: close, collapse toggle, media reveal/open ---- */
