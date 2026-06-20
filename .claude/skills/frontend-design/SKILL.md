@@ -70,8 +70,9 @@ dark, the native identity); `theme.js` persists the choice and applies it before
   --r-pill`. **Elevation:** `--shadow-row / --shadow-pop / --shadow-toast` (theme-tuned;
   `--shadow` aliases `--shadow-pop`).
 - **Motion:** `--ease cubic-bezier(.2,.7,.3,1)`, `--dur 160ms` (`--dur-fast 120 / --dur-slow 200`).
-- **Icons:** `static/icons.js` → `window.chIcon("keep"|"archive"|"done")` returns inline SVG
-  (recolors via `currentColor`); any static `[data-ico]` element is auto-filled on load.
+- **Icons:** `core/icons.js` (ES module) exports `chIcon("keep"|"archive"|"done"|"firefox")` →
+  inline SVG (recolors via `currentColor`) and `fillIcons(root)` to hydrate static `[data-ico]`
+  placeholders (call it on init). Browse + triage import it; reddit inlines its own SVG.
 - **Inbox:** three densities (compact/comfortable/card) via a class on `.items`; rows have a
   source avatar that swaps to a select checkbox, hover-revealed icon actions, and swipe
   (right = archive, left = done). Browse keys: J/K move · S keep · E archive · Y done · X select.
