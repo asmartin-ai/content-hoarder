@@ -508,24 +508,23 @@ need separate filter controls.*
   `core/media.js` `openVideo` (`/HLSPlaylist.m3u8` + vendored `hls.min.js`), and the reader/lightbox video tile
   (`browse/reader.js` + `core/media.js`). Could also be YouTube enrich (`yt-dlp --dump-single-json`) failing to
   fetch. Pin down which source/post first.
-- [ ] **P2 — Inline-video tap-autoplay no-ops on Chrome/Android (hls.js race).** *(Found 2026-06-20, review of
-  the inline-video reader `c8c49a3`.)* In `browse/reader.js` the media-tile tap calls `video.play()` **synchronously**
-  right after `mountVideo()` returns, but for the **hls.js** path (Chrome/Android, no native HLS) the source isn't
-  attached yet — `loadHls().then(...)` resolves async and only then does `h.attachMedia(video)` (`core/media.js:136-146`).
-  So the eager `play()` runs against a source-less `<video>` and no-ops (the user's tap-to-play does nothing; they must
-  tap the controls again). **Fix:** kick off playback **after** attach — e.g. have `mountVideo` accept an autoplay
-  intent and call `play()` in the `then()` (and on the native-HLS/direct paths where it's already attached), or return
-  a "ready" promise the reader awaits before `play()`. Verify on the Pixel-6/Chrome target. Relates to Epic 15 inline
-  media + Epic 13 P2 video-fetch.
-- [ ] **P2 — External-video Reddit post → dead inline `<video src=item.url>` (no lightbox fallback).** *(Found
-  2026-06-20, same review.)* `mediaType()` classifies YouTube and other external-video URLs as `cls:"video"`
-  (`core/media.js:64,66`), so the reader's media-tile tap routes them through the **inline `<video>`** path
-  (`browse/reader.js`), setting `video.src = item.url`. A YouTube watch page / non-direct external video URL is **not a
-  playable media file**, so the `<video>` shows a broken/dead player instead of opening the source (the "Open original ↗"
-  fallback link is present but the player area is dead). **Fix:** in the reader's video branch, only mount an inline
-  `<video>` for **directly playable** sources (v.redd.it/HLS + `.mp4|.webm|.mov`); route YouTube / other external-video
-  items to the lightbox/`onMedia` open-original path instead (or embed the YouTube iframe — see the Epic 15 note-with-video
-  reader). Relates to Epic 11 (YouTube promotion) + Epic 15.
+- [x] ~~**P2 — Inline-video tap-autoplay no-ops on Chrome/Android (hls.js race).**~~ ✅ Fixed 2026-06-20
+  (`frontend-staging`). *(Found 2026-06-20, review of the inline-video reader `c8c49a3`.)* In `browse/reader.js` the
+  media-tile tap called `video.play()` **synchronously** right after `mountVideo()`, but for the **hls.js** path
+  (Chrome/Android, no native HLS) the source wasn't attached yet (`loadHls().then(...)` → `h.attachMedia(video)`), so the
+  eager `play()` no-op'd. **Fix:** `mountVideo` now takes an `{ autoplay }` option and calls `play()` at the point each
+  path's source is actually ready — inside the hls.js `.then()` after `attachMedia`, and after `src` on the
+  native-HLS/direct paths (`core/media.js`); the reader passes `autoplay:true` instead of calling `play()` itself.
+  Predicate + autoplay path unit-verified against the live module; full Chrome/Android E2E not reproducible (no v.redd.it
+  items in the live DB, desktop Chromium).
+- [x] ~~**P2 — External-video Reddit post → dead inline `<video src=item.url>` (no lightbox fallback).**~~ ✅ Fixed
+  2026-06-20 (`frontend-staging`). *(Found 2026-06-20, same review.)* `mediaType()` classifies YouTube and other
+  external-video URLs as `cls:"video"` (`core/media.js:64,66`), so the reader's media-tile tap routed them through the
+  inline `<video>` path, setting `video.src = item.url` — a dead player for a non-playable web page. **Fix:** the reader
+  video branch now mounts an inline `<video>` only for **directly playable** sources (`hlsManifestUrl(srcUrl)` truthy, i.e.
+  v.redd.it/HLS, or `.mp4|.webm|.mov`); YouTube / gfycat / redgifs / other external-video items fall through to
+  `onMedia` → `openMediaFor` (lightbox, else open-original in a new tab). Verified the playability predicate against
+  representative URLs. Relates to Epic 11 (YouTube promotion) + Epic 15.
 - [x] ~~**P3 — Color accents on the Inbox / Keep / Archived / Done / All tabs.**~~ ✅ Already shipped in the
   v3 status-nav (`browse.css:119-131`): `.folder`/`.spill[data-status=…]` carry `--tab:var(--status-keep/-archive/-done)`
   with active-state tinting; Inbox/All (empty status) use `--text-muted`. *(User-requested 2026-06-17.)*
