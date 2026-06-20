@@ -552,12 +552,17 @@ need separate filter controls.*
   lightbox (Epic 13 P1 / Epic 4 inline-gallery).
 - [x] ~~**P3 — Pinboard portrait images anchored top-left (visual polish).**~~ ✅ Fixed 2026-06-20
   (`frontend-staging`). *(User-reported 2026-06-17; **cover** chosen by the user 2026-06-20.)* In the **card /
-  "Pinboard"** density, portrait (tall) images were pillarboxed (`object-fit:contain` + `max-height:430px`
-  letterboxed them), reading poorly. **Fix:** `.pin .screen img` now uses `object-fit:cover` (kept
-  `object-position:center top`), so portrait images fill the slot width and crop past 430px, anchored at the top.
-  Landscape/YouTube thumbs never hit the 430px cap (cover == contain there → unchanged). **Trade-off:** very tall
-  text screenshots are now cropped rather than shrunk-to-fit (reverses the v3 contain decision, line above) — the
-  user accepted this. Verified `object-fit:cover` + box geometry on real portrait rows in the preview.
+  "Pinboard"** density, portrait (tall) images showed pillarbox gutters in the column. **Real root cause (found
+  2026-06-20 via preview geometry):** the `max-height:430px` was on the **`<img>`** with `width:100%` and no
+  explicit height, so when a tall image hit the cap the browser **shrank the element's width too** (to preserve
+  aspect) — e.g. 242×430 inside a ~345px single-column card, leaving side gutters. `object-fit` is irrelevant here
+  (the element box was already aspect-correct), so the first attempt (flip to `object-fit:cover`) was a **no-op**.
+  **Fix:** move the cap to the **container** — `.pin .screen{max-height:430px;overflow:hidden}` and drop
+  `max-height` from the img (kept `object-fit:cover`/`object-position:center top`). The image now holds full column
+  width; tall images crop their overflow at the top, short/landscape show fully. **Only visible in single-column
+  (wide cards);** at 2-column widths nothing reaches the cap. **Trade-off:** very tall images crop rather than
+  shrink-to-fit (reverses the v3 contain decision) — user-accepted. Verified computed styles applied; geometry
+  diagnosed on real rows (live re-capture flaky this session — remote thumbnail load).
 - [ ] **P2 — `Ctrl+Y` redo (mirror `Ctrl+Z` undo).** *(User-requested 2026-06-17.)* Undo exists (per-item +
   bulk snackbar, `api.bulkUndo`); add a **redo** that replays the last undone action. Needs a small undo/redo
   **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
