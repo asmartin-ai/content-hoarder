@@ -18,7 +18,7 @@
 import { esc, ago, isTypingTarget } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
-import { imageUrl, mediaType, mountVideo } from "../core/media.js";
+import { imageUrl, mediaType, mountVideo, hlsManifestUrl } from "../core/media.js";
 import { isNsfw } from "./render.js";
 
 /* ---- collapsible comment thread (pure; local-LLM generated, verified) ---- */
@@ -265,22 +265,28 @@ export function initReader({ onTriage, onMedia, closeSheets } = {}) {
         const v = med.querySelector(".rd-veil"); if (v) v.remove();
         return;
       }
-      /* Video items play inline in the reader; images/galleries use the lightbox. */
+      /* Directly-playable video (v.redd.it/HLS or a .mp4/.webm/.mov file) plays inline;
+         external video (YouTube, gfycat/redgifs pages, …) isn't a playable media file, so
+         it would mount a dead <video> — route those to onMedia (lightbox / open-original)
+         like images/galleries. */
       const mt = mediaType(item);
       if (mt.cls === "video") {
         const m = item.metadata || {};
         const srcUrl = m.media_url || item.url;
-        const posterUrl = imageUrl(item) || m.thumbnail;
-        /* Replace the tile with a video container */
-        const wrap = document.createElement("div");
-        wrap.className = "rd-video-wrap";
-        med.replaceWith(wrap);
-        const { video, destroy } = mountVideo(wrap, srcUrl, posterUrl);
-        videoTeardown = destroy;
-        videoEl = video;
-        inlineVideoMounted = true;
-        if (video) video.play().catch(() => {});  // auto-start on tap (user gesture); guard rejection
-        return;
+        const playable = !!hlsManifestUrl(srcUrl) || /\.(mp4|webm|mov)(\?|#|$)/i.test(srcUrl || "");
+        if (playable) {
+          const posterUrl = imageUrl(item) || m.thumbnail;
+          /* Replace the tile with a video container */
+          const wrap = document.createElement("div");
+          wrap.className = "rd-video-wrap";
+          med.replaceWith(wrap);
+          const { video, destroy } = mountVideo(wrap, srcUrl, posterUrl, { autoplay: true });
+          videoTeardown = destroy;
+          videoEl = video;
+          inlineVideoMounted = true;
+          return;
+        }
+        // external video → fall through to onMedia (open original)
       }
       if (typeof onMedia === "function") onMedia(item);
     }
