@@ -231,6 +231,12 @@ false positives.*
   note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
   **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
   new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
+- [ ] **P2 — More aggressive preload of content + comments (smoother UX).** *(User-requested 2026-06-20.)* Keep
+  lazy-loading, but warm a bit ahead: pre-fetch images/media just below the fold and **pre-hydrate the reddit
+  thread (post + comments)** for the item(s) most likely to be opened next, so the reader feels instant. Bound it
+  (small look-ahead, cancel on fast scroll) to avoid wasted fetches / throttle hits. Extends the "Predictive
+  prefetch cache" item above; touches the reader hydrate path (`browse/reader.js` `load()` + `/reddit/items/<fn>/thread`)
+  and the feed media lazy-load.
 - [ ] **P3 — Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review).**
   *(User idea 2026-06-19.)* GLM already wins several of our *code* bakeoff arms (5.1/5p2); the research says
   **design is GLM-5.2's standout strength** — #1 on **Design Arena** (Elo ~1360, blind human-preference design
@@ -501,6 +507,31 @@ need separate filter controls.*
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
+- [ ] **P2 — "Hide NSFW" not working.** *(User-reported 2026-06-20.)* The hide-NSFW control doesn't actually hide
+  NSFW content. Likely the toggle isn't wired to the `safe=1` / `hide_nsfw` query path (`web.py`), or the setting
+  isn't persisted/applied on load. **Fix + verify** end-to-end. This is the bug report that the unbuilt "NSFW toggle
+  in settings" item (Epic 15 below) is non-functional — reconcile the two.
+- [ ] **P2 — Re-apply NSFW blur when you click off a revealed post.** *(User-reported 2026-06-20.)* Once an NSFW
+  thumbnail/post is tap-revealed it stays un-blurred; when you close/navigate away (reader or lightbox) and come
+  back, the blur should be **re-applied** (don't persist the reveal across close). Touches the reveal state in
+  `browse/reader.js` (`revealed`) + the list reveal set (`nsfwRevealed` in `main.js`) + `core/media.js` NSFW wrap;
+  reset reveal on close/re-render so the thumbnail and the post re-blur.
+- [ ] **P2 — Video thumbnail not loading on some posts.** *(User-reported 2026-06-20.)* Repro post title: **"Diamond
+  Thighs 💎 [Cosplay: @kwaterin]"** (get the permalink from the user). The card/reader shows no video thumbnail —
+  likely the archive fetch didn't populate `metadata.thumbnail`/`media_url`/`preview`, or the thumb URL 404s. Check
+  the live row first. Relates to "Video not fetching properly" below and the gallery-thumbnail bug.
+- [ ] **P3 — Research + mimic reddit-app thumbnail cropping.** *(User-requested 2026-06-20.)* Survey how the major
+  Reddit apps (Apollo, RedReader, Boost, Sync, official, Relay) crop/frame post thumbnails (aspect ratio, fill vs
+  fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on
+  the T4 cover work (`browse.css` `.pin .screen` / `.monitor`). Output: a short comparison + a concrete sizing
+  proposal before touching CSS.
+- [ ] **P3 — Mobile "go to top" button.** *(User-requested 2026-06-20.)* A floating scroll-to-top affordance on
+  mobile that appears after scrolling down the feed and jumps back to the top. Respect the dock / bottom-sheet
+  layout + safe-area insets; reuse existing tokens/motion. Touches `browse/main.js` (scroll listener) + `browse.css`.
+- [ ] **P3 — Ask GLM what looks better for Log-view title wrapping/cutoff.** *(User-requested 2026-06-20.)* In the
+  **log** density, get a design opinion (GLM, via the frontend-design skill) on title **wrapping vs. ellipsis
+  cutoff** — current is a 2-line clamp at `--fs-md`. Compare options (clamp lines, fade-out, single-line ellipsis,
+  wrap-all) and pick. Relates to the shipped row-title shrink + the Epic 8 GLM-5.2 design-trial item.
 - [ ] **P2 — Video not fetching properly.** *(User-reported 2026-06-19 — needs a repro.)* The report is terse:
   a video isn't fetching/loading correctly. **Source + repro item TBD** — get a specific permalink from the user
   before chasing it. Likely suspects to check once a repro is in hand: the `v.redd.it` media path — archive
