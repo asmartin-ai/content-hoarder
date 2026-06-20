@@ -747,6 +747,23 @@ html.reader-lock{overflow:hidden}
   color:var(--text-body)}
 .rd-body p{margin:0 0 var(--sp-3)}
 .rd-body p:last-child{margin-bottom:0}
+/* markdown subset rendered in the reader (post self-text + comment bodies, Epic 15) */
+.rd-body a,.rd-ctext a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
+  overflow-wrap:anywhere}
+.rd-body strong,.rd-ctext strong{font-weight:var(--fw-semibold)}
+.rd-body code,.rd-ctext code{font:var(--fw-regular) .92em/1.4 var(--font-mono);
+  background:var(--surface-inset);border:1px solid var(--border-hairline);
+  border-radius:var(--r-sm);padding:.05em .35em}
+.rd-body pre,.rd-ctext pre{margin:0 0 var(--sp-2);padding:var(--sp-2) var(--sp-3);overflow-x:auto;
+  background:var(--surface-inset);border:1px solid var(--border-hairline);border-radius:var(--r-sm)}
+.rd-body pre code,.rd-ctext pre code{background:none;border:0;padding:0}
+.rd-body blockquote,.rd-ctext blockquote{margin:0 0 var(--sp-2);padding:2px 0 2px var(--sp-3);
+  border-left:3px solid var(--border-hairline);color:var(--text-dim)}
+.rd-body ul,.rd-body ol,.rd-ctext ul,.rd-ctext ol{margin:0 0 var(--sp-2);padding-left:1.4em}
+.rd-body li,.rd-ctext li{margin:.1em 0}
+.rd-ctext p{margin:0 0 var(--sp-2)}
+.rd-ctext p:last-child,.rd-ctext ul:last-child,.rd-ctext ol:last-child,
+.rd-ctext blockquote:last-child,.rd-ctext pre:last-child{margin-bottom:0}
 .rd-media{display:block;width:100%;margin-top:var(--sp-3);padding:0;position:relative;
   border:1px solid var(--border-hairline);border-radius:var(--r-md);overflow:hidden;
   background:var(--tile-fill);cursor:pointer}
