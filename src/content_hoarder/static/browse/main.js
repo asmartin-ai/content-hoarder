@@ -6,7 +6,7 @@
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { createLightbox, imageUrl, mediaType, redditUrl } from "../core/media.js";
+import { createLightbox, imageUrl, mediaType, redditUrl, playableVideoSrc } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -234,8 +234,8 @@ const lightbox = createLightbox({ modal: "#media-modal", body: "#media-body" });
 function openMediaFor(item) {
   const m = item.metadata || {};
   if (Array.isArray(m.gallery) && m.gallery.length) return lightbox.openGallery(m.gallery);
-  const mt = mediaType(item);
-  if (mt.cls === "video" && m.media_url) return lightbox.openVideo(m.media_url, m.thumbnail);
+  const vsrc = playableVideoSrc(item);   // shared playability test (same as the reader's inline player)
+  if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
   const img = imageUrl(item);
   if (img) return lightbox.openImage(img);
   if (m.permalink) return lightbox.openMedia(m.permalink);
