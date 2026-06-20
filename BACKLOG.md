@@ -511,15 +511,25 @@ need separate filter controls.*
   NSFW content. Likely the toggle isn't wired to the `safe=1` / `hide_nsfw` query path (`web.py`), or the setting
   isn't persisted/applied on load. **Fix + verify** end-to-end. This is the bug report that the unbuilt "NSFW toggle
   in settings" item (Epic 15 below) is non-functional — reconcile the two.
-- [ ] **P2 — Re-apply NSFW blur when you click off a revealed post.** *(User-reported 2026-06-20.)* Once an NSFW
-  thumbnail/post is tap-revealed it stays un-blurred; when you close/navigate away (reader or lightbox) and come
-  back, the blur should be **re-applied** (don't persist the reveal across close). Touches the reveal state in
-  `browse/reader.js` (`revealed`) + the list reveal set (`nsfwRevealed` in `main.js`) + `core/media.js` NSFW wrap;
-  reset reveal on close/re-render so the thumbnail and the post re-blur.
-- [ ] **P2 — Video thumbnail not loading on some posts.** *(User-reported 2026-06-20.)* Repro post title: **"Diamond
-  Thighs 💎 [Cosplay: @kwaterin]"** (get the permalink from the user). The card/reader shows no video thumbnail —
-  likely the archive fetch didn't populate `metadata.thumbnail`/`media_url`/`preview`, or the thumb URL 404s. Check
-  the live row first. Relates to "Video not fetching properly" below and the gallery-thumbnail bug.
+- [x] ~~**P2 — Re-apply NSFW blur when you click off a revealed post.**~~ ✅ Done 2026-06-20 (commit 4413f18):
+  reveal now toggles the `.nsfw` class only (the veil node is kept and hidden via CSS, not deleted), so it's
+  reversible; closing the reader or lightbox opened for an item re-adds `.nsfw` to its feed thumbnail. `reblur(fn)`
+  in `main.js` (idempotent, no-op for non-NSFW) wired to a new `initReader({onClose})` (fires on every close path)
+  + `createLightbox({onClose})` (tracks the opened item via `lastMediaFn`); `browse.css` `.veil` positioned
+  regardless of `.nsfw`, hidden via `:not(.nsfw)`. Verified on mobile preview (reader + lightbox close both
+  re-blur); 590 tests. *(User-reported 2026-06-20.)*
+- [x] ~~**P2 — Video thumbnail not loading on some posts.**~~ ✅ Investigated + fixed 2026-06-20 (commit pending).
+  *(User-reported 2026-06-20.)* **Root cause was NOT a missing thumbnail on the repro.** The repro (`reddit:t3_1u62v1i`
+  "Diamond Thighs") has a valid `external-preview.redd.it` thumbnail that loads (HTTP 200) and renders correctly in
+  list, card, AND reader — likely fixed by an enrich backfill since the report. **Real bug found:** card density
+  (`pinCard` in `browse/render.js`) rendered **no media tile at all** for a poster-less video/gallery
+  (`screen = t ? … : ""`), whereas the list (`monitorHtml`) and reader (`mediaTileHtml`) both fall back to a
+  glyph-only play tile. Fixed: `pinCard` now emits a `.screen.noimg` glyph tile for poster-less video/gallery
+  (+ `browse.css` full-width centered-glyph styling). SW v35→v36. Verified on mobile preview (full-width tappable
+  🖼/🎬 tile); 590 tests. **Data finding (separate, not fixable):** 528 reddit video items (364 inbox) have no
+  thumbnail and **none is recoverable** — 0 from cached threads (`reddit-thumbnails` dry-run), and a PullPush +
+  live-OAuth sample returned `thumbnail:"default"` with no `preview` images (Reddit never generated a poster for
+  these v.redd.it posts). The glyph tile is the correct terminal rendering for them.
 - [ ] **P3 — Research + mimic reddit-app thumbnail cropping.** *(User-requested 2026-06-20.)* Survey how the major
   Reddit apps (Apollo, RedReader, Boost, Sync, official, Relay) crop/frame post thumbnails (aspect ratio, fill vs
   fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on
