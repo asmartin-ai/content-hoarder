@@ -560,20 +560,22 @@ import { chIcon, fillIcons } from "./core/icons.js";
     if (willOpen) { setActiveChip(); ruRefreshPop(); }
   });
 
-  // Reddit unsave: show a "Sync now (N)" control only when a cookie is configured.
+  // Reddit unsave: the button DRAINS the unsave queue (unsaves the queued items on
+  // Reddit) — labelled "Unsave queued (N)" so it doesn't read as a content sync. Only
+  // shown when a cookie is configured.
   function ruRefreshPop() {
     if (!ruPop) return;
     fetchJSON("/reddit/unsave/status").then(function (s) {
       if (!s.configured) { ruPop.hidden = true; return; }
       ruPop.hidden = false;
-      ruPopStatus.textContent = s.pending ? (s.pending + " queued to unsave") : "all synced";
-      ruSyncBtn.textContent = s.pending ? ("Sync now (" + s.pending + ")") : "Sync now";
+      ruPopStatus.textContent = s.pending ? (s.pending + " queued to unsave") : "nothing queued";
+      ruSyncBtn.textContent = s.pending ? ("Unsave queued (" + s.pending + ")") : "Unsave queued";
       ruSyncBtn.disabled = !s.pending;
     }).catch(function () {});
   }
   if (ruSyncBtn) ruSyncBtn.addEventListener("click", function () {
     ruSyncBtn.disabled = true;
-    ruPopStatus.textContent = "Syncing…";
+    ruPopStatus.textContent = "Unsaving…";
     fetchJSON("/reddit/unsave/drain", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
     }).then(function (res) {
