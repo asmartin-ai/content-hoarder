@@ -171,7 +171,12 @@ export const pinCard = (item, opts) => {
         ? '<span class="badge dur">' + fmtDur(m.duration) + "</span>" : "") +
       (blur ? '<span class="veil">NSFW · REVEAL</span>' : "") +
       "</button>"
-    : "";
+    // poster-less video/gallery (e.g. thumbnail-less v.redd.it) still gets a glyph-only
+    // play tile so it's tappable — matching the list (monitorHtml) + reader (Epic 13 P2)
+    : (mt.cls === "video" || mt.cls === "gallery")
+      ? '<button type="button" class="screen noimg" data-media="1" aria-label="' + esc(mt.label) +
+        '"><span class="mglyph" aria-hidden="true">' + mt.icon + "</span></button>"
+      : "";
   return '<article class="pin" data-fullname="' + esc(item.fullname) + '">' + screen +
     '<div class="body">' +
     '<div class="head">' +
