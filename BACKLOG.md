@@ -74,6 +74,40 @@ the categorizer (Epic 1) wants for accuracy.*
   into `metadata.gallery`; the browse media-modal renders them as an inline stacked lightbox
   (`openGallery` in `app.js`, routed via a `data-gallery` attribute). Populated for all gallery items
   on the next `enrich --source reddit --scores` pass. (Triage-card inline gallery still TODO.)
+- [ ] **P1 — Hoard the BYTES, not just the link: local media archiving.** *(User-requested 2026-06-20.)*
+  **Problem (core to the "hoarder" mission):** we store *URLs*, not media. When reddit deletes an image the
+  app shows reddit's "if you're looking for an image, it was probably deleted" placeholder and it's gone for
+  good — confirmed 2026-06-20 on `reddit:t3_1u69n0s` (r/196 "rule"): `i.redd.it/9pxkje0ife7h1.jpeg` → 404
+  (1048-byte placeholder), **every** `preview.redd.it` size also 404, PullPush has no record, Arctic-Shift has
+  only metadata + the now-dead preview URLs, and the Wayback Machine never captured the bytes (only
+  post-deletion redirects). Our DB backups are **metadata-only**, so they can't restore it either. The bytes
+  were never on our disk. **Feature — an opt-in media-archiving pass** that downloads + stores the actual
+  bytes for saved items so deletions are survivable:
+  - **What to archive (phase order):** (1) reddit images (`i.redd.it`, direct image `url`/`media_url`), (2)
+    gallery images (`metadata.gallery[*]`), (3) video posters/thumbnails; (4) *maybe later* full videos
+    (`v.redd.it` DASH — large, separate opt-in). YouTube keeps its remote thumbnails (rarely deleted).
+  - **Storage:** files on disk under e.g. `data/media/<sha256>.<ext>` (content-addressed → free dedup across
+    reposts), NOT DB blobs (keeps the 500 MB DB lean + backups fast). Track in a `media_blobs` table or
+    `metadata.archived_media` (original_url → local hash, bytes, mime, fetched_utc). Mind volume: tens of
+    thousands of images = multi-GB; add a size cap / per-run `--limit` / skip-if-present (resumable, mirrors
+    the enrich passes). `data/media/` must be gitignored.
+  - **Serving + the SW win:** serve archived bytes from a **same-origin** route (`/media/<hash>` or
+    `/media?url=<orig>`). Today the service worker **can't** cache reddit media because it skips cross-origin
+    (`sw.js:40`); a same-origin media route flips that — the SW (and HTTP cache) will cache it, so the PWA
+    works offline and survives remote deletion. Frontend (`core/media.js` `thumb()`/`imageUrl()` +
+    `openGallery`/reader) prefers the local archived copy when present, and **falls back to it when the remote
+    404s** (an `onerror` swap to `/media/<hash>`). This also unblocks Epic 12's OCR (needs local image bytes).
+  - **When:** an `archive-media` CLI pass (enrich-style: dry-run, `--limit`, `--source`, resumable) the user
+    runs over the backlog; later optionally at save/sync time for *new* saves (catch deletions early — the
+    whole point). Keep it opt-in + throttled (respect the reddit de-risking rate floors).
+  - **Recovery of EXISTING deleted items (partial, do first):** for items whose `i.redd.it` is already 404,
+    `preview.redd.it` *sometimes* outlives the original — a recovery sub-pass can try the archive's preview
+    URLs and Wayback, and archive whatever still resolves. Won't save `t3_1u69n0s` (all dead) but will save
+    the subset caught in the preview-survival window. Scope it by first counting saved image items whose
+    `i.redd.it` now 404s and how many have a still-live `preview.redd.it`.
+  Relates to Epic 4 (recovery), Epic 12 P3 (OCR needs bytes), Epic 8 (infra/storage), and the SW
+  cross-origin note in `sw.js`. Sizable — sequence: storage model + `/media` route + `archive-media` pass
+  first; the remote-404→local fallback in the frontend second; full-video archiving last.
 
 ## Epic 5 — Inbox redesign follow-ups  (`enhancement`, `area:ui`)
 *Shipped: bigger cards + list swipe + undo snackbar; **sources as top tabs**; **status as a left
