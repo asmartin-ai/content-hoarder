@@ -536,6 +536,13 @@ need separate filter controls.*
   **stack** (not just the single last-action snackbar). Bind `Ctrl+Z` → undo / `Ctrl+Y` (+ `Ctrl+Shift+Z`) →
   redo — confirm `Ctrl+Z` is actually keyboard-bound today, not snackbar-only. Relates to the Epic 5 keyboard
   rework.
+- [ ] **P3 — Reader subreddit label clips descenders (`r/gaming` → the "g" tail is cut off).** *(User-reported
+  2026-06-20.)* In the inline reader header the subreddit chip (`browse/reader.js:117` → `.rd-sub`,
+  `browse/browse.css:717`) uses `line-height: 1` (`font:var(--fw-semibold) var(--fs-sm)/1 …`) together with
+  `overflow:hidden` for the single-line ellipsis, so the em-box is ~cap-height and **descenders (g/j/p/q/y) are
+  clipped at the bottom**. Fix: relax the line-height (e.g. `/1.3`) and/or add a hair of vertical breathing room
+  so descenders clear, keeping the one-line ellipsis truncation. Styling only (`browse.css`). Verify on the
+  Pixel-6/Firefox target.
 - [x] ~~**P2 — Rework the comfortable density layout.**~~ ✅ Shipped on v3 (2026-06-13 audit): `.items.density-comfortable .item-fg` is locked to `height:100px` (browse.css:290) with the thumb constrained to the fixed monitor box; adaptive height is cards-only. Orig: **User spec (2026-06-08):** positioning is good,
   but make **every comfortable row a uniform fixed height (~100px)** — adaptive/dynamic height should
   apply to **cards density only**. Constrain the thumbnail within that fixed height (`object-fit: cover`)
@@ -882,6 +889,35 @@ mobile-friendly".*
   signatures/return-shapes/error-policies; all injection seams preserved; the 6 network test files pass
   unedited + 19 new offline `_http` tests. Behavior-preserving (no live round-trip exercised).
 
+*Bugs migrated 2026-06-20 from the retired `docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue
+(B1/B2/B4 — confirmed by code read at write time; verify line numbers before acting):*
+
+- [ ] **P2 — Same-second decay-wave UNDO collision (B1).** `letgo()` (`resurface.py:152`) decays a cluster
+  and stamps `metadata.decayed_at = now` (whole seconds) via `db.decay`; `undo_letgo()` (`resurface.py:166`)
+  reverses by a **1-second window** (`db.undecay(decayed_after=decayed_at, decayed_before=decayed_at+1)`),
+  selecting rows purely by timestamp (tag/sub deliberately unused, `resurface.py:169`). **Failure:** two "let
+  it go" actions on **different** clusters within the same wall-clock second share a `decayed_at`, so UNDO on
+  one cluster's toast un-decays **both** — violates the "one independently reversible wave" invariant
+  (`db.decay` docstring, `db.py:~1233`). **Fix (anti-gaming):** make the wave id unique per call — preferred:
+  `db.decay` allocates a monotonic wave id (mirror `db.allocate_saved_order`) and returns it; `undo_letgo`
+  selects on that id, not a time window. Must NOT route through `bulk_set_status` (decay-safety invariant).
+  **Acceptance:** `letgo(A)` then `letgo(B)` with a frozen identical `now`, then `undo_letgo(A)` → only A's
+  rows return to inbox; B's stay decayed. *Delegation: ✅ qwen single-shot (oracle-shaped).*
+- [ ] **P2 — Reconcile cap guards on row count, not real truncation (B2).** `db.py:~1040` skips saved-list
+  reconciliation when `len(present) >= cap` (~1000), inferring "the listing was truncated" (Reddit caps the
+  saved listing ~1000/type). But keying on the parsed count can't distinguish "complete export of exactly
+  1000" from "truncated at 1000," so a user with exactly `cap` saved + a complete export silently skips
+  reconciliation and genuine unsaves are never detected. **Fails safe** (never an *erroneous* unsave) → low
+  urgency. **Fix:** pass an explicit `truncated_by_kind` flag from the sync/import layer (which knows
+  `after`-exhaustion vs. a page cap) rather than inferring from the row count. *Delegation: 🟡 borderline,
+  GLM (crosses the sync/import seam).*
+- [ ] **P3 — `/import/prepare` temp-file leak (B4).** `/import/prepare` (`web.py:~763`) writes an
+  uploaded/yt-dlp temp file and stashes it in `_prepared[token]`; it's only unlinked by `/import/commit`
+  (`web.py:~833`) or the 1-hour TTL sweep `_cleanup_prepared` (`web.py:~718`), and the sweep only runs on the
+  *next* `/import/prepare`. A preview that's never committed (with no later prepare) lingers up to an hour.
+  **Fix:** add cleanup on app teardown or a timer. Low priority given the TTL. *Delegation: 🟡 borderline,
+  qwen (oracle ≈ fix size — batch with another web-layer item).*
+
 ## Epic 20 — Frontend v3 overhaul  (`enhancement`, `area:ui`)
 *Decision (2026-06-09): full overhaul on `feat/frontend-v3` — vanilla JS, no build step, mobile
 fluidity first-class. Plan: shared `static/core/` layer (util/api/toast/render/media — kills the
@@ -964,6 +1000,32 @@ Stage C design gate:*
   the card (not just title/meta); and its **"Open" action should route into `section#reader`** (the same
   in-app reader a normal post open uses), not an external tab or bare lightbox. Builds on `surprise()`
   (`browse/main.js:358`) + the Epic 15 reader routing.
+
+*Code-quality / dead-code cleanup migrated 2026-06-20 from the retired
+`docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue (I1–I4). The v3 `static/core/` layer was created to
+kill exactly this duplication; the two non-module legacy pages (`/triage`, `/reddit`) still carry copies:*
+
+- [ ] **P2 — Dead duplicate `icons.js` + offline cache gap (I1).** `static/icons.js` (legacy self-executing
+  IIFE) and `static/core/icons.js` (ES-module export) hold the same icon set. Only `static/icons.js` is
+  referenced (`templates/triage.html:~97`); browse uses `core/icons.js`; reddit inlines SVG. **`static/icons.js`
+  is NOT in the `sw.js` SHELL cache array**, so on an offline cold-open of `/triage` icons can fail to render.
+  **Fix:** either (a) add `/static/icons.js` to the `sw.js` SHELL, or (b) delete `static/icons.js`, migrate
+  `triage.html` to the `core/icons.js` module (or inline like reddit.js), and drop the script tag — (b) is the
+  cleaner end-state. **Acceptance:** triage icons render offline; no duplicate icon source remains.
+- [ ] **P2 — Helper duplication on the legacy pages (I2).** `triage.js` and `reddit.js` each define their own
+  `esc` / `safeUrl` / `isTypingTarget` / `ago` / `fetchJSON`; `static/core/util.js` already exports the
+  canonical versions. **Fix:** convert `triage.js`/`reddit.js` to ES modules importing from `core/util.js`, or
+  extract a shared non-module `util` that sets globals. Also permanently retires the B0a single-quote-escape
+  divergence (one `esc`, not three).
+- [ ] **P3 — Unused `app.css` selectors (I3) — defer.** `app.css` (~2100 lines, consumed only by the legacy
+  `/triage` page) has many unreferenced selectors (e.g. `.ai-*` suggest-UI classes), but confidence on
+  individual selectors is medium. Defer to a triage redesign; don't bulk-delete without per-selector usage
+  checks.
+- [ ] **P3 — Document the two token files (I4) — doc-only.** `static/tokens.css` (legacy dark/teal, used by
+  `/triage` + `/reddit`) and `static/core/tokens.css` (v3 "Log Book" apricot, used by browse) are **both live
+  and intentional** — not dead code. Add a one-line comment in each (and/or `sw.js`) noting which pages consume
+  which, to prevent a future "looks duplicated, delete one" mistake. Unify only when the legacy pages are
+  redesigned.
 
 ## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
 *From the PKMS research handoff (2026-06-10; evidence in

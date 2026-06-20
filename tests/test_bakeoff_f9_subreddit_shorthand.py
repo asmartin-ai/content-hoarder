@@ -1,7 +1,7 @@
 """Bakeoff ORACLE — F9: bare ``r/<sub>`` is subreddit-operator shorthand.
 
 RED until implemented. This file is the objective "done" oracle for the delegation
-task in ``docs/IMPLEMENTATION-HANDOFF-2026-06-17.md`` §3C (F9):
+task formerly tracked as F9 (now SHIPPED; see ``BACKLOG.md`` Epic 12):
 
     Typing ``r/tankporn`` in the search bar is equivalent to ``subreddit:tankporn``.
 
