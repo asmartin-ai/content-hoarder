@@ -95,6 +95,18 @@ export const hlsManifestUrl = (srcUrl) => {
   return m ? "https://v.redd.it/" + m[1] + "/HLSPlaylist.m3u8" : "";
 };
 
+/* The directly-playable video URL for an item — a v.redd.it/HLS source or a
+   .mp4/.webm/.mov file — or "" when the item's "video" is an external page
+   (YouTube, gfycat/redgifs, …) that must open via its source link, not an inline
+   <video>. Single source of truth for the reader's inline player AND the lightbox
+   (browse/reader.js + browse/main.js) so the two can't disagree about playability. */
+export const playableVideoSrc = (item) => {
+  if (mediaType(item).cls !== "video") return "";
+  const m = item.metadata || {};
+  const src = m.media_url || item.url || "";
+  return (hlsManifestUrl(src) || /\.(mp4|webm|mov)(\?|#|$)/i.test(src)) ? src : "";
+};
+
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.
    Handles v.redd.it HLS (native or hls.js) and plain direct video files.
    opts.autoplay: start playback as soon as THIS path's source is actually attached —
