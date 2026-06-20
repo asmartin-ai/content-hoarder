@@ -40,7 +40,7 @@ coloured icon + SI count + star-to-pin + ⋮ actions (C4/C5), section visibility
   full value on hover/`title`. These are *navigational* counts (where content is), not a guilt-inducing global
   backlog total — consistent with the no-backlog-counts principle.
 - **Per-row actions** via a star (pin) + ⋮ (action sheet). **Pinned** items also surface in the Pinned group.
-- Icons: human-made only — the app's `static/icons.js` (`window.chIcon`) in-app, Tabler Icons (MIT, Paweł Kuna)
+- Icons: human-made only — the app's `core/icons.js` (`chIcon`) in-app, Tabler Icons (MIT, Paweł Kuna)
   where a glyph isn't in the app set, credited. Coloured dots / the apricot LED are CSS, not art.
 - Port by **reusing Fable mechanisms**, not new ones (§8).
 
