@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v33";  // v33: /triage now an ES module — cache core/icons.js, drop deleted static/icons.js (I1/I2)
+const CACHE = "ch-shell-v34";  // v34: swipe gestures now register when starting on links/thumbnails (core/swipe.js + triage.js)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
