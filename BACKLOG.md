@@ -326,7 +326,7 @@ false positives.*
   `metadata.tags` on every write — on-disk order is `[topic..., processing]`. Seed maps are
   deliberately conservative — extend `_YOUTUBE_CHANNEL_TAGS`/`_YOUTUBE_KEYWORD_TAGS` with
   corpus-confirmed channels next.
-- [ ] **P2 — Add incremental "Sync newest" to the main browse view.** *(User-requested 2026-06-08.)* The
+- [x] ~~**P2 — Add incremental "Sync newest" to the main browse view.**~~ ✅ Done 2026-06-20 (commit 88eb6f2): added to the browse settings sheet COLLECTION group — POSTs /reddit/sync, toasts the result, refreshes feed/counts/rail/pulse. *(User-requested 2026-06-08.)* The
   working `POST /reddit/sync` button lives only in `/reddit` (`reddit.html` `#btn-sync`); surface it in the
   main browse header/tools too.
 - [x] ~~**P2 — Disambiguate the "Sync now" label.**~~ ✅ Done 2026-06-20 (Task D): triage's `#ru-sync-triage` relabelled "Unsave queued (N)" + title; browse had no such button (the `#ru-sync` ref was stale). The browse/triage "Sync now" buttons (`#ru-sync`,
@@ -507,7 +507,7 @@ need separate filter controls.*
 ## Epic 13 — UI bugs & quick fixes  (`bug`, `area:ui`)
 *Discrete defects surfaced during the redesign; several are fixed in the v2 design pass (marked).*
 
-- [ ] **P2 — "Hide NSFW" not working.** *(User-reported 2026-06-20.)* The hide-NSFW control doesn't actually hide
+- [x] ~~**P2 — "Hide NSFW" not working.**~~ ✅ Done 2026-06-20 (commit 54e270e): root cause was a criteria mismatch — the UI blurs on `over_18` but the backend `hide_nsfw` only filtered `nsfw_*` TAGS (71 over_18-untagged rows leaked). Aligned both include/exclude paths to (tag OR over_18). The settings toggle was already wired. *(User-reported 2026-06-20.)* The hide-NSFW control doesn't actually hide
   NSFW content. Likely the toggle isn't wired to the `safe=1` / `hide_nsfw` query path (`web.py`), or the setting
   isn't persisted/applied on load. **Fix + verify** end-to-end. This is the bug report that the unbuilt "NSFW toggle
   in settings" item (Epic 15 below) is non-functional — reconcile the two.
@@ -525,7 +525,7 @@ need separate filter controls.*
   fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on
   the T4 cover work (`browse.css` `.pin .screen` / `.monitor`). Output: a short comparison + a concrete sizing
   proposal before touching CSS.
-- [ ] **P3 — Mobile "go to top" button.** *(User-requested 2026-06-20.)* A floating scroll-to-top affordance on
+- [x] ~~**P3 — Mobile "go to top" button.**~~ ✅ Done 2026-06-20 (commit 595e08f): rAF-throttled, mobile-only floating ↑ that clears the dock + safe-area and smooth-scrolls to top. *(User-requested 2026-06-20.)* A floating scroll-to-top affordance on
   mobile that appears after scrolling down the feed and jumps back to the top. Respect the dock / bottom-sheet
   layout + safe-area insets; reuse existing tokens/motion. Touches `browse/main.js` (scroll listener) + `browse.css`.
 - [ ] **P3 — Ask GLM what looks better for Log-view title wrapping/cutoff.** *(User-requested 2026-06-20.)* In the
@@ -719,7 +719,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P3 — "Swipe only on mobile" → now a decision (see Epic 16).**~~ ✅ v3: implemented — `swipe.js:37` ignores mouse pointers, `attachSwipe` is touch-only by default (no toggle). Orig: Inbox swipe is mobile/touch-only by
   default, not a toggle.
 - [x] ~~**P3 — Hide the Stats button under settings.**~~ ✅ v3: Stats is the `#statsheet` panel inside the settings menu (GET /stats), per the 2026-06-12 parallel session. De-cluttered.
-- [ ] **P2 — NSFW toggle in settings (hide/show NSFW posts AND nsfw_* tags).** *(User-requested
+- [x] ~~**P2 — NSFW toggle in settings (hide/show NSFW posts AND nsfw_* tags).**~~ ✅ Done 2026-06-20 (commits 82ab283 + 54e270e): the toggle already existed + persisted (state.safe → ?safe=1); completed it — the rail/drawer/autocomplete drop the nsfw_* facets while off (refreshRail on toggle), and the Epic 13 P2 over_18 fix makes the posts actually hide. *(User-requested
   2026-06-17.)* A persisted toggle in the settings sheet that, when OFF (default), hides NSFW content
   everywhere: the feed already supports it via the `safe=1` query param (`web.py` `hide_nsfw`), so wire
   the toggle to that; AND hide the NSFW tag facets (`nsfw_erotic`, `nsfw_other`, `nsfw_talk`) from the
@@ -748,7 +748,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P2 — Reddit video → open the in-app reader (video + comments), not the bare lightbox.**~~
   Shipped (2026-06-17): extends the image→reader routing to v.redd.it video; the reader's media tile
   plays the HLS stream (Epic 13 P2), with poster backfill (sync/lazy/offline `reddit-thumbnails`).
-- [ ] **P2 — Markdown formatting in the reader's comment + post bodies.** *(User-requested 2026-06-17.)*
+- [x] ~~**P2 — Markdown formatting in the reader's comment + post bodies.**~~ ✅ Done 2026-06-20 (commit 250e1d1): `core/markdown.js` `renderMarkdown()` — a safe subset (links, bold/italic, > quotes, ul/ol, inline + fenced code, bare URLs), XSS-safe by escaping first and gating every href through safeUrl; one renderer drives both the post self-text and comments. +11 node-backed tests. *(User-requested 2026-06-17.)*
   The inline reader currently renders comment/self-text as **plain escaped text** (`reader.js`
   `renderThread` → `helpers.esc(c.body)`; `paragraphs()` only splits on blank lines). Reddit bodies are
   **markdown** — links, **bold**/*italic*, `>` quotes, lists, code, and bare URLs (incl. **giphy** +
@@ -856,7 +856,7 @@ mobile-friendly".*
   called from `closeReader`. Since **all** close paths funnel through `closeReader` — close-button, popstate/back,
   Esc, the F/A/D reader keys, and swipe-right — every exit now silences playback. DOM-API sequence verified in the
   preview engine; full inline-video E2E not exercisable (no v.redd.it items in the live DB).
-- [ ] **P2 — Maintain the feed scroll position after opening + closing the reader.** *(User-requested
+- [x] ~~**P2 — Maintain the feed scroll position after opening + closing the reader.**~~ ✅ Done 2026-06-20 (commit 29cb122): capture `window.scrollY` on openReader BEFORE the reader-lock (overflow:hidden resets it), restore it on closeReader after unlocking — covers every close path (button/Esc/popstate/swipe/F-A-D). *(User-requested
   2026-06-19.)* On mobile, opening the reader and returning loses your place in the list — the feed jumps back
   to the top instead of restoring where you were. Likely the `reader-lock` overflow toggle on `documentElement`
   (reader.js:195/207) resets the underlying scroll. Capture the feed `scrollTop` on `openReader` and restore it
@@ -959,7 +959,7 @@ mobile-friendly".*
 *Bugs migrated 2026-06-20 from the retired `docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue
 (B1/B2/B4 — confirmed by code read at write time; verify line numbers before acting):*
 
-- [ ] **P2 — Same-second decay-wave UNDO collision (B1).** `letgo()` (`resurface.py:152`) decays a cluster
+- [x] ~~**P2 — Same-second decay-wave UNDO collision (B1).**~~ ✅ Done 2026-06-20 (commit 5e37732): `db.decay` now stamps `metadata.decayed_at` with a UNIQUE monotonic wave id (`_allocate_decay_wave`, mirrors `allocate_saved_order`) instead of bare `now`, so two decays in the same second get distinct stamps and undo reverses exactly one wave. +2 oracle tests. `letgo()` (`resurface.py:152`) decays a cluster
   and stamps `metadata.decayed_at = now` (whole seconds) via `db.decay`; `undo_letgo()` (`resurface.py:166`)
   reverses by a **1-second window** (`db.undecay(decayed_after=decayed_at, decayed_before=decayed_at+1)`),
   selecting rows purely by timestamp (tag/sub deliberately unused, `resurface.py:169`). **Failure:** two "let
@@ -970,7 +970,7 @@ mobile-friendly".*
   selects on that id, not a time window. Must NOT route through `bulk_set_status` (decay-safety invariant).
   **Acceptance:** `letgo(A)` then `letgo(B)` with a frozen identical `now`, then `undo_letgo(A)` → only A's
   rows return to inbox; B's stay decayed. *Delegation: ✅ qwen single-shot (oracle-shaped).*
-- [ ] **P2 — Reconcile cap guards on row count, not real truncation (B2).** `db.py:~1040` skips saved-list
+- [x] ~~**P2 — Reconcile cap guards on row count, not real truncation (B2).**~~ ✅ Done 2026-06-20 (commit 801f056): added an additive `truncated_by_kind` override to `reconcile_reddit_saves` (True skips, False reconciles even at/above cap) + a `reconcile_complete` opt-in threaded through `import_path` and the `--reconcile-complete` import flag; the legacy row-count inference stays as the fallback so existing callers are unchanged. +3 tests. `db.py:~1040` skips saved-list
   reconciliation when `len(present) >= cap` (~1000), inferring "the listing was truncated" (Reddit caps the
   saved listing ~1000/type). But keying on the parsed count can't distinguish "complete export of exactly
   1000" from "truncated at 1000," so a user with exactly `cap` saved + a complete export silently skips
@@ -978,7 +978,7 @@ mobile-friendly".*
   urgency. **Fix:** pass an explicit `truncated_by_kind` flag from the sync/import layer (which knows
   `after`-exhaustion vs. a page cap) rather than inferring from the row count. *Delegation: 🟡 borderline,
   GLM (crosses the sync/import seam).*
-- [ ] **P3 — `/import/prepare` temp-file leak (B4).** `/import/prepare` (`web.py:~763`) writes an
+- [x] ~~**P3 — `/import/prepare` temp-file leak (B4).**~~ ✅ Done 2026-06-20 (commit 7df72fc): an `atexit` hook unlinks every remaining staged temp file on process exit (the TTL sweep only ran on the next /prepare); the in-session TTL sweep stays. +1 test. `/import/prepare` (`web.py:~763`) writes an
   uploaded/yt-dlp temp file and stashes it in `_prepared[token]`; it's only unlinked by `/import/commit`
   (`web.py:~833`) or the 1-hour TTL sweep `_cleanup_prepared` (`web.py:~718`), and the sweep only runs on the
   *next* `/import/prepare`. A preview that's never committed (with no later prepare) lingers up to an hour.
@@ -1159,7 +1159,7 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   `--also-unsave` enqueues into the unsave queue BEFORE rows vanish, and without it stale
   pending queue rows are purged so a later drain can't unsave a local-only delete. Deletes
   the `reddit_threads` cache rows too. 8 tests.
-- [ ] **P2 — Done items auto-delete after a retention window (Gmail-trash style).** *(User-requested
+- [~] **P2 — Done items auto-delete after a retention window (Gmail-trash style).** ✅ CLI half done 2026-06-20 (commit 08ad3d6): the `purge-done` command wraps `db.purge_done` in the money-action safety shape (dry-run default, `--apply` + `--yes` gate, auto pre-purge backup, `delete-audit.jsonl` with victim fullnames, `--max` blast cap, `--retention-days` to set the window). +2 tests. **STILL OPEN:** the settings-sheet control for the retention window (needs your visual review) + an optional scheduled-sweep entrypoint. *(User-requested
   2026-06-17.)* **DB primitive SHIPPED 2026-06-18 (F15 bakeoff, glm-5p2 arm + review fixes):**
   `db.purge_done(conn, *, now, apply, max_rows)` permanently purges `status='done'` items older than
   setting `done_retention_days` (default 30), aging from `processed_utc` (NULL excluded). Direct-delete —
