@@ -6,6 +6,7 @@
     done: 10,                          // backlog-reducing — lighter confirm (user feedback 2026-06-20)
     keep: [10, 30, 10],                // the preserve action — a gentler, deliberately less-rewarding cue
     inbox: 8,                          // un-process (back to inbox) — light, undo-like
+    skip: 6,                           // a non-decision "pass" — the faintest cue, never a reward
     milestone: [12, 40, 12, 40, 20],   // batch cleared / goal reached — the one richer celebration
     undo: 8,                           // very light
   };
