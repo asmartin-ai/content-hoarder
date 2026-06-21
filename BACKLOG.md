@@ -569,7 +569,7 @@ need separate filter controls.*
   fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on
   the T4 cover work (`browse.css` `.pin .screen` / `.monitor`). Output: a short comparison + a concrete sizing
   proposal before touching CSS.
-- [ ] **P2 — Album/gallery lightbox loads extremely slowly.** *(User-reported 2026-06-20.)* Opening a reddit
+- [x] ~~**P2 — Album/gallery lightbox loads extremely slowly.**~~ ✅ Done 2026-06-20 (commits 4f24df1 + dbcb433 + 1afbe5f): both fixes shipped — (b) the lightbox lazy-loads (only the in-view image fetches, via IntersectionObserver) and (a) sized ~1080px pre-signed `gallery_preview` variants now drive the feed card poster + lightbox (full original on tap), keyed off the `media_metadata` `p` ladder. Backfilled 1,730/1,738 galleries (`enrich --source reddit --gallery-previews`; 8 have no archived `p` data → graceful fallback to the original). *(User-reported 2026-06-20.)* Opening a reddit
   gallery in the lightbox is very slow (noticed on mobile data, but the cause is structural, not just the link).
   **Root cause:** `archival.providers._gallery` stores only the **full-resolution source** URLs
   (`media_metadata[*].s.u`, often 2000px+/multi-MB each), and `core/media.js` `openGallery` renders **all** of them
