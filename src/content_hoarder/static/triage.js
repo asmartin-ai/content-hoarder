@@ -18,6 +18,8 @@ import { chIcon, fillIcons } from "./core/icons.js";
   var srcFilter = document.getElementById("source-filter");
   var toastEl = document.getElementById("toast");
   var undoBtn = document.getElementById("undo-btn");
+  var skipBtn = document.getElementById("skip-btn");
+  var skipRow = document.getElementById("skip-row");
   var menuBtn = document.getElementById("menu-btn");
   var menuPop = document.getElementById("menu-pop");
   var batchChips = document.getElementById("batch-chips");
@@ -277,6 +279,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
   function showEmpty(show) {
     emptyEl.hidden = !show;
     actionsEl.hidden = show;
+    if (skipRow) skipRow.hidden = show;   // skipping makes no sense with an empty queue
     if (show) {
       if (!emptyStamped) {                                 // fire the celebration once per emptying
         emptyStamped = true;
@@ -373,7 +376,28 @@ import { chIcon, fillIcons } from "./core/icons.js";
       });
   }
 
+  // Skip: pass on this card without deciding — move it to the back of the current batch
+  // and show the next. No status change, no API call, and not counted as a clear (a skip
+  // is a non-decision, never a "win"). It quietly resurfaces later in the session; for a
+  // *timed* "decide later" see the Defer/Snooze backlog item (Epic 5).
+  function skip() {
+    if (queue.length < 2) { toast("Nothing else in this batch", false); return; }
+    if (window.chHaptic) window.chHaptic("skip");   // faintest cue — registers input, no reward
+    animateSkipOut(stack.querySelector(".tcard"));
+    queue.push(queue.shift());                       // current → back of the queue
+    saveSession();                                   // persist the reordered queue for resume
+    setTimeout(renderCurrent, 180);
+  }
+
   // ---- swipe (pointer events) ----
+  // Skip = a non-decision "pass": a gentle down-and-away, deliberately distinct from the
+  // horizontal decision fling (animateOut) so it never reads as a commit.
+  function animateSkipOut(card) {
+    if (!card) return;
+    card.style.transition = "transform .18s ease-out, opacity .18s ease-out";
+    card.style.transform = "translateY(16%) scale(.96)";
+    card.style.opacity = "0";
+  }
   function animateOut(card, dir) {
     if (!card) return;
     card.style.transition = "transform .18s ease-out, opacity .18s ease-out";
@@ -555,6 +579,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
     else if (k === "e" || k === "arrowright") commit("archived");
     else if (k === "y" || k === "arrowleft") commit("done");
     else if (k === "s") commit("keep");
+    else if (k === " ") { e.preventDefault(); skip(); }   // Space = pass / show next (stops scroll + button activation)
     else if (k === "z" || k === "u") undo();
   });
   var nb = document.getElementById("next-batch");
@@ -563,6 +588,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
 
   function updateUndoBtn() { if (undoBtn) undoBtn.disabled = !lastAction; }
   if (undoBtn) undoBtn.addEventListener("click", undo);
+  if (skipBtn) skipBtn.addEventListener("click", skip);
 
   function setActiveChip() {
     if (!batchChips) return;
