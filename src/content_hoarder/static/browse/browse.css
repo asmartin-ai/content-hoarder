@@ -565,6 +565,7 @@ kbd{font:var(--fw-bold) .7rem/1 var(--font-mono);background:var(--surface-inset)
 #media-body .media-video{max-width:100%;max-height:82vh;border-radius:var(--r-sm)}
 #media-body .reddit-embed-frame{width:min(640px,92vw);height:80vh;border:none;border-radius:var(--r-sm)}
 #media-body .media-gallery{display:flex;flex-direction:column;gap:10px}
+#media-body .gallery-img{background:var(--surface-inset);cursor:zoom-in}  /* placeholder + tap=full-res */
 #media-body .media-fallback{display:inline-block;margin-top:10px;color:var(--accent);
   font:var(--fw-semibold) var(--fs-xs)/1 var(--font-sans)}
 
