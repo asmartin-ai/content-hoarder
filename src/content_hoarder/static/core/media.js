@@ -13,7 +13,9 @@ export const thumb = (item, density) => {
   // Card density wants a crisp preview: a gallery's first full-size image beats the small
   // (often 140px) reddit thumbnail, which upscales to a blurry placeholder in Pinboard
   // density. List/compact keep the lightweight thumbnail for scroll perf (Epic 13 P2).
-  if (density === "card" && Array.isArray(m.gallery) && m.gallery.length) return m.gallery[0];
+  if (density === "card" && Array.isArray(m.gallery) && m.gallery.length)
+    // prefer the sized ~1080px variant over the 5000px original for the feed card (Epic 13 P2)
+    return (Array.isArray(m.gallery_preview) && m.gallery_preview[0]) || m.gallery[0];
   let t = m.thumbnail || "";
   if (!t && item.source === "hackernews") t = m.og_image || "";  // article preview (Epic 15 P3)
   if (!t) {
