@@ -552,7 +552,7 @@ need separate filter controls.*
   + `createLightbox({onClose})` (tracks the opened item via `lastMediaFn`); `browse.css` `.veil` positioned
   regardless of `.nsfw`, hidden via `:not(.nsfw)`. Verified on mobile preview (reader + lightbox close both
   re-blur); 590 tests. *(User-reported 2026-06-20.)*
-- [x] ~~**P2 — Video thumbnail not loading on some posts.**~~ ✅ Investigated + fixed 2026-06-20 (commit pending).
+- [x] ~~**P2 — Video thumbnail not loading on some posts.**~~ ✅ Investigated + fixed 2026-06-20 (commit ff78721).
   *(User-reported 2026-06-20.)* **Root cause was NOT a missing thumbnail on the repro.** The repro (`reddit:t3_1u62v1i`
   "Diamond Thighs") has a valid `external-preview.redd.it` thumbnail that loads (HTTP 200) and renders correctly in
   list, card, AND reader — likely fixed by an enrich backfill since the report. **Real bug found:** card density
