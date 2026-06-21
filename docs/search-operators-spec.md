@@ -109,9 +109,13 @@ needs no change — it already sends raw `q`).
 
 ## Decisions to make (pick the simple option, note it in the PR)
 
-- `is:nsfw` ⇒ membership in the three `nsfw_*` tags (not `over_18`). `is:saved` ⇒ `is_saved=1`.
+- `is:nsfw` ⇒ membership in an `nsfw_*` tag **OR** `metadata.over_18=1` (widened 2026-06 to match
+  what the UI blurs; `safe=1`/`hide_nsfw` is its inverse). `is:saved` ⇒ `is_saved=1`.
 - `is:firefox-tab` ⇒ `metadata.open_in_firefox = 1` (the "📑 Firefox tabs" set — includes YouTube
   items promoted from Firefox tabs, which `source:firefox` misses). Alias `is:firefoxtab`.
+- `is:deleted` ⇒ `metadata.media_status='gone'` (reddit media probed unrecoverable by the
+  `scan-media` pass). The durable SSOT — the mirrored `deleted` tag is convenience only (a
+  `categorize` retag replaces `metadata.tags` and wipes it).
 - Multi-tag logic: repeated `tag:` = AND; comma/pipe inside one token = OR. Mirror this in
   `search_items(tags, tags_all)`.
 - Date format: `YYYY-MM-DD` only (UTC midnight). `before:` exclusive, `after:` inclusive.
