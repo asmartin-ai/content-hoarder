@@ -29,8 +29,16 @@ _TARGET_WHERE = (
 
 
 def _scope_where(scope: str) -> str:
-    # "all" hydrates score/content for every reddit item; "removed" only the placeholders.
-    return "source='reddit'" if scope == "all" else _TARGET_WHERE
+    # "all" hydrates score/content for every reddit item; "removed" only the placeholders;
+    # "gallery_preview" backfills galleries missing the sized variant (Epic 13 P2 — run with
+    # retry=True since these were already hydrated; the gallery_preview IS NULL clause is what
+    # makes it resumable, dropping each gallery out once backfilled).
+    if scope == "all":
+        return "source='reddit'"
+    if scope == "gallery_preview":
+        return ("source='reddit' AND json_extract(metadata, '$.gallery') IS NOT NULL "
+                "AND json_extract(metadata, '$.gallery_preview') IS NULL")
+    return _TARGET_WHERE
 
 
 def count_targets(conn, *, retry: bool = False, scope: str = "removed") -> int:
@@ -88,7 +96,8 @@ def _overlay_fields(fields: dict):
 
     # subreddit/permalink + the refined media fields (media_type overrides the
     # connector's URL-heuristic value via merge_upsert's incoming-non-empty-wins).
-    for key in ("subreddit", "permalink", "media_type", "media_url", "thumbnail", "gallery"):
+    for key in ("subreddit", "permalink", "media_type", "media_url", "thumbnail",
+                "gallery", "gallery_preview"):
         if fields.get(key):  # empty gallery list is falsy -> skipped for non-gallery posts
             md[key] = fields[key]
     if fields.get("score"):
