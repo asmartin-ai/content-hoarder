@@ -430,6 +430,30 @@ def cmd_purge_done(args) -> int:
     return 0
 
 
+def cmd_scan_media(args) -> int:
+    """Probe saved reddit image/gallery items for deleted media + classify (Epic 4 P1
+    groundwork). Dry-run by default; --apply stamps metadata.media_status (+ a `deleted` tag on
+    gone items, surfaced by is:deleted / tag:deleted). Crash-safe (per-batch commit), resumable
+    (skips already-classified unless --recheck). Writes a JSON manifest beside the DB."""
+    from pathlib import Path
+
+    from content_hoarder import config, media_scan
+    with _connect() as conn:
+        res = media_scan.scan(
+            conn, status=args.status, limit=args.limit, recheck=args.recheck,
+            apply=args.apply, workers=args.workers, batch=args.batch,
+            progress=lambda m: print(m, file=sys.stderr),
+        )
+    manifest = Path(config.db_path()).with_name("deleted-media-scan.json")
+    manifest.write_text(json.dumps(res, indent=2), encoding="utf-8")
+    print(json.dumps({k: v for k, v in res.items() if k != "salvageable_items"}, indent=2))
+    print(f"manifest -> {manifest}  ({len(res['salvageable_items'])} salvageable URL(s) recorded)",
+          file=sys.stderr)
+    if not args.apply:
+        print("(dry run — re-run with --apply to write media_status/tags)", file=sys.stderr)
+    return 0
+
+
 def cmd_export(args) -> int:
     from pathlib import Path
 
@@ -888,6 +912,23 @@ def build_parser() -> argparse.ArgumentParser:
     ppd.add_argument("--yes", action="store_true",
                      help="Second confirmation; --apply alone shows the plan and refuses.")
     ppd.set_defaults(func=cmd_purge_done)
+
+    psm = sub.add_parser(
+        "scan-media",
+        help="Probe saved reddit media for deletion + classify (metadata.media_status); "
+             "dry-run default, --apply writes. Surfaces via is:deleted.",
+    )
+    psm.add_argument("--status", default=None,
+                     help="Limit to a triage status (e.g. inbox); default all.")
+    psm.add_argument("--limit", type=int, default=None, help="Cap items probed this run.")
+    psm.add_argument("--recheck", action="store_true",
+                     help="Re-probe items already classified (e.g. the transient 'unknown's).")
+    psm.add_argument("--workers", type=int, default=10, help="Concurrent probes (default 10).")
+    psm.add_argument("--batch", type=int, default=200,
+                     help="Commit cadence — rows per crash-safe batch (default 200).")
+    psm.add_argument("--apply", action="store_true",
+                     help="Write media_status + the deleted tag (default: dry run).")
+    psm.set_defaults(func=cmd_scan_media)
 
     pex = sub.add_parser(
         "export",
