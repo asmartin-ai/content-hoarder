@@ -736,7 +736,7 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
 .triage-main {
     max-width: 560px;
     margin: 0 auto;
-    padding: 0.5rem 1rem 7rem;
+    padding: 0.5rem 1rem 9rem;   /* clear the fixed Skip row + decision bar */
 }
 
 .card-stack {
@@ -984,6 +984,32 @@ body[data-page="triage"] .toast { bottom: calc(5.5rem + env(safe-area-inset-bott
     color: var(--done-ink);
     border-color: transparent;
 }
+
+/* Skip — a non-decision "pass": floats just above the 3-button decision bar, styled
+   secondary (smaller, muted) so it never competes with Done/Keep/Archive. */
+.triage-skip {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: center;
+    padding: 0 0.75rem;
+    z-index: 15;
+    pointer-events: none;        /* don't block the card behind; re-enable on the button */
+}
+.skip-btn {
+    pointer-events: auto;
+    min-height: 40px;
+    padding: 0.45rem 1.1rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    background-color: var(--panel2);
+    color: var(--muted);
+    font-size: var(--fs-sm);
+    box-shadow: var(--shadow-row);
+}
+.skip-btn:hover { color: var(--text); filter: brightness(1.05); }
 
 .triage-hint {
     text-align: center;
