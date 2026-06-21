@@ -768,7 +768,8 @@ function openDrawer() {
   renderDrawer();
   drawer.classList.add("show"); scrim.classList.add("show");
   drawer.setAttribute("aria-hidden", "false");
-  setTimeout(() => { const fi = $("#nav-filter"); if (fi) fi.focus(); }, 60);
+  // Desktop only: autofocusing the filter pops the on-screen keyboard on mobile (user-reported).
+  if (!isPhone()) setTimeout(() => { const fi = $("#nav-filter"); if (fi) fi.focus(); }, 60);
 }
 $("#open-nav").addEventListener("click", openDrawer);
 $("#nav-close").addEventListener("click", closeSheets);

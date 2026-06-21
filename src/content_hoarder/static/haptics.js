@@ -3,7 +3,7 @@
   // Keyed on the real status enum (models.VALID_STATUSES) so call sites pass `status` directly.
   var patterns = {
     archived: 18,                      // backlog-reducing — a crisp, satisfying confirm
-    done: 18,                          // backlog-reducing — same crisp confirm
+    done: 10,                          // backlog-reducing — lighter confirm (user feedback 2026-06-20)
     keep: [10, 30, 10],                // the preserve action — a gentler, deliberately less-rewarding cue
     inbox: 8,                          // un-process (back to inbox) — light, undo-like
     milestone: [12, 40, 12, 40, 20],   // batch cleared / goal reached — the one richer celebration
