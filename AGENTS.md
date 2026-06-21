@@ -15,7 +15,7 @@ manifest) already ships.
 - `yt-dlp` is optional (YouTube only, **lazy-imported**). `adb` is an external CLI the user runs.
 - Run: `python -m content_hoarder <cmd>`. Full command set (see the README CLI table for flags):
   `init-db`, `import`, `enrich`, `categorize`, `dedup`, `consolidate`, `serve`, `stats`, `sources`,
-  `bankruptcy`, `decay`, `delete`, `export`, `export-obsidian`, `promote`, `suggest`, `learn-triage`,
+  `bankruptcy`, `decay`, `delete`, `purge-done`, `scan-media`, `export`, `export-obsidian`, `promote`, `suggest`, `learn-triage`,
   `migrate-rsm-threads`, `migrate-firefox-tabs`, `reddit-sync`, `reddit-unsave`, `reddit-oauth`,
   `reddit-hydrate`, `reddit-hydrate-titles`, `reddit-thumbnails`. Web default `127.0.0.1:8788`.
   (`reddit-hydrate --from <bdfr-dir>` is an offline local-archive thread hydrate; `--batch` is the
