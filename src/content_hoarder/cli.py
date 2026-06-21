@@ -85,7 +85,15 @@ def cmd_reddit_hydrate_titles(args) -> int:
 def cmd_enrich(args) -> int:
     from content_hoarder import enrich as enrich_mod
     with _connect() as conn:
-        if getattr(args, "archives", False) or getattr(args, "scores", False):
+        if getattr(args, "gallery_previews", False):
+            from content_hoarder.archival import service as archival
+            # already-hydrated galleries -> retry=True; the gallery_preview IS NULL scope is
+            # what makes it resumable (each gallery drops out once backfilled).
+            n = archival.count_targets(conn, retry=True, scope="gallery_preview")
+            print(f"{n} gallery item(s) need sized previews; querying archives...", file=sys.stderr)
+            res = archival.recover(conn, limit=args.limit, retry=True, scope="gallery_preview",
+                                   progress=lambda m: print(m, file=sys.stderr))
+        elif getattr(args, "archives", False) or getattr(args, "scores", False):
             from content_hoarder.archival import service as archival
             scope = "all" if getattr(args, "scores", False) else "removed"
             n = archival.count_targets(conn, retry=args.all, scope=scope)
@@ -720,6 +728,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Recover [Private/Deleted video] YouTube titles from the Wayback Machine.")
     pe.add_argument("--scores", action="store_true",
                     help="Hydrate upvotes/score (+ current title/body) for ALL reddit items via the archives.")
+    pe.add_argument("--gallery-previews", action="store_true", dest="gallery_previews",
+                    help="Backfill sized ~1080px gallery preview variants (metadata.gallery_preview) "
+                         "for galleries missing them (Epic 13 P2 perf). Network; resumable.")
     pe.add_argument("--limit", type=int, default=None,
                     help="Max items to attempt this run (chunked/resumable recovery).")
     pe.set_defaults(func=cmd_enrich)
