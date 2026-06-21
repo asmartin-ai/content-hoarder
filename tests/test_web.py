@@ -236,6 +236,25 @@ def test_import_commit_expired_token(tmp_db):
     assert _client(tmp_db).post("/import/commit", json={"token": "nope"}).status_code == 400
 
 
+def test_media_route_serves_blob_and_404s(tmp_path, monkeypatch):
+    """/media/<blob> serves a content-addressed local blob (Epic 4 P1) with an immutable
+    cache header, and 404s on a missing or path-traversal-shaped id."""
+    from content_hoarder import config, media_store
+    dbp = tmp_path / "app.db"
+    monkeypatch.setattr(config, "db_path", lambda: str(dbp))
+    db.connect(str(dbp)).close()                       # init the app DB
+    blob = media_store.store(b"IMGBYTES", mime="image/png")  # -> tmp/media/<hash>.png
+    cl = create_app(str(dbp)).test_client()
+
+    r = cl.get("/media/" + blob)
+    assert r.status_code == 200 and r.data == b"IMGBYTES"
+    assert "image/png" in r.headers["Content-Type"]
+    assert "immutable" in r.headers.get("Cache-Control", "")
+    # missing blob + traversal-shaped id both 404 (never touch the filesystem unsafely)
+    assert cl.get("/media/" + ("a" * 64) + ".png").status_code == 404
+    assert cl.get("/media/notarealhash").status_code == 404
+
+
 def test_import_prepare_temp_file_cleaned_on_exit(tmp_db):
     """B4: a previewed-but-never-committed staged temp file is removed by the
     process-exit cleanup, not just the next /import/prepare's 1-hour TTL sweep."""
