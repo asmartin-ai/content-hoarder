@@ -201,6 +201,33 @@ def test_recover_stores_gallery(tmp_db):
     assert md["gallery"] == ["https://preview.redd.it/a.jpg?s=1", "https://preview.redd.it/b.jpg?s=2"]
 
 
+def test_recover_gallery_preview_backfill_scope(tmp_db):
+    conn = db.connect(tmp_db)
+    # an ALREADY-hydrated gallery with full URLs but no sized variant (Epic 13 P2 backfill target)
+    db.merge_upsert(conn, models.new_item(
+        source="reddit", source_id="t3_galp", kind="post", title="G",
+        metadata={"permalink": "/r/x/comments/galp/g/", "media_type": "gallery",
+                  "gallery": ["https://preview.redd.it/a.jpg?width=5000&s=1"]}))
+    conn.execute("UPDATE items SET hydrated_at=123 WHERE fullname='reddit:t3_galp'")
+    # a gallery that already HAS a preview must be excluded by the scope
+    db.merge_upsert(conn, models.new_item(
+        source="reddit", source_id="t3_done", kind="post", title="D",
+        metadata={"media_type": "gallery", "gallery": ["https://preview.redd.it/d.jpg?s=9"],
+                  "gallery_preview": ["https://preview.redd.it/d-1080.jpg?s=9"]}))
+    conn.commit()
+    # scope selects only the un-backfilled gallery, even though it's already hydrated (retry=True)
+    assert archival.count_targets(conn, retry=True, scope="gallery_preview") == 1
+    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(post_recs=[
+        {"id": "galp", "title": "G", "is_gallery": True,
+         "gallery_data": {"items": [{"media_id": "a"}]},
+         "media_metadata": {"a": {"s": {"u": "https://preview.redd.it/a.jpg?width=5000&s=1"},
+             "p": [{"x": 1080, "u": "https://preview.redd.it/a-1080.jpg?s=p"}]}}}]))
+    archival.recover(conn, scope="gallery_preview", retry=True, providers=[prov])
+    md = json.loads(db.get_item(conn, "reddit:t3_galp")["metadata"])
+    assert md["gallery_preview"] == ["https://preview.redd.it/a-1080.jpg?s=p"]
+    assert len(md["gallery_preview"]) == len(md["gallery"])
+
+
 def test_media_refinement_overrides_heuristic_and_keeps_video_url(tmp_db):
     conn = db.connect(tmp_db)
     # two media posts as the connector's URL-heuristic imported them: generic reddit_media,
