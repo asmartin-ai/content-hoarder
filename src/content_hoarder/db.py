@@ -578,6 +578,7 @@ def search_items(
     hide_nsfw: bool = False,
     decayed: bool = False,
     swept: bool = False,
+    deleted: bool = False,
     has_media: str | list[str] | None = None,
     before: int | None = None,
     after: int | None = None,
@@ -683,6 +684,10 @@ def search_items(
         if swept:
             # swept (is:swept): decayed in the labeled initial backfill pass specifically.
             filters.append(f"json_extract({a}metadata, '$.decay_label') = 'swept'")
+        if deleted:
+            # deleted (is:deleted): media probed gone (scan-deleted-media). media_status is the
+            # durable SSOT — the mirrored `deleted` tag is wiped by a categorize retag.
+            filters.append(f"json_extract({a}metadata, '$.media_status') = 'gone'")
         if subreddit:
             if isinstance(subreddit, list):
                 ph = ",".join("?" for _ in subreddit)

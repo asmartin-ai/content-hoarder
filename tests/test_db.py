@@ -246,6 +246,19 @@ def test_hide_nsfw_covers_over18_without_a_tag(conn):
     assert shown == {"t3_tag", "t3_o18"}   # is:nsfw includes the over_18-only item too
 
 
+def test_search_is_deleted_filters_on_media_status(conn):
+    # is:deleted keys off the durable metadata.media_status='gone' SSOT, NOT the fragile
+    # `deleted` tag (a categorize retag would wipe the tag but not the status).
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_gone", title="gone",
+                             metadata={"media_status": "gone", "tags": ["deleted", "memes"]}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_salv", title="salv",
+                             metadata={"media_status": "salvageable"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="t3_ok", title="ok", metadata={}))
+
+    got = {x["source_id"] for x in db.search_items(conn, "", deleted=True)}
+    assert got == {"t3_gone"}                       # only gone; salvageable + clean excluded
+
+
 def test_search_tags_all_or_nsfw_and_score_and_dates(conn):
     # Two reddit posts, one NSFW + high score, one SFW + low score.
     db.merge_upsert(conn, mk(

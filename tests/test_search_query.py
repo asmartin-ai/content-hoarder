@@ -72,6 +72,12 @@ def test_parse_is_decayed_and_swept():
     assert search_query.parse("is:sweeped").text == "is:sweeped"
 
 
+def test_parse_is_deleted():
+    p = search_query.parse("is:deleted source:reddit")
+    assert p.deleted is True and p.source == "reddit"
+    assert search_query.parse("hi").deleted is False
+
+
 def test_parse_is_firefox_tab():
     p = search_query.parse("is:firefox-tab")
     assert p.open_in_firefox is True and p.text == ""

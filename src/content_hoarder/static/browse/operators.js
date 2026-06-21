@@ -14,7 +14,7 @@ const KEYS = [
   { key: "source:", hint: "by source", vals: ["reddit", "youtube", "hackernews", "firefox", "obsidian", "keep"] },
   { key: "status:", hint: "triage state", vals: ["inbox", "keep", "archived", "done"] },
   { key: "kind:", hint: "item type", vals: ["post", "video", "comment", "story", "tab"] },
-  { key: "is:", hint: "a flag", vals: ["saved", "unsaved", "nsfw", "decayed", "swept", "firefox-tab"] },
+  { key: "is:", hint: "a flag", vals: ["saved", "unsaved", "nsfw", "decayed", "swept", "firefox-tab", "deleted"] },
   { key: "has:", hint: "media type", vals: ["video", "image", "gallery"] },
   { key: "tag:", hint: "by tag", dyn: "tags" },
   { key: "subreddit:", hint: "by subreddit", dyn: "subs" },
