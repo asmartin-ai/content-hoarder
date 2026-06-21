@@ -81,6 +81,38 @@ def _gallery(rec: dict) -> list:
     return urls
 
 
+def _gallery_preview(rec: dict, target: int = 1080) -> list:
+    """Sized (~``target`` px wide) pre-signed preview variants, PARALLEL (same order + length)
+    to ``_gallery`` (Epic 13 P2 perf). The ``s.u`` originals are huge (preview.redd.it
+    width=5000); ``media_metadata[mid]['p']`` is an ascending ``[{x,y,u}]`` list of pre-signed
+    smaller renditions. Pick the largest entry not exceeding ``target`` (else the smallest
+    available); fall back to the full ``s.u`` when a frame has no ``p``. Gated on the same
+    ``full`` presence as ``_gallery`` so the two arrays stay index-aligned (the frontend keys
+    off equal lengths)."""
+    if not rec.get("is_gallery"):
+        return []
+    mm = rec.get("media_metadata") or {}
+    items = (rec.get("gallery_data") or {}).get("items") or []
+    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(mm.keys())
+    out = []
+    for mid in order:
+        meta = mm.get(mid) or {}
+        s = meta.get("s") or {}
+        full = s.get("u") or s.get("gif") or s.get("mp4")
+        if not full:
+            continue  # mirror _gallery's skip so indexes line up
+        previews = [p for p in (meta.get("p") or [])
+                    if isinstance(p, dict) and p.get("u")]
+        chosen = full
+        if previews:
+            le = [p for p in previews if (p.get("x") or 0) <= target]
+            pick = (max(le, key=lambda p: p.get("x") or 0) if le
+                    else min(previews, key=lambda p: p.get("x") or 0))
+            chosen = pick.get("u") or full
+        out.append(html.unescape(chosen))
+    return out
+
+
 def _media_type(rec: dict) -> str:
     """Classify a submission as image / reddit_video / gallery / link, or '' (unknown —
     the caller keeps the URL-heuristic value). Order matters: video and gallery win."""
@@ -113,6 +145,7 @@ def _norm_post(rec: dict) -> dict:
         "media_url": _media_url(rec),
         "thumbnail": _thumb(rec),
         "gallery": _gallery(rec),
+        "gallery_preview": _gallery_preview(rec),
     }
 
 

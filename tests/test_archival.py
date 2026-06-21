@@ -158,6 +158,32 @@ def test_norm_post_extracts_gallery_images():
     assert _norm_post({"post_hint": "image"})["gallery"] == []  # non-gallery -> empty
 
 
+def test_norm_post_extracts_sized_gallery_preview():
+    from content_hoarder.archival.providers import _norm_post
+    g = _norm_post({"is_gallery": True,
+                    "gallery_data": {"items": [{"media_id": "m1"}, {"media_id": "m2"}]},
+                    "media_metadata": {
+                        "m1": {"s": {"u": "https://preview.redd.it/m1.jpg?width=5000&s=a"},
+                               "p": [{"x": 640, "u": "https://preview.redd.it/m1-640.jpg?s=p640"},
+                                     {"x": 1080, "u": "https://preview.redd.it/m1-1080.jpg?s=p1080"},
+                                     {"x": 2000, "u": "https://preview.redd.it/m1-2000.jpg?s=p2000"}]},
+                        "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?width=3000&s=b"}}}})  # no p
+    # gallery stays the full originals; gallery_preview is parallel (same order/length):
+    #   m1 -> largest p <= 1080 (the 1080 rendition); m2 (no p) -> falls back to the full s.u
+    assert g["gallery"] == ["https://preview.redd.it/m1.jpg?width=5000&s=a",
+                            "https://preview.redd.it/m2.jpg?width=3000&s=b"]
+    assert g["gallery_preview"] == ["https://preview.redd.it/m1-1080.jpg?s=p1080",
+                                    "https://preview.redd.it/m2.jpg?width=3000&s=b"]
+    assert len(g["gallery_preview"]) == len(g["gallery"])
+    # every variant larger than target -> the smallest available; non-gallery -> empty
+    only_big = _norm_post({"is_gallery": True,
+                           "gallery_data": {"items": [{"media_id": "x"}]},
+                           "media_metadata": {"x": {"s": {"u": "https://preview.redd.it/x.jpg?s=s"},
+                               "p": [{"x": 2000, "u": "https://preview.redd.it/x-2000.jpg?s=p"}]}}})
+    assert only_big["gallery_preview"] == ["https://preview.redd.it/x-2000.jpg?s=p"]
+    assert _norm_post({"post_hint": "image"})["gallery_preview"] == []
+
+
 def test_recover_stores_gallery(tmp_db):
     conn = db.connect(tmp_db)
     db.merge_upsert(conn, models.new_item(
