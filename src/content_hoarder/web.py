@@ -585,6 +585,21 @@ def create_app(db_path: str | None = None) -> Flask:
             res = reddit_sync.sync_saved(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
 
+    @app.get("/media/<blob>")
+    def media_blob(blob):
+        # Serve a locally-archived media blob from data/media/ (Epic 4 P1). Same-origin so the
+        # service worker can finally cache reddit media + the UI can fall back here on a remote
+        # 404. Content-addressed => immutable => cache forever. path_for is traversal-safe.
+        from flask import send_file
+
+        from content_hoarder import media_store
+        p = media_store.path_for(blob)
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        resp = send_file(str(p), mimetype=media_store.mime_for(p.name), conditional=True)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
     @app.get("/sources")
     def sources():
         # Optional ?status= cross-filters the per-source counts (tabs by active status).
