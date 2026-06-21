@@ -39,6 +39,7 @@ class ParsedQuery:
     decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
     swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
     open_in_firefox: bool = False  # is:firefox-tab — metadata.open_in_firefox (incl. promoted YT tabs)
+    deleted: bool = False  # is:deleted — metadata.media_status='gone' (durable SSOT; the `deleted` tag is fragile)
     has: str | list[str] | None = None  # has:video|image|gallery — metadata.media_type facet
 
     before: int | None = None  # unix seconds (UTC)
@@ -160,6 +161,7 @@ def parse(q: str) -> ParsedQuery:
     nsfw = False
     decayed = swept = False
     open_in_firefox = False
+    deleted = False
     has_groups: list[list[str]] = []
     before = after = None
     score_min = score_max = None
@@ -251,6 +253,9 @@ def parse(q: str) -> ParsedQuery:
             if v in ("firefox-tab", "firefoxtab"):
                 open_in_firefox = True
                 continue
+            if v == "deleted":
+                deleted = True
+                continue
             text_terms.append(t)
             continue
 
@@ -341,6 +346,7 @@ def parse(q: str) -> ParsedQuery:
         decayed=decayed,
         swept=swept,
         open_in_firefox=open_in_firefox,
+        deleted=deleted,
         has=has,
         before=before,
         after=after,
