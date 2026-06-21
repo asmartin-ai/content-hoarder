@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v39";  // v39: gallery lightbox lazy-loads images (Epic 13 P2 perf)
+const CACHE = "ch-shell-v40";  // v40: gallery sized-variant posters/lightbox (Epic 13 P2 perf)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js

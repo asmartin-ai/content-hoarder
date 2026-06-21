@@ -257,7 +257,8 @@ const lightbox = createLightbox({ modal: "#media-modal", body: "#media-body", on
 function openMediaFor(item) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
-  if (Array.isArray(m.gallery) && m.gallery.length) return lightbox.openGallery(m.gallery);
+  if (Array.isArray(m.gallery) && m.gallery.length)
+    return lightbox.openGallery(m.gallery, m.gallery_preview);  // sized variants load first (Epic 13 P2)
   const vsrc = playableVideoSrc(item);   // shared playability test (same as the reader's inline player)
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
   const img = imageUrl(item);
