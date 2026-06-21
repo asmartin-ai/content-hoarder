@@ -1,0 +1,44 @@
+"""media_store: content-addressed on-disk blob store (Epic 4 P1)."""
+from content_hoarder import media_store
+
+
+def test_store_is_content_addressed_and_idempotent(tmp_path):
+    d = tmp_path / "media"
+    b = b"\x89PNG fake image bytes"
+    id1 = media_store.store(b, mime="image/png", base_dir=d)
+    assert id1.endswith(".png") and len(id1.split(".")[0]) == 64
+    f = d / id1
+    assert f.exists() and f.read_bytes() == b
+    mtime = f.stat().st_mtime_ns
+    # same bytes -> same id, file NOT rewritten (dedup)
+    assert media_store.store(b, mime="image/png", base_dir=d) == id1
+    assert f.stat().st_mtime_ns == mtime
+    # different bytes -> different id
+    assert media_store.store(b + b"x", mime="image/png", base_dir=d) != id1
+
+
+def test_ext_and_mime():
+    assert media_store.ext_for("image/jpeg") == ".jpg"
+    assert media_store.ext_for("image/webp; charset=binary") == ".webp"
+    assert media_store.ext_for("", "https://i.redd.it/x.webp") == ".webp"
+    assert media_store.ext_for("", "") == ".bin"
+    assert media_store.mime_for("abc.png") == "image/png"
+    assert media_store.mime_for("abc.bin") == "application/octet-stream"
+
+
+def test_id_validation_blocks_traversal(tmp_path):
+    h = "a" * 64
+    assert media_store.is_valid_id(h + ".jpg") and media_store.is_valid_id(h)
+    for bad in ("../etc/passwd", h + ".exe", "nothex.jpg", "", h + "/x"):
+        assert not media_store.is_valid_id(bad)
+
+
+def test_path_for_resolves_and_rejects(tmp_path):
+    d = tmp_path / "media"
+    d.mkdir()
+    h = "b" * 64
+    assert media_store.path_for("../x", base_dir=d) is None
+    assert media_store.path_for(h, base_dir=d) is None  # not stored yet
+    (d / (h + ".jpg")).write_bytes(b"x")
+    assert media_store.path_for(h + ".jpg", base_dir=d).name == h + ".jpg"
+    assert media_store.path_for(h, base_dir=d).name == h + ".jpg"  # bare hash finds the ext
