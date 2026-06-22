@@ -906,12 +906,13 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   design reference — analyze them AND the RES repo (https://github.com/honestbleeps/Reddit-Enhancement-Suite,
   esp. its inline-expando / media-host modules) for how RES inlines comment media, then adapt the
   patterns that fit our reader. Don't start until the screenshots are in hand.
-- [ ] **P2 — Thumbnail tap = quick media peek (lightbox); title/body opens the thread.** *(User-requested
-  2026-06-17.)* Refines the Epic 15 tap routing: in the inbox/browse list, tapping the **media thumbnail**
-  opens a **lightbox peek of the media only** (fast preview, no thread); tapping the **title / the rest of the
-  row** opens the in-app reader (media + thread). **Exclude HN article thumbnails** — those keep their current
-  behavior (don't peek). Splits today's single tap target (an image/video thumb currently routes straight to
-  the reader). Touches the `[data-media]` dispatch (`browse/main.js`) vs. the title `<a>` handler.
+- [x] ~~**P2 — Thumbnail tap = quick media peek (lightbox); title/body opens the thread.**~~ ✅ SHIPPED
+  2026-06-22 (browser-verified): in `browse/main.js` the `[data-media]` tap now always calls `openMediaFor`
+  (plain media — image lightbox / video player / gallery viewer); the reddit-image/video → reader
+  interception (added 2026-06-17, `107665b`) was reverted. Title/body tap still opens the reader. The
+  lightbox already registers with the overlay coordinator (`core/media.js` `pushOverlay`), so OS/back closes
+  it and returns to the feed (verified). SW v66. *(User-requested 2026-06-17.)* (HN article thumbnails: they
+  use the title-`<a>` route, not `[data-media]`, so they're unaffected.)
 - [ ] **P2 — Video plays inline in the reader (no lightbox).** *(User-requested 2026-06-17.)* In
   `section#reader` a video currently opens the lightbox; play it **inline in the reader's media tile** instead
   (reuse the HLS/`<video>` path from `core/media.js`). The lightbox stays for the browse-list peek (above);
