@@ -806,6 +806,24 @@ scrim.addEventListener("click", closeSheets);
 $("#open-settings").addEventListener("click", () => openPanel("#settings"));
 $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 
+/* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
+   APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
+   running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
+const APP_VERSION = "v67";
+(() => {
+  const ver = $("#app-version"); if (ver) ver.textContent = APP_VERSION;
+  const head = $(".console"); if (!head) return;
+  let lastY = window.scrollY || 0;
+  const onScroll = () => {
+    const y = window.scrollY || 0;
+    if (y < 24) head.classList.remove("compact");             // at the top → expand
+    else if (y > lastY + 4) head.classList.add("compact");     // scrolling down → shrink
+    else if (y < lastY - 4) head.classList.remove("compact");  // scrolling up → expand
+    lastY = y;
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });  // cheap; scroll is already frame-throttled
+})();
+
 /* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
    The phone expression of the desktop .rail. Rows render from the SAME facet data
    refreshRail() fetches (sources/categories/tags); selecting a row drives the same
