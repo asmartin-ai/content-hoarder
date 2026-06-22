@@ -154,6 +154,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
 .rnav .dot{width:8px;height:8px;border-radius:50%;background:var(--src,var(--text-dim));flex:none}
 .rnav.more{color:var(--accent);font-size:var(--fs-xs)}
 
+/* ---- parent/child tag grouping in the rail (Epic 26 P2) ---- */
+.rail-group{display:flex;flex-direction:column}
+.rail-group + .rail-group{margin-top:2px}
+.rail-ghead{font-weight:var(--fw-semibold)}
+.rail-ghead .dot{background:var(--text-dim)}
+/* partial selection: some children on but not all — accent the dot, don't fill the row */
+.rail-ghead[data-sel="some"]{color:var(--text-body)}
+.rail-ghead[data-sel="some"] .dot{background:var(--accent)}
+.rail-ghead.static{color:var(--text-dim);font:var(--fw-medium) var(--fs-xs)/1 var(--font-sans);
+  height:auto;padding:var(--sp-2) 12px var(--sp-1);cursor:default}
+/* indented child tags under their parent — the indent (not a dot) conveys the hierarchy */
+.rail-group .rnav[data-tag]{padding-left:30px;height:34px;font-size:var(--fs-xs)}
+.rail-group .rnav[data-tag] .dot{display:none}
+
 .sheet{background:var(--surface-card);border:1px solid var(--border-control);
   border-radius:0 var(--r-md) var(--r-md) var(--r-md);box-shadow:var(--shadow-pop);min-width:0}
 .shelf{display:flex;gap:var(--sp-3);align-items:center;padding:var(--sp-3) var(--sp-4);
@@ -413,6 +427,45 @@ body.focus .batchstrip{display:flex}
 .row .meta .tag-chips{margin-left:8px;flex-wrap:nowrap;vertical-align:-3px}
 .row .meta .tag-chip{font-size:.62rem;padding:2px 7px;background:var(--surface-inset)}
 .tag-chip.tag-rest{color:var(--text-dim);border-style:dashed;cursor:default}
+
+/* ---- per-item tag editor (browse/tagedit.js): the ＋ trigger + the popover ---- */
+.tag-cluster{display:inline-flex;gap:5px;align-items:center}
+.tag-edit{font:var(--fw-semibold) .8rem/1 var(--font-mono);color:var(--text-dim);
+  background:var(--surface-card);border:1px dashed var(--border-hairline);border-radius:var(--r-pill);
+  width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0;
+  cursor:pointer;flex:none;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.tag-edit:hover{color:var(--accent);border-color:var(--accent)}
+.row .meta .tag-edit{vertical-align:-3px}
+.pin .tagrow .tag-edit{width:20px;height:20px}
+
+.tagpop-scrim{position:fixed;inset:0;z-index:55;background:transparent}
+@media (max-width:700px){.tagpop-scrim{background:rgba(8,6,12,.45)}}
+.tagpop{position:fixed;z-index:56;width:280px;max-width:calc(100vw - 16px);
+  background:var(--surface-card);border:1px solid var(--border-control);border-radius:var(--r-md);
+  box-shadow:var(--shadow-pop);padding:12px;display:flex;flex-direction:column;gap:10px}
+.tagpop.busy{opacity:.65;pointer-events:none}
+.tagpop.sheet{left:0;right:0;bottom:0;top:auto!important;width:100%;max-width:100%;
+  border-radius:var(--r-lg) var(--r-lg) 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.tp-head{display:flex;align-items:center}
+.tp-title{font:var(--fw-semibold) var(--fs-sm)/1 var(--font-sans);color:var(--text-body)}
+.tp-x{margin-left:auto;background:none;border:0;color:var(--text-dim);cursor:pointer;font-size:.9rem;padding:2px 4px}
+.tp-x:hover{color:var(--text-body)}
+.tp-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:22px}
+.tp-empty{font:var(--fw-regular) var(--fs-xs)/1.6 var(--font-sans);color:var(--text-dim)}
+.tp-chip{display:inline-flex;align-items:center;gap:6px;font:var(--fw-medium) .72rem/1 var(--font-sans);
+  color:var(--text-muted);background:var(--surface-inset);border:1px solid var(--border-hairline);
+  border-radius:var(--r-pill);padding:5px 6px 5px 10px}
+.tp-rm{background:none;border:0;color:var(--text-dim);cursor:pointer;padding:0 2px;font-size:.7rem;line-height:1}
+.tp-rm:hover{color:var(--accent)}
+.tp-input{width:100%;font:var(--fw-regular) var(--fs-sm)/1.2 var(--font-sans);color:var(--text-body);
+  background:var(--surface-app);border:1px solid var(--border-control);border-radius:var(--r-sm);padding:8px 10px}
+.tp-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.tp-sugg{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto}
+.tp-opt{text-align:left;font:var(--fw-medium) var(--fs-sm)/1.2 var(--font-sans);color:var(--text-muted);
+  background:none;border:0;border-radius:var(--r-sm);padding:7px 9px;cursor:pointer;display:flex;align-items:center}
+.tp-opt:hover,.tp-opt.sel{background:var(--surface-hover);color:var(--text-body)}
+.tp-new{font:var(--fw-semibold) .6rem/1 var(--font-mono);color:var(--accent);
+  text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
 
 /* ===================== decay line + empty state (locked #10/#12) ===================== */
 .decayline{padding:var(--sp-3) var(--sp-4) var(--sp-4);
