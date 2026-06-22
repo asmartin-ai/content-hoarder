@@ -35,6 +35,35 @@ export function subtreeLen(comments, i) {
   }
   return count;
 }
+const DELETED_BODIES = new Set(["[deleted]", "[removed]"]);
+
+/* A comment Reddit has tombstoned — removed by a mod ("[removed]") or deleted by its author
+   ("[deleted]" body, and the author is "[deleted]" too). */
+export function isDeletedComment(c) {
+  if (!c) return false;
+  const body = String(c.body == null ? "" : c.body).trim();
+  return DELETED_BODIES.has(body) || String(c.author || "") === "[deleted]";
+}
+
+/* Indices to auto-collapse on load: a deleted/removed comment that HAS replies AND whose entire
+   subtree is also deleted — a fully-dead thread worth hiding. A deleted comment with ANY live
+   descendant stays expanded (so the live reply remains visible); a childless deleted comment stays
+   as a single line (nothing to hide). Pure → node-testable. */
+export function deadThreadCollapseSet(comments) {
+  const out = new Set();
+  for (let i = 0; i < comments.length; i++) {
+    if (!isDeletedComment(comments[i])) continue;
+    const len = subtreeLen(comments, i);
+    if (len === 0) continue;                       // no replies → nothing to collapse
+    let allDead = true;
+    for (let j = i + 1; j <= i + len; j++) {
+      if (!isDeletedComment(comments[j])) { allDead = false; break; }
+    }
+    if (allDead) out.add(i);
+  }
+  return out;
+}
+
 export function renderThread(comments, collapsed, helpers) {
   let html = "";
   for (let i = 0; i < comments.length; i++) {
@@ -50,7 +79,11 @@ export function renderThread(comments, collapsed, helpers) {
     html += '<button type="button" class="rd-ctoggle" data-ci="' + i + '" aria-label="' +
       (isC ? "Expand" : "Collapse") + ' thread">' + (isC ? "+" : "−") + "</button>";
     html += '<div class="rd-cmain"><div class="rd-cby">';
-    html += '<span class="rd-au">u/' + helpers.esc(c.author) + "</span>";
+    const au = helpers.esc(c.author);              // reddit usernames are [A-Za-z0-9_-] → URL-safe
+    html += (c.author && c.author !== "[deleted]")
+      ? '<a class="rd-au" href="https://www.reddit.com/user/' + au +
+        '" target="_blank" rel="noopener noreferrer nofollow">u/' + au + "</a>"
+      : '<span class="rd-au">u/' + au + "</span>";
     if (c.author && c.author === helpers.opAuthor) html += '<span class="rd-op">OP</span>';
     html += '<span class="rd-cscore">' + (+c.score || 0) + "</span>";
     html += '<span class="rd-cage">' + helpers.ago(c.created_utc) + "</span>";
@@ -291,6 +324,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   }
   function applyThread(res, justHydrated) {
     comments = Array.isArray(res.comments) ? res.comments : [];
+    collapsed = deadThreadCollapseSet(comments);   // auto-collapse fully-dead (deleted) threads on load
     opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
     if (!videoEl) renderPost(res.post || null);  // don't clobber a playing inline video
     setChip(res.archived ? "archived" : (justHydrated ? "hydrated" : "cached"));
@@ -417,6 +451,19 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
       const ci = +tog.dataset.ci;
       collapsed.has(ci) ? collapsed.delete(ci) : collapsed.add(ci);
       renderComments();
+      return;
+    }
+    // Tap the comment byline (author/score/age line) to collapse/expand its thread — a big tap
+    // target alongside the −/+ button. Ignore taps on the author link (it opens the profile) so
+    // the two affordances don't fight. The body text stays non-toggling (links/images/selection).
+    const by = e.target.closest(".rd-cby");
+    if (by && !e.target.closest("a")) {
+      const cmt = by.closest(".rd-cmt");
+      const ci = cmt ? +cmt.dataset.ci : NaN;
+      if (cmt && !Number.isNaN(ci)) {
+        collapsed.has(ci) ? collapsed.delete(ci) : collapsed.add(ci);
+        renderComments();
+      }
       return;
     }
     // ---- manual tag editor (POST /items/<fn>/tags) ----
