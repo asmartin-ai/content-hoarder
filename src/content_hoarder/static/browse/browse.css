@@ -27,6 +27,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
 .brand{display:flex;align-items:center;gap:9px;margin:0;
   font:var(--fw-bold) var(--fs-md)/1 var(--font-disp);letter-spacing:-.01em;white-space:nowrap}
 .brand .led{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:var(--led-glow)}
+/* loaded-version badge (right of the bar) — set by main.js APP_VERSION so you can tell what your phone cached */
+.app-ver{flex:none;font:var(--fw-medium) .62rem/1 var(--font-mono);color:var(--text-faded);
+  letter-spacing:.02em;padding:2px 6px;border:1px solid var(--border-hairline);border-radius:var(--r-pill)}
+.app-ver:empty{display:none}
 .cmd{flex:1;display:flex;align-items:center;gap:10px;background:var(--surface-card);
   border:1px solid var(--border-control);border-radius:var(--r-pill);padding:0 16px;
   height:42px;min-width:0;position:relative}
@@ -747,8 +751,15 @@ kbd{font:var(--fw-bold) .7rem/1 var(--font-mono);background:var(--surface-inset)
 
 /* ===================== phone layout ===================== */
 @media (max-width:700px){
-  .con-row{flex-wrap:wrap;gap:var(--sp-2);padding:10px var(--sp-3)}
-  .cmd{order:5;width:100%;flex:none}
+  .con-row{flex-wrap:wrap;gap:var(--sp-2);padding:10px var(--sp-3);transition:padding .2s var(--ease)}
+  .cmd{order:5;width:100%;flex:none;max-height:60px;
+    transition:max-height .22s var(--ease),opacity .18s var(--ease),margin .2s var(--ease)}
+  /* Relay-style shrink: scrolling down (main.js adds .compact) collapses the search row + TODAY
+     counter; at the top / scrolling up it expands again */
+  .console.compact .cmd{max-height:0;opacity:0;margin-top:-6px;padding-top:0;padding-bottom:0;
+    border-color:transparent;overflow:hidden;pointer-events:none}
+  .console.compact .wins{display:none}
+  .console.compact .con-row{padding-top:6px;padding-bottom:6px}
   .wins{margin-left:auto}
   .btn-triage{display:none}     /* the dock FAB owns triage */
   #open-settings{display:none}  /* dock MORE owns settings */
