@@ -64,16 +64,31 @@ def test_reconcile_skips_incomplete_walk(conn):
     assert db.get_item(conn, "reddit:t3_b")["is_saved"] == 1    # absent-from-partial -> protected
 
 
-def test_reconcile_skips_at_listing_cap(conn, monkeypatch):
-    """At/above the ~1000 listing cap the walk may be truncated, so reconcile refuses to act."""
-    monkeypatch.setattr(reddit_sync, "RECONCILE_SAFE_CAP", 2)
+def test_reconcile_skips_in_ambiguous_legacy_cap_band(conn, monkeypatch):
+    """A walk ENDING right at the legacy ~1000 boundary could be a hidden cap, so reconcile skips it."""
+    monkeypatch.setattr(reddit_sync, "LEGACY_CAP_LO", 2)
+    monkeypatch.setattr(reddit_sync, "LEGACY_CAP_HI", 2)
     _seed_saved(conn, ["t3_a", "t3_gone"])
-    # census returns 2 items (>= the patched cap of 2) -> treated as possibly-capped -> skip
+    # census exhausts at exactly 2 present -> inside the patched ambiguous band -> skip
     res = reddit_sync.sync_saved(
         conn, reconcile=True, getf=make_getf([([child("t3_a"), child("t3_b")], None)]),
         user_agent="ua", max_pages=12, sleep=NOSLEEP)
-    assert res["reconcile"]["skipped"] == "listing_cap"
+    assert res["reconcile"]["skipped"] == "ambiguous_cap"
     assert db.get_item(conn, "reddit:t3_gone")["is_saved"] == 1  # protected
+
+
+def test_reconcile_runs_when_exhausted_above_the_cap_band(conn, monkeypatch):
+    """An account that paginates PAST the legacy cap and reaches the end still reconciles — the count
+    is not the completeness signal, reaching after==null is."""
+    monkeypatch.setattr(reddit_sync, "LEGACY_CAP_LO", 2)
+    monkeypatch.setattr(reddit_sync, "LEGACY_CAP_HI", 3)   # ambiguous band = {2,3}; census of 4 is clear
+    _seed_saved(conn, ["t3_a", "t3_b", "t3_c", "t3_gone"])
+    res = reddit_sync.sync_saved(
+        conn, reconcile=True,
+        getf=make_getf([([child("t3_a"), child("t3_b"), child("t3_c"), child("t3_d")], None)]),
+        user_agent="ua", max_pages=12, sleep=NOSLEEP)
+    assert res["reconcile"]["ran"] is True                  # exhausted above the band -> reconciled
+    assert db.get_item(conn, "reddit:t3_gone")["is_saved"] == 0  # absent -> un-saved
 
 
 def test_reconcile_dry_run_previews_without_writing(conn):
