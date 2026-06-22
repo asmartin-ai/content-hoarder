@@ -190,37 +190,40 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
   }
   async function readerAddTag(raw) {
     if (!item) return;
+    const it = item, fn = fullname;            // snapshot: openReader may swap item mid-POST
+    if (!it.metadata) it.metadata = {};        // some items carry no metadata object
     const tag = normTag(raw); if (!tag) return;
-    const prev = tagsOf(item).slice();
+    const prev = tagsOf(it).slice();
     if (prev.indexOf(tag) !== -1) return;
-    item.metadata.tags = prev.concat([tag]);
-    refreshReaderTagRow();
+    it.metadata.tags = prev.concat([tag]);
+    refreshReaderTagRow();                      // optimistic (item === it here)
     try {
-      const res = await api.postJSON("/items/" + encodeURIComponent(fullname) + "/tags", { add: [tag] });
-      item.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.concat([tag]);
-      refreshReaderTagRow();
-      refreshAddSuggestions(postEl.querySelector(".rd-tag-add-input"));
+      const res = await api.postJSON("/items/" + encodeURIComponent(fn) + "/tags", { add: [tag] });
+      it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.concat([tag]);
     } catch (e) {
-      item.metadata.tags = prev;                          // revert
+      it.metadata.tags = prev;                  // revert
+      toast("Couldn't add tag — check connection");
+    }
+    if (item === it) {                          // repaint only if still showing this item
       refreshReaderTagRow();
       refreshAddSuggestions(postEl.querySelector(".rd-tag-add-input"));
-      toast("Couldn't add tag — check connection");
     }
   }
   async function readerRemoveTag(tag) {
     if (!item) return;
-    const prev = tagsOf(item).slice();
-    item.metadata.tags = prev.filter((t) => t !== tag);
+    const it = item, fn = fullname;
+    if (!it.metadata) it.metadata = {};
+    const prev = tagsOf(it).slice();
+    it.metadata.tags = prev.filter((t) => t !== tag);
     refreshReaderTagRow();
     try {
-      const res = await api.postJSON("/items/" + encodeURIComponent(fullname) + "/tags", { remove: [tag] });
-      item.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.filter((t) => t !== tag);
-      refreshReaderTagRow();
+      const res = await api.postJSON("/items/" + encodeURIComponent(fn) + "/tags", { remove: [tag] });
+      it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.filter((t) => t !== tag);
     } catch (e) {
-      item.metadata.tags = prev;                          // revert
-      refreshReaderTagRow();
+      it.metadata.tags = prev;                  // revert
       toast("Couldn't remove tag — check connection");
     }
+    if (item === it) refreshReaderTagRow();
   }
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
@@ -279,7 +282,21 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     if (String(body).trim()) h += '<div class="rd-body">' + renderMarkdown(body) + "</div>";
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
+    // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
+    // thread load calls renderPost again a few hundred ms after open, which would otherwise
+    // wipe the editor the user is typing into. null = the add-UI was closed.
+    const openUi = postEl.querySelector(".rd-tag-add-ui");
+    const keep = (openUi && !openUi.hidden)
+      ? ((postEl.querySelector(".rd-tag-add-input") || {}).value || "") : null;
     postEl.innerHTML = h;
+    if (keep !== null) {
+      const ui = postEl.querySelector(".rd-tag-add-ui");
+      if (ui) {
+        ui.hidden = false;
+        const inp = ui.querySelector(".rd-tag-add-input");
+        if (inp) { inp.value = keep; refreshAddSuggestions(inp); inp.focus(); }
+      }
+    }
   }
   function setChip(kind) {
     const chip = postEl.querySelector("#reader-chip");
