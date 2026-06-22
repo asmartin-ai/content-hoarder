@@ -13,6 +13,7 @@ import { listHtml, emptyHtml, isNsfw } from "./render.js";
 import { initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
 import { initOperators } from "./operators.js";
+import { initTagEditor } from "./tagedit.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -216,6 +217,22 @@ function redo() {
    reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
 const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur });
 
+/* per-item manual tag editor (browse surface, Epic 5/26 P2) — opens from the ＋ trigger on
+   a row/card or the `t` key. Writes the server's returned tag list back to state, re-renders
+   so the row's chips update, and refreshes the rail (debounced) so a freshly-created user tag
+   shows up as a facet. */
+const refreshRailSoon = debounce(() => refreshRail(), 350);
+const tagEditor = initTagEditor({
+  getItem: (fn) => state.items.find((it) => it.fullname === fn),
+  getKnownTags: () => facets.tags.map((t) => t.id),
+  onChange: (fn, tags) => {
+    const it = state.items.find((x) => x.fullname === fn);
+    if (it) { it.metadata = it.metadata || {}; it.metadata.tags = tags; }
+    render();
+    refreshRailSoon();
+  },
+});
+
 /* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
   const actBtn = e.target.closest(".act");
@@ -224,6 +241,8 @@ itemsEl.addEventListener("click", (e) => {
   const fn = card.dataset.fullname;
   if (actBtn) { act(fn, actBtn.dataset.act); return; }
   if (e.target.closest("[data-select]")) { toggleSelect(card); return; }
+  const tagBtn = e.target.closest("[data-tagedit]");
+  if (tagBtn) { e.stopPropagation(); tagEditor.open(fn, tagBtn); return; }
   const media = e.target.closest("[data-media]");
   if (media) {
     const item = state.items.find((it) => it.fullname === fn);
@@ -638,6 +657,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "d" && it) act(it.fullname, "done");
   else if (k === "x" && it && state.status !== "inbox") act(it.fullname, "inbox");
   else if (k === "e" && it) { const u = it.url; if (u) window.open(u, "_blank", "noopener"); }
+  else if (k === "t" && it) { const r = rowEl(it.fullname); tagEditor.open(it.fullname, r ? r.querySelector(".tag-edit") : null); }
   else if (k === "q" && it) { const r = rowEl(it.fullname); if (r) toggleSelect(r); }
   else if (k === "z") { const u = $("#toast .toast-undo"); if (u) u.click(); }
   else if (k === "y") { redo(); }
