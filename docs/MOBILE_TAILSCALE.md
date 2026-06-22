@@ -41,6 +41,10 @@ python -m content_hoarder serve
 tailscale serve --bg 8788
 tailscale serve status        # shows the https://<pc>.<tailnet>.ts.net URL
 ```
+> **Windows shortcut:** `scripts/serve_mobile.ps1` does Terminal 1 for you — binds `127.0.0.1:8788`
+> (so `tailscale serve` can front it) and prints the `https://<pc>.<tailnet>.ts.net` URL. The
+> `tailscale serve --bg 8788` step (Terminal 2) is one-time and persists across reboots.
+
 On the phone, open **`https://<pc>.<tailnet>.ts.net`** → **Chrome menu (⋮) → Install app** to add it to
 your home screen as a standalone, offline-capable **WebAPK**. (Chrome may also pop its own install
 prompt automatically via `beforeinstallprompt` once the secure-context + manifest checks pass.)
