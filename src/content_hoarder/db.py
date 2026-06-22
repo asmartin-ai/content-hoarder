@@ -389,6 +389,56 @@ def set_category(conn: sqlite3.Connection, fullname: str, category: str) -> bool
     return True
 
 
+def _norm_user_tag(t) -> str:
+    """Normalize a user-entered tag: stripped + lowercased (to match the curated
+    vocabulary and avoid case-duplicate tags), capped to a sane length."""
+    return str(t or "").strip().lower()[:40]
+
+
+def set_tags(conn: sqlite3.Connection, fullname: str, *, add=None, remove=None) -> list[str] | None:
+    """Add/remove **user** tags on an item, non-destructively.
+
+    Manual tags live in ``metadata.tags`` (the displayed list) AND are stamped in
+    ``metadata.tags_manual`` so the pipeline (``categorize`` re-tag / ``merge_upsert``
+    re-import) can't clobber them — the stamp is re-unioned wherever tags get rewritten.
+    Rebuilds ``search_text`` but does NOT move ``last_seen_utc`` (a tag edit shouldn't
+    reorder the feed). Returns the resulting tag list, or ``None`` if the item is missing.
+    Caller commits."""
+    add_tags = [s for s in (_norm_user_tag(t) for t in (add or [])) if s]
+    remove_tags = {s for s in (_norm_user_tag(t) for t in (remove or [])) if s}
+    row = get_item(conn, fullname)
+    if row is None:
+        return None
+    md = parse_metadata(row.get("metadata"))
+    tags = _tag_list(md.get("tags"))
+    manual = _tag_list(md.get("tags_manual"))
+    changed = False
+    for t in add_tags:
+        if t not in manual:
+            manual.append(t)
+            changed = True
+        if t not in tags:
+            tags.append(t)
+            changed = True
+    if remove_tags:
+        kept = [t for t in tags if t not in remove_tags]
+        kept_manual = [t for t in manual if t not in remove_tags]
+        if kept != tags or kept_manual != manual:
+            tags, manual, changed = kept, kept_manual, True
+    if changed:
+        md["tags"] = tags
+        if manual:
+            md["tags_manual"] = manual
+        else:
+            md.pop("tags_manual", None)
+        item = dict(row)
+        conn.execute(
+            "UPDATE items SET metadata=?, search_text=? WHERE fullname=?",
+            (json.dumps(md, ensure_ascii=False), build_search_text(item, md), fullname),
+        )
+    return tags
+
+
 def normalize_processing_tags(conn: sqlite3.Connection) -> int:
     """Backfill category-derived processing tags for existing rows, idempotently."""
     rows = conn.execute(
@@ -465,6 +515,15 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
         emd = metadata_with_category_tag(emd, incoming_category)
     elif emd.get("category"):
         emd = metadata_with_category_tag(emd, str(emd.get("category") or ""))
+    # User-applied (manual) tags survive any tag rewrite/replace above: re-union the
+    # stamped subset back into tags. Additive — only fires when tags_manual is present.
+    manual = _tag_list(emd.get("tags_manual"))
+    if manual:
+        tags = _tag_list(emd.get("tags"))
+        for t in manual:
+            if t not in tags:
+                tags.append(t)
+        emd["tags"] = tags
     merged["metadata"] = json.dumps(emd, ensure_ascii=False)
 
     if item.get("hydrated_at"):
