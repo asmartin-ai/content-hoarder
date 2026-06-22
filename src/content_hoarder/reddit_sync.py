@@ -257,10 +257,15 @@ def sync_saved(
     return result
 
 
-# Reddit's saved listing is one mixed (posts+comments) stream globally capped at ~1000 items, so a
-# walk that reaches that many may be TRUNCATED rather than complete. At/above this floor we refuse to
-# infer unsaves (a previously-seen item could merely be beyond the cap, not actually un-saved).
-RECONCILE_SAFE_CAP = 990
+# Reddit's saved listing historically caps at ~1000 items, but some accounts (incl. this one — a
+# dry-run walked 1200+ with the cursor still advancing) paginate well past it. So the count is NOT a
+# reliable completeness signal — reaching the END of the listing (after==null -> stopped 'exhausted')
+# is. The one genuinely ambiguous case is a walk that ENDS right at the legacy ~1000 boundary: that
+# could be the real end OR the cap hiding older saves, so we refuse to reconcile in that band only. A
+# walk ending well below (a small saved list) or well above (an account that paginates past 1000) it
+# is treated as complete.
+LEGACY_CAP_LO = 990
+LEGACY_CAP_HI = 1010
 
 
 def _reconcile_present(conn, present_by_kind: dict, *, stopped: str | None,
@@ -274,16 +279,17 @@ def _reconcile_present(conn, present_by_kind: dict, *, stopped: str | None,
     their status stands. The done-promotion passes ``queue_unsave=False`` so it never re-enqueues a
     no-op Reddit unsave for an item that's already gone server-side.
 
-    SAFETY: reconciles NOTHING (``ran=False``) unless the walk reached a complete boundary
-    (``exhausted``/``empty``) AND stayed below the ~1000 listing cap — a partial or capped view must
-    never trigger a false unsave. ``dry_run`` previews the would-unsave set without writing.
+    SAFETY: reconciles NOTHING (``ran=False``) unless the walk reached the END of the listing
+    (``exhausted``/``empty``) — a ``max_pages`` truncation is a partial view. And if it ended in the
+    ambiguous legacy-cap band (~1000) we also skip, since a hidden cap there would look like the end.
+    ``dry_run`` previews the would-unsave set without writing.
     """
     total = sum(len(v) for v in present_by_kind.values())
     if stopped not in ("exhausted", "empty"):
         return {"ran": False, "skipped": "incomplete_walk", "stopped": stopped, "present": total}
-    if total >= RECONCILE_SAFE_CAP:
-        return {"ran": False, "skipped": "listing_cap", "present": total}
-    # Complete walk below the cap -> this census IS the current saved set; reconcile both kinds.
+    if LEGACY_CAP_LO <= total <= LEGACY_CAP_HI:
+        return {"ran": False, "skipped": "ambiguous_cap", "present": total}
+    # Reached the listing's end, clear of the ambiguous band -> this census IS the current saved set.
     rec = db.reconcile_reddit_saves(
         conn, present_by_kind, dry_run=dry_run,
         truncated_by_kind={"post": False, "comment": False})
@@ -314,7 +320,8 @@ _LAST_RECON_KEY = "reddit_autosync_last_reconcile"  # epoch of the last complete
 
 MIN_RUN_INTERVAL = 90        # debounce: triggers within this window no-op (PWA-open spam collapses to 1)
 RECONCILE_INTERVAL = 6 * 3600  # how often the heavy unsave-reconcile runs; cheap imports run between
-RECONCILE_MAX_PAGES = 12     # ~1200 items — enough to exhaust the ~1000-item saved listing cap
+RECONCILE_MAX_PAGES = 60     # up to ~6000 items — the saved list can paginate well past 1000; the
+                             # reconcile MUST reach the listing's end (after==null) or it can't run
 
 
 def _to_int(value, default: int = 0) -> int:
