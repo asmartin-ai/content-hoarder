@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v68";  // v68: fix top-bar flicker — position-based hysteresis instead of direction toggle — v67 = shrink-on-scroll + version badge
+const CACHE = "ch-shell-v69";  // v69: restore plain-stacked gallery lightbox (revert IO/min-height) — v68 = top-bar flicker fix
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
