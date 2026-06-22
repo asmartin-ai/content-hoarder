@@ -26,6 +26,7 @@ const actsHtml = (status) =>
   (status && status !== "inbox"
     ? '<button type="button" class="act x" data-act="inbox" title="Back to Inbox — X" aria-label="Back to Inbox">IN</button>'
     : "") +
+  '<button type="button" class="act sh" data-share title="Share" aria-label="Share">' + chIcon("share") + "</button>" +
   "</div>";
 
 const underlay =

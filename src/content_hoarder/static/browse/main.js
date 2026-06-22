@@ -8,7 +8,7 @@ import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
 import { createLightbox, imageUrl, mediaType, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
-import { wireTagExpanders } from "../core/render.js";
+import { wireTagExpanders, shareItem } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
 import { initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
@@ -254,7 +254,8 @@ itemsEl.addEventListener("click", (e) => {
   const card = e.target.closest("[data-fullname]");
   if (!card) return;
   const fn = card.dataset.fullname;
-  if (actBtn) { act(fn, actBtn.dataset.act); return; }
+  if (actBtn && actBtn.dataset.act) { act(fn, actBtn.dataset.act); return; }   // status acts carry data-act
+  if (e.target.closest("[data-share]")) { shareItem(state.items.find((it) => it.fullname === fn)); return; }
   if (e.target.closest("[data-select]")) { toggleSelect(card); return; }
   const tagBtn = e.target.closest("[data-tagedit]");
   if (tagBtn) { e.stopPropagation(); tagEditor.open(fn, tagBtn); return; }
@@ -271,7 +272,7 @@ itemsEl.addEventListener("click", (e) => {
     // native app — not the bare lightbox. The reader renders the media tile, which still
     // opens the raw player/lightbox on tap (onMedia → openMediaFor). Galleries keep their
     // dedicated stacked viewer.
-    if (item.source === "reddit" && ["image", "video"].includes(mediaType(item).cls)) { readerUI.open(item); return; }
+    if (item.source === "reddit" && ["image", "video"].includes(mediaType(item).cls)) { readerUI.open(item); preloadNext(item); return; }
     openMediaFor(item);
     return;
   }
@@ -283,9 +284,35 @@ itemsEl.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     const onTitle = a && a.parentElement && a.parentElement.tagName === "H3";
     const onText = !a && e.target.closest(".title, .snippet, .pin h3");
-    if (onTitle || onText) { e.preventDefault(); readerUI.open(rItem); }
+    if (onTitle || onText) { e.preventDefault(); readerUI.open(rItem); preloadNext(rItem); }
   }
 });
+
+/* ---- predictive preload: on reader-open, warm the NEXT reddit thread + its media (Epic 8 P2) ----
+   Sequential reading is the common path, so when an item opens we pre-hydrate the next reddit item's
+   comment thread (a GET lazily hydrates it server-side → the next open is instant) and prime its media
+   image. Bounded + safe: ONE thread fetch per open (de-duped via _preloaded; respects reddit rate
+   limits), only reddit items have threads, and an in-flight preload is aborted when a newer one starts. */
+let _preloadCtl = null;
+const _preloaded = new Set();
+function preloadNext(opened) {
+  if (!opened) return;
+  const i = state.items.indexOf(opened);
+  if (i < 0) return;
+  let next = null;                                  // nearest following reddit item (small look-ahead)
+  for (let j = i + 1; j < state.items.length && j <= i + 4; j++) {
+    if (state.items[j].source === "reddit") { next = state.items[j]; break; }
+  }
+  if (!next) return;
+  const mu = imageUrl(next);                         // prime media (CDN/local — no rate-limit concern)
+  if (mu) { const im = new Image(); im.src = mu; }
+  if (_preloaded.has(next.fullname)) return;         // warm each thread at most once
+  _preloaded.add(next.fullname);
+  if (_preloadCtl) { try { _preloadCtl.abort(); } catch (_e) {} }
+  _preloadCtl = new AbortController();
+  // sort is irrelevant for warming (hydration caches the whole thread; sort is applied at read time)
+  fetch("/reddit/items/" + encodeURIComponent(next.fullname) + "/thread", { signal: _preloadCtl.signal }).catch(() => {});
+}
 
 /* ---- media lightbox ---- */
 let lastMediaFn = null;   // item whose media is open in the lightbox → re-blurred on close

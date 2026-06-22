@@ -5,6 +5,7 @@
 
 import { esc, safeUrl, ago, fmtDate } from "./util.js";
 import { redditUrl } from "./media.js";
+import { toast } from "./toast.js";
 
 /* ---- source identity ---- */
 export const CH_SOURCES = {
@@ -34,6 +35,22 @@ export const itemUrl = (item) =>
   item.source === "hackernews" ? (hnThreadUrl(item) || item.url || "")
   : item.source === "reddit" ? (redditUrl((item.metadata || {}).permalink) || item.url || "")
   : (item.url || "");
+
+/* Share an item's canonical source link — native share sheet on mobile (navigator.share),
+   clipboard-copy fallback on desktop/unsupported (Epic 5 P2). A user-cancel is swallowed. */
+export function shareItem(item) {
+  if (!item) return;
+  const url = itemUrl(item) || (item.url || "");
+  if (!url) { toast("No link to share"); return; }
+  const data = { title: item.title || "Saved item", url };
+  if (navigator.share) {
+    navigator.share(data).catch(() => {});   // ignore AbortError (user dismissed the sheet)
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => toast("Link copied")).catch(() => toast("Couldn't copy link"));
+  } else {
+    toast(url);
+  }
+}
 
 /* The external article an HN story links to (item.url), but only when it's a real
    outbound link — Ask/Show-HN self-posts store the thread URL in item.url, so those
