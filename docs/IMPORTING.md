@@ -55,43 +55,45 @@ python -m content_hoarder import wl2.json
 
 ---
 
-## Hacker News (Materialistic app)
+## Hacker News
 
-The app keeps saved stories in a `favorite` table inside `Materialistic.db`. On a **non-rooted**
-phone you can't `adb pull` app-private storage — use **`adb backup`** instead.
+> **Migrated 2026-06-22: Materialistic → [Harmonic](https://github.com/SimonHalvdansson/Harmonic-HN).**
+> Materialistic (abandoned ~2022) keeps saves **local-only** — they never reach your HN account, so
+> syncing them needs the phone + a cable + a per-device `adb backup`. Harmonic (actively maintained)
+> **favorites stories to your HN account server-side**, which makes HN saves **remotely pullable like
+> Reddit's** — no phone, no cable. All prior Materialistic saves are **already imported** (7,367 items,
+> 2026-06-22), so nothing was lost in the switch.
 
-**1. Install adb (Android platform-tools) on Windows:**
-- Download "SDK Platform-Tools for Windows" from
-  <https://developer.android.com/tools/releases/platform-tools>, unzip to e.g. `C:\platform-tools`.
+### Current path — Harmonic → HN-account favorites
+1. In **Harmonic** (logged into your HN account), **favorite** the stories you want to keep. They land
+   on your account at `https://news.ycombinator.com/favorites?id=<YOURNAME>` (public, keyless).
+2. **One-time confirm** Harmonic favorites server-side: favorite one story, then open that favorites URL
+   in a browser — it should appear there. (HN's API is read-only; favoriting works by driving the HN
+   website, same as voting — so it must be confirmed once.)
+3. **Import** (manual, until the auto-scraper lands — see BACKLOG Epic 7 P2): save the favorites page as
+   HTML and import it — the HN connector already parses `item?id=`/`athing` out of HN HTML (and bare-id
+   `.txt`/`.json` lists):
+   ```bash
+   python -m content_hoarder import "path/to/favorites.html" --source hackernews
+   python -m content_hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
+   ```
+   The planned **favorites-page scraper** (`favorites?id=<user>`, paginated `&p=N`) turns this into a
+   keyless, server-side, scheduled sync — the HN analogue of the Reddit auto-sync.
 
-**2. Confirm the phone is connected** (USB debugging on — you've done this):
+### Legacy — Materialistic app DB (reference only; being retired)
+Older saves came from the Materialistic Android app's local DB via `adb backup` (a non-rooted phone
+can't `adb pull` app-private storage). Keep this only for other-device / historical data. The saved
+table is **`saved`** (newer Room builds, e.g. v3.3) or `favorite` (older); a `read` history table also
+imports (as `hn_list=read`, archived). Clear the phone's saved list with the app's own ⋮ → **Clear all**
+(no ADB write-back is possible on a non-rooted phone).
 ```bash
-cd C:\platform-tools
-adb devices            # approve the "Allow USB debugging?" prompt on the phone
-```
-
-**3. Back up just Materialistic** (leave the on-phone backup password blank, then tap "Back up my data"):
-```bash
-adb backup -f materialistic.ab -noapk io.github.hidroh.materialistic
-```
-
-**4. Extract the `.ab`** (it's a 24-byte header + gzipped tar). In **Git Bash**:
-```bash
-( printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" ; tail -c +25 materialistic.ab ) | tar xfvz -
-# → creates apps/io.github.hidroh.materialistic/db/Materialistic.db
-```
-
-**5. Import + enrich** (enrich fills score/author from HN's free API):
-```bash
+adb backup -f materialistic.ab -noapk io.github.hidroh.materialistic   # tap "Back up my data", blank password
+( printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" ; tail -c +25 materialistic.ab ) | tar xfz -
 python -m content_hoarder import "apps/io.github.hidroh.materialistic/db/Materialistic.db" --source hackernews
-python -m content_hoarder enrich --source hackernews
 ```
-
-> **Caveat:** `adb backup` is deprecated and **Android 12+ may produce an empty backup** if the OS
-> or the app's `allowBackup` flag blocks it. If `materialistic.ab` is tiny/empty:
-> fallbacks are (a) if you also *favorited* stories on the HN website, save
-> `https://news.ycombinator.com/favorites?id=YOURNAME` as HTML and import that, or (b) export a
-> plain list of HN item ids and import the `.txt`/`.json`. Tell me which and I'll wire it up.
+> `adb backup` is deprecated but **still worked on Android 16** (2026-06-22) when `allowBackup` is set —
+> the old "Android 12+ may be empty" warning didn't bite. On Windows/**Git Bash**, prefix any adb command
+> with a `/sdcard/...` device path with `MSYS_NO_PATHCONV=1`, or the path gets mangled to a Windows path.
 
 ---
 
