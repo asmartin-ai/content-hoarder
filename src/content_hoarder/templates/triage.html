@@ -70,7 +70,13 @@
         <span class="act-label">Archive</span><kbd class="act-key">E</kbd>
       </button>
     </div>
-    <div class="triage-hint">Swipe → archive · ← done · or use the buttons / S&nbsp;E&nbsp;Y keys</div>
+    <div id="skip-row" class="triage-skip">
+      <button id="skip-btn" class="btn skip-btn" type="button"
+              title="Skip — pass for now, decide later (Space)">
+        Skip for now <kbd class="act-key">Space</kbd>
+      </button>
+    </div>
+    <div class="triage-hint">Swipe → archive · ← done · or use the buttons / S&nbsp;E&nbsp;Y keys · Space&nbsp;to&nbsp;skip</div>
   </main>
 
   <div id="shortcut-modal" class="modal" hidden>
@@ -81,6 +87,7 @@
         <div class="shortcut-row"><span><kbd>S</kbd></span><span>Keep</span></div>
         <div class="shortcut-row"><span><kbd>E</kbd> / <kbd>&rarr;</kbd></span><span>Archive</span></div>
         <div class="shortcut-row"><span><kbd>Y</kbd> / <kbd>&larr;</kbd></span><span>Done</span></div>
+        <div class="shortcut-row"><span><kbd>Space</kbd></span><span>Skip &mdash; pass, decide later</span></div>
         <div class="shortcut-row"><span><kbd>U</kbd> / <kbd>Z</kbd></span><span>Undo</span></div>
         <div class="shortcut-row"><span><kbd>?</kbd></span><span>Toggle this sheet</span></div>
       </div>

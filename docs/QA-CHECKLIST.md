@@ -10,7 +10,7 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 - **Desktop:** `python -m content_hoarder serve` → http://127.0.0.1:8788
 - **Mobile:** `python -m content_hoarder serve --host <tailscale-ip>` → open the URL on the phone
-  (Firefox / Pixel-6 target) and install to home screen. See [MOBILE_TAILSCALE.md](MOBILE_TAILSCALE.md).
+  (Chrome / Pixel-6 target) and install to home screen. See [MOBILE_TAILSCALE.md](MOBILE_TAILSCALE.md).
 - **Mobile layout** engages at **≤ 860 px** (left sidebar becomes a hamburger drawer). You can preview
   it on desktop via DevTools device-emulation, but do a real-phone pass for swipe/touch.
 - **Service worker caveat:** the shell is precached (`sw.js` — check the current `CACHE` constant for
@@ -24,8 +24,9 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 - [x] App loads at `/`; no console errors on first paint. ⬛
 - [ ] **Offline:** load, kill the network, reload — the shell still renders (service worker). ⬛
-- [ ] **Install to home screen** (Firefox menu → Install); the installed PWA opens standalone. 📱
-      *(No in-app `install-hint` banner exists in v3 — install via the browser menu only.)*
+- [ ] **Install to home screen** (Chrome menu → Install app → real WebAPK); the installed PWA opens standalone. 📱
+      *(No in-app `install-hint` banner exists in v3 — install via the browser menu. Chrome does fire
+      `beforeinstallprompt`, so a custom install button is possible if wanted.)*
 - [x] **Theme toggle** (three-dot ⋯ menu → Light/dark) switches instantly, persists across reload, and
       both modes are readable. ⬛
 - [ ] **Reduced motion:** with the OS "reduce motion" setting on, swipes/animations are neutralized. ⬛

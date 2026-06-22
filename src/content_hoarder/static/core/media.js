@@ -132,13 +132,13 @@ export const playableVideoSrc = (item) => {
 };
 
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.
-   Handles v.redd.it HLS (native or hls.js) and plain direct video files.
-   opts.autoplay: start playback as soon as THIS path's source is actually attached —
-   for the hls.js path that's inside the async .then(), so a synchronous play() by the
-   caller would no-op (the source isn't attached yet). Returns { video, destroy } where
-   video is the <video> element and destroy is a teardown function to call when done
-   (stops HLS buffering). The destroy closure reads the hls instance at call time, not at
-   mount time, avoiding the async leak. */
+   Handles v.redd.it HLS (hls.js preferred; native HLS as the iOS-Safari fallback) and
+   plain direct video files. opts.autoplay: start playback as soon as THIS path's source is
+   attached — for the hls.js path that's inside the async loader, so a synchronous play()
+   by the caller would no-op (the source isn't attached yet). Returns { video, destroy }
+   where video is the <video> element and destroy is a teardown function to call when done
+   (clears the watchdog + stops HLS buffering). The destroy closure reads the hls instance
+   at call time, not at mount time, avoiding the async leak. */
 export function mountVideo(container, srcUrl, posterUrl, opts) {
   if (!safeUrl(srcUrl)) return { video: null, destroy: null };
   const autoplay = !!(opts && opts.autoplay);
@@ -169,26 +169,61 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   container.appendChild(video);
   container.insertAdjacentHTML("beforeend", fallbackHtml);
 
-  if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = hlsUrl;
-    tryPlay();
-    return { video, destroy: null };
-  }
+  // Replace a dead <video> (eternal spinner) with a clear escape + a short diagnostic
+  // when the stream never plays — hls.js failed fatally, the host is unreachable, or native
+  // HLS errored. Covers BOTH the native-HLS and hls.js paths so neither can leave the user
+  // stuck on a spinner (restored from 7aa27b6/abe3b75).
+  let lastErr = "";
+  let watchdog = 0;
+  const showFailed = (why) => {
+    if (!document.body.contains(video)) return;
+    clearTimeout(watchdog);
+    container.innerHTML = '<p class="media-fallback">Couldn’t load this video' +
+      (why ? " (" + esc(String(why)) + ")" : "") + ". " +
+      '<a href="' + fallbackUrl + '" target="_blank" rel="noopener">Open on Reddit ↗</a></p>';
+  };
+  // Watchdog: if no frame has decoded after 14s, the spinner is dead — surface the
+  // fallback with whatever the last error was (so a silent stall becomes reportable).
+  watchdog = setTimeout(() => {
+    if (document.body.contains(video) && video.readyState < 2) showFailed(lastErr || "stalled — no video data");
+  }, 14000);
+  const clearWatch = () => clearTimeout(watchdog);
+  video.addEventListener("playing", clearWatch, { once: true });
+  video.addEventListener("loadeddata", clearWatch, { once: true });
+  video.addEventListener("error", () => showFailed("media error " + (video.error ? video.error.code : "?")));
 
+  // Decide the HLS path. PREFER hls.js when Hls.isSupported(): Android/desktop Chrome and
+  // Firefox have NO native HLS, yet video.canPlayType('application/vnd.apple.mpegurl') can
+  // return "maybe" there — a false positive. Routing those to video.src = manifest produced
+  // media error 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) on the Pixel-6 even though the .m3u8 plays
+  // fine when opened directly. Native HLS is kept ONLY as the fallback for genuine support
+  // (iOS Safari, where hls.js lacks MSE). We NEVER set video.src to the bare v.redd.it
+  // redirect (srcUrl) — it 302s, it isn't a playable file.
   let activeHls = null;
-  loadHls().then((Hls) => {
-    if (!Hls || !document.body.contains(video)) return;
+  const attachHls = (Hls) => {
+    if (!document.body.contains(video)) return;       // closed/replaced before the loader resolved
+    if (!Hls) { showFailed("player unavailable"); return; }   // hls.js script failed to load
     if (Hls.isSupported()) {
       const h = new Hls();
       activeHls = h;
+      h.on(Hls.Events.ERROR, (_e, data) => {            // record every error; bail out on a fatal one
+        if (!data) return;
+        lastErr = data.details || data.type || "hls error";
+        if (data.fatal) { try { h.destroy(); } catch (_err) {} activeHls = null; showFailed(lastErr); }
+      });
       h.loadSource(hlsUrl);
       h.attachMedia(video);
+      tryPlay();  // play AFTER the source is attached (fixes the Chrome/Android tap-autoplay race)
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;   // genuine native HLS (iOS Safari)
+      tryPlay();
     } else {
-      video.src = srcUrl;
+      showFailed("HLS not supported by this browser");
     }
-    tryPlay();  // play AFTER the source is attached (fixes the Chrome/Android tap-autoplay race)
-  });
-  const destroy = () => { if (activeHls) { activeHls.destroy(); activeHls = null; } };
+  };
+  if (window.Hls) attachHls(window.Hls); else loadHls().then(attachHls);
+
+  const destroy = () => { clearWatch(); if (activeHls) { activeHls.destroy(); activeHls = null; } };
   return { video, destroy };
 }
 
@@ -283,10 +318,10 @@ export function createLightbox(opts) {
         imgs.forEach(load);  // no IO support → eager
       }
     },
-    /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored
-       url has no audio, so we play the HLS manifest (audio+video): native HLS where
-       supported (Safari/iOS), else lazy-loaded hls.js; a non-v.redd.it direct file
-       keeps the plain <video src>. */
+    /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored url
+       has no audio, so we play the HLS manifest (audio+video) via hls.js (preferred) or
+       native HLS (iOS-Safari fallback); a non-v.redd.it direct file keeps the plain
+       <video src>. See mountVideo for why hls.js wins over a canPlayType check. */
     openVideo(srcUrl, posterUrl) {
       if (!safeUrl(srcUrl)) return;
       open("");  // clear first and show (open() sets modal.hidden = false)
