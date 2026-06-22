@@ -22,7 +22,7 @@ export function attachSwipe(el, opts) {
   const COMMIT2 = opts.onRightLong ? (opts.commit2 || 170) : Infinity;
   const fg = el.querySelector(".item-fg") || el;
   let startX = 0, startY = 0, dragging = false, decided = false, horizontal = false;
-  let stage2 = false;
+  let stage2 = false, armed = false;
 
   fg.style.touchAction = "pan-y";
 
@@ -31,6 +31,7 @@ export function attachSwipe(el, opts) {
     fg.style.transform = "";
     el.classList.remove("swipe-arch", "swipe-done", "swipe-keep");
     stage2 = false;
+    armed = false;
   }
 
   // After a horizontal swipe the browser still synthesizes a click on the original
@@ -69,11 +70,18 @@ export function attachSwipe(el, opts) {
     fg.style.transform = "translateX(" + dx + "px)";
     el.classList.toggle("swipe-arch", dx > 40 && dx <= COMMIT2);  // right → archive
     el.classList.toggle("swipe-done", dx < -40);                  // left → done
+    // Detent when an action crosses its COMMIT threshold (release-to-fire): one firm pulse per arm,
+    // for done (left) AND archive (right, below the Keep stage) — was Keep-only (user 2026-06-22).
+    const a = Math.abs(dx) >= COMMIT && dx <= COMMIT2;
+    if (a !== armed) {
+      armed = a;
+      if (a && navigator.vibrate) navigator.vibrate(12);  // done/archive "armed" detent (firm tick)
+    }
     const s2 = dx > COMMIT2;
     if (s2 !== stage2) {
       stage2 = s2;
       el.classList.toggle("swipe-keep", s2);
-      if (s2 && navigator.vibrate) navigator.vibrate(3);  // one faint pulse at the threshold (softened 2026-06-22)
+      if (s2 && navigator.vibrate) navigator.vibrate(15);  // Keep stage detent — firmer (more travel/commitment)
     }
   });
 
