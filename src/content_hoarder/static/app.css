@@ -934,6 +934,31 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 .tcard-cat-label { font-size: var(--fs-xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-label); }
 .tcard-cat .chip-row { margin-top: 0; }
 
+/* triage card: manual tag editor (removable chips + an inline add UI). */
+.tcard-tags { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.tcard-tags-label { font-size: var(--fs-xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-label); padding-top: 0.3rem; flex-shrink: 0; }
+.tcard-tags-body { flex: 1 1 160px; min-width: 0; }
+.tcard-tagrow { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.tcard-tags .chip { font-size: var(--fs-sm); }
+.tag-edit { display: inline-flex; align-items: center; gap: 0.3rem; }
+.tag-x { font-size: 0.72rem; opacity: 0.55; line-height: 1; }
+.tag-edit:hover .tag-x, .tag-edit:focus-visible .tag-x { opacity: 1; }
+.tag-add { color: var(--muted); border-style: dashed; }
+.tag-add:hover { color: var(--accent); border-color: var(--accent); }
+/* inline add UI: a free-text input + clickable known-tag suggestions */
+.tag-add-ui { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+.tag-add-ui[hidden] { display: none; }
+.tag-add-input {
+    flex: 0 1 200px; min-width: 0; padding: 0.3rem 0.55rem;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: inherit; font: inherit; font-size: var(--fs-sm);
+}
+.tag-add-input:focus { outline: none; border-color: var(--accent); }
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.tag-sugg { font-size: var(--fs-xs); }
+.tag-sugg:hover { color: var(--accent); border-color: var(--accent); }
+.tag-sugg-empty { font-size: var(--fs-xs); color: var(--dim); align-self: center; }
+
 .triage-empty {
     text-align: center;
     color: var(--muted);
