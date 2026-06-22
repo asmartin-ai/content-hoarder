@@ -659,11 +659,14 @@ def create_app(db_path: str | None = None) -> Flask:
         # Curated filter-tag counts for the browse rail, cross-filtered by the active
         # source/status. Kept off the hot /stats path (it's a json_each scan) so the
         # per-action status refresh stays cheap; the rail refetches this only on navigation.
+        from content_hoarder import categorize
         source = request.args.get("source") or None
         status = request.args.get("status") or None
         with conn() as c:
             counts = db.tag_counts(c, source=source, status=status)
-        return jsonify({"tags": counts, "total": sum(counts.values())})
+        # `groups` is the static parent→children rail grouping (Epic 26 P2); the rail nests the
+        # curated `tags` counts under it. Tags stay flat — this is presentation only.
+        return jsonify({"tags": counts, "total": sum(counts.values()), "groups": categorize.tag_groups()})
 
     @app.get("/stats")
     def stats():
