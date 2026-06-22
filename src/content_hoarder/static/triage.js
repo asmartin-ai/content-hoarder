@@ -3,6 +3,7 @@
 import { esc, safeUrl, isTypingTarget, ago } from "./core/util.js";
 import { getJSON as fetchJSON } from "./core/api.js";
 import { chIcon, fillIcons } from "./core/icons.js";
+import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
 
 (function () {
   "use strict";
@@ -18,6 +19,8 @@ import { chIcon, fillIcons } from "./core/icons.js";
   var srcFilter = document.getElementById("source-filter");
   var toastEl = document.getElementById("toast");
   var undoBtn = document.getElementById("undo-btn");
+  var skipBtn = document.getElementById("skip-btn");
+  var skipRow = document.getElementById("skip-row");
   var menuBtn = document.getElementById("menu-btn");
   var menuPop = document.getElementById("menu-pop");
   var batchChips = document.getElementById("batch-chips");
@@ -45,17 +48,51 @@ import { chIcon, fillIcons } from "./core/icons.js";
     return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
   }
 
-  // Gallery lightbox (reuse the same .media-gallery + .gallery-img pattern as browse).
-  function openGallery(urls) {
-    var imgs = (urls || []).filter(safeUrl);
+  function itemByFn(fn) {
+    for (var i = 0; i < queue.length; i++) if (queue[i].fullname === fn) return queue[i];
+    return null;
+  }
+  // Gallery lightbox: stacked images that load the sized ~1080px variants first
+  // (gallery_preview) instead of the multi-MB 5000px originals — the Epic 13 P2 perf fix,
+  // now applied to triage too. .media-gallery is the scroll container, so native
+  // loading=lazy tracks it correctly (no IntersectionObserver needed). Tap an image to
+  // swap up to its full-res original.
+  function openGallery(full, previews) {
+    var imgs = (full || []).filter(safeUrl);
     if (!imgs.length) return;
+    var sized = (previews || []).filter(safeUrl);
+    var src = sized.length === imgs.length ? sized : imgs;
     document.getElementById("media-body").innerHTML =
       '<div class="media-gallery">' +
-      imgs.map(function (u) { return '<img class="media-img gallery-img" loading="lazy" src="' + esc(u) + '" alt="">'; }).join("") +
+      src.map(function (u, i) {
+        return '<img class="media-img gallery-img" loading="lazy" decoding="async" src="' +
+          esc(u) + '" data-full="' + esc(imgs[i]) + '" alt="">';
+      }).join("") +
       "</div>" + '<p class="media-fallback">' + imgs.length + " images</p>";
     document.getElementById("media-modal").hidden = false;
   }
+  // Direct / catch-all image → simple lightbox (no reddit iframe dependency).
+  function openImage(url) {
+    if (!safeUrl(url)) return;
+    document.getElementById("media-body").innerHTML =
+      '<img class="media-img" src="' + esc(url) + '" alt="">' +
+      '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>';
+    document.getElementById("media-modal").hidden = false;
+  }
+  // Reddit / direct video → native <video> in the lightbox (Epic 13 P2), same as browse:
+  // v.redd.it plays the audio+video HLS manifest (hls.js preferred, native HLS fallback), a
+  // direct .mp4/.webm keeps a plain <video src>. videoTeardown stops HLS buffering on close.
+  var videoTeardown = null;
+  function openVideo(srcUrl, posterUrl) {
+    if (!safeUrl(srcUrl)) return;
+    var body = document.getElementById("media-body");
+    body.innerHTML = "";
+    document.getElementById("media-modal").hidden = false;
+    var r = mountVideo(body, srcUrl, posterUrl && safeUrl(posterUrl) ? posterUrl : "", { autoplay: true });
+    videoTeardown = r && r.destroy ? r.destroy : null;
+  }
   function closeMedia() {
+    if (videoTeardown) { videoTeardown(); videoTeardown = null; }   // stop HLS buffering
     document.getElementById("media-modal").hidden = true;
     document.getElementById("media-body").innerHTML = "";
   }
@@ -165,21 +202,53 @@ import { chIcon, fillIcons } from "./core/icons.js";
   function mediaHtml(item) {
     var m = item.metadata || {};
     var mt = m.media_type;
-    // Reddit gallery with captured image URLs → show inline gallery images (tap opens lightbox).
+    // Reddit gallery with captured image URLs → inline images, tap opens the lightbox.
+    // Inline thumbnails use the sized ~1080px gallery_preview variants when present (not
+    // the multi-MB 5000px originals) — the Epic 13 P2 perf fix, now in triage too.
     if (item.source === "reddit" && Array.isArray(m.gallery) && m.gallery.length) {
       var nsfw = m.over_18 ? " nsfw" : "";
       var imgs = m.gallery.filter(safeUrl);
+      var sized = Array.isArray(m.gallery_preview) ? m.gallery_preview.filter(safeUrl) : [];
+      var inlineSrc = sized.length === imgs.length ? sized : imgs;
       if (imgs.length) {
         return '<div class="tcard-media tcard-gallery' + nsfw + '">' +
-          imgs.map(function (u) {
-            return '<img class="tcard-gallery-img" loading="lazy" src="' + esc(u) + '" alt="">';
+          inlineSrc.map(function (u) {
+            return '<img class="tcard-gallery-img" loading="lazy" decoding="async" src="' + esc(u) + '" alt="">';
           }).join("") +
           (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") +
           "</div>";
       }
     }
-    // Reddit video/media → keep the click-to-load inline embed button (don't let a
-    // thumbnail replace it, which would drop the play/open affordance).
+    // Direct / catch-all reddit image → tappable image preview (opens the simple lightbox).
+    // Recognized by media SHAPE via core mediaType (parity with browse), so the reddit_media
+    // catch-all posts whose url is the permalink still surface their image instead of a
+    // generic embed button. Galleries are handled above, so this only catches single images.
+    if (item.source === "reddit" && mediaType(item).cls === "image") {
+      var iu = imageUrl(item) || m.thumbnail || "";
+      if (safeUrl(iu)) {
+        var insfw = m.over_18 ? " nsfw" : "";
+        return '<div class="tcard-media tcard-img' + insfw + '">' +
+          '<img loading="lazy" decoding="async" src="' + esc(iu) + '" alt="">' +
+          (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") +
+          "</div>";
+      }
+    }
+    // Reddit video with a directly-playable source (v.redd.it HLS / direct mp4) → poster +
+    // play button that opens the NATIVE <video> lightbox (Epic 13 P2), same as browse —
+    // no more online-only redditmedia iframe. External "videos" (YouTube, gfycat/redgifs)
+    // have no playable src, so playableVideoSrc() returns "" and they fall through to the
+    // iframe embed below.
+    if (item.source === "reddit" && playableVideoSrc(item)) {
+      var vposter = m.thumbnail || imageUrl(item) || "";
+      var vnsfw = m.over_18 ? " nsfw" : "";
+      return '<div class="tcard-media tcard-video' + vnsfw + '">' +
+        (safeUrl(vposter) ? '<img loading="lazy" decoding="async" src="' + esc(vposter) + '" alt="">' : "") +
+        '<span class="tcard-play" aria-hidden="true">▶</span>' +
+        (m.over_18 ? '<span class="nsfw-tag">NSFW · tap</span>' : "") +
+        "</div>";
+    }
+    // Reddit video/media → click-to-load inline embed button (don't let a thumbnail
+    // replace it, which would drop the play/open affordance).
     if (item.source === "reddit" && (mt === "reddit_video" || mt === "reddit_media" || mt === "gallery")) {
       var permalink = m.permalink || item.url || "";
       var label = mt === "reddit_video" ? "▶ Play"
@@ -277,6 +346,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
   function showEmpty(show) {
     emptyEl.hidden = !show;
     actionsEl.hidden = show;
+    if (skipRow) skipRow.hidden = show;   // skipping makes no sense with an empty queue
     if (show) {
       if (!emptyStamped) {                                 // fire the celebration once per emptying
         emptyStamped = true;
@@ -373,7 +443,28 @@ import { chIcon, fillIcons } from "./core/icons.js";
       });
   }
 
+  // Skip: pass on this card without deciding — move it to the back of the current batch
+  // and show the next. No status change, no API call, and not counted as a clear (a skip
+  // is a non-decision, never a "win"). It quietly resurfaces later in the session; for a
+  // *timed* "decide later" see the Defer/Snooze backlog item (Epic 5).
+  function skip() {
+    if (queue.length < 2) { toast("Nothing else in this batch", false); return; }
+    if (window.chHaptic) window.chHaptic("skip");   // faintest cue — registers input, no reward
+    animateSkipOut(stack.querySelector(".tcard"));
+    queue.push(queue.shift());                       // current → back of the queue
+    saveSession();                                   // persist the reordered queue for resume
+    setTimeout(renderCurrent, 180);
+  }
+
   // ---- swipe (pointer events) ----
+  // Skip = a non-decision "pass": a gentle down-and-away, deliberately distinct from the
+  // horizontal decision fling (animateOut) so it never reads as a commit.
+  function animateSkipOut(card) {
+    if (!card) return;
+    card.style.transition = "transform .18s ease-out, opacity .18s ease-out";
+    card.style.transform = "translateY(16%) scale(.96)";
+    card.style.opacity = "0";
+  }
   function animateOut(card, dir) {
     if (!card) return;
     card.style.transition = "transform .18s ease-out, opacity .18s ease-out";
@@ -440,16 +531,28 @@ import { chIcon, fillIcons } from "./core/icons.js";
     // gallery un-blurs it; only an already-revealed gallery opens the lightbox.
     var media = e.target.closest(".tcard-media.nsfw");
     if (media) { media.classList.remove("nsfw"); return; }
-    // Inline gallery image → open lightbox with all gallery images
-    var galImg = e.target.closest(".tcard-gallery-img");
-    if (galImg) {
-      var galHolder = galImg.closest(".tcard-gallery");
-      if (galHolder) {
-        var urls = Array.prototype.map.call(
-          galHolder.querySelectorAll(".tcard-gallery-img"),
-          function (img) { return img.getAttribute("src"); }
-        );
-        openGallery(urls);
+    // Inline gallery image OR single image → open the lightbox. Looked up by the card's
+    // fullname so we pass the FULL-res gallery urls + sized previews (not the card's
+    // already-sized src), and resolve the single image via the shared imageUrl().
+    var mediaTap = e.target.closest(".tcard-gallery-img, .tcard-img");
+    if (mediaTap) {
+      var mcard = mediaTap.closest(".tcard");
+      var mit = mcard ? itemByFn(mcard.getAttribute("data-fullname")) : null;
+      if (mit) {
+        var mm = mit.metadata || {};
+        if (Array.isArray(mm.gallery) && mm.gallery.length) openGallery(mm.gallery, mm.gallery_preview);
+        else openImage(imageUrl(mit));
+      }
+      return;
+    }
+    // Reddit video poster → open the native <video> lightbox (HLS for v.redd.it).
+    var vtap = e.target.closest(".tcard-video");
+    if (vtap) {
+      var vcard = vtap.closest(".tcard");
+      var vit = vcard ? itemByFn(vcard.getAttribute("data-fullname")) : null;
+      if (vit) {
+        var vsrc = playableVideoSrc(vit);
+        if (vsrc) openVideo(vsrc, (vit.metadata || {}).thumbnail || imageUrl(vit));
       }
       return;
     }
@@ -555,6 +658,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
     else if (k === "e" || k === "arrowright") commit("archived");
     else if (k === "y" || k === "arrowleft") commit("done");
     else if (k === "s") commit("keep");
+    else if (k === " ") { e.preventDefault(); skip(); }   // Space = pass / show next (stops scroll + button activation)
     else if (k === "z" || k === "u") undo();
   });
   var nb = document.getElementById("next-batch");
@@ -563,6 +667,7 @@ import { chIcon, fillIcons } from "./core/icons.js";
 
   function updateUndoBtn() { if (undoBtn) undoBtn.disabled = !lastAction; }
   if (undoBtn) undoBtn.addEventListener("click", undo);
+  if (skipBtn) skipBtn.addEventListener("click", skip);
 
   function setActiveChip() {
     if (!batchChips) return;
@@ -628,6 +733,12 @@ import { chIcon, fillIcons } from "./core/icons.js";
   var mediaModal = document.getElementById("media-modal");
   if (mediaModal) mediaModal.addEventListener("click", function (e) {
     if (e.target === mediaModal) closeMedia();
+  });
+  // In the gallery lightbox, tap a sized preview to swap up to its full-res original.
+  var mediaBodyEl = document.getElementById("media-body");
+  if (mediaBodyEl) mediaBodyEl.addEventListener("click", function (e) {
+    var gi = e.target.closest(".gallery-img");
+    if (gi && gi.dataset.full && gi.src !== gi.dataset.full) gi.src = gi.dataset.full;
   });
   updateUndoBtn();
   fillIcons(document);   // hydrate the static [data-ico] action-button glyphs (icons.js auto-fill retired)
