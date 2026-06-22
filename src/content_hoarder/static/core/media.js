@@ -5,6 +5,22 @@
 
 import { esc, safeUrl } from "./util.js";
 
+/* ---- local media archive (Epic 4 P1) ----
+   When the user enables the archive (settings toggle; off by default for perf/bloat), prefer the
+   same-origin /media/<blob> copy for any URL we've archived (metadata.archived_media), so the feed
+   + lightbox serve our bytes — survivable, cacheable, fast. setArchivePref() is called by the page
+   on load + when the toggle flips; off => localUrl is a pure pass-through (zero cost). */
+let _archive = false;
+export const setArchivePref = (on) => { _archive = !!on; };
+export const localUrl = (item, url) => {
+  if (!_archive) return url;
+  const am = (item && item.metadata && item.metadata.archived_media) || null;
+  if (!am) return url;
+  if (am[url]) return "/media/" + am[url];                 // exact archived match (galleries map 1:1)
+  const vals = Object.values(am);                          // salvageable: shown URL (dead original)
+  return vals.length === 1 ? "/media/" + vals[0] : url;    // ≠ the archived key → use the lone blob
+};
+
 /* ---- thumbnails ---- */
 /* density: "card" gets the crisp maxres variant (onerror-falls back to mqdefault
    via ytFallback); everything else gets the light bar-free mqdefault (~10KB). */
@@ -14,8 +30,9 @@ export const thumb = (item, density) => {
   // (often 140px) reddit thumbnail, which upscales to a blurry placeholder in Pinboard
   // density. List/compact keep the lightweight thumbnail for scroll perf (Epic 13 P2).
   if (density === "card" && Array.isArray(m.gallery) && m.gallery.length)
-    // prefer the sized ~1080px variant over the 5000px original for the feed card (Epic 13 P2)
-    return (Array.isArray(m.gallery_preview) && m.gallery_preview[0]) || m.gallery[0];
+    // prefer the sized ~1080px variant over the 5000px original for the feed card (Epic 13 P2),
+    // and the locally-archived copy over either when present (Epic 4 P1)
+    return localUrl(item, (Array.isArray(m.gallery_preview) && m.gallery_preview[0]) || m.gallery[0]);
   let t = m.thumbnail || "";
   if (!t && item.source === "hackernews") t = m.og_image || "";  // article preview (Epic 15 P3)
   if (!t) {
@@ -28,7 +45,7 @@ export const thumb = (item, density) => {
     const variant = density === "card" ? "maxresdefault" : "mqdefault";
     t = t.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/" + variant + ".jpg");
   }
-  return t;
+  return localUrl(item, t);  // prefer the locally-archived copy when present (Epic 4 P1)
 };
 
 /* YouTube maxres thumbs 404 on some videos → onerror-fall-back to mqdefault. */
@@ -41,12 +58,13 @@ export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
 const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
 export const imageUrl = (item) => {
   const m = item.metadata || {};
-  if (_directImg(item.url)) return item.url;
+  // each return prefers the locally-archived copy when present (Epic 4 P1, localUrl)
+  if (_directImg(item.url)) return localUrl(item, item.url);
   // Epic 13:344 (harvested from feat/reddit-media-v13): recognize images by media_url
   // SHAPE, not the media_type label — unlocks ~25.8k i.redd.it posts stuck in the
   // reddit_media catch-all with item.url = permalink.
-  if (_directImg(m.media_url)) return m.media_url;
-  return m.media_type === "image" ? (m.media_url || "") : "";
+  if (_directImg(m.media_url)) return localUrl(item, m.media_url);
+  return m.media_type === "image" ? localUrl(item, m.media_url || "") : "";
 };
 
 /* ---- media/content classification (from reddit.js — drives the Epic 13:344

@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v41";  // v41: mobile — no drawer-filter autofocus; lighter Done haptic
+const CACHE = "ch-shell-v42";  // v42: prefer locally-archived media (Epic 4 P1) + settings toggle
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
