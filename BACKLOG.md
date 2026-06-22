@@ -1009,6 +1009,14 @@ Absorbs "make the Reddit view more mobile-friendly".*
   current swipe is a little stiff; could add momentum/spring + better thresholds for a smoother feel.
   Reactivate if the swipe starts to feel laggy/stiff in real use.
 - [ ] **P3 — Mobile-friendly scrollbar** (Nova-Launcher-style fast-scroll handle).
+- [ ] **P3 — Visual rework of the collapsing top bar.** *(User-requested 2026-06-22.)* The shrink-on-scroll
+  shipped and works (Relay-style: scroll down → `.console.compact` collapses the search row + TODAY counter;
+  expands at the top / on scroll-up — `browse/main.js` scroll handler + `.compact` rules in `browse.css`), but
+  it wants a **visual polish pass**. Open ideas: smoother/spring collapse easing; decide what stays vs. hides
+  when compact (shrink the brand? a slim always-tappable search affordance instead of fully hiding it? what the
+  status pills do); a subtle elevation/shadow once scrolled; tune the down/up thresholds + add hysteresis so it
+  doesn't flicker on tiny scrolls. Keep it inside the Fable design language (reuse tokens, don't invent a new
+  paradigm — see preserve-fable-design). Pairs well with the Epic 23 design-language / GLM design-bakeoff lanes.
 - [x] ~~**P2 — Inbox swipe = mobile/touch only.**~~ ✅ v3: `swipe.js:37` ignores `pointerType==="mouse"` unless `{mouse:true}`; `main.js` `attachSwipe` passes no `mouse` flag → desktop uses buttons, touch swipes. *(User decision 2026-06-08.)* Orig: Disable row-swipe on the
   inbox on desktop (desktop uses the action buttons/hover); keep swipe for touch only.
 - [ ] **P3 — Swipe-only interactions on mobile.** Per the v2 decision the action icons stay visible on
