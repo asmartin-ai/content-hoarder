@@ -18,6 +18,14 @@ import pytest
 
 # `playwright`/`browser` fixtures come from the pytest-playwright plugin.
 
+# Skip collecting the whole UI suite when Playwright isn't installed (CI installs only [dev]) — otherwise
+# test_smoke.py's `from playwright.sync_api import ...` would ImportError at COLLECTION, even though the
+# tests are deselected at run time. Locally: `pip install -e .[ui] && playwright install chromium`.
+try:
+    import playwright.sync_api  # noqa: F401
+except Exception:                # pragma: no cover
+    collect_ignore_glob = ["*"]
+
 # Pixel 6 is a built-in Playwright device descriptor (viewport 412x839, DSF 2.625, touch).
 # Playwright can't emulate `display-mode: standalone` natively (microsoft/playwright#26853), so we
 # inject a matchMedia shim → the app renders as an installed PWA.
