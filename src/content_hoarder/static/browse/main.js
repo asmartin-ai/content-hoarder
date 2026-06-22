@@ -6,7 +6,7 @@
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { createLightbox, imageUrl, mediaType, redditUrl, playableVideoSrc } from "../core/media.js";
+import { createLightbox, imageUrl, mediaType, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -29,6 +29,7 @@ const state = {
   density: localStorage.chDensity || "comfortable",
   focus: localStorage.chFocus === "1",
   safe: localStorage.chSafe !== "0",   // default ON: hide NSFW unless the user opted into "Show all"
+  archiveMedia: localStorage.chArchiveMedia === "1",  // default OFF: prefer local /media copies (Epic 4 P1)
   goal: localStorage.chGoal === undefined ? 8 : parseInt(localStorage.chGoal, 10) || 0,
   offset: 0,
   hasMore: false,
@@ -41,6 +42,7 @@ const state = {
   pulse: { new_today: 0, cleared_today: 0, swept_recent: 0 },
 };
 const FOCUS_BATCH = 25;
+setArchivePref(state.archiveMedia);  // tell core/media.js whether to prefer local /media copies
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
 
@@ -258,7 +260,9 @@ function openMediaFor(item) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
   if (Array.isArray(m.gallery) && m.gallery.length)
-    return lightbox.openGallery(m.gallery, m.gallery_preview);  // sized variants load first (Epic 13 P2)
+    // sized variants load first (Epic 13 P2); prefer locally-archived copies when present (Epic 4 P1)
+    return lightbox.openGallery(m.gallery.map((u) => localUrl(item, u)),
+                               (m.gallery_preview || []).map((u) => localUrl(item, u)));
   const vsrc = playableVideoSrc(item);   // shared playability test (same as the reader's inline player)
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
   const img = imageUrl(item);
@@ -944,6 +948,13 @@ $$("#set-nsfw button").forEach((b) => b.addEventListener("click", () => {
   refreshRail();   // surface/hide the nsfw_* facets to match the toggle (Epic 14)
   loadItems(true);
 }));
+$$("#set-archive button").forEach((b) => b.addEventListener("click", () => {
+  state.archiveMedia = b.dataset.archive === "on";   // prefer local /media copies (Epic 4 P1)
+  localStorage.chArchiveMedia = state.archiveMedia ? "1" : "0";
+  setArchivePref(state.archiveMedia);
+  $$("#set-archive button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  render();   // re-render with the new media-source preference
+}));
 
 /* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9) ---- */
 const syncBtn = $("#open-sync");
@@ -974,6 +985,8 @@ $$("#set-goal button").forEach((b) =>
   b.setAttribute("aria-pressed", String((parseInt(b.dataset.g, 10) || 0) === state.goal)));
 $$("#set-nsfw button").forEach((b) =>
   b.setAttribute("aria-pressed", String((b.dataset.nsfw === "hide") === state.safe)));
+$$("#set-archive button").forEach((b) =>
+  b.setAttribute("aria-pressed", String((b.dataset.archive === "on") === state.archiveMedia)));
 $$("#set-theme button").forEach((b) =>
   b.setAttribute("aria-pressed",
     String((document.documentElement.dataset.theme || "dark") === b.dataset.theme)));
