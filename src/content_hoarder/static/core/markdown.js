@@ -7,7 +7,7 @@
    XSS-safe BY CONSTRUCTION: the raw text is HTML-escaped FIRST (via core esc), then a
    small set of inline + block transforms run on the *escaped* text and only ever INSERT
    a known-safe tag set (<p>/<br>/<a>/<strong>/<em>/<code>/<pre>/<blockquote>/<ul>/<ol>/
-   <li>). User text can never introduce a tag, and every <a href> is gated through
+   <li>/<table>/<thead>/<tbody>/<tr>/<th>/<td>). User text can never introduce a tag, and every <a href> is gated through
    safeUrl (http(s)/root-relative only — blocks javascript:/data: sinks). Pure +
    dependency-light so it stays node-testable like the other reader helpers. */
 
@@ -92,6 +92,14 @@ const isUl = (l) => /^\s*[-*+]\s+/.test(l);
 const isOl = (l) => /^\s*\d+\.\s+/.test(l);
 const startsBlock = (l) => isFence(l) || isQuote(l) || isUl(l) || isOl(l);
 
+/* GFM pipe table: a header row (`| a | b |`) immediately followed by a separator row of
+   dashes/colons (`| --- | :-: |`). Detected by the separator + a piped line above it. */
+const TABLE_SEP = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
+const isTableAt = (lines, i) =>
+  i + 1 < lines.length && lines[i].indexOf("|") >= 0 && TABLE_SEP.test(lines[i + 1]);
+const splitRow = (line) =>
+  line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
 /* Render a safe markdown subset to an HTML string. Empty/blank input → "".
    `opts.media` is the comment/post media map ({id: {u, kind, w, h}}) the server resolved from
    media_metadata — used to turn Reddit's native ![img](media-id) refs into inline images. */
@@ -130,9 +138,25 @@ export function renderMarkdown(src, opts) {
         items.push("<li>" + inline(lines[i].replace(/^\s*\d+\.\s+/, ""), media) + "</li>"); i++;
       }
       out.push("<ol>" + items.join("") + "</ol>");
+    } else if (isTableAt(lines, i)) {    // GFM pipe table → <table> (header row + dashes separator)
+      const head = splitRow(line);
+      i += 2;                            // consume the header + separator rows
+      const rows = [];
+      while (i < lines.length && !isBlank(lines[i]) && lines[i].indexOf("|") >= 0 && !startsBlock(lines[i])) {
+        rows.push(splitRow(lines[i])); i++;
+      }
+      let t = '<table class="md-table"><thead><tr>';
+      for (const h of head) t += "<th>" + inline(h, media) + "</th>";
+      t += "</tr></thead><tbody>";
+      for (const r of rows) {
+        t += "<tr>";
+        for (let k = 0; k < head.length; k++) t += "<td>" + inline(r[k] == null ? "" : r[k], media) + "</td>";
+        t += "</tr>";
+      }
+      out.push(t + "</tbody></table>");
     } else {                             // paragraph: run of plain lines, \n → <br>
       const buf = [];
-      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i])) {
+      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i]) && !isTableAt(lines, i)) {
         buf.push(lines[i]); i++;
       }
       out.push("<p>" + inline(buf.join("<br>"), media) + "</p>");

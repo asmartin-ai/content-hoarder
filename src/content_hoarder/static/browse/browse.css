@@ -439,6 +439,28 @@ body.focus .batchstrip{display:flex}
 .tag-edit:hover{color:var(--accent);border-color:var(--accent)}
 .row .meta .tag-edit{vertical-align:-3px}
 .pin .tagrow .tag-edit{width:20px;height:20px}
+/* row tags on their own line (tagging is now via long-press) — clips within the text column,
+   so chips never run under / get cut off by the thumbnail */
+.rowtags{margin-top:3px;overflow:hidden;max-width:100%}
+.rowtags .tag-chips{display:inline-flex;flex-wrap:nowrap;gap:5px;vertical-align:-2px}
+.rowtags .tag-chip{font-size:.62rem;padding:2px 7px;background:var(--surface-inset);flex:none}
+/* long-press action menu — a compact bottom sheet that reuses #scrim */
+.rowmenu{position:fixed;left:50%;bottom:0;z-index:51;width:min(480px,100%);
+  transform:translate(-50%,100%);visibility:hidden;
+  background:var(--surface-card);border:1px solid var(--border-control);
+  border-radius:var(--r-md) var(--r-md) 0 0;
+  padding:0 var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:2px;transition:transform 180ms var(--ease)}
+.rowmenu.show{transform:translate(-50%,0);visibility:visible}
+.rowmenu::before{content:"";display:block;width:42px;height:5px;border-radius:3px;
+  background:var(--border-control);margin:8px auto}
+.rowmenu-title{font:var(--fw-medium) var(--fs-xs)/1.3 var(--font-sans);color:var(--text-muted);
+  padding:2px 12px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1px solid var(--border-hairline);margin-bottom:4px}
+.rowmenu-item{display:flex;align-items:center;gap:10px;width:100%;padding:14px;
+  background:transparent;border:none;border-radius:var(--r-sm);color:var(--text-body);
+  font:var(--fw-medium) var(--fs-md)/1 var(--font-sans);text-align:left;cursor:pointer}
+.rowmenu-item:hover,.rowmenu-item:active{background:var(--surface-hover)}
 
 .tagpop-scrim{position:fixed;inset:0;z-index:55;background:transparent}
 @media (max-width:700px){.tagpop-scrim{background:rgba(8,6,12,.45)}}
@@ -800,7 +822,8 @@ html.reader-lock{overflow:hidden}
 .rd-head .led{width:9px;height:9px;border-radius:50%;background:var(--source-reddit);
   box-shadow:0 0 7px var(--source-reddit);flex:none}
 .rd-sub{font:var(--fw-semibold) var(--fs-sm)/1.3 var(--font-sans);letter-spacing:.01em;
-  color:var(--text-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  color:var(--text-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  min-width:0}  /* shrink/truncate so "open original" + share + close stay on-screen (mobile) */
 .rd-oo{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:5px;
   font:var(--fw-medium) var(--fs-xs)/1 var(--font-mono);color:var(--text-muted);
   text-decoration:none;border:1px solid var(--border-control);border-radius:var(--r-pill);
@@ -811,6 +834,19 @@ html.reader-lock{overflow:hidden}
   background:transparent;border:1px solid var(--border-control);border-radius:var(--r-pill);
   color:var(--text-muted);cursor:pointer}
 .rd-x:hover{color:var(--text-body);border-color:var(--accent)}
+/* markdown pipe tables (reader post selftext + comment bodies) — scroll horizontally on
+   narrow screens so a wide table never blows out the layout */
+.reader .md-table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%;
+  margin:.5em 0;font-size:var(--fs-sm);-webkit-overflow-scrolling:touch}
+.reader .md-table th,.reader .md-table td{border:1px solid var(--border-hairline);
+  padding:5px 9px;text-align:left;white-space:nowrap}
+.reader .md-table th{background:var(--panel-2,rgba(255,255,255,.04));font-weight:var(--fw-semibold)}
+/* mobile: compact the reader header so "share" (second from right) never gets pushed off-screen —
+   "open original" collapses to just its ↗ glyph, freeing room for share + close. */
+@media (max-width:480px){
+  .rd-oo-txt{display:none}
+  .rd-oo,.rd-share{padding:6px 9px}
+}
 
 .rd-scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch}
