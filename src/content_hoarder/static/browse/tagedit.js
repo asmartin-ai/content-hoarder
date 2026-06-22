@@ -30,18 +30,24 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
 
   let curFn = null;        // the item being edited
   let curTags = [];        // local working copy (kept in sync with the server's returned list)
+  let manualSet = new Set(); // norm()'d editable tags: metadata.tags_manual + ones added here
   let selIdx = 0;          // highlighted suggestion option
-  let busy = false;        // single-flight guard so a double-tap can't double-post
+  let busy = false;        // single-flight guard so a double-tap can't double-post (UI also goes pointer-events:none)
 
   const isOpen = () => !pop.hidden;
+
+  /* Close on a DESKTOP window resize (the anchor moved). IGNORE mobile resizes: the
+     on-screen keyboard fires a resize, and the bottom-sheet is CSS-pinned, so closing there
+     would dismiss the editor the instant the user taps the input to type. */
+  const onResize = () => { if (!isPhone()) close(); };
 
   function close() {
     if (!isOpen()) return;
     pop.hidden = true; scrim.hidden = true;
     pop.innerHTML = "";
-    curFn = null; curTags = []; selIdx = 0;
+    curFn = null; curTags = []; manualSet = new Set(); selIdx = 0;
     document.removeEventListener("keydown", onKeydown, true);
-    window.removeEventListener("resize", close);
+    window.removeEventListener("resize", onResize);
   }
 
   function onKeydown(e) {
@@ -77,9 +83,19 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     ).join("");
   }
 
+  /* What the editor shows + lets you remove: the item's CURATED tags plus tags the user
+     added manually (metadata.tags_manual + adds made here). Raw enrich keywords (e.g. a
+     YouTube item's dozens of yt-dlp keywords) are hidden, so the editor stays about MANUAL
+     tagging and a stray click can't strip a pipeline keyword out of search. */
+  function editableTags() {
+    const known = new Set(getKnownTags().map(norm));
+    return curTags.filter((t) => known.has(norm(t)) || manualSet.has(norm(t)));
+  }
+
   function render() {
-    const chips = curTags.length
-      ? curTags.map((t) =>
+    const shown = editableTags();
+    const chips = shown.length
+      ? shown.map((t) =>
           '<span class="tp-chip">' + esc(t) +
           '<button type="button" class="tp-rm" data-rm="' + esc(t) +
           '" aria-label="Remove ' + esc(t) + '">&#10005;</button></span>').join("")
@@ -102,6 +118,8 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     try {
       const r = await api.postJSON("/items/" + encodeURIComponent(curFn) + "/tags", body);
       curTags = r.tags || [];
+      (body.add || []).forEach((t) => manualSet.add(norm(t)));      // adds here are manual → keep editable
+      (body.remove || []).forEach((t) => manualSet.delete(norm(t)));
       onChange(curFn, curTags);          // let the page sync state + rail
       const fn = curFn;
       render();                          // rebuild chips + suggestions
@@ -167,12 +185,13 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     close();
     curFn = fullname;
     curTags = ((item.metadata || {}).tags || []).slice();
+    manualSet = new Set((((item.metadata || {}).tags_manual) || []).map(norm));
     scrim.hidden = false;
     pop.hidden = false;
     render();
     position(anchor);
     document.addEventListener("keydown", onKeydown, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("resize", onResize);
     setTimeout(() => { const i = pop.querySelector(".tp-input"); if (i && !isPhone()) i.focus(); }, 30);
   }
 
