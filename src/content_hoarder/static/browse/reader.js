@@ -128,8 +128,9 @@ function tagEditorHtml(it) {
     '<div class="rd-tags-body">' +
       '<div class="rd-tagrow">' + tagChipRowHtml(it) + "</div>" +
       '<div class="rd-tag-add-ui" hidden>' +
-        '<input class="rd-tag-add-input" type="text" placeholder="new or existing tag" ' +
-          'autocomplete="off" maxlength="40" aria-label="Add a tag">' +
+        '<input class="rd-tag-add-input" type="search" placeholder="new or existing tag" ' +
+          'autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" ' +
+          'maxlength="40" aria-label="Add a tag">' +
         '<span class="rd-tag-suggest"></span>' +
       "</div>" +
     "</div></div>";
