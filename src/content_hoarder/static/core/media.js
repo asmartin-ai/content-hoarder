@@ -292,42 +292,27 @@ export function createLightbox(opts) {
       open('<img class="media-img" src="' + esc(url) + '" alt="">' +
         '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>');
     },
-    /* Gallery (metadata.gallery from the archive's media_metadata) → stacked lightbox.
-       The reddit `s.u` originals are huge (preview.redd.it width=5000, multi-MB each), and a
-       plain stacked <img loading=lazy> pulled several at once (each image is ~one screen tall,
-       so the next sits inside the lazy preload margin) → the "album lightbox is extremely slow"
-       report (Epic 13 P2). Fix: each image is a data-src placeholder with a min-height so only
-       the in-view one occupies the viewport, loaded on demand via IntersectionObserver. Pass
-       `previews` (sized variants, same order) to load those first; the full original opens via
-       the per-image tap / "Open original". */
+    /* Gallery → plain STACKED lightbox (restored 2026-06-22 per user pref — reverts the
+       IntersectionObserver + min-height:50vh placeholder version, which felt jumpy/popped-in).
+       To keep the "album extremely slow" fix (Epic 13 P2) we still stack the SIZED previews
+       (~1080px), NOT the multi-MB 5000px originals, with native loading=lazy; tapping an image
+       swaps it up to the full original. */
     openGallery(urls, previews) {
       const full = (urls || []).filter(safeUrl);
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
-      const srcs = sized.length === full.length ? sized : full;
+      const srcs = sized.length === full.length ? sized : full;   // prefer the smaller sized variants
       open('<div class="media-gallery">' +
         srcs.map((u, i) =>
-          '<img class="media-img gallery-img" decoding="async" style="min-height:50vh" ' +
-          'data-src="' + esc(u) + '" data-full="' + esc(full[i]) + '" alt="">').join("") +
+          '<img class="media-img gallery-img" loading="lazy" decoding="async" ' +
+          'src="' + esc(u) + '" data-full="' + esc(full[i]) + '" alt="">').join("") +
         '</div><p class="media-fallback">' + full.length + " images</p>");
-      const imgs = [...body.querySelectorAll(".gallery-img")];
-      const load = (im) => { if (im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; } };
-      // tapping an image swaps the sized preview up to the full original
-      imgs.forEach((im) => {
-        im.addEventListener("load", () => { im.style.minHeight = ""; }, { once: true });
+      // tap an image → swap the sized preview up to the full original
+      [...body.querySelectorAll(".gallery-img")].forEach((im) => {
         im.addEventListener("click", () => {
           if (im.dataset.full && im.src !== im.dataset.full) im.src = im.dataset.full;
         });
       });
-      if (imgs[0]) load(imgs[0]);  // first image is always in view — load eagerly so it never blanks
-      if ("IntersectionObserver" in window) {
-        const io = new IntersectionObserver((ents, obs) => {
-          ents.forEach((e) => { if (e.isIntersecting) { load(e.target); obs.unobserve(e.target); } });
-        }, { root: body, rootMargin: "300px 0px" });
-        imgs.slice(1).forEach((im) => io.observe(im));  // the rest load as they scroll into view
-      } else {
-        imgs.forEach(load);  // no IO support → eager
-      }
     },
     /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored url
        has no audio, so we play the HLS manifest (audio+video) via hls.js (preferred) or
