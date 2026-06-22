@@ -21,6 +21,12 @@ manifest) already ships.
   (`reddit-hydrate --from <bdfr-dir>` is an offline local-archive thread hydrate; `--batch` is the
   rate-limited, resumable backfill — OAuth-preferred when configured, else the cookie.)
 - Tests: `python -m pytest` — all offline, `:memory:` SQLite, tiny synthetic fixtures, **no network**.
+- **UI / browser tests** (`tests/ui/`, Playwright): `pip install -e .[ui] && playwright install chromium`,
+  then `pytest -m ui`. Real headless Chromium at a **Pixel-6** viewport + **PWA-standalone** emulation,
+  against the app served in-process on a free port off a **copy** of the live DB with autosync OFF
+  (no live mutation, no scheduler). Excluded from the default run (`addopts -m "not ui"`) so unit/CI stay
+  browser-free. **Verify any mobile/PWA UI change here** — it catches what unit tests + the preview tool
+  miss (mobile viewport, rAF/transitions, gallery view, top-bar collapse). Add a regression test per UI bug.
 
 ## Layout
 ```
