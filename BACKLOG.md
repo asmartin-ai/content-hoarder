@@ -1424,7 +1424,18 @@ namespace) and builds on Epic 9 (tagging).*
   **user-defined tags** to live so they (i) appear in the rail/filters alongside the curated set and (ii)
   **survive re-import** (`merge_upsert` overlays — stamp manual tags like the Epic 15 body-edit `*_edited_at`
   pattern so a re-sync can't clobber them). Decide where user tags are stored (a `user_tags` table / a settings
-  list vs. inline on `metadata`) as part of the model reorg above.
+  list vs. inline on `metadata`) as part of the model reorg above. **✅ Core SHIPPED 2026-06-22** (origin/main):
+  editor on all three surfaces + `POST /items/<fn>/tags` (stamps `tags_manual`, survives re-import) + the rail
+  registry (`db.user_tag_vocab`, derived **inline from `tags_manual`** — no table — unioned into `db.tag_counts`
+  so user tags render under the rail's "More" group). Remaining trade-offs split to the P3 below.
+- [ ] **P3 — User-tag table: pre-create empty tags + rename-in-vocabulary.** *(Follow-up to the shipped registry,
+  2026-06-22.)* The registry derives the vocabulary from `metadata.tags_manual`, so a tag exists exactly while it
+  is applied to ≥1 item — two things derive-from-usage cannot do, both needing a real `user_tags` table (or a
+  settings list): (a) **create an empty tag** ahead of applying it (a 0-item tag has nowhere to live); (b)
+  **rename a user tag** across the vocabulary in one action (today a rename = re-tag every item and the old name
+  vanishes everywhere; a `user_tags` row carrying a stable id + display name lets one UPDATE rewrite
+  `metadata.tags`/`tags_manual` in bulk). Also unlocks delete-from-vocab and per-tag colour/order. Decide
+  table-vs-inline once, alongside folders, in the Epic 26 model reorg.
 - [ ] **P2 — Rule-based + AI-based tagging and new-tag suggestions.** *(User-requested 2026-06-19.)* Two
   engines feeding the tag set, plus a **suggestion** surface. **Rule-based** largely exists — `categorize.py`'s
   subreddit/host maps + word-bounded title keywords — so expose it as **user-editable rules** (add a
