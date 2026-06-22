@@ -74,7 +74,7 @@ the categorizer (Epic 1) wants for accuracy.*
   into `metadata.gallery`; the browse media-modal renders them as an inline stacked lightbox
   (`openGallery` in `app.js`, routed via a `data-gallery` attribute). Populated for all gallery items
   on the next `enrich --source reddit --scores` pass. (Triage-card inline gallery still TODO.)
-- [ ] **P1 — Hoard the BYTES, not just the link: local media archiving.** *(User-requested 2026-06-20.)*
+- [ ] **P1 — Hoard the BYTES, not just the link: local media archiving.** ⏳ **Infrastructure ✅ SHIPPED** (Epic 4: `media_store.py` blob store + `archive-media` CLI + same-origin `/media/<blob>` route + prefer-local toggle, default OFF, on main); the archiving pass has **not been run** on the live corpus yet, so the bytes still aren't on disk. *(User-requested 2026-06-20.)*
   **Problem (core to the "hoarder" mission):** we store *URLs*, not media. When reddit deletes an image the
   app shows reddit's "if you're looking for an image, it was probably deleted" placeholder and it's gone for
   good — confirmed 2026-06-20 on `reddit:t3_1u69n0s` (r/196 "rule"): `i.redd.it/9pxkje0ife7h1.jpeg` → 404
@@ -143,7 +143,7 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
   source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
   Web-Share-with-clipboard-fallback so it works on the Pixel-6 target.
-- [ ] **P2 — Defer/Skip as a first-class triage action.** *(User-requested 2026-06-19.)* A "decide later"
+- [ ] **P2 — Defer/Skip as a first-class triage action.** ⏳ **Skip half ✅ SHIPPED** (triage-skip: a no-decision "pass / show next" via button + Space, on main); the **timed Defer/Snooze** half (`metadata.snoozed_until`) is still pending. *(User-requested 2026-06-19.)* A "decide later"
   action available everywhere triage happens (triage card + browse row + reader), not just a swipe gesture —
   surfaced as a button + keyboard key alongside Keep/Archive/Done, and reversible like the other actions.
   **Two distinct behaviors to decide between (or ship both):** (a) **Skip** = a no-decision "pass, show me the
@@ -409,7 +409,7 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
   deterministic, so infinite-scroll pages don't dup/skip, unlike RANDOM()). +3 tests; preview-verified
   (sources interleave hackernews/reddit/youtube…). Orig: interleaves a *mix* of sources
   and categories (not grouped) for variety; complements smart-triage above.
-- [ ] **P2 — Default "All" view sorted by "easy to triage".** Use the learned likely-done score (this
+- [x] **P2 — Default "All" view sorted by "easy to triage".** ✅ SHIPPED 2026-06-22 (origin/main): per-tab sort memory — the All tab defaults to `smart:desc` (the learned triage-score, degrades to recency until trained). Use the learned likely-done score (this
   epic) to order the default All view so quick wins surface first, instead of recency/random.
 - Note: the user's "analytics/learning → triage suggestion" idea (collect activity offline, batch-
   process, suggest) is exactly this epic — folded here.
@@ -1396,13 +1396,13 @@ multi-label buckets) are two separate systems with overlapping rail UI. Unify th
 parent→child structure. Overlaps + absorbs Epic 5 P2 (categories in the sidebar / as a reserved tag
 namespace) and builds on Epic 9 (tagging).*
 
-- [ ] **P2 — Parent/child tag grouping in the rail (visual).** *(User-requested 2026-06-17.)* Group the flat
+- [x] **P2 — Parent/child tag grouping in the rail (visual).** ✅ SHIPPED 2026-06-22 (origin/main): `categorize.TAG_GROUPS` served via `/tags`; rail nests facets under parent headers, parent-click OR-selects present children (some/all/none), ungrouped/user tags → a "More" group. *(User-requested 2026-06-17.)* Group the flat
   tag list under **parent tags** (e.g. **Humorous**, **Educational**, **Trivial**, **Gaming**) with the
   sub-tags **indented** under their parent. Selecting a parent **highlights + selects all of its sub-tags**
   (OR-filter across the children). Scope per user: **visual grouping** — the underlying tags stay flat for
   FTS/search; this is rail UX + a parent→children map. Touches the sidebar rail + `db.tag_counts` /
   `categorize.FILTER_TAGS`.
-- [ ] **P2 — Source-aware tag rail.** *(User idea 2026-06-17.)* The tag rail should **adapt to the active
+- [x] **P2 — Source-aware tag rail.** ✅ SHIPPED 2026-06-22 (origin/main): `refreshRail` passes the active source to `/tags`+`/categories`, so picking a source narrows the rail to that source's present tags (empty groups auto-hide). *(User idea 2026-06-17.)* The tag rail should **adapt to the active
   source**. Tags aren't source-exclusive, but most cluster to one source in practice (defense/anime → reddit;
   channel topics → youtube). When a source tab is active, surface the tags actually present for that source
   (volume-sorted) instead of the global vocabulary. Reuses the cross-filtered-counts pattern
@@ -1415,7 +1415,7 @@ namespace) and builds on Epic 9 (tagging).*
   how `categorize.py`'s buckets map onto the parents above. **Sketch the model before** refactoring
   `categorize.py` + `search_items` + the rail. Large — sequence the two visual-grouping items above as the
   near-term wins, this reorg as the structural follow-up.
-- [ ] **P2 — Manual tagging + user-created tags.** *(User-requested 2026-06-19.)* Today tags are applied
+- [x] **P2 — Manual tagging + user-created tags.** *(User-requested 2026-06-19.)* Today tags are applied
   **only by the pipeline** (`categorize.py` heuristics + the optional LLM pass) from a **fixed curated
   vocabulary** (`REDDIT_TAGS`/`FILTER_TAGS`). Let the user **manually tag any item** from the UI **and create a
   new tag on the fly** when none fits. Needs: a tag editor on the item (triage card + reader + browse row — a
