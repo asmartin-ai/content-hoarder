@@ -16,6 +16,7 @@
    inlining. Only addition over the generated form: the `c.author &&` OP guard. */
 
 import { esc, ago, isTypingTarget } from "../core/util.js";
+import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
@@ -76,44 +77,11 @@ const absReddit = (p) => {
 };
 
 /* ---- manual tag editor (reader header/meta area) ----
-   The reader lives in index.html → browse.css (off-limits here), so this module
-   injects its own styles once. Mirror of the triage card editor: existing tags as
-   removable chips + a "＋ tag" affordance (known vocabulary + free input), POSTed
-   to /items/<fn>/tags, optimistic with revert+toast on error. The pure helpers +
-   style injection live at module scope; the stateful ones (which close over the
-   reader's item/postEl) are defined inside initReader, below. */
-let readerTagStylesInjected = false;
-function injectTagStyles() {
-  if (readerTagStylesInjected || document.getElementById("rd-tag-styles")) return;
-  readerTagStylesInjected = true;
-  const s = document.createElement("style");
-  s.id = "rd-tag-styles";
-  s.textContent = `
-.rd-tags{display:flex;align-items:flex-start;gap:8px;margin-top:var(--sp-3);flex-wrap:wrap}
-.rd-tags-label{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:var(--tracking-label);padding-top:4px;flex-shrink:0}
-.rd-tags-body{flex:1 1 160px;min-width:0}
-.rd-tagrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.rd-chip-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;
-  border:1px solid var(--border-hairline,var(--border));background:var(--panel-2,var(--panel2));
-  color:var(--text-muted,var(--muted));font-size:var(--fs-sm);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
-.rd-chip-tag:hover{color:var(--accent);border-color:var(--accent)}
-.rd-tag-x{font-size:.72rem;opacity:.55;line-height:1}
-.rd-chip-tag:hover .rd-tag-x{opacity:1}
-.rd-tag-add{border-style:dashed;color:var(--text-muted,var(--muted))}
-.rd-tag-add:hover{color:var(--accent);border-color:var(--accent)}
-.rd-tag-add-ui{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
-.rd-tag-add-ui[hidden]{display:none}
-.rd-tag-add-input{flex:0 1 200px;min-width:0;padding:4px 8px;background:var(--panel-2,var(--panel2));
-  border:1px solid var(--border);border-radius:6px;color:inherit;font:inherit;font-size:var(--fs-sm)}
-.rd-tag-add-input:focus{outline:none;border-color:var(--accent)}
-.rd-tag-suggest{display:flex;flex-wrap:wrap;gap:5px}
-.rd-tag-sugg{font-size:var(--fs-xs)}
-.rd-tag-sugg:hover{color:var(--accent);border-color:var(--accent)}
-.rd-tag-sugg-empty{font-size:var(--fs-xs);color:var(--dim,var(--text-muted));align-self:center}`;
-  document.head.appendChild(s);
-}
-const normTag = (t) => String(t == null ? "" : t).trim().toLowerCase().slice(0, 40);
-const tagsOf = (it) => (((it && it.metadata) || {}).tags) || [];
+   Mirror of the triage card editor: existing tags as removable chips + a "＋ tag"
+   affordance (known vocabulary + free input), POSTed to /items/<fn>/tags, optimistic
+   with revert+toast on error. Styles live in browse.css (.rd-tag*), which index.html
+   loads. The pure helpers live at module scope; the stateful ones (which close over
+   the reader's item/postEl) are defined inside initReader, below. */
 function tagChipRowHtml(it) {
   const chips = tagsOf(it).map((t) =>
     '<button class="rd-chip-tag" type="button" data-rd-rmtag="' + esc(t) + '">' +
@@ -160,15 +128,10 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     const row = postEl.querySelector(".rd-tagrow");
     if (row) row.innerHTML = tagChipRowHtml(item);
   }
-  function tagSuggestionsFor(query) {
-    const have = {}; tagsOf(item).forEach((t) => { have[t] = 1; });
-    const q = normTag(query);
-    return knownTags.filter((t) => !have[t] && (!q || t.indexOf(q) !== -1)).slice(0, 8);
-  }
   function refreshAddSuggestions(inp) {
     if (!inp) return;
     const ui = inp.closest(".rd-tag-add-ui"); if (!ui) return;
-    const sugg = tagSuggestionsFor(inp.value);
+    const sugg = suggestTags(knownTags, tagsOf(item), inp.value);
     const box = ui.querySelector(".rd-tag-suggest");
     box.innerHTML = sugg.length ? sugg.map((t) =>
       '<button class="rd-chip-tag rd-tag-sugg" type="button" data-rd-addtag="' + esc(t) + '">' + esc(t) + "</button>").join("")
@@ -358,7 +321,6 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
   function openReader(it) {
     if (typeof closeSheets === "function") closeSheets();
     stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
-    injectTagStyles();                 // tag-editor styles (reader lives in index.html → browse.css, off-limits here)
     item = it; fullname = it.fullname;
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
     ooHref = absReddit(it.metadata && it.metadata.permalink) || it.url || "";
