@@ -898,10 +898,12 @@ Absorbs "make the Reddit view more mobile-friendly".*
   (archived 18→10, done 10→6, keep [10,30,10]→single 5, inbox 8→4, skip 6→3, milestone shortened, undo 8→4)
   AND the compounding `swipe.js` stage-2 threshold pulse 8→3 — a long swipe fired TWO buzzes (threshold +
   commit), which read as "too strong." Friction-asymmetry hierarchy kept.
-- [ ] **P2 — Tag-add box clips into the bottom bar on mobile when idle (not fully hidden).** *(User-
-  reported 2026-06-22.)* The tag-add input (`browse/tagedit.js` popover) isn't fully hidden when not in
-  use — its bottom edge bleeds into the mobile bottom bar. Ensure it's `display:none`/off-canvas when
-  closed, and that its open position clears the bottom bar (safe-area inset).
+- [x] ~~**P2 — Tag-add box clips into the bottom bar on mobile when idle (not fully hidden).**~~ ✅ SHIPPED
+  2026-06-22 (`browse.css`, sw.js v56→v57). *(User-reported 2026-06-22.)* Root cause: `.tagpop`'s base
+  `display:flex` overrode the `[hidden]` UA `display:none`, so `close()` (`pop.hidden=true`) left an EMPTY
+  sheet pinned at `bottom:0` clipping into the bottom bar. Fix = one rule `.tagpop[hidden]{display:none}`
+  (higher specificity). Verified: hidden→`display:none` in every state (incl. `.sheet` still applied — the
+  exact tap-away-after-use case), shown→`flex`.
 - [~] **P2 — Back on the reader/triage view should return to the inbox, not exit the app.** *(User-
   reported 2026-06-22.)* ✅ **Reader + overlays SHIPPED** 2026-06-22 via the shared `core/overlaynav.js`
   back-button coordinator (one history entry + one `popstate` over a stack; OS-back closes only the top
