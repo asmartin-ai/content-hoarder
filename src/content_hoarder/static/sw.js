@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v53";  // v53: + shared core/tags.js (tag-helper dedup, PR #10) — v52 = manual tags everywhere
+const CACHE = "ch-shell-v54";  // v54: main.js auto-sync PWA-open hook (Epic 25) — v53 = + shared core/tags.js
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
