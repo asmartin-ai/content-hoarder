@@ -160,12 +160,114 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
     return '<div class="tcard-dates" title="' + esc(tip.join("\n")) + '">' + vis.join(" · ") + "</div>";
   }
 
-  function tagChips(item) {
-    var tags = (item.metadata || {}).tags || [];
-    if (!tags.length) return "";
-    return '<div class="tag-chips">' + tags.map(function (t) {
-      return '<span class="tag-chip">' + esc(t) + "</span>";
-    }).join("") + "</div>";
+  // Manual tag editor: existing tags as removable chips + a "＋ tag" affordance that
+  // picks from the known vocabulary OR takes a brand-new tag. Mirrors the category
+  // chip-row precedent (render in cardHtml, network POST in the stack click handler),
+  // but POSTs to /tags. Optimistic update, reconcile against the returned tags list,
+  // revert + toast on error.
+  var knownTags = [];   // the user's tag vocabulary, cached from /tags once at boot
+  function normTag(t) { return String(t == null ? "" : t).trim().toLowerCase().slice(0, 40); }
+  function itemTags(item) { return ((item && (item.metadata || {})).tags) || []; }
+  function setItemTags(item, tags) { if (item) { item.metadata = item.metadata || {}; item.metadata.tags = tags; } }
+  function chipRowHtml(item) {
+    var chips = itemTags(item).map(function (t) {
+      return '<button class="chip tag-edit" type="button" data-rmtag="' + esc(t) + '">' +
+        esc(t) + '<span class="tag-x" aria-hidden="true">✕</span></button>';
+    }).join("");
+    return chips + '<button class="chip tag-add" type="button" data-tagadd="1">＋ tag</button>';
+  }
+  function tagEditorHtml(item) {
+    return '<div class="tcard-tags" data-tags="1">' +
+      '<span class="tcard-tags-label">tags</span>' +
+      '<div class="tcard-tags-body">' +
+        '<div class="tcard-tagrow">' + chipRowHtml(item) + "</div>" +
+        '<div class="tag-add-ui" hidden>' +
+          '<input class="tag-add-input" type="text" placeholder="new or existing tag" ' +
+            'autocomplete="off" maxlength="40" aria-label="Add a tag">' +
+          '<span class="tag-suggest"></span>' +
+        "</div>" +
+      "</div></div>";
+  }
+  function findCardEl(fn) {
+    var cards = stack.querySelectorAll(".tcard");
+    for (var i = 0; i < cards.length; i++) if (cards[i].getAttribute("data-fullname") === fn) return cards[i];
+    return null;
+  }
+  function refreshTagEditor(fn) {
+    var card = findCardEl(fn); if (!card) return;
+    var row = card.querySelector(".tcard-tagrow"); if (!row) return;
+    row.innerHTML = chipRowHtml(itemByFn(fn));
+  }
+  // Suggestions = known vocabulary not already on the item, filtered by the query.
+  function tagSuggestions(item, query) {
+    var have = {}; itemTags(item).forEach(function (t) { have[t] = 1; });
+    var q = normTag(query);
+    return knownTags.filter(function (t) { return !have[t] && (!q || t.indexOf(q) !== -1); }).slice(0, 8);
+  }
+  function refreshSuggestions(inp) {
+    if (!inp) return;
+    var ui = inp.closest(".tag-add-ui"); if (!ui) return;
+    var card = inp.closest(".tcard");
+    var item = card ? itemByFn(card.getAttribute("data-fullname")) : null;
+    var sugg = tagSuggestions(item, inp.value);
+    var box = ui.querySelector(".tag-suggest");
+    box.innerHTML = sugg.length ? sugg.map(function (t) {
+      return '<button class="chip tag-sugg" type="button" data-addtag="' + esc(t) + '">' + esc(t) + "</button>";
+    }).join("") : (inp.value.trim() ? "" : '<span class="tag-sugg-empty">type to create a new tag</span>');
+  }
+  function openTagAdd(fn) {
+    var card = findCardEl(fn); if (!card) return;
+    var ui = card.querySelector(".tag-add-ui"); if (!ui) return;
+    if (!ui.hidden) { ui.hidden = true; return; }   // toggle: a second tap collapses
+    ui.hidden = false;
+    var inp = ui.querySelector(".tag-add-input");
+    refreshSuggestions(inp);
+    if (inp) inp.focus();
+  }
+  function collapseTagAdd(inp) {
+    var ui = inp ? inp.closest(".tag-add-ui") : null;
+    if (ui) ui.hidden = true;
+    if (inp) inp.value = "";
+  }
+  function addTag(fn, raw) {
+    var item = itemByFn(fn); if (!item) return;
+    var tag = normTag(raw); if (!tag) return;
+    var prev = itemTags(item).slice();
+    if (prev.indexOf(tag) !== -1) return;            // already present
+    setItemTags(item, prev.concat([tag]));
+    refreshTagEditor(fn);
+    fetchJSON("/items/" + encodeURIComponent(fn) + "/tags", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ add: [tag] })
+    }).then(function (res) {
+      setItemTags(item, Array.isArray(res.tags) ? res.tags : prev.concat([tag]));
+      refreshTagEditor(fn);
+      var card = findCardEl(fn);
+      if (card) refreshSuggestions(card.querySelector(".tag-add-input"));
+    }).catch(function () {
+      setItemTags(item, prev);                        // revert
+      refreshTagEditor(fn);
+      var card = findCardEl(fn);
+      if (card) refreshSuggestions(card.querySelector(".tag-add-input"));
+      toast("Couldn't add tag — check connection", false);
+    });
+  }
+  function removeTag(fn, tag) {
+    var item = itemByFn(fn); if (!item) return;
+    var prev = itemTags(item).slice();
+    setItemTags(item, prev.filter(function (t) { return t !== tag; }));
+    refreshTagEditor(fn);
+    fetchJSON("/items/" + encodeURIComponent(fn) + "/tags", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remove: [tag] })
+    }).then(function (res) {
+      setItemTags(item, Array.isArray(res.tags) ? res.tags : prev.filter(function (t) { return t !== tag; }));
+      refreshTagEditor(fn);
+    }).catch(function () {
+      setItemTags(item, prev);                        // revert
+      refreshTagEditor(fn);
+      toast("Couldn't remove tag — check connection", false);
+    });
   }
 
   // Companion discussion threads folded onto a canonical YouTube item (Epic 11).
@@ -320,7 +422,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
       whyHtml(item) +
       datesLine(item) +
       companionsHtml(item) +
-      tagChips(item) +
+      tagEditorHtml(item) +
       catHtml(item) +
       recoverHtml(item) +
       (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
@@ -594,6 +696,33 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
         .catch(function () { rb.disabled = false; rb.textContent = "↻ Recover from archives"; });
       return;
     }
+    // ---- manual tag editor (mirrors the cat-chip network pattern, POSTs to /tags) ----
+    // Remove an existing tag chip. The ✕ and the chip itself both carry the removal
+    // (closest() walks up from either), so the whole pill is a tap target.
+    var tagRm = e.target.closest("[data-rmtag]");
+    if (tagRm) {
+      var cardEl = tagRm.closest(".tcard");
+      var tagFn = cardEl ? cardEl.getAttribute("data-fullname") : "";
+      if (tagFn) removeTag(tagFn, tagRm.getAttribute("data-rmtag"));
+      return;
+    }
+    // A suggestion chip in the open add-UI → add that tag and close the UI.
+    var sugg = e.target.closest("[data-addtag]");
+    if (sugg) {
+      e.preventDefault();
+      var sCard = sugg.closest(".tcard");
+      var sFn = sCard ? sCard.getAttribute("data-fullname") : "";
+      if (sFn) { addTag(sFn, sugg.getAttribute("data-addtag")); collapseTagAdd(sCard.querySelector(".tag-add-input")); }
+      return;
+    }
+    // "＋ tag" button → toggle the inline add UI (known-tag suggestions + a free input).
+    var addBtn = e.target.closest("[data-tagadd]");
+    if (addBtn) {
+      var addCard = addBtn.closest(".tcard");
+      var addFn = addCard ? addCard.getAttribute("data-fullname") : "";
+      if (addFn) openTagAdd(addFn);
+      return;
+    }
     var chip = e.target.closest(".cat-chip");
     if (chip) {
       var cat = chip.getAttribute("data-cat");
@@ -632,6 +761,26 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
           if (holder) holder.innerHTML = aiHtml(s);
         })
         .catch(function () { aiBtn.textContent = "AI unavailable"; });
+    }
+  });
+
+  // ---- manual tag editor: keyboard + live suggestions ----
+  stack.addEventListener("input", function (e) {
+    var inp = e.target.closest(".tag-add-input");
+    if (inp) refreshSuggestions(inp);
+  });
+  stack.addEventListener("keydown", function (e) {
+    var inp = e.target.closest(".tag-add-input");
+    if (!inp) return;
+    var card = inp.closest(".tcard");
+    var fn = card ? card.getAttribute("data-fullname") : "";
+    if (e.key === "Enter") {
+      e.preventDefault();
+      var v = inp.value;
+      if (fn && normTag(v)) { addTag(fn, v); collapseTagAdd(inp); }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      collapseTagAdd(inp);
     }
   });
 
@@ -752,6 +901,13 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
   });
   // Today's clears (shared with browse) so the header shows accumulating wins across batches.
   fetchJSON("/pulse").then(function (p) { todayCleared = (p && p.cleared_today) || 0; updateProgress(); }).catch(function () {});
+  // Cache the user's tag vocabulary once so the "＋ tag" add-UI can suggest known tags
+  // (and the user can still type a brand-new one). /tags is cross-filtered by the
+  // active source/status on browse, but we want the FULL vocabulary here (triage is
+  // unfiltered), so call it with no source/status.
+  fetchJSON("/tags").then(function (d) {
+    if (d && d.tags && typeof d.tags === "object") knownTags = Object.keys(d.tags).sort();
+  }).catch(function () {});
   fetchJSON("/sources").then(function (data) {
     (data.sources || []).forEach(function (s) {
       sources[s.id] = s;
