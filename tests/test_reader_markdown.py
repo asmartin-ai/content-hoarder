@@ -18,13 +18,14 @@ import pytest
 STATIC = Path(__file__).resolve().parents[1] / "src" / "content_hoarder" / "static"
 
 
-def _render(md):
+def _render(md, media=None):
     node = shutil.which("node")
     if not node:
         pytest.skip("node not available")
+    opts = json.dumps({"media": media}) if media else "null"
     script = (
         "import { renderMarkdown } from './core/markdown.js';"
-        f"console.log(renderMarkdown({json.dumps(md)}));"
+        f"console.log(renderMarkdown({json.dumps(md)}, {opts}));"
     )
     r = subprocess.run(
         [node, "--input-type=module", "-e", script],
@@ -101,3 +102,63 @@ def test_xss_raw_html_is_escaped_not_executed():
 def test_snake_case_not_italicised():
     out = _render("a snake_case_word here")
     assert "<em>" not in out and "snake_case_word" in out
+
+
+# --- embedded images (Epic 15): markdown ![](url), Reddit media-ids, bare URLs, host allowlist ---
+
+def test_markdown_image_allowlisted_host_renders_img():
+    out = _render("![cat](https://i.redd.it/cat.jpg)")
+    assert '<img' in out and 'class="md-img"' in out
+    assert 'src="https://i.redd.it/cat.jpg"' in out
+    assert 'data-img="https://i.redd.it/cat.jpg"' in out
+    assert 'referrerpolicy="no-referrer"' in out
+    assert '<a' not in out                       # image, not the link fallback
+    assert not out.lstrip('<p>').startswith('!') # the leading "!" wasn't left dangling
+
+
+def test_markdown_image_non_allowlisted_host_falls_back_to_link():
+    out = _render("![x](https://evil.example/x.jpg)")
+    assert '<img' not in out                      # untrusted host -> no inline image
+    assert '<a href="https://evil.example/x.jpg"' in out  # safe click-through instead
+
+
+def test_markdown_image_unsafe_scheme_is_neither_img_nor_link():
+    out = _render("![x](javascript:alert(1))")
+    assert '<img' not in out and '<a' not in out and 'javascript' not in out
+
+
+def test_reddit_media_id_resolves_to_img_and_escapes_url():
+    media = {"abc123": {"u": "https://preview.redd.it/abc.png?width=640&s=xyz", "kind": "image"}}
+    out = _render("look ![img](abc123)", media)
+    assert '<img' in out
+    assert 'src="https://preview.redd.it/abc.png?width=640&amp;s=xyz"' in out  # & escaped in attr
+
+
+def test_giphy_media_id_renders_img():
+    media = {"giphy|RAND": {"u": "https://i.giphy.com/media/RAND/giphy.gif", "kind": "gif"}}
+    out = _render("![gif](giphy|RAND)", media)
+    assert '<img' in out and 'giphy.gif' in out
+
+
+def test_unknown_media_id_without_url_degrades_to_alt_text():
+    out = _render("![img](notamediaid)")           # not a URL, not in the media map
+    assert '<img' not in out and '<a' not in out
+    assert 'img' in out                            # the alt text survives
+
+
+def test_bare_allowlisted_image_url_renders_inline():
+    out = _render("look https://i.redd.it/x.png here")
+    assert '<img' in out and 'src="https://i.redd.it/x.png"' in out
+    assert 'here' in out                           # surrounding text preserved
+
+
+def test_bare_non_image_url_stays_a_link():
+    out = _render("see https://example.com/page for more")
+    assert '<img' not in out and '<a href="https://example.com/page"' in out
+
+
+def test_image_alt_is_escaped_no_attribute_injection():
+    out = _render('![" onerror=alert(1)](https://i.redd.it/x.jpg)')
+    assert '<img' in out
+    assert '"onerror' not in out and '" onerror' not in out   # the quote was escaped
+    assert '&quot;' in out                                     # ...to its entity form
