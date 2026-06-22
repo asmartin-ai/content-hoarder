@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v61";  // v61: firmer haptics + done/archive swipe reveal detents — v60 = crisper/shorter keyboard-tap haptics
+const CACHE = "ch-shell-v62";  // v62: tag inputs type=search (suppress Android autofill bar) — v61 = firmer haptics + swipe detents
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js

@@ -194,8 +194,9 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       '<div class="tcard-tags-body">' +
         '<div class="tcard-tagrow">' + chipRowHtml(item) + "</div>" +
         '<div class="tag-add-ui" hidden>' +
-          '<input class="tag-add-input" type="text" placeholder="new or existing tag" ' +
-            'autocomplete="off" maxlength="40" aria-label="Add a tag">' +
+          '<input class="tag-add-input" type="search" placeholder="new or existing tag" ' +
+            'autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" ' +
+            'maxlength="40" aria-label="Add a tag">' +
           '<span class="tag-suggest"></span>' +
         "</div>" +
       "</div></div>";
