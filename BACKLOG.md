@@ -172,7 +172,7 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
   J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new
   mapping for review. (The `?` cheatsheet already ships.)
-- [ ] **P2 — Share button on items.** *(User-requested 2026-06-17.)* Add a Share affordance to the item
+- [x] ~~**P2 — Share button on items.**~~ ✅ SHIPPED 2026-06-22 (browser-verified): Web-Share with clipboard fallback, sharing the **source permalink** — `shareItem()` in `core/render.js` (navigator.share on mobile; clipboard + "Link copied" toast on desktop; reuses `itemUrl()` per source). On the row/card action cluster (`browse/render.js` actsHtml, `data-share`; hidden on touch ROWS where swipe owns the acts, shown on cards) + the reader header (`#reader-share`). Tabler share icon, SW v63. *(User-requested 2026-06-17.)* Orig scope: Add a Share affordance to the item
   (row/card + reader). **Open scope:** native Web Share API (`navigator.share` — works on the mobile PWA,
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
   source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
@@ -333,7 +333,7 @@ false positives.*
   note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
   **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
   new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
-- [ ] **P2 — More aggressive preload of content + comments (smoother UX).** *(User-requested 2026-06-20.)* Keep
+- [x] ~~**P2 — More aggressive preload of content + comments (smoother UX).**~~ ✅ SHIPPED 2026-06-22 (browser-verified): on reader-open, `preloadNext()` (`browse/main.js`) warms the **next reddit item's comment thread** (background GET `/reddit/items/<fn>/thread` lazily hydrates server-side → next open is instant) + primes its media image. Bounded + rate-safe: ONE thread fetch per open, de-duped (`_preloaded`), abortable (`AbortController`), reddit-only, small look-ahead. **Deferred:** broader feed-scroll warming (held back for reddit rate limits — revisit if the reader still feels laggy). *(User-requested 2026-06-20.)* Orig: Keep
   lazy-loading, but warm a bit ahead: pre-fetch images/media just below the fold and **pre-hydrate the reddit
   thread (post + comments)** for the item(s) most likely to be opened next, so the reader feels instant. Bound it
   (small look-ahead, cancel on fast scroll) to avoid wasted fetches / throttle hits. Extends the "Predictive
@@ -1004,8 +1004,9 @@ Absorbs "make the Reddit view more mobile-friendly".*
 - [x] ~~**P2 — NSFW blur in the inbox/triage**~~ ✅ v3: over-18 media blurred in the browse list (`render.js:13/62` veil + `browse.css:318` `filter:blur(16px)`), reveal-on-tap. Orig: adopt the Reddit view's blur for over-18 media.
 - [ ] **P2 — Tap thumbnail opens the view modal; long-press enters group-select.** ✅ tap-opens-modal SHIPPED on v3 (`main.js:161-180` delegated `[data-media]` → `openMediaFor`); ⏳ the **long-press → group-select** half is still unbuilt (`swipe.js` has no long-press; select is via the avatar `[data-select]` button). Box stays open for that half. Orig: Today a thumbnail
   tap on mobile doesn't open the modal.
-- [ ] **P2 — Swipe physics feel.** The current swipe is a little stiff; add momentum/spring + better
-  thresholds for a smoother feel.
+- [ ] **P3 — ICEBOX: Swipe physics feel.** *(Iceboxed 2026-06-22 — user: "right now it's fine.")* The
+  current swipe is a little stiff; could add momentum/spring + better thresholds for a smoother feel.
+  Reactivate if the swipe starts to feel laggy/stiff in real use.
 - [ ] **P3 — Mobile-friendly scrollbar** (Nova-Launcher-style fast-scroll handle).
 - [x] ~~**P2 — Inbox swipe = mobile/touch only.**~~ ✅ v3: `swipe.js:37` ignores `pointerType==="mouse"` unless `{mouse:true}`; `main.js` `attachSwipe` passes no `mouse` flag → desktop uses buttons, touch swipes. *(User decision 2026-06-08.)* Orig: Disable row-swipe on the
   inbox on desktop (desktop uses the action buttons/hover); keep swipe for touch only.
