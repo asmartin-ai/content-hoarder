@@ -815,12 +815,17 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   external links). Render a safe subset to HTML (escape first, then linkify + apply markdown; no raw
   HTML injection — XSS-safe). Reuse one renderer for both the post self-text and comments. Keep it pure
   so it stays node-testable like the other reader helpers.
-- [ ] **P3 — Inline media playback inside the reader's comment thread.** *(User idea 2026-06-17.)* Once
-  comment markdown linkifies (above), detect media links in comments — **giphy**, `i.redd.it`/imgur
-  images, `v.redd.it`/gfycat/redgifs/streamable video — and render them inline (image thumb → lightbox;
-  video → the same HLS/`<video>` path) instead of a bare link. Gate behind a tap/expander to avoid
-  auto-loading a wall of media; respect the NSFW reveal. Builds on `mediaType`/`hlsManifestUrl`/the
-  lightbox already in `core/media.js`.
+- [~] **P3 — Inline media playback inside the reader's comment thread.** *(User idea 2026-06-17.)*
+  ✅ **IMAGES SHIPPED 2026-06-22** (user-requested directly, ahead of the RES screenshots): `core/markdown.js`
+  now renders `![alt](url)`, bare image URLs, AND Reddit's native `![img](media-id)` (resolved server-side
+  from `media_metadata` — `reddit_thread._resolve_media`, passed through on each comment + the post selftext)
+  as inline `<img>`, tap → lightbox. **Host-allowlisted** (Reddit + imgur + giphy; others → safe link) with
+  `referrerpolicy=no-referrer` + lazy-load; XSS-safe-by-construction (escape-first, no event attrs). +15 tests
+  (6 server + 9 node), full suite 647 green, verified live. sw.js →v58.
+  ⏳ **STILL OPEN:** (a) **video in comments** — `v.redd.it`/gfycat/redgifs/streamable → the HLS/`<video>`
+  path; (b) the RES-informed refinements — a **tap/expander gate** so a comment with many images doesn't
+  auto-load a wall, and **NSFW reveal** on inline comment media (currently images render directly). Analyze
+  the RES screenshots + repo (inline-expando / media-host modules) when tackling these.
   **When tackling this:** the user will provide Reddit Enhancement Suite (RES) UI screenshots as a
   design reference — analyze them AND the RES repo (https://github.com/honestbleeps/Reddit-Enhancement-Suite,
   esp. its inline-expando / media-host modules) for how RES inlines comment media, then adapt the

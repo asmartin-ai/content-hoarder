@@ -841,6 +841,10 @@ html.reader-lock{overflow:hidden}
 .rd-ctext p{margin:0 0 var(--sp-2)}
 .rd-ctext p:last-child,.rd-ctext ul:last-child,.rd-ctext ol:last-child,
 .rd-ctext blockquote:last-child,.rd-ctext pre:last-child{margin-bottom:0}
+/* inline embedded images in selftext + comment bodies (Epic 15) — tap opens the lightbox */
+.rd-body .md-img,.rd-ctext .md-img{display:block;max-width:100%;max-height:60vh;width:auto;
+  margin:var(--sp-2) 0;border:1px solid var(--border-control);border-radius:var(--r-sm);
+  background:var(--surface-sunken);cursor:zoom-in}
 .rd-media{display:block;width:100%;margin-top:var(--sp-3);padding:0;position:relative;
   border:1px solid var(--border-hairline);border-radius:var(--r-md);overflow:hidden;
   background:var(--tile-fill);cursor:pointer}

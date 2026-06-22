@@ -7,6 +7,7 @@ Pure parsing + a cache reader — no network here.
 
 from __future__ import annotations
 
+import html
 import json
 
 from content_hoarder import db
@@ -15,6 +16,33 @@ from content_hoarder import db
 def _abs_permalink(p: str) -> str:
     p = p or ""
     return ("https://www.reddit.com" + p) if p.startswith("/") else p
+
+
+def _resolve_media(mm: dict) -> dict:
+    """Slim a post/comment ``media_metadata`` dict to ``{id: {u, kind, w, h}}`` for inline rendering.
+
+    Reddit stores native comment images (and emotes/giphy) here; the keys match the ``![..](id)``
+    refs in the markdown body. URLs are ``html.unescape``d (Reddit HTML-encodes the ``&`` in the
+    query string). Only ``valid`` Image/AnimatedImage entries with an http(s) source survive — the
+    client re-escapes the URL before it ever reaches the DOM. ``kind`` ∈ {image, gif, video}."""
+    out: dict = {}
+    if not isinstance(mm, dict):
+        return out
+    for mid, meta in mm.items():
+        if not isinstance(meta, dict) or meta.get("status") not in (None, "valid"):
+            continue
+        s = meta.get("s") or {}
+        if meta.get("e") == "AnimatedImage":
+            u = s.get("gif") or s.get("mp4") or s.get("u")
+            kind = "gif" if s.get("gif") else ("video" if s.get("mp4") else "image")
+        else:
+            u = s.get("u") or s.get("gif") or s.get("mp4")
+            kind = "image"
+        if not isinstance(u, str) or not u.startswith(("http://", "https://")):
+            continue
+        out[str(mid)] = {"u": html.unescape(u), "kind": kind,
+                         "w": s.get("x") or 0, "h": s.get("y") or 0}
+    return out
 
 
 def _extract_comments(children: list, depth: int = 0, sort: str = "best") -> list:
@@ -27,14 +55,18 @@ def _extract_comments(children: list, depth: int = 0, sort: str = "best") -> lis
     out: list = []
     for child in filtered:
         d = child.get("data", {}) or {}
-        out.append({
+        entry = {
             "author": d.get("author", ""),
             "body": d.get("body", ""),
             "score": d.get("score", 0),
             "depth": depth,
             "permalink": _abs_permalink(d.get("permalink", "")),
             "created_utc": int(d.get("created_utc") or 0),
-        })
+        }
+        media = _resolve_media(d.get("media_metadata"))
+        if media:                       # only when present — keeps the common (no-media) comment lean
+            entry["media"] = media
+        out.append(entry)
         replies = d.get("replies")
         if isinstance(replies, dict):
             out.extend(_extract_comments(replies.get("data", {}).get("children", []), depth + 1, sort))
@@ -64,6 +96,7 @@ def parse_thread(raw_json: str, item: dict, sort: str = "best") -> dict:
                 "score": pd.get("score", 0),
                 "url": pd.get("url", ""),
                 "created_utc": pd.get("created_utc", 0),
+                "media": _resolve_media(pd.get("media_metadata")),   # selftext ![](id) images
             }
         if len(data) >= 2:
             comments = _extract_comments(data[1].get("data", {}).get("children", []), sort=sort)
