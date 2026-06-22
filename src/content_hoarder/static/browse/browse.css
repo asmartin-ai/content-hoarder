@@ -338,10 +338,12 @@ body.focus .batchstrip{display:flex}
 .act.a{color:var(--status-archive)}
 .act.d{color:var(--status-done)}
 .act.x{color:var(--text-muted);font:var(--fw-bold) .72rem/1 var(--font-mono)}
+.act.sh{color:var(--text-muted)}
 .act.k:hover{border-color:var(--status-keep);background:var(--keep-tint)}
 .act.a:hover{border-color:var(--status-archive);background:var(--archive-tint)}
 .act.d:hover{border-color:var(--status-done);background:var(--done-tint)}
 .act.x:hover{border-color:var(--accent);background:var(--accent-tint)}
+.act.sh:hover{border-color:var(--accent);background:var(--accent-tint)}
 .act:hover,.act:focus-visible{opacity:1}
 .act:focus-visible{outline:2px solid currentColor;outline-offset:1px}
 .row:hover .act,.pin:hover .act{opacity:1;border-color:var(--border-control)}
@@ -804,6 +806,7 @@ html.reader-lock{overflow:hidden}
   text-decoration:none;border:1px solid var(--border-control);border-radius:var(--r-pill);
   padding:7px 11px}
 .rd-oo:hover{color:var(--text-body);border-color:var(--accent)}
+.rd-share{margin-left:8px;background:none;cursor:pointer}
 .rd-x{width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;
   background:transparent;border:1px solid var(--border-control);border-radius:var(--r-pill);
   color:var(--text-muted);cursor:pointer}
