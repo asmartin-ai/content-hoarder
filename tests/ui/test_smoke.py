@@ -68,5 +68,22 @@ def test_topbar_shrinks_on_scroll_then_expands(pixel6_page):
     page.wait_for_timeout(150)
     expect(console).to_have_class(re.compile(r"\bcompact\b"))       # collapsed
     page.evaluate("window.scrollTo(0, 0)")                          # back to the top
-    page.wait_for_timeout(150)
-    expect(console).not_to_have_class(re.compile(r"\bcompact\b"))   # expanded again
+    expect(console).not_to_have_class(re.compile(r"\bcompact\b"))   # expanded again (expect auto-waits)
+
+
+def test_topbar_no_flicker_near_top(pixel6_page):
+    """REGRESSION GUARD (2026-06-22): the collapsing bar must not FLIP rapidly near the top, where
+    expanding grows the bar and scroll-anchoring nudges scrollY. Count .console class mutations over a
+    scroll-down-then-back-to-top sequence — a healthy run toggles a small, bounded number of times."""
+    page = pixel6_page
+    page.evaluate(
+        "() => { window.__t = 0; const h = document.querySelector('.console');"
+        " new MutationObserver(() => { window.__t++; }).observe(h, {attributes: true, attributeFilter: ['class']}); }"
+    )
+    page.mouse.wheel(0, 700)                 # scroll well down → collapse
+    page.wait_for_timeout(600)
+    page.evaluate("window.scrollTo(0, 8)")   # back to near the top → expand
+    page.wait_for_timeout(900)               # leave time for any flicker to manifest
+    toggles = page.evaluate("window.__t")
+    assert toggles <= 4, f"top bar flickered: {toggles} class mutations (expected ~2: collapse + expand)"
+    expect(page.locator(".console")).not_to_have_class(re.compile(r"\bcompact\b"))  # settled expanded
