@@ -226,7 +226,10 @@ function redo() {
 
 /* the in-app Reddit reader — replaces the external Firefox/Relay handoff for
    reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
-const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur });
+const readerUI = initReader({
+  onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur,
+  onImage: (url) => lightbox.openImage(url),   // inline comment/selftext image → lightbox
+});
 
 /* per-item manual tag editor (browse surface, Epic 5/26 P2) — opens from the ＋ trigger on
    a row/card or the `t` key. Writes the server's returned tag list back to state, re-renders

@@ -36,8 +36,13 @@ export function settleTop() {
   try { history.back(); } catch (e) { unwinding = false; }
 }
 
-window.addEventListener("popstate", () => {
-  if (unwinding) { unwinding = false; return; }   // our own settleTop() back() — already torn down
-  const onClose = stack.pop();
-  if (onClose) { try { onClose(); } catch (e) { /* a closer that throws must not wedge the stack */ } }
-});
+// Guard `window` so this module is import-safe in Node (the node-backed markdown/media tests import
+// core/media.js, which imports this). pushOverlay/settleTop touch `history` only at call time, never
+// on import, so they need no guard.
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => {
+    if (unwinding) { unwinding = false; return; }   // our own settleTop() back() — already torn down
+    const onClose = stack.pop();
+    if (onClose) { try { onClose(); } catch (e) { /* a closer that throws must not wedge the stack */ } }
+  });
+}
