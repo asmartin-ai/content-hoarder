@@ -1,7 +1,7 @@
 /* Triage focus mode: one card at a time, swipe / keyboard / buttons.
    Pixel-6 / Android gesture-nav safe: 30px edge deadzone + inset card + tap buttons. */
 import { esc, safeUrl, isTypingTarget, ago } from "./core/util.js";
-import { getJSON as fetchJSON } from "./core/api.js";
+import { getJSON as fetchJSON, postJSON } from "./core/api.js";
 import { chIcon, fillIcons } from "./core/icons.js";
 import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
 
@@ -236,10 +236,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
     if (prev.indexOf(tag) !== -1) return;            // already present
     setItemTags(item, prev.concat([tag]));
     refreshTagEditor(fn);
-    fetchJSON("/items/" + encodeURIComponent(fn) + "/tags", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ add: [tag] })
-    }).then(function (res) {
+    postJSON("/items/" + encodeURIComponent(fn) + "/tags", { add: [tag] }).then(function (res) {
       setItemTags(item, Array.isArray(res.tags) ? res.tags : prev.concat([tag]));
       refreshTagEditor(fn);
       var card = findCardEl(fn);
@@ -257,10 +254,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
     var prev = itemTags(item).slice();
     setItemTags(item, prev.filter(function (t) { return t !== tag; }));
     refreshTagEditor(fn);
-    fetchJSON("/items/" + encodeURIComponent(fn) + "/tags", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ remove: [tag] })
-    }).then(function (res) {
+    postJSON("/items/" + encodeURIComponent(fn) + "/tags", { remove: [tag] }).then(function (res) {
       setItemTags(item, Array.isArray(res.tags) ? res.tags : prev.filter(function (t) { return t !== tag; }));
       refreshTagEditor(fn);
     }).catch(function () {
