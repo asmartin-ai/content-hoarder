@@ -1739,24 +1739,49 @@ def pulse(conn: sqlite3.Connection, *, now: int | None = None) -> dict:
             "swept_recent": swept_recent}
 
 
+def user_tag_vocab(conn: sqlite3.Connection) -> list[str]:
+    """The user-tag registry: distinct tags the user applied by hand, derived from the
+    ``metadata.tags_manual`` stamps that :func:`set_tags` writes (Epic 26).
+
+    No separate table — a tag is "in the vocabulary" exactly while it's stamped on at least one
+    item, so it survives re-import via the same stamp and drops out when the last item loses it.
+    Crucially this reads ``tags_manual`` (only user-applied tags), NOT ``tags`` (which also holds
+    the tens-of-thousands of enrich keywords), so surfacing these in the rail stays cheap + clean.
+    """
+    rows = conn.execute(
+        "SELECT DISTINCT je.value AS tag "
+        "FROM items, json_each(items.metadata, '$.tags_manual') je"
+    ).fetchall()
+    return [r["tag"] for r in rows]
+
+
 def tag_counts(
     conn: sqlite3.Connection,
     *,
     source: str | None = None,
     status: str | None = None,
 ) -> dict:
-    """Counts for the curated filter tags (``categorize.FILTER_TAGS``), descending.
+    """Counts for the rail's facet tags (curated ``categorize.FILTER_TAGS`` PLUS user-created
+    tags from :func:`user_tag_vocab`), descending.
 
     ``metadata.tags`` also holds non-facet values (e.g. YouTube per-video keywords from the
-    enrich pass), so the result is restricted to the curated vocabulary — otherwise the browse
-    rail would render tens of thousands of one-off keyword tags. Optionally cross-filtered by
-    source/status so the rail composes with the active source tab + status nav.
+    enrich pass), so the result is restricted to the facet vocabulary — otherwise the browse
+    rail would render tens of thousands of one-off keyword tags. User tags join the vocabulary
+    so a manually-applied tag shows up as a rail facet alongside the curated set (Epic 26).
+    Optionally cross-filtered by source/status so the rail composes with the active source tab
+    + status nav.
     """
     from content_hoarder.categorize import FILTER_TAGS
 
-    placeholders = ",".join("?" for _ in FILTER_TAGS)
+    facet_tags = list(FILTER_TAGS)
+    seen = set(facet_tags)
+    for t in user_tag_vocab(conn):          # user-created tags join the curated facet vocabulary
+        if t not in seen:
+            facet_tags.append(t)
+            seen.add(t)
+    placeholders = ",".join("?" for _ in facet_tags)
     where = [f"je.value IN ({placeholders})"]
-    params: list = list(FILTER_TAGS)
+    params: list = list(facet_tags)
     if source:
         where.append("items.source = ?")
         params.append(source)

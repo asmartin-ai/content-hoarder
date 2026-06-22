@@ -57,3 +57,22 @@ def test_no_op_does_not_reorder_feed(conn):
     before = db.get_item(conn, "r:1")["last_seen_utc"]
     db.set_tags(conn, "r:1", add=["tagא"])  # add a tag (non-ASCII tolerated)
     assert db.get_item(conn, "r:1")["last_seen_utc"] == before  # tag edit never bumps recency
+
+
+def test_user_tag_registry_surfaces_in_rail_counts(conn):
+    # User-created tags (stamped in tags_manual) join the rail facet vocabulary (Epic 26),
+    # while enrich keywords (only in tags, never tags_manual) stay OUT.
+    db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
+    db.merge_upsert(conn, mk(source="r", source_id="2", title="y"))
+    db.set_tags(conn, "r:1", add=["Recipes"])     # normalized -> recipes
+    db.set_tags(conn, "r:2", add=["recipes"])     # same user tag on a 2nd item
+    assert "recipes" in db.user_tag_vocab(conn)
+    counts = db.tag_counts(conn)
+    assert counts.get("recipes") == 2             # was excluded before (not in FILTER_TAGS)
+    # an enrich keyword lives in metadata.tags but NOT tags_manual → never a facet
+    db.merge_upsert(conn, mk(source="r", source_id="3", title="z",
+                             metadata={"tags": ["some random keyword"]}))
+    assert "some random keyword" not in db.tag_counts(conn)
+    # a curated tag still counts as before
+    db.set_tags(conn, "r:3", add=["science"])
+    assert db.tag_counts(conn).get("science") == 1
