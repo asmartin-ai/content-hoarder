@@ -809,21 +809,31 @@ $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v69";
+const APP_VERSION = "v70";
 (() => {
   const ver = $("#app-version"); if (ver) ver.textContent = APP_VERSION;
   const head = $(".console"); if (!head) return;
-  // POSITION-based with a dead zone (hysteresis), NOT direction-based: collapsing/expanding the bar
-  // changes its height (reflow), and a direction toggle fed that reflow back into itself near a single
-  // threshold → flicker on scroll-up. Separate add/remove thresholds with a 56px gap absorb both the
-  // reflow jump and mobile scroll jitter. Shrinks once scrolled down; expands when back near the top.
-  const onScroll = () => {
-    const y = window.scrollY || 0;
-    if (y > 88) head.classList.add("compact");          // scrolled down → shrink
-    else if (y < 32) head.classList.remove("compact");  // back near the top → expand
-    // 32..88 = dead zone: keep the current state (no flip → no flicker)
+  // Collapsing/expanding the (sticky) header changes its height, so the browser's scroll-anchoring
+  // nudges scrollY to keep content stable — near a threshold that nudge re-triggered the toggle =
+  // flicker (worst near the top, where expanding GROWS the bar). Two guards: (1) a WIDE dead zone
+  // (>110 collapse / <28 expand) bigger than the bar's height change, so the nudge lands inside it;
+  // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle,
+  // then re-checks once from the settled position. Together they can't oscillate.
+  let locked = false;
+  const set = (compact) => {
+    if (compact === head.classList.contains("compact")) return;   // already in this state
+    head.classList.toggle("compact", compact);
+    locked = true;
+    setTimeout(() => { locked = false; onScroll(); }, 320);       // > the collapse transition
   };
-  window.addEventListener("scroll", onScroll, { passive: true });  // cheap; scroll is already frame-throttled
+  function onScroll() {
+    if (locked) return;
+    const y = window.scrollY || 0;
+    if (y > 110) set(true);          // scrolled well down → shrink
+    else if (y < 28) set(false);     // back near the top → expand
+    // 28..110 = wide dead zone: keep the current state
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
 })();
 
 /* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
