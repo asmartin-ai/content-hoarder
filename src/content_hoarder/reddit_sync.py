@@ -21,10 +21,14 @@ with the importer via ``connectors.reddit.child_to_item``.
 from __future__ import annotations
 
 import json
+import logging
+import threading
 import time
 import urllib.parse
 
 from content_hoarder import _http, db, reddit_oauth
+
+logger = logging.getLogger(__name__)
 from content_hoarder.reddit_unsave import (
     RedditAuthError,
     RedditNetworkError,
@@ -64,9 +68,19 @@ def sync_saved(
     getf=None,
     user_agent: str | None = None,
     progress=None,
+    reconcile: bool = False,
+    reconcile_dry_run: bool = False,
 ) -> dict:
     """Pull newest saved items into the local DB. Returns a summary dict:
     ``{fetched, new, updated, pages, stopped, auth_error, username}``.
+
+    ``reconcile=True`` flips this into a *full-walk census* run: it forces ``stop_on_known=False``
+    (so the whole current saved set is seen, not just the new top), records every listed fullname
+    by kind, and after the walk feeds that census into :func:`db.reconcile_reddit_saves` — flagging
+    previously-saved items now MISSING from Reddit as ``is_saved=0`` and promoting any still in the
+    inbox to ``done`` (see :func:`_reconcile_present`). The result then carries a ``"reconcile"`` key.
+    A reconcile only acts on a walk that reached a complete boundary below the listing cap, so a
+    partial view can never trigger a false unsave.
 
     ``stopped`` ∈ {``caught_up`` (re-reached the high-water mark), ``all_known`` (a page had 0
     new and there's no mark yet), ``max_pages``, ``exhausted`` (no more pages), ``empty``,
@@ -83,6 +97,9 @@ def sync_saved(
     result = {"fetched": 0, "new": 0, "updated": 0, "pages": 0,
               "stopped": None, "auth_error": False, "network_error": False,
               "username": None, "transport": None}
+    if reconcile:
+        stop_on_known = False  # a census MUST see the whole saved set, not stop at the new top
+    present_by_kind: dict[str, set] = {"post": set(), "comment": set()}
 
     # Transport selection (mirrors reddit_hydrate.hydrate_one): prefer the sanctioned OAuth read
     # path when it's configured (refresh token present + an access token mintable + a username to
@@ -180,7 +197,9 @@ def sync_saved(
             name = (ch.get("data") or {}).get("name")
             if name and len(top_names) < _MARK_DEPTH and name not in top_names:
                 top_names.append(name)  # incl. a matched mark item — it's still listed
-            if mark_set and name in mark_set:  # reached where the last sync left off
+            if reconcile and name:  # full census of the live saved set (every kind, every page)
+                present_by_kind["post" if name.startswith("t3_") else "comment"].add(name)
+            if mark_set and name in mark_set and not reconcile:  # last sync's boundary (skip in census)
                 hit_mark = True
                 break
             item = child_to_item(ch, saved_seen_utc=snapshot_utc)
@@ -232,10 +251,188 @@ def sync_saved(
     if top_names and (not marks or result["stopped"] in ("caught_up", "exhausted", "all_known")):
         db.set_setting(conn, _MARK_KEY, json.dumps(top_names), commit=False)
     conn.commit()
+    if reconcile:
+        result["reconcile"] = _reconcile_present(
+            conn, present_by_kind, stopped=result["stopped"], dry_run=reconcile_dry_run)
     return result
+
+
+# Reddit's saved listing is one mixed (posts+comments) stream globally capped at ~1000 items, so a
+# walk that reaches that many may be TRUNCATED rather than complete. At/above this floor we refuse to
+# infer unsaves (a previously-seen item could merely be beyond the cap, not actually un-saved).
+RECONCILE_SAFE_CAP = 990
+
+
+def _reconcile_present(conn, present_by_kind: dict, *, stopped: str | None,
+                       dry_run: bool = False) -> dict:
+    """Reconcile a full-walk census against the local DB (the "infer unsaved + unsave locally" step).
+
+    Feeds the live-saved census into :func:`db.reconcile_reddit_saves` (which clears ``is_saved`` for
+    previously-snapshot-seen items now absent — a Reddit-side unsave; it never writes to Reddit), then
+    promotes the freshly-unsaved items that are still in the INBOX to ``done`` (the unsave decided it).
+    Items already in a decided local state (``keep``/``archived``/``done``) only lose ``is_saved`` —
+    their status stands. The done-promotion passes ``queue_unsave=False`` so it never re-enqueues a
+    no-op Reddit unsave for an item that's already gone server-side.
+
+    SAFETY: reconciles NOTHING (``ran=False``) unless the walk reached a complete boundary
+    (``exhausted``/``empty``) AND stayed below the ~1000 listing cap — a partial or capped view must
+    never trigger a false unsave. ``dry_run`` previews the would-unsave set without writing.
+    """
+    total = sum(len(v) for v in present_by_kind.values())
+    if stopped not in ("exhausted", "empty"):
+        return {"ran": False, "skipped": "incomplete_walk", "stopped": stopped, "present": total}
+    if total >= RECONCILE_SAFE_CAP:
+        return {"ran": False, "skipped": "listing_cap", "present": total}
+    # Complete walk below the cap -> this census IS the current saved set; reconcile both kinds.
+    rec = db.reconcile_reddit_saves(
+        conn, present_by_kind, dry_run=dry_run,
+        truncated_by_kind={"post": False, "comment": False})
+    unsaved_fns = [fn for k in ("post", "comment") for fn in rec.get(k, {}).get("fullnames", [])]
+    promoted = 0
+    if not dry_run and unsaved_fns:
+        for fn in unsaved_fns:
+            row = conn.execute("SELECT status FROM items WHERE fullname=?", (fn,)).fetchone()
+            if row and row["status"] == "inbox":  # undecided -> the Reddit unsave decided it
+                db.set_status(conn, fn, "done", queue_unsave=False)
+                promoted += 1
+        conn.commit()
+    return {"ran": True, "present": total, "by_kind": rec, "dry_run": dry_run,
+            "unsaved": len(unsaved_fns), "promoted_done": promoted}
 
 
 # Backward-compatible name: this was cookie-only before the OAuth read path was added. The public
 # entry point is now ``sync_saved`` (transport-aware); the old name stays as an alias so existing
 # callers/tests keep working. With an injected ``getf`` it is the cookie path, unchanged.
 sync_saved_cookie = sync_saved
+
+
+# --- Automatic sync orchestration (the background scheduler + PWA-open hook share this one path) ---
+
+_ENABLED_KEY = "reddit_autosync_enabled"        # "1" arms the background scheduler + PWA-open trigger
+_LAST_RUN_KEY = "reddit_autosync_last_run"      # epoch of the last non-debounced auto run (any mode)
+_LAST_RECON_KEY = "reddit_autosync_last_reconcile"  # epoch of the last completed reconcile
+
+MIN_RUN_INTERVAL = 90        # debounce: triggers within this window no-op (PWA-open spam collapses to 1)
+RECONCILE_INTERVAL = 6 * 3600  # how often the heavy unsave-reconcile runs; cheap imports run between
+RECONCILE_MAX_PAGES = 12     # ~1200 items — enough to exhaust the ~1000-item saved listing cap
+
+
+def _to_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def is_autosync_enabled(conn) -> bool:
+    """Whether the background scheduler + PWA-open auto path are armed (opt-in, default off)."""
+    return db.get_setting(conn, _ENABLED_KEY, "0") == "1"
+
+
+def set_autosync_enabled(conn, enabled: bool) -> None:
+    db.set_setting(conn, _ENABLED_KEY, "1" if enabled else "0", commit=True)
+
+
+def auto_sync(conn, *, now=None, force: bool = False, reconcile_dry_run: bool = False,
+              min_interval: int = MIN_RUN_INTERVAL, reconcile_interval: int = RECONCILE_INTERVAL,
+              getf=None, sleep=None, user_agent: str | None = None, progress=None) -> dict:
+    """The single entry point the background scheduler AND the PWA-open hook both call.
+
+    Debounced (a trigger within ``min_interval`` of the last run no-ops — so opening the app
+    repeatedly costs one sync, not ten) and two-speed: when a reconcile is due it does ONE full-walk
+    run that imports new saves AND reconciles Reddit-side unsaves; otherwise just a cheap incremental
+    top-walk import. ``force`` bypasses the debounce and forces the reconcile. Never raises — auth /
+    network failure is reported inside the inner ``result``. ``reconcile_dry_run`` previews the
+    reconcile (no ``is_saved``/status writes), and does NOT advance the reconcile high-water mark.
+    """
+    now = now if now is not None else int(time.time())
+    last_run = _to_int(db.get_setting(conn, _LAST_RUN_KEY, "0"))
+    if not force and now - last_run < min_interval:
+        return {"skipped": "debounced", "since_last": now - last_run, "mode": None}
+
+    last_recon = _to_int(db.get_setting(conn, _LAST_RECON_KEY, "0"))
+    due = force or (now - last_recon >= reconcile_interval)
+    if due:
+        res = sync_saved(conn, reconcile=True, reconcile_dry_run=reconcile_dry_run,
+                         max_pages=RECONCILE_MAX_PAGES, stop_on_known=False,
+                         getf=getf, sleep=sleep, user_agent=user_agent, progress=progress)
+        out = {"mode": "reconcile", "result": res}
+        if not reconcile_dry_run and (res.get("reconcile") or {}).get("ran"):
+            db.set_setting(conn, _LAST_RECON_KEY, str(now), commit=True)
+    else:
+        res = sync_saved(conn, max_pages=3, stop_on_known=True,
+                         getf=getf, sleep=sleep, user_agent=user_agent, progress=progress)
+        out = {"mode": "incremental", "result": res}
+
+    db.set_setting(conn, _LAST_RUN_KEY, str(now), commit=True)
+    out["transport"] = res.get("transport")
+    return out
+
+
+def _timer_scheduler(delay, fn):
+    """Default scheduler: a one-shot daemon Timer (mirrors reddit_trickle). Returns a ``.cancel()``
+    handle. Injected in tests so the scheduler is driven synchronously with no real threads."""
+    t = threading.Timer(delay, fn)
+    t.daemon = True
+    t.start()
+    return t
+
+
+class SyncScheduler:
+    """Periodic, single-flight background driver of :func:`auto_sync`.
+
+    Always re-arms after a fire, and each fire re-checks :func:`is_autosync_enabled`, so the
+    scheduler can be toggled at runtime (the next tick simply no-ops while disabled) without an app
+    restart. Modeled on :class:`reddit_trickle.TrickleDrainer`: a daemon Timer, a single-flight lock
+    so overlapping ticks can't double-sync, and its OWN per-fire DB connection (``db.connect`` is
+    per-call, hence thread-safe). Inject ``scheduler`` / ``sync_fn`` in tests."""
+
+    def __init__(self, conn_factory, *, interval: float = 600.0,
+                 scheduler=_timer_scheduler, sync_fn=None):
+        self._conn_factory = conn_factory          # () -> context manager yielding a db connection
+        self._interval = interval
+        self._scheduler = scheduler
+        self._sync_fn = sync_fn or auto_sync
+        self._run_lock = threading.Lock()          # single-flight: at most one sync at a time
+        self._timer_lock = threading.Lock()
+        self._timer = None
+        self._stopped = False
+
+    def start(self) -> "SyncScheduler":
+        self._arm()
+        return self
+
+    def _arm(self) -> None:
+        with self._timer_lock:
+            if self._stopped:
+                return
+            self._timer = self._scheduler(self._interval, self.fire)
+
+    def stop(self) -> None:
+        with self._timer_lock:
+            self._stopped = True
+            if self._timer is not None:
+                self._timer.cancel()
+
+    def fire(self):
+        """Run one auto_sync tick if armed + opted-in. Single-flight; always re-arms. Returns the
+        auto_sync summary, or ``None`` when skipped (a sync already running, or autosync disabled)."""
+        if not self._run_lock.acquire(blocking=False):
+            return None                            # a sync is in flight; the next tick will retry
+        res = None
+        try:
+            with self._conn_factory() as conn:
+                if not is_autosync_enabled(conn):
+                    return None                    # opt-in off — cheap no-op tick
+                res = self._sync_fn(conn)
+        except Exception:                          # a daemon-thread crash must not kill the timer
+            logger.exception("reddit autosync tick failed")
+        finally:
+            self._run_lock.release()
+            self._arm()
+        # No user is in the loop on a daemon tick, so surface a dead token/cookie or connectivity blip.
+        inner = (res or {}).get("result") or {} if isinstance(res, dict) else {}
+        if inner.get("auth_error") or inner.get("network_error"):
+            logger.warning("reddit autosync halted (%s error) — re-authenticate or check connectivity",
+                           "auth" if inner.get("auth_error") else "network")
+        return res
