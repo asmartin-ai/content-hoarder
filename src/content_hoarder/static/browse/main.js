@@ -152,6 +152,7 @@ function render() {
         onRight: () => act(fn, "archived"),
         onRightLong: () => act(fn, "keep"),
         onLeft: () => act(fn, "done"),
+        onLongPress: () => openRowMenu(fn),
       });
     }
   });
@@ -751,7 +752,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "d" && it) act(it.fullname, "done");
   else if (k === "x" && it && state.status !== "inbox") act(it.fullname, "inbox");
   else if (k === "e" && it) { const u = it.url; if (u) window.open(u, "_blank", "noopener"); }
-  else if (k === "t" && it) { const r = rowEl(it.fullname); tagEditor.open(it.fullname, r ? r.querySelector(".tag-edit") : null); }
+  else if (k === "t" && it) { tagEditor.open(it.fullname, rowEl(it.fullname)); }
   else if (k === "q" && it) { const r = rowEl(it.fullname); if (r) toggleSelect(r); }
   else if (k === "z") { const u = $("#toast .toast-undo"); if (u) u.click(); }
   else if (k === "y") { redo(); }
@@ -762,10 +763,40 @@ document.addEventListener("keydown", (e) => {
 const scrim = $("#scrim");
 function openPanel(id) { closeSheets(); $(id).classList.add("show"); scrim.classList.add("show"); }
 function closeSheets() {
-  ["#settings", "#navdrawer", "#kbd", "#statsheet"].forEach((s) => $(s).classList.remove("show"));
+  ["#settings", "#navdrawer", "#kbd", "#statsheet", "#rowmenu"].forEach((s) => $(s).classList.remove("show"));
   if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
 }
+
+/* ---- long-press / right-click row action menu (Tag · Share) — Epic 16 ---- */
+let rowMenuFn = null;
+const rowMenu = $("#rowmenu");
+function openRowMenu(fn) {
+  const it = state.items.find((i) => i.fullname === fn);
+  if (!it) return;
+  rowMenuFn = fn;
+  const title = $("#rowmenu-title");
+  if (title) title.textContent = it.title || "(untitled)";
+  closeSheets();
+  rowMenu.classList.add("show");
+  scrim.classList.add("show");
+}
+rowMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-rowmenu]");
+  if (!btn) return;
+  const action = btn.dataset.rowmenu, fn = rowMenuFn;
+  closeSheets();
+  if (!fn) return;
+  if (action === "tag") tagEditor.open(fn, rowEl(fn));
+  else if (action === "share") shareItem(state.items.find((i) => i.fullname === fn));
+});
+// desktop has no long-press → right-click a row opens the same menu
+itemsEl.addEventListener("contextmenu", (e) => {
+  const card = e.target.closest(".row[data-fullname]");
+  if (!card) return;
+  e.preventDefault();
+  openRowMenu(card.dataset.fullname);
+});
 function toggleKbd() {
   const k = $("#kbd"), show = !k.classList.contains("show");
   closeSheets();
