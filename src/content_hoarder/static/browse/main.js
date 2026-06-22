@@ -49,7 +49,7 @@ const itemsEl = $("#items");
 
 /* ---- mobile "Jump" drawer state (the phone expression of the .rail) ---- */
 const drawer = $("#navdrawer");
-let facets = { sources: [], categories: [], tags: [] };
+let facets = { sources: [], categories: [], tags: [], groups: [] };
 let navFilter = "";
 let managing = false;
 const loadJSON = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? f; } catch (e) { return f; } };
@@ -532,6 +532,39 @@ function railBtn(label, value, count, kind, color) {
     '<span class="dot"></span>' + esc(label) +
     (count ? '<span class="n">' + count + "</span>" : "") + "</button>";
 }
+
+/* The tag rail, grouped under parent headers (Epic 26 P2). Each present group renders a
+   header (data-tagparent = its present child ids) that OR-selects/clears all its children in
+   one click, then the indented child rows (the same per-tag toggles as before). Tags not in
+   any served group (drift / a user tag that ever reaches the curated facet set) fall into a
+   trailing "More" group so nothing silently vanishes. */
+function railTagsHtml() {
+  const present = new Map(facets.tags.map((t) => [t.id, t]));
+  const grouped = new Set();
+  let html = "";
+  for (const g of facets.groups) {
+    const kids = (g.tags || []).map((id) => present.get(id)).filter(Boolean);
+    if (!kids.length) continue;                      // whole group filtered out (e.g. NSFW hidden)
+    kids.forEach((k) => grouped.add(k.id));
+    const sel = kids.filter((k) => state.tags.includes(k.id)).length;
+    const selState = sel === 0 ? "none" : sel === kids.length ? "all" : "some";
+    const total = kids.reduce((n, k) => n + (k.count || 0), 0);
+    html += '<div class="rail-group">' +
+      '<button type="button" class="rnav rail-ghead" data-tagparent="' +
+        esc(kids.map((k) => k.id).join(",")) + '" data-sel="' + selState +
+        '" aria-pressed="' + (selState === "all") + '">' +
+      '<span class="dot"></span>' + esc(g.label) +
+      '<span class="n">' + total + "</span></button>" +
+      kids.map((k) => railBtn(k.label, k.id, k.count, "tag")).join("") +
+      "</div>";
+  }
+  const orphans = facets.tags.filter((t) => !grouped.has(t.id));
+  if (orphans.length) {
+    html += '<div class="rail-group"><div class="rail-ghead static">More</div>' +
+      orphans.map((t) => railBtn(t.label, t.id, t.count, "tag")).join("") + "</div>";
+  }
+  return html;
+}
 async function refreshRail() {
   try {
     const qs = new URLSearchParams(state.status ? { status: state.status } : {}).toString();
@@ -547,18 +580,29 @@ async function refreshRail() {
       .map(([id, count]) => ({ id, label: id, count }))
       // hide the NSFW tag facets from the rail/drawer/autocomplete while "Hide NSFW" is on (Epic 14)
       .filter((t) => !(state.safe && /^nsfw/i.test(t.id)));
+    facets.groups = tags.groups || [];
     state.curated = new Set(facets.tags.map((t) => t.id));
     $("#rail-sources").innerHTML = facets.sources.map((s) =>
       railBtn(s.label, s.id, s.count, "source", s.badge_color)).join("");
-    $("#rail-tags").innerHTML = facets.tags.slice(0, 12).map((t) =>
-      railBtn(t.label, t.id, t.count, "tag")).join("");
+    $("#rail-tags").innerHTML = railTagsHtml();
     renderDrawer();
   } catch (e) { /* rail is navigation sugar */ }
 }
 document.addEventListener("click", (e) => {
-  const r = e.target.closest("[data-source], [data-tag]");
   // the drawer owns its own rows (and the category facet) — see the #navdrawer handler
-  if (!r || e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
+  if (e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
+  const parent = e.target.closest("[data-tagparent]");
+  if (parent) {   // rail group header → OR-select (or clear) all of its present children at once
+    const kids = parent.dataset.tagparent.split(",").filter(Boolean);
+    if (kids.every((t) => state.tags.includes(t)))
+      state.tags = state.tags.filter((t) => !kids.includes(t));
+    else
+      kids.forEach((t) => { if (!state.tags.includes(t)) state.tags.push(t); });
+    paintChips(); refreshRail(); loadItems(true);
+    return;
+  }
+  const r = e.target.closest("[data-source], [data-tag]");
+  if (!r) return;
   if (r.dataset.source !== undefined) {
     state.source = state.source === r.dataset.source ? "" : r.dataset.source;
   } else if (r.dataset.tag !== undefined) {

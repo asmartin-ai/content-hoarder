@@ -101,6 +101,28 @@ REDDIT_TAGS = (
 # instead of the tens of thousands of raw keywords. db.tag_counts restricts to this set.
 FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 
+# Visual parent→children grouping for the browse tag rail (Epic 26 P2). Purely a RAIL-UX
+# concern: the underlying tags stay FLAT for search/FTS — this only nests the curated facets
+# under parent headers and lets one click OR-select all of a parent's children. Every child
+# must be a real FILTER_TAG and the groups must cover FILTER_TAGS exactly (no dup, no orphan) —
+# both are test-locked (test_tag_groups), so adding a new curated tag forces grouping it.
+# The tuple ORDER is the rail order. Labels are display-only; edit freely to retune the taxonomy.
+TAG_GROUPS = (
+    ("Gaming", ("gaming", "esports", "minecraft")),
+    ("Anime & Otaku", ("anime", "vtubers", "wotagei")),
+    ("Educational", ("science", "coding", "tips", "investing")),
+    ("Watchlist", ("watch", "listenable")),
+    ("Memes & Trivial", ("memes", "ephemeral")),
+    ("World & Culture", ("defense", "japan")),
+    ("NSFW", ("nsfw_erotic", "nsfw_talk", "nsfw_other")),
+)
+
+
+def tag_groups() -> list[dict]:
+    """The rail's parent→children map as a JSON-serializable list (served by web.py /tags).
+    Children are guaranteed curated FILTER_TAGS covering the whole set (see test_tag_groups)."""
+    return [{"label": label, "tags": list(tags)} for label, tags in TAG_GROUPS]
+
 # Resurfacing-card clusters (Epic 20; docs/resurfacing-card-design.md — DESIGN LOCKED
 # 2026-06-11). Knowledge buckets only: identity/meme content never resurfaces (CH3).
 # The subreddit clusters are deliberately untagged communities — they cluster by

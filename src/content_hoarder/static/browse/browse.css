@@ -154,6 +154,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{
 .rnav .dot{width:8px;height:8px;border-radius:50%;background:var(--src,var(--text-dim));flex:none}
 .rnav.more{color:var(--accent);font-size:var(--fs-xs)}
 
+/* ---- parent/child tag grouping in the rail (Epic 26 P2) ---- */
+.rail-group{display:flex;flex-direction:column}
+.rail-group + .rail-group{margin-top:2px}
+.rail-ghead{font-weight:var(--fw-semibold)}
+.rail-ghead .dot{background:var(--text-dim)}
+/* partial selection: some children on but not all — accent the dot, don't fill the row */
+.rail-ghead[data-sel="some"]{color:var(--text-body)}
+.rail-ghead[data-sel="some"] .dot{background:var(--accent)}
+.rail-ghead.static{color:var(--text-dim);font:var(--fw-medium) var(--fs-xs)/1 var(--font-sans);
+  height:auto;padding:var(--sp-2) 12px var(--sp-1);cursor:default}
+/* indented child tags under their parent — the indent (not a dot) conveys the hierarchy */
+.rail-group .rnav[data-tag]{padding-left:30px;height:34px;font-size:var(--fs-xs)}
+.rail-group .rnav[data-tag] .dot{display:none}
+
 .sheet{background:var(--surface-card);border:1px solid var(--border-control);
   border-radius:0 var(--r-md) var(--r-md) var(--r-md);box-shadow:var(--shadow-pop);min-width:0}
 .shelf{display:flex;gap:var(--sp-3);align-items:center;padding:var(--sp-3) var(--sp-4);
