@@ -815,6 +815,14 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   external links). Render a safe subset to HTML (escape first, then linkify + apply markdown; no raw
   HTML injection — XSS-safe). Reuse one renderer for both the post self-text and comments. Keep it pure
   so it stays node-testable like the other reader helpers.
+- [x] ~~**P2 — Comment-thread UX: tap-to-collapse, author links, auto-collapse dead threads.**~~ ✅ SHIPPED
+  2026-06-22 (`browse/reader.js` + `browse.css`, sw.js v58→v59). *(User-requested 2026-06-22.)* (1) **Tap the
+  comment byline** (`.rd-cby`) to collapse/expand the thread — a big tap target alongside the `−`/`+` button;
+  ignores taps on the author link, and the body stays non-toggling (links/images/selection work). (2) **Author
+  `u/name` → a link** to the Reddit profile (`noopener noreferrer nofollow`; `[deleted]` stays a plain span).
+  (3) **Auto-collapse fully-dead threads** on load — pure `deadThreadCollapseSet()` collapses a deleted comment
+  only when it HAS replies AND its whole subtree is deleted, so a live reply under a deleted parent stays
+  visible. +5 node tests; verified live (author link, dead-subtree collapse, collapsed shows "N replies").
 - [~] **P3 — Inline media playback inside the reader's comment thread.** *(User idea 2026-06-17.)*
   ✅ **IMAGES SHIPPED 2026-06-22** (user-requested directly, ahead of the RES screenshots): `core/markdown.js`
   now renders `![alt](url)`, bare image URLs, AND Reddit's native `![img](media-id)` (resolved server-side
@@ -970,6 +978,17 @@ Absorbs "make the Reddit view more mobile-friendly".*
   the current project / wants an Android side-project — NOT as in-place work here. **For now:** use the
   Chromium **WebAPK via Chrome "Install app"** (the only mainstream path; auto-updates its engine). See
   [[inline-reddit-reader]] (prior "Firefox is the culprit" note) and [[content-hoarder]].
+- [ ] **P3 — Explore Cromite (or similar adblock Chromium fork) as the PWA host browser.** *(User idea
+  2026-06-22.)* Chrome-for-Android can't run ad-blocking extensions, so the reader's "Open original ↗"
+  + any embedded web/reddit content carries ads. **Cromite** (maintained Bromite successor — de-Googled
+  Chromium fork with **built-in adblock** + anti-fingerprinting) can mint a real **WebAPK** (standalone PWA
+  install, same as Chrome) AND block ads engine-side — getting BOTH the standalone-install goal and adblock
+  WITHOUT a Chromium-engine extension or the GeckoView custom-wrapper maintenance burden. This likely
+  **supersedes** the GeckoView icebox above (Cromite = the Chromium-adblock path; GeckoView = the
+  no-Chromium path). Evaluate: (a) does Cromite's "Install app"/WebAPK flow work for our `.ts.net` PWA;
+  (b) trust + maintenance (FOSS, active releases; sideload APK + auto-update via Obtainium/its own channel);
+  (c) adblock efficacy on the reader's embedded reddit content. Alternatives to weigh: Brave (Chromium +
+  adblock, Google-adjacent), Mull/Vanadium, or an in-app blocklist if we ever render remote pages ourselves.
 
 ### Icebox — remote-wake / always-on hosting *(Epic 16)*
 - [ ] **P3 — ICEBOX: remotely "turn on" the server from the phone.** *(Researched 2026-06-20.)* Problem: the

@@ -897,8 +897,11 @@ html.reader-lock{overflow:hidden}
 .rd-ctoggle:hover{color:var(--accent)}
 .rd-cmain{min-width:0}
 .rd-cby{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:3px;
-  font:var(--fw-regular) var(--fs-xs)/1 var(--font-mono);color:var(--text-dim)}
+  font:var(--fw-regular) var(--fs-xs)/1 var(--font-mono);color:var(--text-dim);
+  cursor:pointer;-webkit-tap-highlight-color:transparent}  /* tap the byline to collapse the thread */
 .rd-cby .rd-au{color:var(--text-muted);font-weight:var(--fw-medium)}
+a.rd-au{text-decoration:none}                                 /* author → profile link, but keep the byline look */
+a.rd-au:hover{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 .rd-cby .rd-op{color:var(--accent-ink);background:var(--accent);border-radius:var(--r-sm);
   padding:1px 5px;font-size:.62rem;font-weight:var(--fw-bold);letter-spacing:.02em}
 .rd-cby .rd-cscore{color:var(--text-dim);font-variant-numeric:tabular-nums}
