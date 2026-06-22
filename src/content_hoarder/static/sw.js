@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v50";  // v50: parent/child tag grouping in the rail (Epic 26 P2) — + v49 tag editor
+const CACHE = "ch-shell-v51";  // v51: All-view smart default sort + source-aware rail (Epic 10/26) — + v50 grouping
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
