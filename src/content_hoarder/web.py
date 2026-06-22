@@ -71,6 +71,20 @@ def create_app(db_path: str | None = None) -> Flask:
     _unsave_audit, _unsave_audit_path = reddit_unsave.audit_appender(app.config["DB_PATH"])
     _trickle = reddit_trickle.TrickleDrainer(conn, audit=_unsave_audit)
 
+    # Automatic Reddit saved-sync: a background scheduler periodically imports new saves and (on a
+    # slower cadence) reconciles Reddit-side unsaves; the PWA-open hook (POST /reddit/sync/auto) funnels
+    # into the SAME debounced auto_sync path. Opt-in (reddit_autosync_enabled, default off) — only then
+    # do we spin the daemon timer, so the test suite (which builds many apps) stays timer-free. Toggling
+    # it on takes effect for the foreground PWA-open path immediately; the background thread starts on the
+    # next app launch. See reddit_sync.auto_sync / SyncScheduler.
+    from content_hoarder import reddit_sync as _reddit_sync
+    _sync_scheduler = None
+    with conn() as _c0:
+        if _reddit_sync.is_autosync_enabled(_c0):
+            _interval = _int(config.get("REDDIT_AUTOSYNC_INTERVAL"), 600) or 600
+            _sync_scheduler = _reddit_sync.SyncScheduler(conn, interval=_interval).start()
+            atexit.register(_sync_scheduler.stop)
+
     @app.before_request
     def _same_origin_guard():
         # CSRF / DNS-rebinding guard. The app holds a live reddit_session cookie and some
@@ -601,6 +615,18 @@ def create_app(db_path: str | None = None) -> Flask:
         max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
             res = reddit_sync.sync_saved(c, max_pages=max_pages, stop_on_known=not full)
+        return jsonify(res)
+
+    @app.post("/reddit/sync/auto")
+    def reddit_sync_auto_route():
+        """The PWA-open hook: fire-and-forget on app load / tab-focus. Debounced + two-speed inside
+        auto_sync, and a NO-OP unless autosync is opted in — so the client can poll it freely. The
+        background scheduler funnels into the same auto_sync path."""
+        from content_hoarder import reddit_sync
+        with conn() as c:
+            if not reddit_sync.is_autosync_enabled(c):
+                return jsonify({"skipped": "disabled"})
+            res = reddit_sync.auto_sync(c)
         return jsonify(res)
 
     @app.get("/media/<blob>")

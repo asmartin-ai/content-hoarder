@@ -518,12 +518,26 @@ def cmd_suggest(args) -> int:
 
 def cmd_reddit_sync(args) -> int:
     from content_hoarder import reddit_sync
-    max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
+    prog = lambda m: print(m, file=sys.stderr)
     with _connect() as conn:
-        res = reddit_sync.sync_saved(
-            conn, max_pages=max_pages, stop_on_known=not args.full,
-            progress=lambda m: print(m, file=sys.stderr),
-        )
+        # Toggle the automatic background sync / PWA-open path (opt-in, default off).
+        if args.enable_auto or args.disable_auto:
+            reddit_sync.set_autosync_enabled(conn, args.enable_auto)
+            print(json.dumps({"autosync_enabled": args.enable_auto,
+                              "note": "background thread starts on next app launch; "
+                                      "the PWA-open path is live immediately"}, indent=2))
+            return 0
+        if args.reconcile:
+            # Full-walk census: import new saves AND infer Reddit-side unsaves (clear is_saved;
+            # inbox -> done). Dry-run previews the would-unsave set with no writes. Reconcile is
+            # destructive (non-additive) — back up the DB before a real run.
+            res = reddit_sync.sync_saved(
+                conn, reconcile=True, reconcile_dry_run=args.reconcile_dry_run,
+                max_pages=reddit_sync.RECONCILE_MAX_PAGES, stop_on_known=False, progress=prog)
+        else:
+            max_pages = args.max_pages if args.max_pages else (50 if args.full else 3)
+            res = reddit_sync.sync_saved(
+                conn, max_pages=max_pages, stop_on_known=not args.full, progress=prog)
     print(json.dumps(res, indent=2))
     # Non-zero for network errors too, so a scheduled run is visibly unhealthy; the
     # printed JSON distinguishes auth_error (re-paste cookie) from network_error (retry).
@@ -1012,6 +1026,15 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Pages of 100 to fetch (default 3 newest pages).")
     prs.add_argument("--full", action="store_true",
                      help="Deeper backfill (up to 50 pages) — slower; for a first/large catch-up.")
+    prs.add_argument("--reconcile", action="store_true",
+                     help="Full-walk census: import new saves AND infer Reddit-side unsaves "
+                          "(clear is_saved; promote still-inbox items to done). Destructive — back up first.")
+    prs.add_argument("--reconcile-dry-run", action="store_true",
+                     help="Preview --reconcile (lists the would-unsave set) with NO writes.")
+    prs.add_argument("--enable-auto", action="store_true",
+                     help="Arm the automatic background sync + PWA-open trigger (opt-in, default off).")
+    prs.add_argument("--disable-auto", action="store_true",
+                     help="Disarm the automatic sync.")
     prs.set_defaults(func=cmd_reddit_sync)
 
     pu = sub.add_parser("reddit-unsave",
