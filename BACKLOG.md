@@ -893,10 +893,11 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 *Make the PWA feel native on the phone (Chrome / Pixel-6 target; switched from Firefox 2026-06-21).
 Absorbs "make the Reddit view more mobile-friendly".*
 
-- [ ] **P2 — Swipe haptics are too strong — reduce them.** *(User-reported 2026-06-22.)* The tactile
-  commit feedback (engagement B6 haptics) buzzes too hard on the phone. Soften the `navigator.vibrate`
-  pattern (shorter/lighter), firing only on a committed action — never mid-drag. Find the `vibrate`
-  call(s) on the triage + browse swipe paths and dial the duration down.
+- [x] ~~**P2 — Swipe haptics are too strong — reduce them.**~~ ✅ SHIPPED 2026-06-22 (`haptics.js` +
+  `core/swipe.js`, sw.js v54→v55). *(User-reported 2026-06-22.)* Commit patterns softened ~45%
+  (archived 18→10, done 10→6, keep [10,30,10]→single 5, inbox 8→4, skip 6→3, milestone shortened, undo 8→4)
+  AND the compounding `swipe.js` stage-2 threshold pulse 8→3 — a long swipe fired TWO buzzes (threshold +
+  commit), which read as "too strong." Friction-asymmetry hierarchy kept.
 - [ ] **P2 — Tag-add box clips into the bottom bar on mobile when idle (not fully hidden).** *(User-
   reported 2026-06-22.)* The tag-add input (`browse/tagedit.js` popover) isn't fully hidden when not in
   use — its bottom edge bleeds into the mobile bottom bar. Ensure it's `display:none`/off-canvas when
