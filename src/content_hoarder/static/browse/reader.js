@@ -16,6 +16,7 @@
    inlining. Only addition over the generated form: the `c.author &&` OP guard. */
 
 import { esc, ago, isTypingTarget } from "../core/util.js";
+import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
@@ -81,8 +82,6 @@ const absReddit = (p) => {
    with revert+toast on error. Styles live in browse.css (.rd-tag*), which index.html
    loads. The pure helpers live at module scope; the stateful ones (which close over
    the reader's item/postEl) are defined inside initReader, below. */
-const normTag = (t) => String(t == null ? "" : t).trim().toLowerCase().slice(0, 40);
-const tagsOf = (it) => (((it && it.metadata) || {}).tags) || [];
 function tagChipRowHtml(it) {
   const chips = tagsOf(it).map((t) =>
     '<button class="rd-chip-tag" type="button" data-rd-rmtag="' + esc(t) + '">' +
@@ -129,15 +128,10 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     const row = postEl.querySelector(".rd-tagrow");
     if (row) row.innerHTML = tagChipRowHtml(item);
   }
-  function tagSuggestionsFor(query) {
-    const have = {}; tagsOf(item).forEach((t) => { have[t] = 1; });
-    const q = normTag(query);
-    return knownTags.filter((t) => !have[t] && (!q || t.indexOf(q) !== -1)).slice(0, 8);
-  }
   function refreshAddSuggestions(inp) {
     if (!inp) return;
     const ui = inp.closest(".rd-tag-add-ui"); if (!ui) return;
-    const sugg = tagSuggestionsFor(inp.value);
+    const sugg = suggestTags(knownTags, tagsOf(item), inp.value);
     const box = ui.querySelector(".rd-tag-suggest");
     box.innerHTML = sugg.length ? sugg.map((t) =>
       '<button class="rd-chip-tag rd-tag-sugg" type="button" data-rd-addtag="' + esc(t) + '">' + esc(t) + "</button>").join("")
