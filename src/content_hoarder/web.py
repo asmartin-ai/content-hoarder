@@ -338,6 +338,24 @@ def create_app(db_path: str | None = None) -> Flask:
             c.commit()
         return jsonify({"fullname": fullname, "category": cat})
 
+    @app.post("/items/<path:fullname>/tags")
+    def set_item_tags(fullname):
+        # Manual tagging: body = {"add": [...], "remove": [...]} (or {"tag": "x"} shorthand).
+        # Adds are stamped manual (survive recategorize/re-import); non-destructive.
+        body = request.get_json(silent=True) or {}
+        add = body.get("add") or ([body["tag"]] if body.get("tag") else [])
+        remove = body.get("remove") or []
+        if not isinstance(add, list) or not isinstance(remove, list):
+            return jsonify({"error": "add/remove must be lists"}), 400
+        if not add and not remove:
+            return jsonify({"error": "no tags given"}), 400
+        with conn() as c:
+            tags = db.set_tags(c, fullname, add=add, remove=remove)
+            if tags is None:
+                return jsonify({"error": "not found"}), 404
+            c.commit()
+        return jsonify({"fullname": fullname, "tags": tags})
+
     @app.post("/bulk/status")
     def bulk_status():
         data = request.get_json(silent=True) or {}
