@@ -43,6 +43,17 @@ const state = {
   pulse: { new_today: 0, cleared_today: 0, swept_recent: 0 },
 };
 const FOCUS_BATCH = 25;
+/* Per-tab sort memory (Epic 10 / item 412): each status tab remembers its own sort, and the
+   "All" view (status "") defaults to the learned easy-to-triage "smart" sort. Falls back to the
+   legacy global chSort, then newest-saved. (smart degrades to recency until triage_score is
+   learned, so it's safe on an untrained DB — see db._order_clause NULLS LAST.) */
+const SORT_DEFAULT = "first_seen_utc:desc";
+const SORT_BY_TAB = { "": "smart:desc" };
+const sortKey = (status) => "chSort:" + (status || "all");
+function sortForTab(status) {
+  try { const v = localStorage.getItem(sortKey(status)); if (v) return v; } catch (e) {}
+  return SORT_BY_TAB[status] || localStorage.chSort || SORT_DEFAULT;
+}
 setArchivePref(state.archiveMedia);  // tell core/media.js whether to prefer local /media copies
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
@@ -509,6 +520,7 @@ function paintTabs() {
 $$(".folder, .spill").forEach((t) => t.addEventListener("click", () => {
   if (t.dataset.status === undefined) return;
   state.status = t.dataset.status;
+  state.sort = sortForTab(state.status); sortSel.value = state.sort;   // per-tab sort (All → smart)
   paintTabs(); refreshRail(); loadItems(true); loadCounts();
 }));
 
@@ -567,7 +579,14 @@ function railTagsHtml() {
 }
 async function refreshRail() {
   try {
-    const qs = new URLSearchParams(state.status ? { status: state.status } : {}).toString();
+    // Tag/category facets cross-filter by BOTH the active status AND source (Epic 26 P2:
+    // source-aware rail) — picking a source narrows the rail to that source's tags, volume-
+    // ordered within each group. The source list itself stays status-only so you can still
+    // switch source.
+    const fp = {};
+    if (state.status) fp.status = state.status;
+    if (state.source) fp.source = state.source;
+    const qs = new URLSearchParams(fp).toString();
     const [src, cats, tags] = await Promise.all([
       api.fetchSources(state.status || undefined),
       api.getJSON("/categories?" + qs),
@@ -664,7 +683,7 @@ sortSel.value = state.sort;
 if (sortSel.value !== state.sort) { state.sort = "first_seen_utc:desc"; sortSel.value = state.sort; }
 sortSel.addEventListener("change", () => {
   state.sort = sortSel.value;
-  localStorage.chSort = state.sort;
+  try { localStorage.setItem(sortKey(state.status), state.sort); } catch (e) {}   // remember per tab
   loadItems(true);
 });
 
@@ -1084,6 +1103,7 @@ function restoreView() {
   } catch (e) { /* ignore corrupt value */ }
 }
 restoreView();
+state.sort = sortForTab(state.status); sortSel.value = state.sort;   // apply the tab's sort once the view restores
 
 /* ---- boot ---- */
 paintTabs();
