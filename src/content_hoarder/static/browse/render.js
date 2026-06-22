@@ -111,8 +111,17 @@ const fmtDur = (secs) => {
 
 /* ---- per-density builders ---- */
 
-/* inline row chips: fixed-height log/ledger rows can't grow, so no expander */
-const rowChips = (item, o) => tagChips(item, { curated: o.curated, max: 2, expand: false });
+/* the per-item tag-edit trigger — opens the browse tag editor (browse/tagedit.js).
+   Always rendered (even on a tagless item) so adding the FIRST tag is reachable. */
+const tagEditBtn =
+  '<button type="button" class="tag-edit" data-tagedit="1" title="Edit tags" aria-label="Edit tags">+</button>';
+
+/* inline row chips: fixed-height log/ledger rows can't grow, so no expander.
+   Wrapped with the edit trigger in a cluster so the ＋ sits with the chips. */
+const rowChips = (item, o) =>
+  '<span class="tag-cluster">' +
+  tagChips(item, { curated: o.curated, max: 2, expand: false }) +
+  tagEditBtn + "</span>";
 
 export const logRow = (item, opts) => {
   const o = opts || {};
@@ -186,7 +195,7 @@ export const pinCard = (item, opts) => {
     "<h3>" + titleLine(item) + "</h3>" +
     domainHtml +
     snippet(item).replace('class="snippet"', 'class="snippet" style="display:block"') +
-    '<div class="tagrow">' + tagChips(item, { curated: o.curated, max: 3 }) + actsHtml(o.view) + "</div>" +
+    '<div class="tagrow">' + tagChips(item, { curated: o.curated, max: 3 }) + tagEditBtn + actsHtml(o.view) + "</div>" +
     "</div></article>";
 };
 
