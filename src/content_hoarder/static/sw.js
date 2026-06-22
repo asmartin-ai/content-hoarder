@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v42";  // v42: triage Skip action (pass / decide-later) — triage.js + haptics.js
+const CACHE = "ch-shell-v48";  // v48: re-enable triage native <video>/hls.js player + fix mountVideo (hls.js over canPlayType false-positive)
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
