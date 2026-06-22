@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v59";  // v59: comment tap-collapse + author links + auto-collapse dead threads — v58 = embedded images
+const CACHE = "ch-shell-v61";  // v61: firmer haptics + done/archive swipe reveal detents — v60 = crisper/shorter keyboard-tap haptics
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
