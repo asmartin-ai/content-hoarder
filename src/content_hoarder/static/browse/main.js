@@ -230,8 +230,9 @@ const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets,
 
 /* per-item manual tag editor (browse surface, Epic 5/26 P2) — opens from the ＋ trigger on
    a row/card or the `t` key. Writes the server's returned tag list back to state, re-renders
-   so the row's chips update, and refreshes the rail (debounced) so a freshly-created user tag
-   shows up as a facet. */
+   so the row's chips update, and re-syncs the rail (debounced) — note db.tag_counts restricts
+   facets to the curated FILTER_TAGS, so a brand-new user tag shows on the row but NOT in the
+   rail until a user-tag vocab registry exists (Epic 26 follow-up). */
 const refreshRailSoon = debounce(() => refreshRail(), 350);
 const tagEditor = initTagEditor({
   getItem: (fn) => state.items.find((it) => it.fullname === fn),
