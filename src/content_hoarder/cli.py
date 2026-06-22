@@ -462,6 +462,28 @@ def cmd_scan_media(args) -> int:
     return 0
 
 
+def cmd_archive_media(args) -> int:
+    """Download + store media bytes locally so deletions are survivable (Epic 4 P1, hoard the
+    bytes). Dry-run by default; --apply fetches + writes content-addressed blobs under data/media/
+    and stamps metadata.archived_media. Scope with --salvageable/--galleries/--images (default:
+    salvageable + galleries). Resumable (skips already-archived URLs); per-item commit."""
+    from content_hoarder import media_archive
+    scopes = [s for s, on in (("salvageable", args.salvageable), ("galleries", args.galleries),
+                              ("images", args.images)) if on] or ["salvageable", "galleries"]
+    with _connect() as conn:
+        res = media_archive.archive(conn, scopes=scopes, limit=args.limit, apply=args.apply,
+                                    throttle=args.throttle,
+                                    progress=lambda m: print(m, file=sys.stderr))
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(f"(dry run — {res['urls']} URL(s) across {res['items']} item(s) would be fetched; "
+              f"re-run with --apply)", file=sys.stderr)
+    else:
+        print(f"archived {res['archived']} blob(s) ({res['bytes'] // 1024 // 1024} MB), "
+              f"{res['failed']} failed", file=sys.stderr)
+    return 0
+
+
 def cmd_export(args) -> int:
     from pathlib import Path
 
@@ -940,6 +962,24 @@ def build_parser() -> argparse.ArgumentParser:
     psm.add_argument("--apply", action="store_true",
                      help="Write media_status + the deleted tag (default: dry run).")
     psm.set_defaults(func=cmd_scan_media)
+
+    pam = sub.add_parser(
+        "archive-media",
+        help="Download + store media BYTES locally so deletions are survivable (Epic 4 P1); "
+             "dry-run default, --apply writes to data/media/.",
+    )
+    pam.add_argument("--salvageable", action="store_true",
+                     help="Archive items whose original 404'd but a preview still lives (urgent).")
+    pam.add_argument("--galleries", action="store_true",
+                     help="Archive the sized gallery_preview variants (~1080px).")
+    pam.add_argument("--images", action="store_true",
+                     help="Archive direct reddit images (the large set — ~10GB).")
+    pam.add_argument("--limit", type=int, default=None,
+                     help="Cap items with work this run (resumable).")
+    pam.add_argument("--throttle", type=float, default=0.3,
+                     help="Seconds between fetches — CDN politeness (default 0.3).")
+    pam.add_argument("--apply", action="store_true", help="Fetch + write (default: dry run).")
+    pam.set_defaults(func=cmd_archive_media)
 
     pex = sub.add_parser(
         "export",
