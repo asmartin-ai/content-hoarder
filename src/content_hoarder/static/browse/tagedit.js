@@ -103,8 +103,8 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
       '<div class="tp-head"><span class="tp-title">Tags</span>' +
       '<button type="button" class="tp-x" data-tp="close" aria-label="Close">&#10005;</button></div>' +
       '<div class="tp-chips">' + chips + "</div>" +
-      '<input type="text" class="tp-input" placeholder="add or create a tag&hellip;" ' +
-      'autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Add a tag">' +
+      '<input type="search" class="tp-input" placeholder="add or create a tag&hellip;" ' +
+      'autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Add a tag">' +
       '<div class="tp-sugg" hidden></div>';
     selIdx = 0;
     renderSuggest();
