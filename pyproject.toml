@@ -12,10 +12,19 @@ dependencies = ["flask>=3.0,<4.0"]
 [project.optional-dependencies]
 youtube = ["yt-dlp"]
 dev = ["pytest"]
+# UI/e2e: real-browser tests (Pixel-6 + PWA emulation). `pip install -e .[ui]` then
+# `playwright install chromium`, run with `pytest -m ui`. Kept out of `dev` so the unit
+# suite + CI don't need a browser.
+ui = ["pytest-playwright"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# default run excludes the browser tests (no chromium in CI / the fast unit loop);
+# run them explicitly with `pytest -m ui`.
+addopts = "-q -m 'not ui'"
+markers = [
+  "ui: real-browser Playwright tests (Pixel-6 / PWA emulation; needs chromium). Run with -m ui.",
+]
