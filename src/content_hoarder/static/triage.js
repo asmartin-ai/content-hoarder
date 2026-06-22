@@ -5,6 +5,7 @@ import { getJSON as fetchJSON, postJSON } from "./core/api.js";
 import { normTag, itemTags, suggestTags } from "./core/tags.js";
 import { chIcon, fillIcons } from "./core/icons.js";
 import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
+import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-button closes the lightbox, not the app
 
 (function () {
   "use strict";
@@ -71,6 +72,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
       }).join("") +
       "</div>" + '<p class="media-fallback">' + imgs.length + " images</p>";
     document.getElementById("media-modal").hidden = false;
+    pushOverlay(closeMediaVisual);   // register with the back-button coordinator
   }
   // Direct / catch-all image → simple lightbox (no reddit iframe dependency).
   function openImage(url) {
@@ -79,6 +81,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
       '<img class="media-img" src="' + esc(url) + '" alt="">' +
       '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>';
     document.getElementById("media-modal").hidden = false;
+    pushOverlay(closeMediaVisual);   // register with the back-button coordinator
   }
   // Reddit / direct video → native <video> in the lightbox (Epic 13 P2), same as browse:
   // v.redd.it plays the audio+video HLS manifest (hls.js preferred, native HLS fallback), a
@@ -89,13 +92,22 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
     var body = document.getElementById("media-body");
     body.innerHTML = "";
     document.getElementById("media-modal").hidden = false;
+    pushOverlay(closeMediaVisual);   // register with the back-button coordinator
     var r = mountVideo(body, srcUrl, posterUrl && safeUrl(posterUrl) ? posterUrl : "", { autoplay: true });
     videoTeardown = r && r.destroy ? r.destroy : null;
   }
-  function closeMedia() {
+  // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
+  function closeMediaVisual() {
+    if (document.getElementById("media-modal").hidden) return;
     if (videoTeardown) { videoTeardown(); videoTeardown = null; }   // stop HLS buffering
     document.getElementById("media-modal").hidden = true;
     document.getElementById("media-body").innerHTML = "";
+  }
+  // Manual close (backdrop / button): tear down AND unwind the history entry we pushed on open.
+  function closeMedia() {
+    if (document.getElementById("media-modal").hidden) return;
+    closeMediaVisual();
+    settleTop();
   }
   function closeShortcuts() { if (shortcutModal) shortcutModal.hidden = true; }
   function toggleShortcuts() {

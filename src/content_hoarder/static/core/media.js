@@ -4,6 +4,7 @@
    backdrop close are built in (Epic 13:381). */
 
 import { esc, safeUrl } from "./util.js";
+import { pushOverlay, settleTop } from "./overlaynav.js";
 
 /* ---- local media archive (Epic 4 P1) ----
    When the user enables the archive (settings toggle; off by default for perf/bloat), prefer the
@@ -251,11 +252,19 @@ export function createLightbox(opts) {
   const body = typeof opts.body === "string" ? document.querySelector(opts.body) : opts.body;
 
   let videoTeardown = null;  // teardown function for the open video's hls.js instance
-  const close = () => {
+  // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
+  const closeVisual = () => {
+    if (modal.hidden) return;
     if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
     body.innerHTML = "";  // stop playback
     modal.hidden = true;
     if (typeof opts.onClose === "function") opts.onClose();  // e.g. re-blur the source thumbnail (Epic 13 P2)
+  };
+  // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
+  const close = () => {
+    if (modal.hidden) return;
+    closeVisual();
+    settleTop();
   };
   modal.addEventListener("click", (e) => {
     if (e.target === modal || e.target.closest("[data-media-close]")) close();
@@ -264,7 +273,9 @@ export function createLightbox(opts) {
     if (e.key === "Escape" && !modal.hidden) close();
   });
 
-  const open = (html) => { body.innerHTML = html; modal.hidden = false; };
+  // Open over the page + register with the coordinator so the OS back-button closes the lightbox
+  // (returns to the feed/inbox) instead of navigating away / exiting the PWA.
+  const open = (html) => { body.innerHTML = html; modal.hidden = false; pushOverlay(closeVisual); };
 
   return {
     close,

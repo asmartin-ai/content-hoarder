@@ -23,6 +23,7 @@ import * as api from "../core/api.js";
 import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
 import { isNsfw } from "./render.js";
 import { toast } from "../core/toast.js";
+import { pushOverlay, settleTop } from "../core/overlaynav.js";
 
 /* ---- collapsible comment thread (pure; local-LLM generated, verified) ---- */
 export function subtreeLen(comments, i) {
@@ -335,7 +336,9 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     document.documentElement.classList.add("reader-lock");
     if (scrollEl) scrollEl.scrollTop = 0;
     isOpen = true;
-    try { history.pushState({ chReader: 1 }, ""); } catch (e) { /* no-op */ }
+    // Register with the shared overlay coordinator: OS-back closes the reader (or, if a lightbox is
+    // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
+    pushOverlay(() => closeReader(true));
     load();
     // Lazy-load the tag vocabulary once so the "＋ tag" add-UI can suggest known tags.
     if (!knownTags.length && !knownTagsLoading) {
@@ -357,11 +360,10 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
     if (feedScrollY) window.scrollTo(0, feedScrollY);
     if (typeof onClose === "function") onClose(fullname);  // re-blur the feed thumbnail (Epic 13 P2)
-    if (!fromPop) {
-      try { if (history.state && history.state.chReader) history.back(); } catch (e) { /* no-op */ }
-    }
+    // A manual close (button/Esc/swipe/F-A-D keys) unwinds the history entry we pushed; an OS-back
+    // (fromPop) already popped it, so the coordinator handled the history side for us.
+    if (!fromPop) settleTop();
   }
-  window.addEventListener("popstate", () => { if (isOpen) closeReader(true); });
   document.addEventListener("keydown", (e) => {
     if (!isOpen) return;
     if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeReader(false); return; }
