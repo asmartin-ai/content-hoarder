@@ -13,6 +13,7 @@ import { listHtml, emptyHtml, isNsfw } from "./render.js";
 import { initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
 import { initOperators } from "./operators.js";
+import { initTagEditor } from "./tagedit.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -42,13 +43,24 @@ const state = {
   pulse: { new_today: 0, cleared_today: 0, swept_recent: 0 },
 };
 const FOCUS_BATCH = 25;
+/* Per-tab sort memory (Epic 10 / item 412): each status tab remembers its own sort, and the
+   "All" view (status "") defaults to the learned easy-to-triage "smart" sort. Falls back to the
+   legacy global chSort, then newest-saved. (smart degrades to recency until triage_score is
+   learned, so it's safe on an untrained DB — see db._order_clause NULLS LAST.) */
+const SORT_DEFAULT = "first_seen_utc:desc";
+const SORT_BY_TAB = { "": "smart:desc" };
+const sortKey = (status) => "chSort:" + (status || "all");
+function sortForTab(status) {
+  try { const v = localStorage.getItem(sortKey(status)); if (v) return v; } catch (e) {}
+  return SORT_BY_TAB[status] || localStorage.chSort || SORT_DEFAULT;
+}
 setArchivePref(state.archiveMedia);  // tell core/media.js whether to prefer local /media copies
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
 
 /* ---- mobile "Jump" drawer state (the phone expression of the .rail) ---- */
 const drawer = $("#navdrawer");
-let facets = { sources: [], categories: [], tags: [] };
+let facets = { sources: [], categories: [], tags: [], groups: [] };
 let navFilter = "";
 let managing = false;
 const loadJSON = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? f; } catch (e) { return f; } };
@@ -216,6 +228,23 @@ function redo() {
    reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
 const readerUI = initReader({ onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur });
 
+/* per-item manual tag editor (browse surface, Epic 5/26 P2) — opens from the ＋ trigger on
+   a row/card or the `t` key. Writes the server's returned tag list back to state, re-renders
+   so the row's chips update, and re-syncs the rail (debounced) — note db.tag_counts restricts
+   facets to the curated FILTER_TAGS, so a brand-new user tag shows on the row but NOT in the
+   rail until a user-tag vocab registry exists (Epic 26 follow-up). */
+const refreshRailSoon = debounce(() => refreshRail(), 350);
+const tagEditor = initTagEditor({
+  getItem: (fn) => state.items.find((it) => it.fullname === fn),
+  getKnownTags: () => facets.tags.map((t) => t.id),
+  onChange: (fn, tags) => {
+    const it = state.items.find((x) => x.fullname === fn);
+    if (it) { it.metadata = it.metadata || {}; it.metadata.tags = tags; }
+    render();
+    refreshRailSoon();
+  },
+});
+
 /* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
   const actBtn = e.target.closest(".act");
@@ -224,6 +253,8 @@ itemsEl.addEventListener("click", (e) => {
   const fn = card.dataset.fullname;
   if (actBtn) { act(fn, actBtn.dataset.act); return; }
   if (e.target.closest("[data-select]")) { toggleSelect(card); return; }
+  const tagBtn = e.target.closest("[data-tagedit]");
+  if (tagBtn) { e.stopPropagation(); tagEditor.open(fn, tagBtn); return; }
   const media = e.target.closest("[data-media]");
   if (media) {
     const item = state.items.find((it) => it.fullname === fn);
@@ -490,6 +521,7 @@ function paintTabs() {
 $$(".folder, .spill").forEach((t) => t.addEventListener("click", () => {
   if (t.dataset.status === undefined) return;
   state.status = t.dataset.status;
+  state.sort = sortForTab(state.status); sortSel.value = state.sort;   // per-tab sort (All → smart)
   paintTabs(); refreshRail(); loadItems(true); loadCounts();
 }));
 
@@ -513,9 +545,49 @@ function railBtn(label, value, count, kind, color) {
     '<span class="dot"></span>' + esc(label) +
     (count ? '<span class="n">' + count + "</span>" : "") + "</button>";
 }
+
+/* The tag rail, grouped under parent headers (Epic 26 P2). Each present group renders a
+   header (data-tagparent = its present child ids) that OR-selects/clears all its children in
+   one click, then the indented child rows (the same per-tag toggles as before). Tags not in
+   any served group (drift / a user tag that ever reaches the curated facet set) fall into a
+   trailing "More" group so nothing silently vanishes. */
+function railTagsHtml() {
+  const present = new Map(facets.tags.map((t) => [t.id, t]));
+  const grouped = new Set();
+  let html = "";
+  for (const g of facets.groups) {
+    const kids = (g.tags || []).map((id) => present.get(id)).filter(Boolean);
+    if (!kids.length) continue;                      // whole group filtered out (e.g. NSFW hidden)
+    kids.forEach((k) => grouped.add(k.id));
+    const sel = kids.filter((k) => state.tags.includes(k.id)).length;
+    const selState = sel === 0 ? "none" : sel === kids.length ? "all" : "some";
+    const total = kids.reduce((n, k) => n + (k.count || 0), 0);
+    html += '<div class="rail-group">' +
+      '<button type="button" class="rnav rail-ghead" data-tagparent="' +
+        esc(kids.map((k) => k.id).join(",")) + '" data-sel="' + selState +
+        '" aria-pressed="' + (selState === "all") + '">' +
+      '<span class="dot"></span>' + esc(g.label) +
+      '<span class="n">' + total + "</span></button>" +
+      kids.map((k) => railBtn(k.label, k.id, k.count, "tag")).join("") +
+      "</div>";
+  }
+  const orphans = facets.tags.filter((t) => !grouped.has(t.id));
+  if (orphans.length) {
+    html += '<div class="rail-group"><div class="rail-ghead static">More</div>' +
+      orphans.map((t) => railBtn(t.label, t.id, t.count, "tag")).join("") + "</div>";
+  }
+  return html;
+}
 async function refreshRail() {
   try {
-    const qs = new URLSearchParams(state.status ? { status: state.status } : {}).toString();
+    // Tag/category facets cross-filter by BOTH the active status AND source (Epic 26 P2:
+    // source-aware rail) — picking a source narrows the rail to that source's tags, volume-
+    // ordered within each group. The source list itself stays status-only so you can still
+    // switch source.
+    const fp = {};
+    if (state.status) fp.status = state.status;
+    if (state.source) fp.source = state.source;
+    const qs = new URLSearchParams(fp).toString();
     const [src, cats, tags] = await Promise.all([
       api.fetchSources(state.status || undefined),
       api.getJSON("/categories?" + qs),
@@ -528,18 +600,29 @@ async function refreshRail() {
       .map(([id, count]) => ({ id, label: id, count }))
       // hide the NSFW tag facets from the rail/drawer/autocomplete while "Hide NSFW" is on (Epic 14)
       .filter((t) => !(state.safe && /^nsfw/i.test(t.id)));
+    facets.groups = tags.groups || [];
     state.curated = new Set(facets.tags.map((t) => t.id));
     $("#rail-sources").innerHTML = facets.sources.map((s) =>
       railBtn(s.label, s.id, s.count, "source", s.badge_color)).join("");
-    $("#rail-tags").innerHTML = facets.tags.slice(0, 12).map((t) =>
-      railBtn(t.label, t.id, t.count, "tag")).join("");
+    $("#rail-tags").innerHTML = railTagsHtml();
     renderDrawer();
   } catch (e) { /* rail is navigation sugar */ }
 }
 document.addEventListener("click", (e) => {
-  const r = e.target.closest("[data-source], [data-tag]");
   // the drawer owns its own rows (and the category facet) — see the #navdrawer handler
-  if (!r || e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
+  if (e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
+  const parent = e.target.closest("[data-tagparent]");
+  if (parent) {   // rail group header → OR-select (or clear) all of its present children at once
+    const kids = parent.dataset.tagparent.split(",").filter(Boolean);
+    if (kids.every((t) => state.tags.includes(t)))
+      state.tags = state.tags.filter((t) => !kids.includes(t));
+    else
+      kids.forEach((t) => { if (!state.tags.includes(t)) state.tags.push(t); });
+    paintChips(); refreshRail(); loadItems(true);
+    return;
+  }
+  const r = e.target.closest("[data-source], [data-tag]");
+  if (!r) return;
   if (r.dataset.source !== undefined) {
     state.source = state.source === r.dataset.source ? "" : r.dataset.source;
   } else if (r.dataset.tag !== undefined) {
@@ -601,7 +684,7 @@ sortSel.value = state.sort;
 if (sortSel.value !== state.sort) { state.sort = "first_seen_utc:desc"; sortSel.value = state.sort; }
 sortSel.addEventListener("change", () => {
   state.sort = sortSel.value;
-  localStorage.chSort = state.sort;
+  try { localStorage.setItem(sortKey(state.status), state.sort); } catch (e) {}   // remember per tab
   loadItems(true);
 });
 
@@ -638,6 +721,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "d" && it) act(it.fullname, "done");
   else if (k === "x" && it && state.status !== "inbox") act(it.fullname, "inbox");
   else if (k === "e" && it) { const u = it.url; if (u) window.open(u, "_blank", "noopener"); }
+  else if (k === "t" && it) { const r = rowEl(it.fullname); tagEditor.open(it.fullname, r ? r.querySelector(".tag-edit") : null); }
   else if (k === "q" && it) { const r = rowEl(it.fullname); if (r) toggleSelect(r); }
   else if (k === "z") { const u = $("#toast .toast-undo"); if (u) u.click(); }
   else if (k === "y") { redo(); }
@@ -1020,6 +1104,7 @@ function restoreView() {
   } catch (e) { /* ignore corrupt value */ }
 }
 restoreView();
+state.sort = sortForTab(state.status); sortSel.value = state.sort;   // apply the tab's sort once the view restores
 
 /* ---- boot ---- */
 paintTabs();
