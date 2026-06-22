@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v48";  // v48: triage native <video>/hls.js player fix (mountVideo) + locally-archived media toggle (Epic 4 P1)
+const CACHE = "ch-shell-v49";  // v49: browse-row manual tag editor (Epic 5/26 P2) — + v48 video/archive
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
@@ -11,7 +11,7 @@ const SHELL = [
   "/static/core/media.js", "/static/core/swipe.js", "/static/core/render.js",
   "/static/core/icons.js",
   "/static/browse/browse.css", "/static/browse/main.js", "/static/browse/render.js",
-  "/static/browse/reader.js",
+  "/static/browse/reader.js", "/static/browse/tagedit.js",
   "/static/browse/palette.js", "/static/browse/operators.js",
   // /triage now loads triage.js as an ES module (imports core/util, core/api, core/icons)
   "/static/app.css", "/static/triage.js",
