@@ -22,6 +22,7 @@ import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
 import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
 import { isNsfw } from "./render.js";
+import { shareItem } from "../core/render.js";
 import { toast } from "../core/toast.js";
 import { pushOverlay, settleTop } from "../core/overlaynav.js";
 
@@ -447,6 +448,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   /* ---- clicks: close, collapse toggle, media reveal/open ---- */
   reader.addEventListener("click", (e) => {
     if (e.target.closest("#reader-close")) { closeReader(false); return; }
+    if (e.target.closest("#reader-share")) { shareItem(item); return; }
     const tog = e.target.closest(".rd-ctoggle");
     if (tog) {
       const ci = +tog.dataset.ci;
