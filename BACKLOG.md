@@ -890,8 +890,8 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   insufficient — otherwise prefer deep-linking out to Obsidian for rich editing.
 
 ## Epic 16 — Mobile UX  (`enhancement`, `area:mobile`)
-*Make the PWA feel native on the phone (Firefox / Pixel-6 target). Absorbs "make the Reddit view more
-mobile-friendly".*
+*Make the PWA feel native on the phone (Chrome / Pixel-6 target; switched from Firefox 2026-06-21).
+Absorbs "make the Reddit view more mobile-friendly".*
 
 - [x] ~~**P1 — Swipe must not trigger horizontal page scroll.**~~ ✅ v3: `body{overflow-x:clip}` (`browse.css:15`) + `swipe.js:27` `touchAction="pan-y"` (transform-only drag + edge-zone guard) — a row swipe can't side-scroll the page. Orig: Lock the layout to the device width
   (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
