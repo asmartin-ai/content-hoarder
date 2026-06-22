@@ -73,7 +73,7 @@ export function attachSwipe(el, opts) {
     if (s2 !== stage2) {
       stage2 = s2;
       el.classList.toggle("swipe-keep", s2);
-      if (s2 && navigator.vibrate) navigator.vibrate(8);  // one pulse at the threshold
+      if (s2 && navigator.vibrate) navigator.vibrate(3);  // one faint pulse at the threshold (softened 2026-06-22)
     }
   });
 
