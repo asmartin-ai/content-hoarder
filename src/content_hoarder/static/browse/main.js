@@ -809,17 +809,19 @@ $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v67";
+const APP_VERSION = "v68";
 (() => {
   const ver = $("#app-version"); if (ver) ver.textContent = APP_VERSION;
   const head = $(".console"); if (!head) return;
-  let lastY = window.scrollY || 0;
+  // POSITION-based with a dead zone (hysteresis), NOT direction-based: collapsing/expanding the bar
+  // changes its height (reflow), and a direction toggle fed that reflow back into itself near a single
+  // threshold → flicker on scroll-up. Separate add/remove thresholds with a 56px gap absorb both the
+  // reflow jump and mobile scroll jitter. Shrinks once scrolled down; expands when back near the top.
   const onScroll = () => {
     const y = window.scrollY || 0;
-    if (y < 24) head.classList.remove("compact");             // at the top → expand
-    else if (y > lastY + 4) head.classList.add("compact");     // scrolling down → shrink
-    else if (y < lastY - 4) head.classList.remove("compact");  // scrolling up → expand
-    lastY = y;
+    if (y > 88) head.classList.add("compact");          // scrolled down → shrink
+    else if (y < 32) head.classList.remove("compact");  // back near the top → expand
+    // 32..88 = dead zone: keep the current state (no flip → no flicker)
   };
   window.addEventListener("scroll", onScroll, { passive: true });  // cheap; scroll is already frame-throttled
 })();
