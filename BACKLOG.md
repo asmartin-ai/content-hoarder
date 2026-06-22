@@ -74,7 +74,7 @@ the categorizer (Epic 1) wants for accuracy.*
   into `metadata.gallery`; the browse media-modal renders them as an inline stacked lightbox
   (`openGallery` in `app.js`, routed via a `data-gallery` attribute). Populated for all gallery items
   on the next `enrich --source reddit --scores` pass. (Triage-card inline gallery still TODO.)
-- [ ] **P1 — Hoard the BYTES, not just the link: local media archiving.** ⏳ **Infrastructure ✅ SHIPPED** (Epic 4: `media_store.py` blob store + `archive-media` CLI + same-origin `/media/<blob>` route + prefer-local toggle, default OFF, on main); the archiving pass has **not been run** on the live corpus yet, so the bytes still aren't on disk. *(User-requested 2026-06-20.)*
+- [~] **P1 — Hoard the BYTES, not just the link: local media archiving.** ✅ **Infra + the big images pass DONE** (Epic 4: `media_store.py` blob store + `archive-media`/`scan-media` CLI + same-origin `/media/<blob>` route + prefer-local frontend, on main). **Live run 2026-06-22:** `scan-media` classified deletions (2,394 `gone`, 32 salvaged); galleries + salvageable archived; the bulk **images** pass archived **22,052 blobs (98.9% ok, 249 already-deleted)** → **`data/media/` = 32,506 blobs / 18 GB**, **25,706 items now carry a local copy** that survives remote deletion (frontend already prefers it + falls back on 404). **Remaining:** (a) `v.redd.it` **videos** (7,012 — phase 4, not started); (b) the deleted/non-image **tail** (~627, mostly unrecoverable → see the archive.today / RedGifs / RepostSleuth recovery items above); (c) **at-save-time** archiving for *new* saves (catch deletions early). ⚠️ **`data/media/` is the ONLY copy** — gitignored, NOT in the metadata-only DB backups → **needs a separate backup.** *(User-requested 2026-06-20; images pass run 2026-06-22.)*
   **Problem (core to the "hoarder" mission):** we store *URLs*, not media. When reddit deletes an image the
   app shows reddit's "if you're looking for an image, it was probably deleted" placeholder and it's gone for
   good — confirmed 2026-06-20 on `reddit:t3_1u69n0s` (r/196 "rule"): `i.redd.it/9pxkje0ife7h1.jpeg` → 404
@@ -1057,6 +1057,40 @@ Absorbs "make the Reddit view more mobile-friendly".*
   (b) trust + maintenance (FOSS, active releases; sideload APK + auto-update via Obtainium/its own channel);
   (c) adblock efficacy on the reader's embedded reddit content. Alternatives to weigh: Brave (Chromium +
   adblock, Google-adjacent), Mull/Vanadium, or an in-app blocklist if we ever render remote pages ourselves.
+- [ ] **P3 — Explore Chrome Custom Tabs (+ Trusted Web Activity).** *(User idea 2026-06-22.)* Chrome Custom
+  Tabs (CCT) is Android's native "embed a real Chrome tab inside an app" surface — faster than a cold browser
+  launch, themeable (match the app bar), shares the user's Chrome session/cookies, and has a back-arrow that
+  returns to the app. Two angles for content-hoarder:
+  - **(a) In-app link opening.** Today the reader's "Open original ↗" + external source links bounce out to
+    the full browser and lose the app. If content-hoarder ever runs inside a native shell, those links could
+    open in a Custom Tab — stay-in-app feel without us rendering remote pages ourselves. *(Pure-PWA caveat: a
+    plain installed PWA can't invoke CCT directly — that's a native API; it needs a wrapper. So this is mostly
+    relevant once (b) exists.)*
+  - **(b) TWA packaging — the bigger reason.** A **Trusted Web Activity** is the official Google path to ship a
+    PWA as a real installable/Play-Store Android app, and **a TWA is literally a full-screen, chrome-less Custom
+    Tab** around your PWA. Tooling: **Bubblewrap** / **PWABuilder** generate the APK from the manifest. This is
+    a **third native-packaging option** alongside the Cromite-WebAPK and GeckoView iceboxes above — TWA = the
+    Google-blessed Chromium path (uses the user's installed Chrome/Cromite engine, so adblock only if that
+    engine has it).
+  - **Open questions:** does a TWA verify against our **Tailscale `.ts.net` origin** (TWA needs Digital Asset
+    Links — host `/.well-known/assetlinks.json` on the Flask app + a signed APK; the cert SHA must match) when
+    the origin is only reachable on the tailnet; offline behavior (TWA falls back to a Chrome error page, not
+    our SW shell, if the origin is unreachable — vs a WebAPK which is friendlier); and whether CCT's lack of
+    engine-adblock makes Cromite-WebAPK still preferable for the ad concern. Relates to the Cromite + GeckoView
+    items above and `docs/MOBILE_TAILSCALE.md`. Refs: Android Custom Tabs, Bubblewrap, PWABuilder.
+- [ ] **P3 — ICEBOX: watch the Web Haptics API (amplitude/intensity haptics for the PWA).** *(Researched
+  2026-06-22.)* Our haptics are capped by `navigator.vibrate()` being **duration-only** — no amplitude knob
+  (Android's `VibrationEffect` amplitude exists natively but is **not** bridged to the web), so "stronger"
+  can only mean "longer," which is why tuning firmness is a tradeoff against crispness. **The fix in flight is
+  the Web Haptics API** (WICG incubation + Microsoft-Edge explainer, with Chromium interest — a BlinkOn 21
+  talk): semantic effects (`hint`/`edge`/`tick`/`align`) **with optional intensity `0.0–1.0`** = real
+  amplitude, declarative (`@haptic` CSS) or imperative. **ICEBOXED because it's not shipped** (incubation, no
+  browser support yet) — nothing to build now; **adopt once it lands in Chrome** (our PWA host) and replace the
+  raw `vibrate(ms)` calls in `haptics.js`/`core/swipe.js` with intensity-aware effects. **The only way to get
+  amplitude *before* it ships is a native shell** (TWA/Capacitor + a native haptics plugin, e.g. Capacitor
+  `ImpactStyle.Light/Medium/Heavy`) — see the Chrome Custom Tabs / TWA item above; Web Haptics is the
+  no-native-wrapper path to the same payoff. Refs: [WICG/web-haptics](https://github.com/WICG/web-haptics),
+  [Edge explainer](https://microsoftedge.github.io/MSEdgeExplainers/Haptics/explainer.html).
 
 ### Icebox — remote-wake / always-on hosting *(Epic 16)*
 - [ ] **P3 — ICEBOX: remotely "turn on" the server from the phone.** *(Researched 2026-06-20.)* Problem: the
