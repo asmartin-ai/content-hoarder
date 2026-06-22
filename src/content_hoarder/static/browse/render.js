@@ -112,17 +112,19 @@ const fmtDur = (secs) => {
 
 /* ---- per-density builders ---- */
 
-/* the per-item tag-edit trigger — opens the browse tag editor (browse/tagedit.js).
-   Always rendered (even on a tagless item) so adding the FIRST tag is reachable. */
+/* The card (.pin) keeps the inline "+" tag trigger — cards have no swipe/long-press attached
+   (attachSwipe targets `.row` only). Log/ledger rows drop it in favour of the long-press menu. */
 const tagEditBtn =
   '<button type="button" class="tag-edit" data-tagedit="1" title="Edit tags" aria-label="Edit tags">+</button>';
 
-/* inline row chips: fixed-height log/ledger rows can't grow, so no expander.
-   Wrapped with the edit trigger in a cluster so the ＋ sits with the chips. */
-const rowChips = (item, o) =>
-  '<span class="tag-cluster">' +
-  tagChips(item, { curated: o.curated, max: 2, expand: false }) +
-  tagEditBtn + "</span>";
+/* Row tags on their OWN line (Epic 16, 2026-06-22): tagging moved to the long-press action menu,
+   so the "+" trigger is gone from log/ledger rows and tags no longer share the meta line — where,
+   at the end of a nowrap+ellipsis run, they used to get truncated away / clipped by the thumbnail
+   on mobile. "" when the item has no tags (the long-press menu adds the first one). */
+const rowTags = (item, o) => {
+  const chips = tagChips(item, { curated: o.curated, max: 3, expand: false });
+  return chips ? '<div class="rowtags">' + chips + "</div>" : "";
+};
 
 export const logRow = (item, opts) => {
   const o = opts || {};
@@ -135,7 +137,7 @@ export const logRow = (item, opts) => {
     '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
+    '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
     domainHtml +
     snippet(item) +
     "</div>" +
@@ -157,7 +159,7 @@ export const ledgerRow = (item, n, opts) => {
     '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + rowChips(item, o) + "</div>" +
+    '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
     domainHtml +
     "</div>" +
     '<div class="trail">' + play + actsHtml(o.view) + "</div>" +

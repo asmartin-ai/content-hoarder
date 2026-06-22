@@ -235,7 +235,7 @@
       <span class="led" aria-hidden="true"></span>
       <span class="rd-sub" id="reader-sub"></span>
       <a class="rd-oo" id="reader-open-original" href="#" target="_blank" rel="noopener"
-         aria-label="Open the original on Reddit">open original &#8599;</a>
+         aria-label="Open the original on Reddit"><span class="rd-oo-txt">open original </span>&#8599;</a>
       <button type="button" class="rd-oo rd-share" id="reader-share" aria-label="Share">share</button>
       <button type="button" class="rd-x" id="reader-close" aria-label="Back to feed">&#10005;</button>
     </header>
@@ -269,6 +269,13 @@
   </div>
 
   <div id="media-modal" hidden><div id="media-body"></div></div>
+
+  <!-- long-press action menu (Epic 16) — opened by holding a row; uses #scrim like the other sheets -->
+  <div class="rowmenu" id="rowmenu" role="menu" aria-label="Item actions">
+    <div class="rowmenu-title" id="rowmenu-title"></div>
+    <button type="button" class="rowmenu-item" data-rowmenu="tag" role="menuitem">＋ Tag</button>
+    <button type="button" class="rowmenu-item" data-rowmenu="share" role="menuitem">↗ Share</button>
+  </div>
 
   <script src="/static/haptics.js"></script>
   <script type="module" src="/static/browse/main.js"></script>
