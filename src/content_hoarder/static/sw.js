@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v66";  // v66: thumbnail tap → plain media lightbox (not the reader; back returns to feed) — v65 = long-press row menu + tags own line
+const CACHE = "ch-shell-v67";  // v67: shrink-on-scroll top bar + version badge in the bar — v66 = thumbnail → plain media lightbox
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
