@@ -56,7 +56,7 @@ export function renderThread(comments, collapsed, helpers) {
     html += '<span class="rd-cage">' + helpers.ago(c.created_utc) + "</span>";
     if (isC) html += '<span class="rd-hidden">' + subtreeLen(comments, i) + " replies</span>";
     html += "</div>";
-    if (!isC) html += '<div class="rd-ctext">' + helpers.md(c.body) + "</div>";
+    if (!isC) html += '<div class="rd-ctext">' + helpers.md(c.body, c.media) + "</div>";
     html += "</div></div>";
   }
   return html;
@@ -104,7 +104,7 @@ function tagEditorHtml(it) {
 let knownTags = [];        // the user's tag vocabulary, cached from /tags on first open
 let knownTagsLoading = false;
 
-export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
+export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } = {}) {
   const $ = (s) => document.querySelector(s);
   const reader = $("#reader");
   if (!reader) return { open() {} };
@@ -243,7 +243,7 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
     h += mediaTileHtml();
-    if (String(body).trim()) h += '<div class="rd-body">' + renderMarkdown(body) + "</div>";
+    if (String(body).trim()) h += '<div class="rd-body">' + renderMarkdown(body, { media: post && post.media }) + "</div>";
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
@@ -285,7 +285,8 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
   function renderComments() {
     cmtsEl.innerHTML = commentsHead(comments.length) +
       (comments.length
-        ? renderThread(comments, collapsed, { esc, md: renderMarkdown, ago, opAuthor })
+        ? renderThread(comments, collapsed, {
+            esc, md: (body, media) => renderMarkdown(body, { media }), ago, opAuthor })
         : '<div class="rd-cmtstate">No comments on this post.</div>');
   }
   function applyThread(res, justHydrated) {
@@ -425,6 +426,13 @@ export function initReader({ onTriage, onMedia, closeSheets, onClose } = {}) {
     if (sugg) { e.preventDefault(); readerAddTag(sugg.getAttribute("data-rd-addtag")); collapseReaderTagAdd(); return; }
     const addBtn = e.target.closest("[data-rd-tagadd]");
     if (addBtn) { openReaderTagAdd(); return; }
+    // ---- inline markdown image (comment / selftext) → open it in the lightbox ----
+    const mdImg = e.target.closest(".md-img[data-img]");
+    if (mdImg) {
+      const src = mdImg.getAttribute("data-img");
+      if (src && typeof onImage === "function") onImage(src);
+      return;
+    }
     const med = e.target.closest(".rd-media");
     if (med) {
       if (isNsfw(item) && !revealed) {                // first tap reveals, second opens
