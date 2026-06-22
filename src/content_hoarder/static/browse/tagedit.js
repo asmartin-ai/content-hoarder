@@ -10,11 +10,11 @@
    anchored popover. Mobile (≤700px): bottom sheet. Own backdrop catches outside-clicks. */
 
 import { esc } from "../core/util.js";
+import { normTag, suggestTags } from "../core/tags.js";
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 
 const isPhone = () => window.matchMedia("(max-width:700px)").matches;
-const norm = (t) => t.trim().toLowerCase();
 
 export function initTagEditor({ getItem, getKnownTags, onChange }) {
   const scrim = document.createElement("div");
@@ -30,7 +30,7 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
 
   let curFn = null;        // the item being edited
   let curTags = [];        // local working copy (kept in sync with the server's returned list)
-  let manualSet = new Set(); // norm()'d editable tags: metadata.tags_manual + ones added here
+  let manualSet = new Set(); // normTag()'d editable tags: metadata.tags_manual + ones added here
   let selIdx = 0;          // highlighted suggestion option
   let busy = false;        // single-flight guard so a double-tap can't double-post (UI also goes pointer-events:none)
 
@@ -59,12 +59,11 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
      then a "create new" option when the typed text isn't already an exact tag. */
   function options() {
     const input = pop.querySelector(".tp-input");
-    const q = input ? norm(input.value) : "";
-    const applied = new Set(curTags.map(norm));
-    const known = getKnownTags().filter((t) => !applied.has(norm(t)));
-    const matches = (q ? known.filter((t) => norm(t).includes(q)) : known).slice(0, 8);
-    const opts = matches.map((t) => ({ tag: t, create: false }));
-    const exists = !q || applied.has(q) || known.some((t) => norm(t) === q);
+    const q = normTag(input ? input.value : "");
+    const known = getKnownTags();
+    const opts = suggestTags(known, curTags, q).map((t) => ({ tag: t, create: false }));
+    const applied = new Set(curTags.map(normTag));
+    const exists = !q || applied.has(q) || known.some((t) => normTag(t) === q);
     if (q && !exists) opts.push({ tag: q, create: true });
     return opts;
   }
@@ -88,8 +87,8 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
      YouTube item's dozens of yt-dlp keywords) are hidden, so the editor stays about MANUAL
      tagging and a stray click can't strip a pipeline keyword out of search. */
   function editableTags() {
-    const known = new Set(getKnownTags().map(norm));
-    return curTags.filter((t) => known.has(norm(t)) || manualSet.has(norm(t)));
+    const known = new Set(getKnownTags().map(normTag));
+    return curTags.filter((t) => known.has(normTag(t)) || manualSet.has(normTag(t)));
   }
 
   function render() {
@@ -118,8 +117,8 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     try {
       const r = await api.postJSON("/items/" + encodeURIComponent(curFn) + "/tags", body);
       curTags = r.tags || [];
-      (body.add || []).forEach((t) => manualSet.add(norm(t)));      // adds here are manual → keep editable
-      (body.remove || []).forEach((t) => manualSet.delete(norm(t)));
+      (body.add || []).forEach((t) => manualSet.add(normTag(t)));      // adds here are manual → keep editable
+      (body.remove || []).forEach((t) => manualSet.delete(normTag(t)));
       onChange(curFn, curTags);          // let the page sync state + rail
       const fn = curFn;
       render();                          // rebuild chips + suggestions
@@ -185,7 +184,7 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     close();
     curFn = fullname;
     curTags = ((item.metadata || {}).tags || []).slice();
-    manualSet = new Set((((item.metadata || {}).tags_manual) || []).map(norm));
+    manualSet = new Set((((item.metadata || {}).tags_manual) || []).map(normTag));
     scrim.hidden = false;
     pop.hidden = false;
     render();

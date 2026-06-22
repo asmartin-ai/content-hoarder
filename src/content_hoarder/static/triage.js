@@ -2,6 +2,7 @@
    Pixel-6 / Android gesture-nav safe: 30px edge deadzone + inset card + tap buttons. */
 import { esc, safeUrl, isTypingTarget, ago } from "./core/util.js";
 import { getJSON as fetchJSON, postJSON } from "./core/api.js";
+import { normTag, itemTags, suggestTags } from "./core/tags.js";
 import { chIcon, fillIcons } from "./core/icons.js";
 import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
 
@@ -166,8 +167,7 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
   // but POSTs to /tags. Optimistic update, reconcile against the returned tags list,
   // revert + toast on error.
   var knownTags = [];   // the user's tag vocabulary, cached from /tags once at boot
-  function normTag(t) { return String(t == null ? "" : t).trim().toLowerCase().slice(0, 40); }
-  function itemTags(item) { return ((item && (item.metadata || {})).tags) || []; }
+  // normTag / itemTags / suggestTags imported from core/tags.js (shared with reader + browse)
   function setItemTags(item, tags) { if (item) { item.metadata = item.metadata || {}; item.metadata.tags = tags; } }
   function chipRowHtml(item) {
     var chips = itemTags(item).map(function (t) {
@@ -198,18 +198,13 @@ import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.
     var row = card.querySelector(".tcard-tagrow"); if (!row) return;
     row.innerHTML = chipRowHtml(itemByFn(fn));
   }
-  // Suggestions = known vocabulary not already on the item, filtered by the query.
-  function tagSuggestions(item, query) {
-    var have = {}; itemTags(item).forEach(function (t) { have[t] = 1; });
-    var q = normTag(query);
-    return knownTags.filter(function (t) { return !have[t] && (!q || t.indexOf(q) !== -1); }).slice(0, 8);
-  }
   function refreshSuggestions(inp) {
     if (!inp) return;
     var ui = inp.closest(".tag-add-ui"); if (!ui) return;
     var card = inp.closest(".tcard");
     var item = card ? itemByFn(card.getAttribute("data-fullname")) : null;
-    var sugg = tagSuggestions(item, inp.value);
+    // Suggestions = known vocabulary not already on the item, filtered by the query.
+    var sugg = suggestTags(knownTags, itemTags(item), inp.value);
     var box = ui.querySelector(".tag-suggest");
     box.innerHTML = sugg.length ? sugg.map(function (t) {
       return '<button class="chip tag-sugg" type="button" data-addtag="' + esc(t) + '">' + esc(t) + "</button>";
