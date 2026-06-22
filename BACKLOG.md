@@ -109,6 +109,40 @@ the categorizer (Epic 1) wants for accuracy.*
   cross-origin note in `sw.js`. Sizable — sequence: storage model + `/media` route + `archive-media` pass
   first; the remote-404→local fallback in the frontend second; full-video archiving last.
 
+- [ ] **P2 — `archive.today` (archive.ph) as a recovery provider.** *(Research 2026-06-22.)* Add a
+  best-effort recovery source alongside the existing Wayback path in `archival/`. `archive.today` runs a
+  **different crawler** than the Wayback Machine (it's the single most-used link archiver — ~44% share vs
+  Wayback's ~29%) and stores **text + inlined images**, so it frequently holds snapshots Wayback missed —
+  widening coverage on the already-dead set (`media_status='gone'`, ~2,394 items today). Per-URL, on-demand:
+  query `archive.ph/newest/<original_url>` (or the timemap), parse the snapshot for the og:image / inlined
+  media, and if the bytes resolve, store them via `media_store` like the rescue sub-pass. **Wire it into the
+  existing `recover_one()` / "↻ Recover" path** (Epic 4), NOT a bulk pass — `archive.today` is Cloudflare-gated,
+  rate-limited, and has no bulk API, so it's a low-volume, per-item, last-resort lookup. Fetcher stays
+  injectable for offline tests. Relates to Epic 4 P1 (hoard the bytes) + the Wayback provider in
+  `archival/providers.py`. Refs: [archive.today](https://archive.today).
+- [ ] **P2 — RedGifs resolver for the ~1,090 dead Gfycat links.** *(Research 2026-06-22.)* Gfycat shut down
+  **2023-09-01** (all bytes deleted), so the **1,090** `gfycat.com` `media_url` items in the corpus are dead —
+  but Gfycat's **NSFW** content migrated to **RedGifs under the same id** (lowercase→CamelCase, e.g.
+  `lazyfatcat` → `LazyFatCat`), and RedGifs has a real **v2 API** + a temporary-token auth flow. A `redgifs`
+  resolver: extract the Gfycat id from the dead URL, resolve it on RedGifs (`/v2/gifs/<id>`), and if it
+  resolves, rewrite `media_url`/`media_type` to the live RedGifs media (and optionally archive the bytes per
+  Epic 4 P1). Bounded, concrete set; **SFW Gfycat is mostly just gone** (try Wayback only). Mind: RedGifs is
+  NSFW-domain — gate behind the same opt-in as the `nsfw_*` tooling. Old `gfycat.com` NSFW links also redirect
+  via `gifdeliverynetwork.com` → RedGifs. Relates to Epic 4 (recovery) + Epic 9 (NSFW handling). Refs:
+  [redgifs API docs](https://redgifs.readthedocs.io/en/stable/migrating.html),
+  [gallery-dl #874](https://github.com/mikf/gallery-dl/issues/874).
+- [ ] **P3 — RepostSleuth reverse-image-hash recovery (spike).** *(Research 2026-06-22.)* Novel recovery angle
+  for **already-deleted** images: even when the original `i.redd.it` is 404, a still-**live repost** of the same
+  image elsewhere on Reddit can be found via perceptual-hash lookup against RepostSleuth's index (undocumented
+  API at `repostsleuth.com`; the bot u/repostsleuthbot is the public face). For a `gone` item we can query by the
+  original Reddit **submission id / url** (which RepostSleuth indexed before deletion) and, if it returns a live
+  duplicate post, pull *that* post's still-live image and archive the bytes. **Spike first** — the API is
+  undocumented + may have broken with Reddit's API changes, hashing is JPEG-compression-sensitive, and it only
+  helps images popular enough to have been reposted — so validate hit-rate on a sample of `gone` items before
+  building a provider. High upside for memes / popular images; nil for one-off personal uploads. Relates to
+  Epic 4 (recovery) + Epic 6 (dedup already hashes). Refs:
+  [RedditRepostSleuth (GitHub)](https://github.com/barrycarey/RedditRepostSleuth).
+
 ## Epic 5 — Inbox redesign follow-ups  (`enhancement`, `area:ui`)
 *Shipped: bigger cards + list swipe + undo snackbar; **sources as top tabs**; **status as a left
 sidebar** (with counts) + mobile hamburger drawer; **Gmail-style swipe-reveal icons** (trash/keep);
@@ -209,24 +243,28 @@ false positives.*
   opt-in and manual — no always-on capture (the project's zero-new-friction guardrail).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
-- [ ] **P2 — Fetch HN saved/favorited items directly (drop the manual Materialistic export).**
-  *(User-requested 2026-06-17; execution TBD — "we'll figure it out".)* Today HN items only arrive via a
-  manual Materialistic Android-app DB export (`adb backup` → `favorite`/`saved`/`read` tables; see
-  `connectors/hackernews.py` + `docs/IMPORTING.md`) or hand-fed id-list/HTML. Goal: pull the user's
-  saved HN items **without** that per-device dance — ideally an incremental sync like reddit's saved-sync.
-  **Open question is HOW** (HN has no official "my saved" API — the Firebase API is per-item only, no
-  user-list endpoint). Candidate paths to investigate (none verified yet):
-  - (a) the **public favorites page** `news.ycombinator.com/favorites?id=<user>` (paginated `&p=N`,
-    keyless, plain HTML the connector's existing `item?id=`/`athing` parsers can already read) — but this
-    only covers items the user explicitly *favorited*, which may differ from Materialistic-local "saved".
-  - (b) **`/upvoted?id=<user>`** — requires being logged in as that user (HN session cookie), mirroring
-    the reddit cookie path; covers upvoted, still not "saved".
-  - (c) automate/parse the Materialistic export so it's not a manual step.
-
-  Needs the user's HN username (+ a login cookie for b). Decide scope (favorites vs upvoted vs both) and
-  whether HN "favorite" is the right proxy for "saved" before building; once ids land, the connector's
-  `enrich()` already hydrates titles/scores/author and (Epic 15) og:image thumbnails. Mirror the
-  analogous reddit saved-sync shape (`reddit-oauth` / `connectors/reddit.py`, Epic 9).
+- [ ] **P2 — HN favorites-page auto-sync (Harmonic → `favorites?id=<user>`).** *(User-requested 2026-06-17;
+  path DECIDED 2026-06-22 — user retired Materialistic, migrated HN browsing to **Harmonic**.)* **Build the
+  `favorites?id=<user>` scraper** as the keyless, server-side, scheduled HN sync — the HN analogue of the
+  Reddit auto-sync. Background:
+  - **Why this is now the path:** Materialistic's "save" was **local-only** (never hit the HN account → needed
+    a per-device `adb backup`). **Harmonic favorites stories to the HN account server-side**, so they appear on
+    the **public** `news.ycombinator.com/favorites?id=<user>` page — pullable from the server with no phone.
+    *(One-time CONFIRM still pending: Harmonic's README/Play listing group "favorites" under account actions
+    alongside vote/comment/submit/see-upvoted, which strongly implies server-side, but verify empirically —
+    favorite one story, then check the favorites URL. HN's API is read-only, so favoriting is a website action.)*
+  - **Build:** fetch `favorites?id=<user>` paginated via `&p=N` (plain HTML; the connector's existing
+    `item?id=`/`athing` parsers already read it) → upsert as `hackernews` items → `enrich()` hydrates
+    title/score/author + og:image. Incremental (stop at a high-water mark like reddit saved-sync) and
+    schedulable (mirror `reddit_sync.SyncScheduler` / `auto_sync`). Needs only the user's **HN username** (the
+    page is public — no cookie). Add a `hn-sync` CLI + a settings field for the username.
+  - **Note:** favorites ≠ Materialistic-local "saved", but that's now moot — the user's workflow IS favoriting
+    in Harmonic going forward. `/upvoted?id=<user>` (needs a login cookie) covers upvotes, a separate optional
+    list. The `adb backup` Materialistic path is **legacy/reference** (see `docs/IMPORTING.md`); all old saves
+    already imported.
+  Mirror the reddit saved-sync shape (`reddit-oauth` / `connectors/reddit.py`, Epic 9). Refs:
+  [Harmonic](https://github.com/SimonHalvdansson/Harmonic-HN), [hnrss favorites feed](https://hnrss.org/),
+  [reactual/hacker-news-favorites-api](https://github.com/reactual/hacker-news-favorites-api).
 - [x] ~~**Differentiate posted / added-in-source / synced dates (UI).**~~ Shipped: the triage card and
   the browse list now label **posted** (`created_utc`), **added in source** (`saved_utc` — shown only
   when a source actually provides a real save timestamp; today HN/Obsidian/Keep do, Reddit/YouTube
@@ -245,6 +283,36 @@ false positives.*
   (Epic 4 spec); (b) the true **"date added to Watch Later"** for YouTube (`playlistItems.publishedAt`)
   still needs OAuth. Keyless stopgaps already shipped: galleries relabel to "🖼 Gallery"; sort by
   **playlist position**; score/upvote hydration via the archives (`enrich --source reddit --scores`).
+- [ ] **P2 — Twitter / X bookmarks as a content source (new connector).** *(User-requested 2026-06-22;
+  preliminary research done.)* Ingest the user's **X bookmarks** as `twitter:<tweet_id>` items. **Ingest path =
+  browser export, NOT the API** (mirrors the Firefox-tabs connector — keyless, manual ramp):
+  - **Why not the official API:** the bookmarks endpoint (`GET /2/users/{id}/bookmarks`, OAuth2 user-context +
+    `bookmark.read`) is **paid-only since 2026-02-06** (no free tier; pay-per-use "owned reads" at $0.001/resource,
+    legacy Basic $200 / Pro $5000 for existing subs only) **and hard-capped at ~800 bookmarks**. Wrong fit for a
+    keyless, complete-archive tool.
+  - **Why not the data-archive export:** X's official "download your data" archive **does not include bookmarks**
+    at all (it has your own *posted* tweets + `tweets_media/`, likes, DMs — not bookmarks). So the GDPR-export
+    trick used for Reddit doesn't apply here.
+  - **The fit — browser-side export:** tools like the open-source **`twitter-web-exporter`** (prinsss; a userscript
+    that installs a network interceptor and captures the X web app's own **GraphQL** bookmark responses as you
+    scroll) export **all** bookmarks to **JSON/CSV**, keyless, client-side, bypassing the 800 cap. Plan: user runs
+    such an export → drop the JSON into `import --source twitter` → a new connector parses it into
+    `twitter:<tweet_id>` items. (Later optional: our own minimal userscript/bookmarklet that POSTs to a local
+    `/import/x-bookmarks` endpoint, like the proposed live-Firefox-tabs ramp.)
+  - **Item shape:** `twitter:<tweet_id>`; fields = author handle/display name, text, `created_utc`, permalink
+    (`x.com/<user>/status/<id>`), and media URLs (`pbs.twimg.com` images — use `?name=orig` for full res;
+    `video.twimg.com` for video). De-dup by tweet id. **No bookmark timestamp** is exposed by the web export
+    (GraphQL gives a sort/order index, not a saved-at time) — same situation as Reddit saved; synthesize order,
+    don't fake a date (reuse `db.allocate_saved_order`).
+  - **Hoard the bytes (ties to Epic 4 P1):** `pbs.twimg.com` / `video.twimg.com` media is **purged within days of
+    a tweet's deletion**, so X media is as ephemeral as Reddit's — fold tweet media into the `archive-media` pass
+    (another durable-while-live CDN; archive proactively at import/sync, don't rely on post-hoc recovery).
+  - **Open:** quote-tweet / thread context (the web export may flatten these); NSFW handling (reuse the `nsfw_*`
+    opt-in); whether to promote tweet-embedded YouTube links into `youtube:` items (Epic 11 pattern).
+  Relates to Epic 7 (connectors), Epic 4 P1 (media bytes), Epic 11 (cross-source promotion). Refs:
+  [twitter-web-exporter (GitHub)](https://github.com/prinsss/twitter-web-exporter),
+  [X API pricing 2026](https://api.sorsa.io/blog/twitter-api-pricing-2026),
+  [X Get Bookmarks docs](https://docs.x.com/x-api/users/get-bookmarks).
 
 ## Epic 8 — Polish & infra  (`chore`)
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
