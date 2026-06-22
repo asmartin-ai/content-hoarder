@@ -902,15 +902,20 @@ Absorbs "make the Reddit view more mobile-friendly".*
   reported 2026-06-22.)* The tag-add input (`browse/tagedit.js` popover) isn't fully hidden when not in
   use — its bottom edge bleeds into the mobile bottom bar. Ensure it's `display:none`/off-canvas when
   closed, and that its open position clears the bottom bar (safe-area inset).
-- [ ] **P2 — Back on the reader/triage view should return to the inbox, not exit the app.** *(User-
-  reported 2026-06-22.)* On mobile, the system back button from the reader (and from the triage view)
-  closes the PWA instead of returning to the feed. Push a history entry when entering reader/triage so
-  `popstate` pops back to the inbox (the reader already wires `popstate`→close — the triage view +
-  top-level nav need the same `pushState`/guard). Verify on the Pixel-6/Chrome target.
-- [ ] **P2 — Back from the lightbox/gallery should return to the inbox, not exit the app.** *(User-
-  reported 2026-06-22.)* Opening the media lightbox/gallery and pressing back closes the PWA. Push a
-  history entry on lightbox open + dismiss it on `popstate` (same pattern as the reader) so back closes
-  the overlay and lands on the feed. Pairs with the reader/triage back-button item above.
+- [~] **P2 — Back on the reader/triage view should return to the inbox, not exit the app.** *(User-
+  reported 2026-06-22.)* ✅ **Reader + overlays SHIPPED** 2026-06-22 via the shared `core/overlaynav.js`
+  back-button coordinator (one history entry + one `popstate` over a stack; OS-back closes only the top
+  overlay — verified live: reader closes + stays on app, lightbox-over-reader nesting closes LIFO).
+  ⏳ **STILL OPEN — the triage PAGE-as-entry case:** when `/triage` is the *first* PWA history entry
+  (launched/refreshed directly onto it), back exits because there's nothing below it. Normal nav
+  (inbox → TRIAGE link) already returns to the inbox. Needs a page-level guard: if `/triage` is the
+  entry (no same-origin referrer / `history.length<=1`), push a sentinel so back routes to `/` instead
+  of exiting — coordinated with the overlay coordinator (overlay-back takes precedence). Verify on Pixel-6/Chrome.
+- [x] ~~**P2 — Back from the lightbox/gallery should return to the inbox, not exit the app.**~~ ✅ SHIPPED
+  2026-06-22 (`core/overlaynav.js` + `core/media.js` createLightbox + triage.js inline lightbox, sw.js
+  v55→v56). *(User-reported 2026-06-22.)* Both lightboxes register with the shared coordinator on open;
+  OS-back closes the overlay and lands on the feed instead of exiting the PWA. Browse path verified live
+  (open pushed history, back closed it, stayed on app); triage wired identically + page boots clean.
 - [x] ~~**P1 — Swipe must not trigger horizontal page scroll.**~~ ✅ v3: `body{overflow-x:clip}` (`browse.css:15`) + `swipe.js:27` `touchAction="pan-y"` (transform-only drag + edge-zone guard) — a row swipe can't side-scroll the page. Orig: Lock the layout to the device width
   (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
 - [x] ~~**P2 — NSFW blur in the inbox/triage**~~ ✅ v3: over-18 media blurred in the browse list (`render.js:13/62` veil + `browse.css:318` `filter:blur(16px)`), reveal-on-tap. Orig: adopt the Reddit view's blur for over-18 media.
