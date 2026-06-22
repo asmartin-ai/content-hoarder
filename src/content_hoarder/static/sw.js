@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v56";  // v56: shared overlay back-button coordinator (core/overlaynav.js) — v55 = softer haptics
+const CACHE = "ch-shell-v57";  // v57: tag-add popover hides cleanly ([hidden] fix) — v56 = overlay back-button coordinator
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js

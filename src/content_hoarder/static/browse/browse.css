@@ -443,6 +443,9 @@ body.focus .batchstrip{display:flex}
 .tagpop{position:fixed;z-index:56;width:280px;max-width:calc(100vw - 16px);
   background:var(--surface-card);border:1px solid var(--border-control);border-radius:var(--r-md);
   box-shadow:var(--shadow-pop);padding:12px;display:flex;flex-direction:column;gap:10px}
+/* the base .tagpop display:flex overrides the [hidden] UA rule, so close() (pop.hidden=true) left an
+   empty sheet pinned at bottom:0, clipping into the mobile bottom bar — restore real hiding. */
+.tagpop[hidden]{display:none}
 .tagpop.busy{opacity:.65;pointer-events:none}
 .tagpop.sheet{left:0;right:0;bottom:0;top:auto!important;width:100%;max-width:100%;
   border-radius:var(--r-lg) var(--r-lg) 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
