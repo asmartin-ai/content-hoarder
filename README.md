@@ -115,8 +115,8 @@ python -m content_hoarder enrich --source reddit --archives
 ```
 
 ## Mobile access
-The app is a responsive PWA you can install via **Add to Home Screen** (on Firefox for Android, use
-the browser menu → *Install*). Reach it from your phone over a private **Tailscale** tunnel or your
+The app is a responsive PWA you can install on **Chrome for Android** (browser menu → *Install app*,
+which creates a real standalone WebAPK). Reach it from your phone over a private **Tailscale** tunnel or your
 LAN. **Security warning: never expose this personal-data app to the public internet** — no port
 forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 
@@ -124,9 +124,10 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 1. On the PC, find your Tailscale IP (`tailscale ip -4`, a `100.x.y.z` address) and start the app
    bound to it: `python -m content_hoarder serve --host 100.x.y.z` (the web guard already accepts
    tailnet addresses; add real DNS names via `CONTENT_HOARDER_ALLOWED_HOSTS`).
-2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Firefox.
-3. Install it: browser menu → **Install** (Add to Home Screen). The PWA opens fullscreen with the
-   app icon; the service worker caches the shell, so cold opens are instant.
+2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Chrome.
+3. Install it: Chrome menu (⋮) → **Install app** (a real WebAPK). The PWA opens fullscreen with the
+   app icon; the service worker caches the shell, so cold opens are instant. *(Install needs a secure
+   context — use the HTTPS `*.ts.net` URL from `tailscale serve`; see [docs/MOBILE_TAILSCALE.md](docs/MOBILE_TAILSCALE.md).)*
 4. Notes for gesture navigation: row swipe is touch-only by design; if a fresh deploy looks stale,
    the shell cache updates on the next reload (the SW takes one visit to swap versions).
 

@@ -91,9 +91,11 @@ inbox; `status_prev` enables one-step undo.
   rejected.
 
 ## Triage UI / mobile
-- Target browser: **Firefox on Android (Pixel 6)**. Firefox supports manifest + service worker +
-  `display:standalone` but **NOT** `beforeinstallprompt` — do not build a custom install button; show
-  a "Firefox menu → Install" hint.
+- Target browser: **Chrome on Android (Pixel 6)** (switched from Firefox 2026-06-21). Chrome supports
+  manifest + service worker + `display:standalone`, installs the PWA as a **WebAPK** (home-screen icon,
+  own task), and **does** fire `beforeinstallprompt` — so a custom "Install" button IS viable (capture
+  the event, call `prompt()` on tap) rather than a menu-hint fallback. (Note: the `firefox` *connector*
+  — tab imports, `migrate-firefox-tabs`, `firefox_youtube` — is unrelated to the PWA target and stays.)
 - **Android gesture-nav conflict:** horizontal swipe must NOT trigger system back. Use a ~30px
   `pointerdown` edge **deadzone**, inset the card ~40px from screen edges
   (`margin: max(env(safe-area-inset-*) + 40px, 40px)`, `<meta viewport … viewport-fit=cover>`),
