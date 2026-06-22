@@ -40,6 +40,20 @@ def test_empty_and_blank_render_to_nothing():
     assert _render("   \n\n  ") == ""
 
 
+def test_pipe_table_renders():
+    out = _render("| A | B |\n| --- | --- |\n| 1 | 2 |")
+    assert "<table" in out and "<thead>" in out and "<tbody>" in out
+    assert "<th>A</th>" in out and "<th>B</th>" in out
+    assert "<td>1</td>" in out and "<td>2</td>" in out
+    assert "|" not in out  # pipes consumed into the table, not printed literally
+
+
+def test_table_cells_run_inline_transforms():
+    out = _render("| Name | Link |\n|:---|---:|\n| **bob** | [x](https://e.com) |")
+    assert "<strong>bob</strong>" in out
+    assert '<a href="https://e.com"' in out
+
+
 def test_bold_italic_inline_code():
     out = _render("a **bold** and *italic* and `code` here")
     assert "<strong>bold</strong>" in out

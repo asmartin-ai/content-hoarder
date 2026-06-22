@@ -22,7 +22,7 @@ export function attachSwipe(el, opts) {
   const COMMIT2 = opts.onRightLong ? (opts.commit2 || 170) : Infinity;
   const fg = el.querySelector(".item-fg") || el;
   let startX = 0, startY = 0, dragging = false, decided = false, horizontal = false;
-  let stage2 = false, armed = false;
+  let stage2 = false, armed = false, lpTimer = null;
 
   fg.style.touchAction = "pan-y";
 
@@ -54,6 +54,16 @@ export function attachSwipe(el, opts) {
     dragging = true; decided = false; horizontal = false;
     startX = e.clientX; startY = e.clientY;
     fg.style.transition = "none";
+    if (opts.onLongPress) {                    // press-and-hold (no drag) → open the row action menu
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => {
+        lpTimer = null;
+        if (horizontal) return;                // a decided swipe already cleared this; guard anyway
+        suppressNextClick();                   // swallow the click that follows finger-up
+        if (navigator.vibrate) navigator.vibrate(15);
+        opts.onLongPress(el);
+      }, opts.longPressMs || 450);
+    }
   });
 
   el.addEventListener("pointermove", (e) => {
@@ -62,6 +72,7 @@ export function attachSwipe(el, opts) {
     if (!decided) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       decided = true;
+      clearTimeout(lpTimer);                 // a real drag cancels the long-press
       horizontal = Math.abs(dx) > Math.abs(dy);
       if (horizontal) { try { el.setPointerCapture(e.pointerId); } catch (_e) {} }
     }
@@ -88,6 +99,7 @@ export function attachSwipe(el, opts) {
   function end(e) {
     if (!dragging) return;
     dragging = false;
+    clearTimeout(lpTimer);
     const dx = e.clientX - startX;
     if (horizontal) suppressNextClick();     // any decided h-swipe: don't let the trailing click fire
     if (horizontal && Math.abs(dx) >= COMMIT) {
@@ -101,5 +113,5 @@ export function attachSwipe(el, opts) {
     }
   }
   el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", () => { dragging = false; reset(); });
+  el.addEventListener("pointercancel", () => { dragging = false; clearTimeout(lpTimer); reset(); });
 }

@@ -456,14 +456,13 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
       renderComments();
       return;
     }
-    // Tap the comment byline (author/score/age line) to collapse/expand its thread — a big tap
-    // target alongside the −/+ button. Ignore taps on the author link (it opens the profile) so
-    // the two affordances don't fight. The body text stays non-toggling (links/images/selection).
-    const by = e.target.closest(".rd-cby");
-    if (by && !e.target.closest("a")) {
-      const cmt = by.closest(".rd-cmt");
-      const ci = cmt ? +cmt.dataset.ci : NaN;
-      if (cmt && !Number.isNaN(ci)) {
+    // Tap ANYWHERE on a comment (byline OR body text) to collapse/expand its thread — a big tap
+    // target alongside the −/+ button. Excludes links, inline images, and buttons so those keep
+    // their own actions (the author link opens the profile; an md-img opens the lightbox below).
+    const cmt = e.target.closest(".rd-cmt");
+    if (cmt && !e.target.closest("a, .md-img, [data-img], button")) {
+      const ci = +cmt.dataset.ci;
+      if (!Number.isNaN(ci)) {
         collapsed.has(ci) ? collapsed.delete(ci) : collapsed.add(ci);
         renderComments();
       }
