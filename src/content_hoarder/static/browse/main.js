@@ -6,7 +6,7 @@
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { createLightbox, imageUrl, mediaType, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
+import { createLightbox, imageUrl, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders, shareItem } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -269,11 +269,11 @@ itemsEl.addEventListener("click", (e) => {
       media.classList.remove("nsfw");             // veil hidden by CSS; re-blurs on reader/lightbox close
       return;
     }
-    // A Reddit image/video post opens the in-app reader (media + comment thread), like the
-    // native app — not the bare lightbox. The reader renders the media tile, which still
-    // opens the raw player/lightbox on tap (onMedia → openMediaFor). Galleries keep their
-    // dedicated stacked viewer.
-    if (item.source === "reddit" && ["image", "video"].includes(mediaType(item).cls)) { readerUI.open(item); preloadNext(item); return; }
+    // Thumbnail tap = a quick PLAIN-MEDIA peek — image lightbox / video player / gallery viewer.
+    // The post + comment THREAD is reached by tapping the title or body text (handled below).
+    // (Reverted the reddit-image/video → reader interception per user pref + Epic 5 P2, 2026-06-22.)
+    // openMediaFor → lightbox registers with the overlay coordinator (core/media.js pushOverlay),
+    // so the OS/back button closes the lightbox and returns to the feed (inbox), not exits the app.
     openMediaFor(item);
     return;
   }
