@@ -1182,8 +1182,14 @@ def reconcile_reddit_saves(
 _STRIP_DECAY_SQL = "json_remove(metadata, '$.decayed_at', '$.decay_label')"
 
 
-def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | None:
-    """Set an item's triage status; record the previous one for undo."""
+def set_status(conn: sqlite3.Connection, fullname: str, status: str,
+               *, queue_unsave: bool = True) -> dict | None:
+    """Set an item's triage status; record the previous one for undo.
+
+    ``queue_unsave`` (default True) controls whether a transition to ``done`` enqueues a Reddit
+    unsave when the opt-in is on. The reconcile path passes ``False``: an item promoted to done
+    *because it was already unsaved on Reddit* must not trigger a redundant no-op unsave write
+    (mirrors ``reconcile_reddit_saves`` — it's already gone server-side)."""
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid status: {status!r}")
     row = conn.execute(
@@ -1201,7 +1207,7 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str) -> dict | N
         f"metadata={_STRIP_DECAY_SQL} WHERE fullname=?",
         (status, old, processed, fullname),
     )
-    if status == "done" and _unsave_enabled(conn):
+    if status == "done" and queue_unsave and _unsave_enabled(conn):
         try:  # best-effort, local-only — an enqueue hiccup must never fail the status write
             enqueue_unsave(conn, fullname)
         except Exception:  # noqa: BLE001
