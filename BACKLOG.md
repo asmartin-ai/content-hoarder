@@ -893,6 +893,23 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 *Make the PWA feel native on the phone (Chrome / Pixel-6 target; switched from Firefox 2026-06-21).
 Absorbs "make the Reddit view more mobile-friendly".*
 
+- [ ] **P2 — Swipe haptics are too strong — reduce them.** *(User-reported 2026-06-22.)* The tactile
+  commit feedback (engagement B6 haptics) buzzes too hard on the phone. Soften the `navigator.vibrate`
+  pattern (shorter/lighter), firing only on a committed action — never mid-drag. Find the `vibrate`
+  call(s) on the triage + browse swipe paths and dial the duration down.
+- [ ] **P2 — Tag-add box clips into the bottom bar on mobile when idle (not fully hidden).** *(User-
+  reported 2026-06-22.)* The tag-add input (`browse/tagedit.js` popover) isn't fully hidden when not in
+  use — its bottom edge bleeds into the mobile bottom bar. Ensure it's `display:none`/off-canvas when
+  closed, and that its open position clears the bottom bar (safe-area inset).
+- [ ] **P2 — Back on the reader/triage view should return to the inbox, not exit the app.** *(User-
+  reported 2026-06-22.)* On mobile, the system back button from the reader (and from the triage view)
+  closes the PWA instead of returning to the feed. Push a history entry when entering reader/triage so
+  `popstate` pops back to the inbox (the reader already wires `popstate`→close — the triage view +
+  top-level nav need the same `pushState`/guard). Verify on the Pixel-6/Chrome target.
+- [ ] **P2 — Back from the lightbox/gallery should return to the inbox, not exit the app.** *(User-
+  reported 2026-06-22.)* Opening the media lightbox/gallery and pressing back closes the PWA. Push a
+  history entry on lightbox open + dismiss it on `popstate` (same pattern as the reader) so back closes
+  the overlay and lands on the feed. Pairs with the reader/triage back-button item above.
 - [x] ~~**P1 — Swipe must not trigger horizontal page scroll.**~~ ✅ v3: `body{overflow-x:clip}` (`browse.css:15`) + `swipe.js:27` `touchAction="pan-y"` (transform-only drag + edge-zone guard) — a row swipe can't side-scroll the page. Orig: Lock the layout to the device width
   (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
 - [x] ~~**P2 — NSFW blur in the inbox/triage**~~ ✅ v3: over-18 media blurred in the browse list (`render.js:13/62` veil + `browse.css:318` `filter:blur(16px)`), reveal-on-tap. Orig: adopt the Reddit view's blur for over-18 media.
@@ -1086,6 +1103,25 @@ build-tracking now, not open design questions:*
   Done/Archive but below Keep; never the cheapest gesture in reach. Open questions: window
   length/escalation curve, quiet resurface marker vs silent return, overlap with the deferred
   ☾ resting-soon markers (both want the same server-side flag).
+- [ ] **P2 — 4-DIRECTIONAL triage: add the vertical axis (↑ = thread, ↓ = skip-for-later).** *(User
+  idea 2026-06-22.)* The two-stage map above claims the horizontal axis (←/→ = Done/Archive/Keep, long-←
+  = Snooze); add the **vertical** axis so triage is genuinely 4-directional:
+  - **Swipe ↑ → open the comments thread** (the inline reader/thread view). First open lazy-hydrates via
+    `reddit_hydrate.hydrate_if_missing` (Epic 24) — ties straight into the hydration work. Read-without-
+    deciding: the card stays in the deck after closing the reader.
+  - **Swipe ↓ → skip the item for later** (no-decision pass / show next). This is the *gesture binding* of
+    the already-shipped **Skip** (triage-skip, on main) — wire the existing action, do NOT add a new one.
+    Decide vs the Epic 16 P2 timed Defer/Snooze and the long-← Snooze above: ↓ maps to the cheap
+    no-decision Skip, NOT the timed snooze, to keep the two gestures distinct.
+  Touches `core/swipe.js` (today `touchAction="pan-y"`, horizontal-only — needs a vertical axis +
+  thresholds that don't fight list scroll, and a direction-lock so a diagonal drag resolves to one axis)
+  + `triage.js`. **Unify with — don't duplicate —** the long-← Snooze item and the Epic 16 Skip/Defer
+  item; this is the gesture layer over those existing actions.
+- [ ] **P2 — Triage visual rework (design bakeoff, probably GLM).** *(User idea 2026-06-22.)* A fresh
+  visual pass on the triage card/deck — hand it to a design bakeoff arm (GLM, per the Epic 20 P3 GLM-5.2
+  design-arm trial). Pair with the 4-directional gesture item above: the new ↑/↓ affordances need visual
+  hinting (edge cues / peek). Scope + lock the design via the `frontend-design` skill + visual review
+  before any build.
 - [x] ~~**P2 — Command palette v1.**~~ Shipped (2026-06-11, the bakeoff's T3 winner —
   GLM-5.1's sample + review fixes): `static/browse/palette.js` (ES module, fuzzy
   subsequence match with strict-prefix > word-boundary > scattered tiers, arrows wrap,

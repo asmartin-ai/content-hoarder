@@ -1124,6 +1124,32 @@ if ("serviceWorker" in navigator)
     console.warn("Service worker registration failed (needs HTTPS or localhost):", err);
   });
 
+/* ---- automatic Reddit saved-sync: the PWA-open half of the auto path (Epic 25). Fire-and-forget on
+   boot + when the tab regains focus; the server DEBOUNCES (90s) and NO-OPs unless autosync is opted
+   in, so this is safe to call freely. Quietly refreshes the view when a sync actually imported or
+   reconciled something — never interrupts the user with a toast. The background scheduler funnels into
+   the same /reddit/sync/auto -> auto_sync path. */
+(function autoSyncOnOpen() {
+  let lastPing = 0;
+  async function ping() {
+    const now = Date.now();
+    if (now - lastPing < 60000) return;          // client guard; server debounce is the real gate
+    lastPing = now;
+    try {
+      const data = await api.postJSON("/reddit/sync/auto", {});
+      if (!data || data.skipped) return;         // disabled / debounced -> nothing changed
+      const r = data.result || {}, rec = r.reconcile || {};
+      if ((r.new || 0) > 0 || (rec.unsaved || 0) > 0 || (rec.promoted_done || 0) > 0) {
+        loadItems(true); loadCounts(); refreshRail(); refreshPulse();
+      }
+    } catch (e) { /* offline / network — silent; retried on next focus */ }
+  }
+  ping();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") ping();
+  });
+})();
+
 /* ---- command palette (locked Epic 20: ">" flips search to command mode) ---- */
 initPalette(qInput, [
   { label: "Go to Triage", hint: "page", run: () => location.assign("/triage") },

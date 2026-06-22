@@ -439,3 +439,22 @@ def test_drain_malformed_max_no_500(tmp_db):
 
 def test_sync_malformed_max_pages_no_500(tmp_db):
     assert _client(tmp_db).post("/reddit/sync", json={"max_pages": "garbage"}).status_code == 200
+
+
+def test_reddit_sync_auto_disabled_by_default(tmp_db):
+    """The PWA-open hook no-ops (and never starts a sync) until autosync is opted in."""
+    r = _client(tmp_db).post("/reddit/sync/auto").get_json()
+    assert r == {"skipped": "disabled"}
+
+
+def test_reddit_sync_auto_runs_when_enabled(tmp_db):
+    """Enabled but with no reddit auth -> the inner sync reports auth_error, not a 500."""
+    from content_hoarder import reddit_sync
+    _seed(tmp_db)
+    c = db.connect(tmp_db)
+    reddit_sync.set_autosync_enabled(c, True)
+    c.close()
+    r = create_app(tmp_db).test_client().post("/reddit/sync/auto").get_json()
+    assert r.get("skipped") is None
+    assert r["mode"] in ("incremental", "reconcile")
+    assert r["result"]["auth_error"] is True
