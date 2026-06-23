@@ -17,7 +17,9 @@ const glyph = (item) => {
   return m ? (m.glyph || item.source[0]) : "?";
 };
 
-/* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters */
+/* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters.
+   Share is NOT here on desktop (use the right-click row menu); the whole .acts cluster is
+   hidden on touch via @media(hover:none), so mobile uses long-press → row menu for share too. */
 const actsHtml = (status) =>
   '<div class="acts">' +
   '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' + chIcon("keep") + "</button>" +
@@ -26,7 +28,6 @@ const actsHtml = (status) =>
   (status && status !== "inbox"
     ? '<button type="button" class="act x" data-act="inbox" title="Back to Inbox — X" aria-label="Back to Inbox">IN</button>'
     : "") +
-  '<button type="button" class="act sh" data-share title="Share" aria-label="Share">' + chIcon("share") + "</button>" +
   "</div>";
 
 const underlay =

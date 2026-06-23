@@ -256,7 +256,6 @@ itemsEl.addEventListener("click", (e) => {
   if (!card) return;
   const fn = card.dataset.fullname;
   if (actBtn && actBtn.dataset.act) { act(fn, actBtn.dataset.act); return; }   // status acts carry data-act
-  if (e.target.closest("[data-share]")) { shareItem(state.items.find((it) => it.fullname === fn)); return; }
   if (e.target.closest("[data-select]")) { toggleSelect(card); return; }
   const tagBtn = e.target.closest("[data-tagedit]");
   if (tagBtn) { e.stopPropagation(); tagEditor.open(fn, tagBtn); return; }
@@ -818,7 +817,7 @@ $("#dock-settings").addEventListener("click", () => openPanel("#settings"));
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v70";
+const APP_VERSION = "v71";
 (() => {
   const ver = $("#app-version"); if (ver) ver.textContent = APP_VERSION;
   const head = $(".console"); if (!head) return;
