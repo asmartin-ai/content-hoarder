@@ -47,6 +47,13 @@ src/content_hoarder/
   static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
                  (the v2 app.js + swipe.js were deleted 2026-06-13)
 ```
+**Source-badge icon contract (the `glyph()` bug bitten 2026-06-22):** a source's avatar glyph flows
+`core/icons.js` (the `D` map of inline-SVG strings, served by `chIcon(name)`) → `core/render.js`
+`CH_SOURCES[source] = { icon?, glyph?, token }` → `browse/render.js glyph(item)`. Use `icon: "name"`
+when a full SVG exists in the `D` map; use `glyph: "x"` for a 1-char mark. `glyph()` honors `m.icon`
+first (renders the SVG), then `m.glyph`, then `source[0]`. **Never `esc()` the `glyph()` output** —
+`chIcon` returns trusted HTML and the glyph chars are safe; escaping turns `<svg>` into visible text.
+The triage (`triage.js`) + reddit views have their own markup and don't use `glyph()`.
 
 ## Data model (one generic `items` table)
 PK `fullname = "<source>:<source_id>"` (namespaces every source — no cross-source collisions).
@@ -72,6 +79,10 @@ inbox; `status_prev` enables one-step undo.
 4. **Lazy-import heavy/optional deps** (e.g. `import yt_dlp` *inside* the function). A missing optional
    dep must break only its one connector, never `init-db`/`serve`/search.
 5. **HTTP is stdlib `urllib`** (HN Firebase, Karakeep push). No `requests`/`httpx`.
+6. **When inspecting `items.metadata` from sqlite, `SELECT` the full column and `json.loads()` it** —
+   never `substr(metadata,1,N)`. JSON keys sort alphabetically, so a 400-char truncation hides late
+   keys (e.g. `gallery`, `media_type` sit after `author`/`body`) and makes a populated row look empty.
+   (Cost a false "empty metadata" detour 2026-06-22.)
 
 ## Connector authoring checklist
 1. Subclass `BaseConnector`; set `id` (== `items.source`), `label`, `badge_color`.
@@ -108,6 +119,15 @@ inbox; `status_prev` enables one-step undo.
   (`margin: max(env(safe-area-inset-*) + 40px, 40px)`, `<meta viewport … viewport-fit=cover>`),
   `touch-action: pan-y`, commit threshold ~80px, and **always** provide Keep/Archive/Done tap buttons.
 - Swipe = pointer events + CSS transforms (no library). K / A / D keyboard shortcuts on desktop.
+- **Gallery lightbox = stacked images, NEVER a reddit iframe** (user pref 2026-06-22). Populated
+  `metadata.gallery[]` → `core/media.js openGallery` stacks plain `<img>`s in a `flex-direction:column`
+  `.media-gallery`. **Empty/missing `gallery[]`** (33 of 1,770 items were never archived) → a clean
+  placeholder ("Gallery images unavailable (not archived).") + "Open on Reddit ↗" link, via
+  `lightbox.openHtml(...)` in `browse/main.js openMediaFor` and the `data-gallery-embed` gate in
+  `triage.js .rd-preview-lg`. The iframe fallback (`openMedia(permalink)`) is for non-gallery
+  permalink items only. When archived media is missing, show an honest "unavailable" + source link,
+  not a degraded embed. The desktop inline action cluster is F/A/D (+IN off-inbox) only — Share lives
+  in the right-click row menu (mobile already hides `.acts` via `@media(hover:none)` → long-press).
 
 ## Working with the local LLM (when an agent delegates codegen)
 Qwen3.6 reliably (a) drops `await` on async calls and (b) starves answers with small `max_tokens`.
