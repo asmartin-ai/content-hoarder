@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v70";  // v70: top-bar flicker-near-top fix (wide dead zone + post-toggle lock) — v69 = plain-stacked gallery
+const CACHE = "ch-shell-v71";  // v71: no reddit-iframe for empty-gallery items — placeholder + link only
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
