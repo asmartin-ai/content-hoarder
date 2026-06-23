@@ -357,7 +357,9 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       var permalink = m.permalink || item.url || "";
       var label = mt === "reddit_video" ? "▶ Play"
         : (mt === "gallery" || /\/gallery\//i.test(item.url || "") ? "🖼 Gallery" : "▶ Preview");
-      return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) + '">' +
+      var isGal = (mt === "gallery" || /\/gallery\//i.test(item.url || ""));
+      return '<div class="tcard-media tcard-embed" data-permalink="' + esc(permalink) +
+        '"' + (isGal ? ' data-gallery-embed="1"' : '') + '>' +
         '<button class="rd-preview-lg" type="button">' + label + "</button></div>";
     }
     var thumb = m.thumbnail || "";
@@ -665,9 +667,16 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       var holder = e.target.closest(".tcard-embed");
       var permalink = holder ? holder.getAttribute("data-permalink") : "";
       if (/^https?:\/\//i.test(permalink)) {
-        holder.innerHTML = '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) +
-          '" loading="lazy"></iframe>' +
-          '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+        /* Gallery embeds without captured images: show placeholder + link, NOT a reddit iframe
+           (user preference 2026-06-22 — the iframe looked wrong embedded in the card). */
+        if (holder && holder.hasAttribute("data-gallery-embed")) {
+          holder.innerHTML = '<p class="media-fallback">Gallery images unavailable (not archived).</p>' +
+            '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+        } else {
+          holder.innerHTML = '<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) +
+            '" loading="lazy"></iframe>' +
+            '<a class="media-fallback" href="' + esc(permalink) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+        }
       }
       return;
     }
