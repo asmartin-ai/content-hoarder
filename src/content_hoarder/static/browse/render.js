@@ -14,7 +14,10 @@ export const isNsfw = (item) => !!((item.metadata || {}).over_18);
 
 const glyph = (item) => {
   const m = CH_SOURCES[item.source];
-  return m ? (m.glyph || item.source[0]) : "?";
+  if (!m) return "?";
+  // firefox uses a full SVG icon (registered in core/icons.js); others use a 1-char glyph.
+  if (m.icon) return chIcon(m.icon);
+  return m.glyph || item.source[0];
 };
 
 /* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters.
@@ -135,7 +138,7 @@ export const logRow = (item, opts) => {
     underlay +
     '<div class="item-fg">' +
     '<span class="idx"></span>' +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
+    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
     '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
@@ -157,7 +160,7 @@ export const ledgerRow = (item, n, opts) => {
     underlay +
     '<div class="item-fg">' +
     '<span class="idx">' + String(n).padStart(2, "0") + "</span>" +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
+    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
     '<div class="t">' +
     '<h3 class="title">' + titleLine(item) + "</h3>" +
     '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
@@ -194,7 +197,7 @@ export const pinCard = (item, opts) => {
     '<div class="body">' +
     '<div class="head">' +
     '<button type="button" class="avatar" data-select="1" style="--src:' + srcAccent(item.source) +
-    '" aria-label="Select"><span class="g">' + esc(glyph(item)) + "</span></button>" +
+    '" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
     '<span class="meta">' + metaHtml(item) + "</span></div>" +
     "<h3>" + titleLine(item) + "</h3>" +
     domainHtml +
