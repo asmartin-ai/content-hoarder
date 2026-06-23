@@ -279,6 +279,9 @@ export function createLightbox(opts) {
 
   return {
     close,
+    /* Open arbitrary HTML in the lightbox (for caller-constructed content like a gallery
+       placeholder). Registers with the overlay coordinator so OS-back closes it. */
+    openHtml(html) { open(html); },
     /* Reddit permalink → redditmedia iframe (online-only; permalink is the fallback). */
     openMedia(permalink) {
       const url = redditUrl(permalink);

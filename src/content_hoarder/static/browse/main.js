@@ -329,6 +329,15 @@ function openMediaFor(item) {
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
   const img = imageUrl(item);
   if (img) return lightbox.openImage(img);
+  /* Gallery without captured image URLs — show a clean placeholder, not a reddit iframe
+     (the 33 empty-gallery items have no local images to stack; the iframe was a bad
+     fallback — user preference 2026-06-22). */
+  if (m.media_type === "gallery" || /\/gallery\//i.test(item.url || "")) {
+    const url = redditUrl(m.permalink || item.url);
+    return lightbox.openHtml(url ? '<p class="media-fallback">Gallery images unavailable (not archived).</p>' +
+      '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>'
+      : '<p class="media-fallback">Gallery images unavailable.</p>');
+  }
   if (m.permalink) return lightbox.openMedia(m.permalink);
   const url = item.url; if (url) window.open(url, "_blank", "noopener");
 }
