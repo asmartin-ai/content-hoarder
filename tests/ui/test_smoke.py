@@ -58,6 +58,36 @@ def test_gallery_opens_as_stacked_lightbox(pixel6_page):
     ), "gallery images must have a plain src (not data-src)"
 
 
+def test_empty_gallery_no_iframe(pixel6_page):
+    """REGRESSION GUARD (2026-06-22): gallery items with no captured image URLs must NOT
+    show a reddit iframe in the lightbox. They should show a clean placeholder + 'Open on
+    Reddit ↗' link instead. Search for a known empty-gallery fullname or a gallery item whose
+    card has no inline images (falls through to the embed button)."""
+    page = pixel6_page
+    # Gallery items whose media_type is gallery but gallery array is empty render as a
+    # .tcard-embed with a "🖼 Gallery" button. Find one via a /gallery/ URL search.
+    page.fill("#q", "has:gallery reddit.com/gallery")
+    page.press("#q", "Enter")
+    page.wait_for_selector(".row[data-fullname]")
+    page.wait_for_timeout(400)
+
+    # Look for an embed button (the empty-gallery fallthrough card)
+    embed_btn = page.locator(".tcard-embed .rd-preview-lg").first
+    if not embed_btn.is_visible():
+        pytest.skip("No empty-gallery items in this DB copy")
+
+    embed_btn.click()
+    page.wait_for_timeout(300)
+
+    # The bug: empty-gallery items showed a reddit-embed-frame <iframe>.
+    # After the fix: the card body shows a placeholder + link, NOT an iframe.
+    holder = page.locator(".tcard-embed").first
+    assert not holder.locator("iframe").count(), \
+        "Empty-gallery embed must NOT contain an iframe"
+    assert holder.locator(".media-fallback").count() > 0, \
+        "Empty-gallery embed should show a placeholder fallback link"
+
+
 def test_topbar_shrinks_on_scroll_then_expands(pixel6_page):
     """The collapsing top bar: compacts when scrolled down, expands back near the top.
     Real Chromium runs the scroll handler (the preview tool couldn't), so this is meaningful."""
