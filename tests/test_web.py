@@ -275,10 +275,19 @@ def test_import_prepare_temp_file_cleaned_on_exit(tmp_db):
 
 def test_recover_route(tmp_db, monkeypatch):
     import content_hoarder.archival.service as svc
-    monkeypatch.setattr(svc, "recover_one",
-                        lambda c, fn, **k: {"recovered": True, "title": "X", "body": "Y", "url": "Z"})
+    seen = {}
+
+    def fake(c, fn, **k):
+        seen.update(k)
+        return {"recovered": True, "title": "X", "body": "Y", "url": "Z",
+                "bytes_archived": 0}
+
+    monkeypatch.setattr(svc, "recover_one", fake)
     r = _client(tmp_db).post("/items/reddit:t3_a/recover")
     assert r.status_code == 200 and r.get_json()["recovered"] is True
+    # The live route must wire archive.today (a non-empty media_providers list), not leave
+    # it dormant — this is the assertion that the feature is actually live in the app.
+    assert seen.get("media_providers"), "route did not pass media_providers (archive.today dormant)"
 
 
 def test_recover_route_non_reddit_400(tmp_db):
