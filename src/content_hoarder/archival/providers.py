@@ -18,6 +18,7 @@ import time
 import urllib.parse
 
 from content_hoarder.archival import _http
+from content_hoarder.archival._http import ArchiveError
 
 # Reddit base36 ids are ASCII alphanumerics. Validate before putting ids in a URL so
 # a malformed imported fullname can't corrupt the request or inject query params.
