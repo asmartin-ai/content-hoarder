@@ -314,8 +314,11 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/items/<path:fullname>/recover")
     def recover_item(fullname):
         from content_hoarder.archival import service as archival
+        from content_hoarder.archival.providers import default_media_providers
         with conn() as c:
-            res = archival.recover_one(c, fullname)
+            res = archival.recover_one(
+                c, fullname,
+                media_providers=default_media_providers(archival.DEFAULT_USER_AGENT, throttle=False))
         if res is None:
             return jsonify({"error": "not a recoverable reddit item"}), 400
         return jsonify(res)
