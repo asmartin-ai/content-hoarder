@@ -109,17 +109,21 @@ the categorizer (Epic 1) wants for accuracy.*
   cross-origin note in `sw.js`. Sizable — sequence: storage model + `/media` route + `archive-media` pass
   first; the remote-404→local fallback in the frontend second; full-video archiving last.
 
-- [ ] **P2 — `archive.today` (archive.ph) as a recovery provider.** *(Research 2026-06-22.)* Add a
-  best-effort recovery source alongside the existing Wayback path in `archival/`. `archive.today` runs a
-  **different crawler** than the Wayback Machine (it's the single most-used link archiver — ~44% share vs
-  Wayback's ~29%) and stores **text + inlined images**, so it frequently holds snapshots Wayback missed —
-  widening coverage on the already-dead set (`media_status='gone'`, ~2,394 items today). Per-URL, on-demand:
-  query `archive.ph/newest/<original_url>` (or the timemap), parse the snapshot for the og:image / inlined
-  media, and if the bytes resolve, store them via `media_store` like the rescue sub-pass. **Wire it into the
-  existing `recover_one()` / "↻ Recover" path** (Epic 4), NOT a bulk pass — `archive.today` is Cloudflare-gated,
-  rate-limited, and has no bulk API, so it's a low-volume, per-item, last-resort lookup. Fetcher stays
-  injectable for offline tests. Relates to Epic 4 P1 (hoard the bytes) + the Wayback provider in
-  `archival/providers.py`. Refs: [archive.today](https://archive.today).
+- [x] ~~**P2 — `archive.today` (archive.ph) as a recovery provider.**~~ Shipped 2026-06-24
+  (`feat/archive-today-recovery`): `ArchiveTodayProvider` in `archival/providers.py` — URL-keyed
+  (not id-keyed like PullPush/Arctic), HTML (not JSON), and uniquely recovers the **media bytes**
+  the metadata archives never had. Wired into `recover_one()` as an explicit **post-chain step**
+  (`_try_archive_today`): after PullPush/Arctic do their metadata best, archive.today runs *only*
+  when `media_status='gone'` — it fetches `archive.ph/newest/<url>`, extracts `og:image` + inlined
+  `<img>`s, and stores bytes via the existing `media_store` (→ `metadata.archived_media` +
+  `media_status='recovered_archive_today'`); the frontend's prefer-local fallback renders the image
+  with **zero UI change**. Non-destructive (writes only `archived_media`/`media_status` via
+  `json_set`, mirrors `media_archive.py`), per-item only (Cloudflare-gated, no bulk API), fetcher +
+  byte-fetcher injected → 7 offline tests. **Conservative wiring:** the production `/recover` route
+  is byte-for-byte unchanged (no `media_providers=` passed yet); archive.today activates once a UI
+  surface opts in. **Live smoke still pending** (Task 4 of the plan — run against a DB copy with a
+  real `gone` item; expect a low hit-rate since archive.today must have snapshotted the exact image
+  URL while live). Relates to Epic 4 P1 (hoard the bytes). Refs: [archive.today](https://archive.today).
 - [ ] **P2 — RedGifs resolver for the ~1,090 dead Gfycat links.** *(Research 2026-06-22.)* Gfycat shut down
   **2023-09-01** (all bytes deleted), so the **1,090** `gfycat.com` `media_url` items in the corpus are dead —
   but Gfycat's **NSFW** content migrated to **RedGifs under the same id** (lowercase→CamelCase, e.g.
