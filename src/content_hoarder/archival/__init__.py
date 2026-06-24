@@ -4,6 +4,7 @@ Optional, removable, network-only and non-destructive. Driven by the CLI:
 ``content_hoarder enrich --source reddit --archives``.
 """
 from content_hoarder.archival.providers import (
+    ArchiveTodayProvider,
     ArcticShiftProvider,
     PullPushProvider,
     default_providers,
@@ -17,4 +18,5 @@ __all__ = [
     "default_providers",
     "PullPushProvider",
     "ArcticShiftProvider",
+    "ArchiveTodayProvider",
 ]
