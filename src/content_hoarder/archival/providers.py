@@ -12,10 +12,13 @@ Field availability (verified against the live APIs):
 PullPush comments omit ``permalink``; Arctic-Shift includes it — hence two providers.
 """
 import html
+import json
 import re
 import time
+import urllib.parse
 
 from content_hoarder.archival import _http
+from content_hoarder.archival._http import ArchiveError
 
 # Reddit base36 ids are ASCII alphanumerics. Validate before putting ids in a URL so
 # a malformed imported fullname can't corrupt the request or inject query params.
@@ -270,6 +273,141 @@ class ArcticShiftProvider(ArchiveProvider):
         return f"{ARCTIC_BASE}/api/comments/search?link_id={_bare_id(link_fullname)}&limit={limit}"
 
 
+class ArchiveTodayProvider:
+    """Recover media bytes for a reddit item from archive.today snapshots.
+
+    archive.today runs a different crawler than the Wayback Machine and stores the
+    original page **with inlined images**, so it can recover the actual bytes for
+    images whose ``i.redd.it`` / ``preview.redd.it`` originals are now 404
+    (``media_status='gone'``) — something the PullPush/Arctic metadata archives cannot
+    do (they store metadata + dead preview URLs only). It's the single most-used link
+    archiver (~44% share vs Wayback's ~29%), so it frequently holds snapshots Wayback missed.
+
+    URL-keyed (not id-keyed), HTML (not JSON), Cloudflare-gated, no bulk API →
+    per-item only, wired into ``recover_one()`` as a post-chain step. The fetcher + HTML
+    parser are injectable (``fetch_html=``) so the whole path is offline-testable.
+
+    This does NOT subclass ``ArchiveProvider`` — that contract is reddit-id-keyed + JSON
+    + metadata-only. ``recover_media`` returns only image URLs; the caller does the byte
+    fetch via ``media_archive``'s injected fetcher + stores via ``media_store``.
+    """
+    name = "archive_today"
+    NEWEST = "https://archive.ph/newest/{url}"
+    # og:image meta (attribute-order agnostic) + inlined <img src>. archive.today stores
+    # images on its own CDN (archive.ph/<id>/...) or proxies the original host.
+    _OG_IMAGE = re.compile(r'<meta\b[^>]*property=["\']og:image["\'][^>]*>', re.I)
+    _OG_TITLE = re.compile(r'<meta\b[^>]*property=["\']og:title["\'][^>]*>', re.I)
+    _CONTENT = re.compile(r'content=["\']([^"\']+)["\']', re.I)
+    _IMG_SRC = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.I)
+
+    def __init__(self, user_agent, *, min_interval: float = 2.0, sleep=time.sleep,
+                 fetch_html=None, max_retries: int = 2):
+        self.user_agent = user_agent
+        self.min_interval = min_interval
+        self._sleep = sleep
+        self._fetch_html = fetch_html or self._default_fetch_html
+        self.max_retries = max_retries
+        self._made_request = False  # throttle flag: space successive snapshot lookups
+
+    def _default_fetch_html(self, url, *, timeout: float = 20.0) -> str:
+        """GET ``url`` → HTML text. Cloudflare challenge pages surface as 403/429 → ArchiveError.
+        Reuses the shared transport (which already honors Retry-After on 429)."""
+        try:
+            _status, _headers, raw = _http.request(
+                url, method="GET",
+                headers={"User-Agent": self.user_agent, "Accept": "text/html"},
+                timeout=timeout, retries=self.max_retries, sleep=self._sleep,
+            )
+        except _http.HttpError as e:
+            raise ArchiveError(f"HTTP error for {url}: {e}", status=e.status,
+                               retry_after=e.retry_after) from e
+        return raw.decode("utf-8", errors="replace")
+
+    def _snapshot_url(self, original_url: str) -> str:
+        """``archive.ph/newest/<url>`` redirects to the latest snapshot. Quoted so a URL with
+        query params doesn't break the path."""
+        return self.NEWEST.format(url=urllib.parse.quote(original_url, safe=""))
+
+    def recover_media(self, item: dict, *, want_gallery: bool = True) -> list:
+        """Resolve the image URLs a snapshot holds for one reddit item.
+
+        Returns ``[{"url": <snapshot_img_url>, "title": <og:title or "">}]`` ordered as in
+        the snapshot (og:image first, then inlined ``<img>``s), de-duped. The CALLER fetches
+        the actual bytes via ``media_archive``'s injected fetcher and stores them via
+        ``media_store`` — this method only resolves WHICH URLs exist, keeping it cheap and
+        fully testable without real network.
+
+        Returns ``[]`` when the item has no original media URL to look up, no snapshot
+        exists, the snapshot has no recoverable images, or any network/Cloudflare error
+        (loud-fail tolerant: a blocked snapshot is a soft miss, not a crash).
+        """
+        urls = self._item_image_urls(item, want_gallery=want_gallery)
+        if not urls:
+            return []
+        results = []
+        for orig in urls:
+            if self._made_request and self.min_interval > 0:
+                self._sleep(self.min_interval)
+            try:
+                html_text = self._fetch_html(self._snapshot_url(orig))
+            except ArchiveError:
+                self._made_request = True
+                continue  # this image had no snapshot / was Cloudflare-blocked → skip it
+            self._made_request = True
+            results.extend(self._extract_images(html_text))
+        return results
+
+    # -- helpers -------------------------------------------------------------
+    @staticmethod
+    def _item_image_urls(item: dict, *, want_gallery: bool = True) -> list:
+        """The original image URLs to look up on archive.today, from the item's media
+        metadata. Prefers the direct ``media_url``; galleries add each frame. These are the
+        URLs that were 404 (gone) — archive.today may have snapshotted them while live."""
+        md = item.get("metadata") or {}
+        if isinstance(md, str):
+            md = json.loads(md) if md else {}
+        out = []
+        u = md.get("media_url") or ""
+        if u and u.startswith("http"):
+            out.append(u)
+        if want_gallery:
+            out += [g for g in (md.get("gallery") or [])
+                    if isinstance(g, str) and g.startswith("http")]
+        seen: set = set()
+        return [x for x in out if not (x in seen or seen.add(x))]
+
+    def _extract_images(self, html_text: str) -> list:
+        """From a snapshot's HTML, the candidate image URLs it holds.
+
+        Prefer og:image (the canonical hero image); fall back to inlined ``<img src>``s.
+        Carries the og:title as an informational hint (PullPush/Arctic own the real title
+        recovery, so it's only attached for completeness, not written by the service)."""
+        html_text = html_text or ""
+        title = ""
+        tm = self._OG_TITLE.search(html_text)
+        if tm:
+            cm = self._CONTENT.search(tm.group(0))
+            if cm:
+                title = html.unescape(cm.group(1)).strip()
+
+        out = []
+        om = self._OG_IMAGE.search(html_text)
+        if om:
+            cm = self._CONTENT.search(om.group(0))
+            if cm:
+                out.append(html.unescape(cm.group(1)))
+        out += (html.unescape(m.group(1)) for m in self._IMG_SRC.finditer(html_text))
+
+        seen: set = set()
+        uniq = []
+        for cand in out:
+            cand = cand.strip()
+            if cand.startswith("http") and cand not in seen:
+                seen.add(cand)
+                uniq.append({"url": cand, "title": title})
+        return uniq
+
+
 def default_providers(user_agent, *, throttle: bool = True, order=("pullpush", "arctic")):
     """Build providers in priority order. ``throttle`` enables rate-limit spacing for
     bulk hydration; pass throttle=False for snappy single on-demand fetches."""
@@ -278,3 +416,9 @@ def default_providers(user_agent, *, throttle: bool = True, order=("pullpush", "
         "arctic": lambda: ArcticShiftProvider(user_agent, min_interval=0.4 if throttle else 0.0),
     }
     return [factories[name]() for name in order if name in factories]
+
+
+def default_media_providers(user_agent, *, throttle: bool = True):
+    """archive.today media-byte recovery provider (last-resort bytes). ``throttle`` spaces
+    successive snapshot lookups; pass ``throttle=False`` for a snappy single on-demand fetch."""
+    return [ArchiveTodayProvider(user_agent, min_interval=2.0 if throttle else 0.0)]

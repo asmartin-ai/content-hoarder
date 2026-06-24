@@ -189,12 +189,70 @@ def recover(conn, *, limit=None, retry: bool = False, scope: str = "removed", pr
     return result
 
 
+def _try_archive_today(conn, item, *, providers, fetch_bytes, apply_bytes) -> int:
+    """Post-chain media-byte recovery from archive.today. Runs only when the item's
+    media is still ``gone`` (PullPush/Arctic didn't recover a live image). Asks each
+    provider for the snapshot's image URLs, fetches the bytes, stores them via
+    ``media_store`` (content-addressed, dedup), records ``archived_media`` and flips
+    ``media_status``. Returns the count of blobs archived (0 if nothing/skipped).
+
+    Non-destructive: writes only ``archived_media`` + ``media_status`` via ``json_set``
+    (mirrors media_archive.py — no triage state, no last_seen bump, no search_text rebuild).
+    Any provider failure is a soft miss (loud-fail tolerant) — recover_one swallows it.
+    """
+    md = item.get("metadata") or {}
+    if isinstance(md, str):
+        import json as _json
+        md = _json.loads(md) if md else {}
+    if md.get("media_status") != "gone":
+        return 0  # we have a live image (or it was never media) → don't burn archive.today
+
+    from content_hoarder import media_store
+
+    arch = dict(md.get("archived_media") or {})
+    n = 0
+    for prov in providers:
+        try:
+            candidates = prov.recover_media(item)
+        except Exception:  # noqa: BLE001 — any provider failure is a soft miss
+            continue
+        if not candidates:
+            continue
+        for c in candidates:
+            url = c.get("url")
+            if not url or url in arch:
+                continue
+            if not apply_bytes:
+                n += 1
+                continue
+            data, mime = fetch_bytes(url)
+            if data is None:
+                continue
+            blob = media_store.store(data, mime=mime, url=url)
+            arch[url] = blob
+            n += 1
+        if n:
+            break  # first provider that found anything wins
+    if n and apply_bytes:
+        import json as _json
+        conn.execute(
+            "UPDATE items SET metadata=json_set(json_set(metadata, "
+            "'$.archived_media', json(?)), '$.media_status', 'recovered_archive_today') "
+            "WHERE fullname=?",
+            (_json.dumps(arch), item["fullname"]))
+        conn.commit()
+    return n
+
+
 def recover_one(conn, fullname: str, *, providers=None,
-                user_agent: str = DEFAULT_USER_AGENT) -> dict | None:
+                user_agent: str = DEFAULT_USER_AGENT,
+                media_providers=None, fetch_bytes=None, apply_bytes=True) -> dict | None:
     """On-demand recovery of a single reddit item (throttle off, for a UI button).
 
-    Returns ``{recovered, title, body, url}`` (post-recovery values), or None if it
-    isn't a recoverable reddit item.
+    Returns ``{recovered, title, body, url, bytes_archived}`` (post-recovery values),
+    or None if it isn't a recoverable reddit item. After the metadata chain
+    (PullPush/Arctic) runs, archive.today is tried for media bytes when the image is
+    still ``media_status='gone'``.
     """
     item = db.get_item(conn, fullname)
     if not item or item.get("source") != "reddit":
@@ -217,6 +275,17 @@ def recover_one(conn, fullname: str, *, providers=None,
     update.update(recovered.get(sid, {}))
     db.merge_upsert(conn, update)
     conn.commit()
+
+    # post-chain: try archive.today for media bytes when still 'gone'
+    bytes_n = 0
+    if media_providers:
+        from content_hoarder.media_archive import default_fetch
+        fb = fetch_bytes or default_fetch
+        fresh = db.get_item(conn, fullname) or {}
+        bytes_n = _try_archive_today(conn, fresh, providers=media_providers,
+                                     fetch_bytes=fb, apply_bytes=apply_bytes)
+
     fresh = db.get_item(conn, fullname) or {}
-    return {"recovered": bool(recovered), "title": fresh.get("title"),
-            "body": fresh.get("body"), "url": fresh.get("url")}
+    return {"recovered": bool(recovered) or bool(bytes_n),
+            "title": fresh.get("title"), "body": fresh.get("body"),
+            "url": fresh.get("url"), "bytes_archived": bytes_n}
