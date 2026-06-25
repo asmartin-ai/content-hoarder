@@ -560,6 +560,24 @@ def create_app(db_path: str | None = None) -> Flask:
                 res["hydrate_status"] = hres.get("status")  # hydrated|archived|cached|auth_*|...
         return jsonify(res)
 
+    @app.get("/hackernews/items/<path:fullname>/thread")
+    def hn_thread_route(fullname):
+        from content_hoarder import hn_thread
+        sort = request.args.get("sort", "top")
+        if sort not in ("top", "new", "default", "best"):
+            sort = "top"
+        no_fetch = request.args.get("nofetch") == "1"
+        with conn() as c:
+            if db.get_item(c, fullname) is None:
+                return jsonify({"error": "not found"}), 404
+            hres = None if no_fetch else hn_thread.hydrate_if_missing(c, fullname)
+            res = hn_thread.get_thread(c, fullname, sort)
+            if res is None:
+                return jsonify({"error": "not found"}), 404
+            if hres is not None:
+                res["hydrate_status"] = hres.get("status")
+        return jsonify(res)
+
     @app.post("/reddit/items/<path:fullname>/unsave")
     def reddit_unsave_one(fullname):
         # Queue for unsaving from the user's Reddit saved list. The Reddit call happens
@@ -924,3 +942,4 @@ def create_app(db_path: str | None = None) -> Flask:
     app._prepared = _prepared
     app._cleanup_all_prepared = _cleanup_all_prepared
     return app
+
