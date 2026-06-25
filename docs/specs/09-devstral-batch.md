@@ -4,6 +4,20 @@ A self-contained spec for tasks picked from `BACKLOG.md` + `docs/specs/parity-id
 that fit a **local Devstral codegen model**. Paste the whole file (or any single Task
 section) into continue.dev.
 
+## Status
+- **Task A — HN comment-thread viewer backend: ✅ SHIPPED 2026-06-25** (`commit 92c8877`).
+  `src/content_hoarder/hn_thread.py` + `tests/test_hn_thread.py` (16 tests) + the
+  `/hackernews/items/<fn>/thread` route (`web.py:563`). Full suite green. Devstral executed
+  the bulk; GLM-5.1 (Fireworks) finished/debugged. The thread-rendering UI is still a
+  separate non-Devstral task.
+- **Task B — Promote YouTube-link notes → youtube items: ⏳ IN PROGRESS (continue.dev worktree
+  `worktrees/migrate-note-youtube-branch`).** `note_youtube.py` + `tests/test_note_youtube.py`
+  exist as untracked files on `main`; not yet committed. Do NOT `git add` them — that worktree
+  owns them.
+- **Task C — Note-body editing backend: ⬜ NOT STARTED.**
+- **Task D — HN favorites-page auto-sync: ⬜ NOT STARTED** (still gated on the
+  `tests/fixtures/hackernews/favorites_sample.html` prerequisite).
+
 ## How these were selected (Devstral fit criteria)
 Devstral does best on **pure backend, synchronous, offline-testable** work where every
 integration point is already pinned to a real `file:line` (so it reads the code instead of
@@ -46,7 +60,7 @@ separate, non-Devstral task). B and D are complete CLI-driven backend features.
 
 ---
 
-## Task A — HN comment-thread viewer backend
+## Task A — HN comment-thread viewer backend  ✅ SHIPPED 2026-06-25 (`92c8877`)
 
 **Backlog ref:** `docs/specs/parity-ideas.md` item C (HN thread viewer). `BACKLOG.md` Epic 7 (HN).
 **Blast radius:** low — additive new module + one new route. Reuses the existing thread cache
@@ -151,7 +165,7 @@ Tests:
 
 ---
 
-## Task B — Promote standalone YouTube-link notes → youtube items
+## Task B — Promote standalone YouTube-link notes → youtube items  ⏳ IN PROGRESS (continue.dev worktree)
 
 **Backlog ref:** `BACKLOG.md` Epic 11 P2. **Blast radius:** low — new CLI module mirroring
 `firefox_youtube.py`; additive `metadata` stamps only. No schema change, no connector DB writes.

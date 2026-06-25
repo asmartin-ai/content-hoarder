@@ -48,6 +48,9 @@ src/content_hoarder/
   media_archive.py hoard the bytes: download + store via media_store (content-addressed, /media/<blob>)
   media_store.py content-addressed blob store under data/media/ (dedup, served same-origin)
   youtube_recover.py deleted YouTube title recovery via Wayback Machine
+  hn_thread.py   HN comment-thread viewer backend — Algolia fetch + parse into the reddit_thread
+                 render shape, cached in the (source-agnostic) reddit_threads table; served by
+                 GET /hackernews/items/<fn>/thread. Backend-only (no thread-render UI yet).
   search_query.py the operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
   categorize.py heuristic tagger (processing areas + multi-label topics) backing `categorize`
   consolidate.py fold reddit-post/HN-story/firefox-tab -> youtube:<id> (`consolidate`)

@@ -65,3 +65,7 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   (`submission_title`). ✅ SHIPPED 2026-06-15 (Phase 1 + 2, on main); branch `feat/reddit-title-hydration` off
   `staging/session-2026-06-14`. 106 local-backfillable, 41 network, 3 deleted. Supersedes the
   `73e16ab` body-snippet stopgap. **Mutates live `data/app.db` — backup first.**
+- [09](09-devstral-batch.md) — Devstral batch of offline-backend backlog tasks. **Task A (HN
+  comment-thread viewer backend) ✅ SHIPPED 2026-06-25** (`92c8877`: `hn_thread.py` + route +
+  16 tests). Task B (note→youtube promotion) is in progress in a continue.dev worktree;
+  Tasks C (note-body edit backend) + D (HN favorites auto-sync) not started.
