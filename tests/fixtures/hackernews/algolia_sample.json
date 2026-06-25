@@ -1,0 +1,37 @@
+{
+  "id": 12345678,
+  "title": "Sample HN Story",
+  "url": "https://news.ycombinator.com/item?id=12345678",
+  "author": "user1",
+  "points": 100,
+  "created_at_i": 1609459200,
+  "type": "story",
+  "children": [
+    {
+      "id": 87654321,
+      "author": "user2",
+      "text": "This is a top-level comment with high points.",
+      "points": 50,
+      "created_at_i": 1609459300,
+      "type": "comment",
+      "children": [
+        {
+          "id": 11223344,
+          "author": "user3",
+          "text": "This is a reply to the top-level comment.",
+          "points": 25,
+          "created_at_i": 1609459400,
+          "type": "comment"
+        }
+      ]
+    },
+    {
+      "id": 55667788,
+      "author": "user4",
+      "text": "This is another top-level comment with fewer points.",
+      "points": 30,
+      "created_at_i": 1609459250,
+      "type": "comment"
+    }
+  ]
+}
