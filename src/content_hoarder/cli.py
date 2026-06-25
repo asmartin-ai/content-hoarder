@@ -169,6 +169,22 @@ def cmd_migrate_firefox_tabs(args) -> int:
     return 0
 
 
+def cmd_migrate_note_youtube(args) -> int:
+    from content_hoarder import note_youtube
+    with _connect() as conn:
+        res = note_youtube.migrate(conn, apply=args.apply)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+    if not args.apply:
+        print(
+            f"(dry run — {res['candidates']} candidate note→YouTube link(s): "
+            f"{res['orphan']} orphan (would create youtube rows) + {res['companion']} companion "
+            f"(would attach to existing youtube rows). Re-run with --apply to commit. "
+            f"Run against a COPY of the DB first.)",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def cmd_migrate_rsm_threads(args) -> int:
     from content_hoarder import rsm_threads
     with _connect() as conn:
@@ -840,6 +856,15 @@ def build_parser() -> argparse.ArgumentParser:
     pm.add_argument("--apply", action="store_true",
                     help="Commit changes (default: dry run). Run against a DB copy first.")
     pm.set_defaults(func=cmd_migrate_firefox_tabs)
+
+    pmy = sub.add_parser(
+        "migrate-note-youtube",
+        help="Promote Keep/Obsidian notes containing YouTube links into youtube:<id> items "
+             "(dry-run by default; attaches the note as a companion).",
+    )
+    pmy.add_argument("--apply", action="store_true",
+                     help="Commit changes (default: dry run). Run against a DB copy first.")
+    pmy.set_defaults(func=cmd_migrate_note_youtube)
 
     prt = sub.add_parser("migrate-rsm-threads",
                          help="One-time: copy cached thread JSON from a reddit-saved-manager "
