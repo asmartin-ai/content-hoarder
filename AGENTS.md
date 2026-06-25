@@ -5,32 +5,25 @@ you don't reintroduce known bugs.
 
 ## What this is
 A local-first, **triage-first** manager for saved content from many sources. Thesis: **process and
-reduce, not just aggregate**. Phase 1 = import + search + a usable triage UI. Several Phase-2 items now
-ship too: LLM assist (`assist/llm.py`, `suggest` / `categorize --llm`), Obsidian export
-(`export-obsidian`), the optional Karakeep push (`promote`), and the **content-hoarding / recovery
-arc** — `scan-media` (detect deleted media) → `archive-media` (hoard the bytes locally so a reddit
-deletion can't take them) → `enrich --archives` (recover `[removed]`/`[deleted]` text from
-PullPush/Arctic-Shift) → the per-item **"↻ Recover"** button (`recover_one`, which also tries
-archive.today for media bytes when `media_status='gone'`). The offline PWA (service worker +
-manifest) already ships.
+reduce, not just aggregate**. Phase 1 = import + search + triage UI; Phase 2 ships LLM assist
+(`suggest` / `categorize --llm`), Obsidian export (`export-obsidian`), Karakeep push (`promote`), and
+the **recovery arc**: `scan-media` (detect deleted media) → `archive-media` (hoard bytes locally) →
+`enrich --archives` (recover `[removed]`/`[deleted]` text from PullPush/Arctic-Shift) → per-item
+**"↻ Recover"** (`recover_one`, also tries archive.today for media bytes when `media_status='gone'`).
+Offline PWA (service worker + manifest) ships.
 
 ## Stack & run
 - Python 3.12, Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
-- `yt-dlp` is optional (YouTube only, **lazy-imported**). `adb` is an external CLI the user runs.
-- Run: `python -m content_hoarder <cmd>`. Full command set (see the README CLI table for flags):
-  `init-db`, `import`, `enrich`, `categorize`, `dedup`, `consolidate`, `serve`, `stats`, `sources`,
-  `bankruptcy`, `decay`, `delete`, `purge-done`, `scan-media`, `export`, `export-obsidian`, `promote`, `suggest`, `learn-triage`,
-  `migrate-rsm-threads`, `migrate-firefox-tabs`, `reddit-sync`, `reddit-unsave`, `reddit-oauth`,
-  `reddit-hydrate`, `reddit-hydrate-titles`, `reddit-thumbnails`. Web default `127.0.0.1:8788`.
-  (`reddit-hydrate --from <bdfr-dir>` is an offline local-archive thread hydrate; `--batch` is the
-  rate-limited, resumable backfill — OAuth-preferred when configured, else the cookie.)
-- Tests: `python -m pytest` — all offline, `:memory:` SQLite, tiny synthetic fixtures, **no network**.
+- `yt-dlp` optional (YouTube only, **lazy-imported**); `adb` is an external CLI the user runs.
+- Run: `python -m content_hoarder <cmd>`. Full command set + flags: see the README CLI table.
+  Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` = offline local-archive hydrate;
+  `--batch` = rate-limited resumable backfill — OAuth-preferred when configured, else the cookie.)
+- Tests: `python -m pytest` — all offline, `:memory:` SQLite, synthetic fixtures, **no network**.
 - **UI / browser tests** (`tests/ui/`, Playwright): `pip install -e .[ui] && playwright install chromium`,
   then `pytest -m ui`. Real headless Chromium at a **Pixel-6** viewport + **PWA-standalone** emulation,
-  against the app served in-process on a free port off a **copy** of the live DB with autosync OFF
-  (no live mutation, no scheduler). Excluded from the default run (`addopts -m "not ui"`) so unit/CI stay
-  browser-free. **Verify any mobile/PWA UI change here** — it catches what unit tests + the preview tool
-  miss (mobile viewport, rAF/transitions, gallery view, top-bar collapse). Add a regression test per UI bug.
+  against the app served in-process off a **copy** of the live DB with autosync OFF (no live mutation,
+  no scheduler). Excluded from the default run (`addopts -m "not ui"`). **Verify any mobile/PWA UI
+  change here** — it catches what unit tests + the preview tool miss. Add a regression test per UI bug.
 
 ## Layout
 ```
@@ -68,18 +61,16 @@ src/content_hoarder/
   static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
   static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js + browse.css
   static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
-                 (the v2 app.js + swipe.js were deleted 2026-06-13)
 scripts/        standalone harnesses: recover_archive_today (archive.today live-smoke probe),
                  rehearse_decay / rehearse_triage_score (dry-run previews), serve_branch_verify /
                  serve_browse_test (local-serve smoke helpers)
 ```
-**Source-badge icon contract (the `glyph()` bug bitten 2026-06-22):** a source's avatar glyph flows
-`core/icons.js` (the `D` map of inline-SVG strings, served by `chIcon(name)`) → `core/render.js`
-`CH_SOURCES[source] = { icon?, glyph?, token }` → `browse/render.js glyph(item)`. Use `icon: "name"`
-when a full SVG exists in the `D` map; use `glyph: "x"` for a 1-char mark. `glyph()` honors `m.icon`
-first (renders the SVG), then `m.glyph`, then `source[0]`. **Never `esc()` the `glyph()` output** —
-`chIcon` returns trusted HTML and the glyph chars are safe; escaping turns `<svg>` into visible text.
-The triage (`triage.js`) + reddit views have their own markup and don't use `glyph()`.
+**Source-badge icon contract:** a source's avatar glyph flows `core/icons.js` (`D` map of inline-SVG
+strings, served by `chIcon(name)`) → `core/render.js` `CH_SOURCES[source] = { icon?, glyph?, token }`
+→ `browse/render.js glyph(item)`, which honors `m.icon` (full SVG) → `m.glyph` (1-char) → `source[0]`.
+**Never `esc()` the `glyph()` output** — `chIcon` returns trusted HTML and glyph chars are safe;
+escaping turns `<svg>` into visible text. The triage (`triage.js`) + reddit views have their own markup
+and don't use `glyph()`.
 
 ## Data model (one generic `items` table)
 PK `fullname = "<source>:<source_id>"` (namespaces every source — no cross-source collisions).
@@ -108,7 +99,6 @@ inbox; `status_prev` enables one-step undo.
 6. **When inspecting `items.metadata` from sqlite, `SELECT` the full column and `json.loads()` it** —
    never `substr(metadata,1,N)`. JSON keys sort alphabetically, so a 400-char truncation hides late
    keys (e.g. `gallery`, `media_type` sit after `author`/`body`) and makes a populated row look empty.
-   (Cost a false "empty metadata" detour 2026-06-22.)
 7. **The recovery chain has two shapes, not one.** `archival/providers.py` holds both:
    - `ArchiveProvider` subclasses (PullPush, Arctic-Shift) are **reddit-id-keyed + JSON +
      metadata-only** — `recover_one()` loops them by *bare base36 id* and takes the first that
@@ -132,42 +122,29 @@ inbox; `status_prev` enables one-step undo.
 5. Register the instance in `connectors/__init__.py` (`REGISTRY`).
 6. Add `tests/test_connector_<id>.py` + a tiny fixture under `fixtures/<id>/`.
 
-## Per-source inputs (v1)
-- **reddit**: read `/path/to/reddit-saved-manager/data/app.db` (read-only) or its CSV/JSON/MD export →
-  `subreddit/permalink/score/over_18` go to `metadata`; `fullname="reddit:<t3_/t1_id>"`.
-- **youtube**: `yt-dlp --flat-playlist --dump-single-json <PLAYLIST_URL>` JSON (top-level
-  `_type=playlist`, `entries[]`); also a WL array/NDJSON fallback. `url=https://youtu.be/<id>`,
-  thumb `https://i.ytimg.com/vi/<id>/hqdefault.jpg`.
-- **hackernews**: `favorites?id=<user>` HTML (Harmonic favorites → HN account; the going-forward path) /
-  id list / Materialistic `Materialistic.db` (legacy — a `saved` table on newer Room builds, or `favorite`
-  on older, with itemid/url/title/time, via `adb backup` NOT `adb pull`; see docs/IMPORTING.md). DB rows
-  carry title+url directly; `enrich` fills score via `hacker-news.firebaseio.com/v0/item/<id>.json`.
-- **obsidian**: vault folder walk (skip `.obsidian/`, `.trash/`); YAML frontmatter + md body;
-  `source_id` = vault-relative path.
-- **keep**: Google Takeout `Keep/` per-note JSON (`title`, `textContent`, `listContent[]`, `labels`,
-  `color`, `isArchived/Trashed`, timestamps); `metadata.account` separates accounts. `gkeepapi` is
-  rejected.
+## Per-source inputs
+Per-source format details (reddit DB/CSV/JSON/MD, youtube `--flat-playlist --dump-single-json` JSON,
+HN favorites HTML / Materialistic `Materialistic.db`, obsidian vault walk, Google Keep Takeout JSON)
+live in **`docs/IMPORTING.md`**. One gotcha worth keeping here: Materialistic `Materialistic.db` comes
+via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
-- Target browser: **Chrome on Android (Pixel 6)** (switched from Firefox 2026-06-21). Chrome supports
-  manifest + service worker + `display:standalone`, installs the PWA as a **WebAPK** (home-screen icon,
-  own task), and **does** fire `beforeinstallprompt` — so a custom "Install" button IS viable (capture
-  the event, call `prompt()` on tap) rather than a menu-hint fallback. (Note: the `firefox` *connector*
-  — tab imports, `migrate-firefox-tabs`, `firefox_youtube` — is unrelated to the PWA target and stays.)
+- Target: **Chrome on Android (Pixel 6)**. Chrome fires `beforeinstallprompt`, so a custom "Install"
+  button is viable (capture the event, call `prompt()` on tap) rather than a menu-hint fallback.
+  (The `firefox` *connector* — tab imports, `migrate-firefox-tabs`, `firefox_youtube` — is unrelated.)
 - **Android gesture-nav conflict:** horizontal swipe must NOT trigger system back. Use a ~30px
   `pointerdown` edge **deadzone**, inset the card ~40px from screen edges
   (`margin: max(env(safe-area-inset-*) + 40px, 40px)`, `<meta viewport … viewport-fit=cover>`),
   `touch-action: pan-y`, commit threshold ~80px, and **always** provide Keep/Archive/Done tap buttons.
-- Swipe = pointer events + CSS transforms (no library). K / A / D keyboard shortcuts on desktop.
-- **Gallery lightbox = stacked images, NEVER a reddit iframe** (user pref 2026-06-22). Populated
-  `metadata.gallery[]` → `core/media.js openGallery` stacks plain `<img>`s in a `flex-direction:column`
-  `.media-gallery`. **Empty/missing `gallery[]`** (33 of 1,770 items were never archived) → a clean
-  placeholder ("Gallery images unavailable (not archived).") + "Open on Reddit ↗" link, via
-  `lightbox.openHtml(...)` in `browse/main.js openMediaFor` and the `data-gallery-embed` gate in
-  `triage.js .rd-preview-lg`. The iframe fallback (`openMedia(permalink)`) is for non-gallery
-  permalink items only. When archived media is missing, show an honest "unavailable" + source link,
-  not a degraded embed. The desktop inline action cluster is F/A/D (+IN off-inbox) only — Share lives
-  in the right-click row menu (mobile already hides `.acts` via `@media(hover:none)` → long-press).
+  Swipe = pointer events + CSS transforms (no library). K / A / D keyboard shortcuts on desktop.
+- **Gallery lightbox = stacked images, NEVER a reddit iframe.** Populated `metadata.gallery[]` →
+  `core/media.js openGallery` stacks plain `<img>`s in a `flex-direction:column` `.media-gallery`.
+  **Empty/missing `gallery[]`** → a clean placeholder ("Gallery images unavailable (not archived).")
+  + "Open on Reddit ↗" link (via `lightbox.openHtml(...)` in `browse/main.js openMediaFor` and the
+  `data-gallery-embed` gate in `triage.js .rd-preview-lg`) — not a degraded embed. The iframe fallback
+  (`openMedia(permalink)`) is for non-gallery permalink items only.
+- Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu
+  (mobile hides `.acts` via `@media(hover:none)` → long-press).
 
 ## Working with the local LLM (when an agent delegates codegen)
 Qwen3.6 reliably (a) drops `await` on async calls and (b) starves answers with small `max_tokens`.
@@ -176,43 +153,21 @@ the Devstral model for pure codegen. Most of this codebase is **synchronous**, s
 functions over async.
 
 ## Reddit unsave-on-Done (`reddit_unsave.py`)
-Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Design:
-- **Decoupled queue, drained on demand.** `db.set_status`/`bulk_set_status` enqueue a row into the
-  `reddit_unsave` table (gated on the `settings` flag `reddit_unsave_on_done`, **off by default**);
-  `undo_status` dequeues a still-`pending` row. The local Done stays instant and never blocks on Reddit.
-- **Transport:** the sanctioned OAuth `save` scope when configured, else the **session cookie + modhash**
-  fallback. Cookie/modhash/username live in the `auth_tokens` row `service='reddit_web'`
-  (access_token=cookie, refresh_token=modhash); OAuth tokens live in their own `auth_tokens` row.
-  Stdlib `urllib` only.
-- **`drain()`** (CLI `reddit-unsave --drain`, the "Sync now" button, or a scheduled task) refreshes the
-  modhash once, then POSTs `/api/unsave` ~1/sec with 429 backoff. All network is injectable
-  (`post=`/`getf=`/`sleep=`) → tests are offline. A dead cookie → `auth_error` (loud), nothing sent.
-- **`is_saved` now means "still in the user's Reddit Saved list"** — flipped `1→0` only after a confirmed
-  unsave. **Never gate the unsave on it** (the DB may be stale; unsaving an already-unsaved item is a
-  Reddit no-op). `merge_upsert` already preserves `is_saved` across re-imports (gotcha #2).
-- Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it mutates real Reddit state).
+Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Off by default,
+gated on the `settings` flag `reddit_unsave_on_done`. Full design (decoupled queue, transport, drain):
+**`docs/reddit-unsave.md`**. Load-bearing: **`is_saved` means "still in the user's Reddit Saved list"**
+— flipped `1→0` only after a confirmed unsave. **Never gate the unsave on it** (the DB may be stale;
+unsaving an already-unsaved item is a Reddit no-op). `merge_upsert` preserves `is_saved` across
+re-imports (gotcha #2). Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it
+mutates real Reddit state).
 
-## Reddit management view (`/reddit`) — merged from reddit-saved-manager
-The RSM interface folded in over the generic `items` table. Full notes: `docs/reddit-management.md`.
-- **No schema change:** Reddit fields stay in `metadata`; `web._reddit_view` flattens them to the flat
-  shape `static/reddit.js` expects. `db.search_items` has a `subreddit=` filter + `score`/`subreddit` sorts.
-- **`reddit_threads` side table** caches post+comment-tree JSON — deliberately NOT in `metadata` (the
-  blobs are large and `metadata` is parsed on every row read). Use `db.get/set_reddit_thread`; parse via
-  `reddit_thread.py`.
-- **One-time thread migration:** `migrate-rsm-threads --from <RSM app.db>` (`rsm_threads.py`) reads RSM
-  read-only and re-keys `t3_x`→`reddit:t3_x`. It writes via db helpers (like `firefox_youtube.migrate`),
-  so it's exempt from the "connectors never touch the DB" rule — it is NOT a connector.
-- **Routes:** `/reddit` + `/reddit/{items,subreddits,stats,sync}`, `/reddit/items/<fn>/{thread,unsave,undo,hydrate}`,
-  and `/reddit/unsave/{status,auth,enable,drain,enqueue-by-tag}` (see `web.py` for the authoritative list).
-  Unsave enqueues + optimistically flips `is_saved=0`; undo cancels a still-pending unsave locally or live
-  re-saves a drained one (the generic `/items/<fn>/resave` primitive still exists). Frontend =
-  `reddit.html`/`reddit.js`/`reddit.css` (reskin of RSM, repointed to `/reddit/*`; OAuth/import/export/archival
-  controls dropped via JS null-guards).
-- **Auth:** OAuth is built — `reddit_oauth.py` + the `reddit-oauth` CLI (installed-app / RedReader client
-  id, no secret; `read history identity save` scopes). It ships dormant and is activated once via
-  `reddit-oauth --login`; once configured it's preferred over the cookie for reads (hydration, saved-list
-  sync) and writes (unsave). The cookie path (`reddit_sync.py`, the `reddit-sync` CLI, `POST /reddit/sync`;
-  needs a `reddit_session` cookie) remains the automatic fallback. See `docs/reddit-derisking.md`.
+## Reddit management view (`/reddit`) — *iceboxed*
+The RSM view folds over the generic `items` table (no schema change — Reddit fields live in
+`metadata`, flattened by `web._reddit_view`). **Full notes: `docs/reddit-management.md`.** Two
+invariants worth keeping in-reach: (1) thread trees live in the `reddit_threads` side table, *not*
+`metadata` (blobs are large, parsed every row read); (2) `migrate-rsm-threads` and `firefox_youtube`
+write via db helpers → exempt from "connectors never touch the DB" (they are NOT connectors).
+Active work paused; see `docs/reddit-management.md` + `docs/reddit-derisking.md` before resuming.
 
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.
