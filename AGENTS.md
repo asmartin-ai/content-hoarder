@@ -7,7 +7,11 @@ you don't reintroduce known bugs.
 A local-first, **triage-first** manager for saved content from many sources. Thesis: **process and
 reduce, not just aggregate**. Phase 1 = import + search + a usable triage UI. Several Phase-2 items now
 ship too: LLM assist (`assist/llm.py`, `suggest` / `categorize --llm`), Obsidian export
-(`export-obsidian`), and the optional Karakeep push (`promote`). The offline PWA (service worker +
+(`export-obsidian`), the optional Karakeep push (`promote`), and the **content-hoarding / recovery
+arc** — `scan-media` (detect deleted media) → `archive-media` (hoard the bytes locally so a reddit
+deletion can't take them) → `enrich --archives` (recover `[removed]`/`[deleted]` text from
+PullPush/Arctic-Shift) → the per-item **"↻ Recover"** button (`recover_one`, which also tries
+archive.today for media bytes when `media_status='gone'`). The offline PWA (service worker +
 manifest) already ships.
 
 ## Stack & run
@@ -38,14 +42,25 @@ src/content_hoarder/
   enrich.py     select sparse rows, call connector.enrich, merge results
   web.py        Flask factory + routes
   cli.py        argparse command dispatch
+  archival/     recovery chain: providers.py (PullPush, Arctic-Shift, **archive.today**) +
+                 service.py (recover bulk / recover_one per-item) + _http.py (shared urllib transport)
+  media_scan.py probe saved Reddit media for deletions -> metadata.media_status (gone/salvageable)
+  media_archive.py hoard the bytes: download + store via media_store (content-addressed, /media/<blob>)
+  media_store.py content-addressed blob store under data/media/ (dedup, served same-origin)
+  youtube_recover.py deleted YouTube title recovery via Wayback Machine
+  search_query.py the operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
+  _http.py      shared stdlib urllib request helper (HN, Karakeep, archival — no requests/httpx)
   connectors/   base.py (BaseConnector ABC + registry); one module per source
   bridge/       karakeep.py (opt-in push of 'keep' items; no-op when unconfigured)
   assist/       llm.py (optional local-LLM suggestions; Phase 2)
+  reddit_*.py   reddit_unsave / reddit_sync / reddit_oauth / reddit_thread / rsm_threads
+  firefox_youtube.py tab->youtube promotion + migrate-firefox-tabs (exempt from "connectors never touch DB")
   templates/     index.html (v3 browse) + triage.html + reddit.html + manifest.webmanifest
   static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
   static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js + browse.css
   static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
                  (the v2 app.js + swipe.js were deleted 2026-06-13)
+scripts/        standalone harnesses (recover_archive_today.py = archive.today live-smoke probe)
 ```
 **Source-badge icon contract (the `glyph()` bug bitten 2026-06-22):** a source's avatar glyph flows
 `core/icons.js` (the `D` map of inline-SVG strings, served by `chIcon(name)`) → `core/render.js`
@@ -83,6 +98,20 @@ inbox; `status_prev` enables one-step undo.
    never `substr(metadata,1,N)`. JSON keys sort alphabetically, so a 400-char truncation hides late
    keys (e.g. `gallery`, `media_type` sit after `author`/`body`) and makes a populated row look empty.
    (Cost a false "empty metadata" detour 2026-06-22.)
+7. **The recovery chain has two shapes, not one.** `archival/providers.py` holds both:
+   - `ArchiveProvider` subclasses (PullPush, Arctic-Shift) are **reddit-id-keyed + JSON +
+     metadata-only** — `recover_one()` loops them by *bare base36 id* and takes the first that
+     returns `meaningful=True` (a real title/body).
+   - `ArchiveTodayProvider` is **URL-keyed + HTML + media-bytes** — it does NOT subclass
+     `ArchiveProvider` (that contract can't express "look up by original URL, parse HTML, return
+     image bytes"). It's wired into `recover_one()` as an explicit **post-chain step**
+     (`_try_archive_today`) that runs *only when `media_status='gone'`* after PullPush/Arctic — it
+     fetches `archive.ph/newest/<original_url>`, extracts `og:image` + inlined `<img>`s, and stores
+     bytes via `media_store` (→ `metadata.archived_media` + `media_status='recovered_archive_today'`).
+     Don't try to fold it into the id-keyed loop; its inputs and outputs are a different shape.
+   Both are loud-fail tolerant: a provider raising/403ing is a soft miss, never a crash. Fetcher +
+   byte-fetcher are injectable → `tests/test_archive_today.py` is fully offline. Per-item only
+   (archive.today is Cloudflare-gated, ~2s throttle, no bulk API) — never wire it into a bulk pass.
 
 ## Connector authoring checklist
 1. Subclass `BaseConnector`; set `id` (== `items.source`), `label`, `badge_color`.
