@@ -49,18 +49,26 @@ src/content_hoarder/
   media_store.py content-addressed blob store under data/media/ (dedup, served same-origin)
   youtube_recover.py deleted YouTube title recovery via Wayback Machine
   search_query.py the operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
+  categorize.py heuristic tagger (processing areas + multi-label topics) backing `categorize`
+  consolidate.py fold reddit-post/HN-story/firefox-tab -> youtube:<id> (`consolidate`)
+  dedup.py      duplicate detection + reversible resolve (`dedup`)
+  export.py     CSV/JSON + Obsidian export + Karakeep promote (`export`, `export-obsidian`, `promote`)
+  resurface.py  decay/snooze resurfacing logic (`decay`, `bankruptcy`)
+  triage_score.py the transparent likely-to-process model (`learn-triage`)
   _http.py      shared stdlib urllib request helper (HN, Karakeep, archival — no requests/httpx)
   connectors/   base.py (BaseConnector ABC + registry); one module per source
   bridge/       karakeep.py (opt-in push of 'keep' items; no-op when unconfigured)
   assist/       llm.py (optional local-LLM suggestions; Phase 2)
-  reddit_*.py   reddit_unsave / reddit_sync / reddit_oauth / reddit_thread / rsm_threads
+  reddit_*.py   reddit_unsave / reddit_sync / reddit_oauth / reddit_thread / reddit_hydrate / reddit_trickle / rsm_threads
   firefox_youtube.py tab->youtube promotion + migrate-firefox-tabs (exempt from "connectors never touch DB")
   templates/     index.html (v3 browse) + triage.html + reddit.html + manifest.webmanifest
   static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
   static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js + browse.css
   static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
                  (the v2 app.js + swipe.js were deleted 2026-06-13)
-scripts/        standalone harnesses (recover_archive_today.py = archive.today live-smoke probe)
+scripts/        standalone harnesses: recover_archive_today (archive.today live-smoke probe),
+                 rehearse_decay / rehearse_triage_score (dry-run previews), serve_branch_verify /
+                 serve_browse_test (local-serve smoke helpers)
 ```
 **Source-badge icon contract (the `glyph()` bug bitten 2026-06-22):** a source's avatar glyph flows
 `core/icons.js` (the `D` map of inline-SVG strings, served by `chIcon(name)`) → `core/render.js`
