@@ -16,6 +16,16 @@ import { toast } from "../core/toast.js";
 
 const isPhone = () => window.matchMedia("(max-width:700px)").matches;
 
+const _RECENT_KEY = "ch_recent_tags";
+const _recentTags = () => { try { return JSON.parse(localStorage.getItem(_RECENT_KEY)) || []; } catch { return []; } };
+const _pushRecent = (tag) => {
+  const n = normTag(tag);
+  if (!n) return;
+  const list = _recentTags().filter(t => t !== n);
+  list.unshift(n);
+  localStorage.setItem(_RECENT_KEY, JSON.stringify(list.slice(0, 20)));
+};
+
 export function initTagEditor({ getItem, getKnownTags, onChange }) {
   const scrim = document.createElement("div");
   scrim.className = "tagpop-scrim";
@@ -55,16 +65,20 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
   }
 
-  /* the visible suggestion options for the current input: matching known tags first,
-     then a "create new" option when the typed text isn't already an exact tag. */
+  /* the visible suggestion options: recent tags when input is empty,
+     matching known tags + "create new" when the user types a query. */
   function options() {
     const input = pop.querySelector(".tp-input");
     const q = normTag(input ? input.value : "");
+    if (!q) {
+      const applied = new Set(curTags.map(normTag));
+      return _recentTags().filter(t => !applied.has(t)).slice(0, 3).map(t => ({ tag: t, create: false }));
+    }
     const known = getKnownTags();
     const opts = suggestTags(known, curTags, q).map((t) => ({ tag: t, create: false }));
     const applied = new Set(curTags.map(normTag));
-    const exists = !q || applied.has(q) || known.some((t) => normTag(t) === q);
-    if (q && !exists) opts.push({ tag: q, create: true });
+    const exists = applied.has(q) || known.some((t) => normTag(t) === q);
+    if (!exists) opts.push({ tag: q, create: true });
     return opts;
   }
 
@@ -117,7 +131,7 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     try {
       const r = await api.postJSON("/items/" + encodeURIComponent(curFn) + "/tags", body);
       curTags = r.tags || [];
-      (body.add || []).forEach((t) => manualSet.add(normTag(t)));      // adds here are manual → keep editable
+      (body.add || []).forEach((t) => { manualSet.add(normTag(t)); _pushRecent(t); });
       (body.remove || []).forEach((t) => manualSet.delete(normTag(t)));
       onChange(curFn, curTags);          // let the page sync state + rail
       const fn = curFn;
