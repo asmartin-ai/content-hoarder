@@ -10,10 +10,11 @@ section) into continue.dev.
   `/hackernews/items/<fn>/thread` route (`web.py:563`). Full suite green. Devstral executed
   the bulk; GLM-5.1 (Fireworks) finished/debugged. The thread-rendering UI is still a
   separate non-Devstral task.
-- **Task B — Promote YouTube-link notes → youtube items: ✅ SHIPPED 2026-06-25** (`commit 49e9fc9`,
-  merged `e4cb934`). `src/content_hoarder/note_youtube.py` + `tests/test_note_youtube.py` (5 tests)
-  + the `migrate-note-youtube [--apply]` CLI. continue.dev authored the work in its worktree; picked
-  up uncommitted, verified (690 passed, py_compile clean, no `await`), committed, merged to main.
+- **Task B — Promote YouTube-link notes → youtube items: ✅ SHIPPED 2026-06-25** (merged to
+  `origin/main`). `src/content_hoarder/note_youtube.py` + `tests/test_note_youtube.py` + the
+  `migrate-note-youtube [--apply]` CLI. continue.dev authored the work in its worktree; picked up
+  uncommitted, verified against this spec's acceptance criteria (new tests + full suite green,
+  `py_compile` clean, no `await`), committed, merged. See `git log --grep=note-youtube`.
 - **Task C — Note-body editing backend: ⬜ NOT STARTED.**
 - **Task D — HN favorites-page auto-sync: ⬜ NOT STARTED** (still gated on the
   `tests/fixtures/hackernews/favorites_sample.html` prerequisite).
@@ -165,7 +166,7 @@ Tests:
 
 ---
 
-## Task B — Promote standalone YouTube-link notes → youtube items  ✅ SHIPPED 2026-06-25 (`49e9fc9`)
+## Task B — Promote standalone YouTube-link notes → youtube items  ✅ SHIPPED 2026-06-25 (merged to `origin/main`)
 
 **Backlog ref:** `BACKLOG.md` Epic 11 P2. **Blast radius:** low — new CLI module mirroring
 `firefox_youtube.py`; additive `metadata` stamps only. No schema change, no connector DB writes.
