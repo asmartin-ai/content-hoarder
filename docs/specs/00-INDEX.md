@@ -67,5 +67,6 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   `73e16ab` body-snippet stopgap. **Mutates live `data/app.db` — backup first.**
 - [09](09-devstral-batch.md) — Devstral batch of offline-backend backlog tasks. **Task A (HN
   comment-thread viewer backend) ✅ SHIPPED 2026-06-25** (`92c8877`: `hn_thread.py` + route +
-  16 tests). Task B (note→youtube promotion) is in progress in a continue.dev worktree;
-  Tasks C (note-body edit backend) + D (HN favorites auto-sync) not started.
+  16 tests). **Task B (note→youtube promotion) ✅ SHIPPED 2026-06-25** (`49e9fc9`:
+  `migrate-note-youtube` CLI + `note_youtube.py` + 5 tests). Tasks C (note-body edit backend)
+  + D (HN favorites auto-sync) not started.
