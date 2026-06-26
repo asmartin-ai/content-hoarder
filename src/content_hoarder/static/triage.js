@@ -10,6 +10,8 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
 (function () {
   "use strict";
 
+  installTriageEntryBackGuard();
+
   var EDGE_DEADZONE = 30;     // ignore pointerdown within 30px of a screen edge
   var COMMIT_PX = 80;         // horizontal distance to commit a swipe
   var BATCH = parseInt(localStorage.getItem("ch_batch"), 10) || 20;
@@ -41,6 +43,60 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   var toastTimer = null;
 
   // ---- helpers: esc/safeUrl/isTypingTarget/ago/fetchJSON imported from core (see top of file) ----
+
+  function navigationType() {
+    try {
+      var entries = performance.getEntriesByType && performance.getEntriesByType("navigation");
+      return entries && entries[0] ? entries[0].type : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function hasSameOriginReferrer() {
+    if (!document.referrer) return false;
+    try {
+      return new URL(document.referrer).origin === location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function shouldInstallEntryBackGuard() {
+    var state = history.state || {};
+    if (state.chTriageEntry) return false;  // reload after we already armed the sentinel
+
+    /* Chrome/Android can report history.length > 1 for a cold PWA/page entry because
+       about:blank sits below the app. Same-origin referrer is the useful "came from inside
+       content-hoarder" signal; back_forward restores should not mint fresh guard entries. */
+    var noPriorHistory = history.length <= 1;
+    var firstAppEntry = !hasSameOriginReferrer() && navigationType() !== "back_forward";
+    return noPriorHistory || firstAppEntry;
+  }
+
+  function installTriageEntryBackGuard() {
+    if (window.__chTriageBackGuardInstalled) return;
+    window.__chTriageBackGuardInstalled = true;
+    window.addEventListener("popstate", function (ev) {
+      if (ev.state && ev.state.chTriageInboxGuard) {
+        location.replace("/");
+      }
+    });
+
+    if (!shouldInstallEntryBackGuard()) return;
+    var here = location.pathname + location.search + location.hash;
+    var replaced = false;
+    try {
+      history.replaceState({ chTriageInboxGuard: true }, "", "/");
+      replaced = true;
+      history.pushState({ chTriageEntry: true }, "", here);
+    } catch (e) {
+      if (replaced) {
+        try { history.replaceState(null, "", here); } catch (_e) {}
+      }
+      // History can be unavailable in unusual embedded contexts; natural browser back remains.
+    }
+  }
 
   // Reddit retired its blockquote + platform.js embed (the script now 404s), so embed the
   // official redditmedia.com iframe directly. Online-only; the permalink link is the fallback.
