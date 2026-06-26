@@ -34,6 +34,7 @@ def _algolia_story(story_id=42, title="Test Story", points=100,
         "url": f"https://news.ycombinator.com/item?id={story_id}",
         "author": "pg",
         "points": points,
+        "text": "<p>Story text</p>",
         "created_at_i": created_at_i,
         "type": "story",
         "children": children or [],
@@ -87,6 +88,7 @@ class TestParseThread:
         # Post
         assert result["post"]["title"] == "Test Story"
         assert result["post"]["points"] == 100
+        assert result["post"]["selftext"] == "<p>Story text</p>"
         assert result["post"]["created_utc"] == 1609459200
 
         # Comments sorted by points desc (top sort)

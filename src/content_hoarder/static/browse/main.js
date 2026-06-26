@@ -225,8 +225,8 @@ function redo() {
   act(lastUndone.fullname, lastUndone.status);
 }
 
-/* the in-app Reddit reader — replaces the external Firefox/Relay handoff for
-   reddit items. act/openMediaFor/closeSheets are hoisted function declarations. */
+/* the in-app thread reader — replaces external handoff for Reddit/HN discussion
+   threads. act/openMediaFor/closeSheets are hoisted function declarations. */
 const readerUI = initReader({
   onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur,
   onImage: (url) => lightbox.openImage(url),   // inline comment/selftext image → lightbox
@@ -276,11 +276,11 @@ itemsEl.addEventListener("click", (e) => {
     openMediaFor(item);
     return;
   }
-  // reddit items: tapping the title link or body text opens the in-app reader.
+  // Discussion-thread items: tapping the title link or body text opens the in-app reader.
   // A title link's parent is an <h3> (every density); meta links (r/subreddit) sit
   // in .meta, so they keep their external navigation.
   const rItem = state.items.find((it) => it.fullname === fn);
-  if (rItem && rItem.source === "reddit") {
+  if (rItem && (rItem.source === "reddit" || rItem.source === "hackernews")) {
     const a = e.target.closest("a");
     const onTitle = a && a.parentElement && a.parentElement.tagName === "H3";
     const onText = !a && e.target.closest(".title, .snippet, .pin h3");
@@ -288,20 +288,25 @@ itemsEl.addEventListener("click", (e) => {
   }
 });
 
-/* ---- predictive preload: on reader-open, warm the NEXT reddit thread + its media (Epic 8 P2) ----
-   Sequential reading is the common path, so when an item opens we pre-hydrate the next reddit item's
+/* ---- predictive preload: on reader-open, warm the NEXT discussion thread + its media (Epic 8 P2) ----
+   Sequential reading is the common path, so when an item opens we pre-hydrate the next Reddit/HN
    comment thread (a GET lazily hydrates it server-side → the next open is instant) and prime its media
-   image. Bounded + safe: ONE thread fetch per open (de-duped via _preloaded; respects reddit rate
-   limits), only reddit items have threads, and an in-flight preload is aborted when a newer one starts. */
+   image. Bounded + safe: ONE thread fetch per open (de-duped via _preloaded), only discussion items have
+   threads, and an in-flight preload is aborted when a newer one starts. */
 let _preloadCtl = null;
 const _preloaded = new Set();
+const threadPath = (item) => item && item.source === "hackernews"
+  ? "/hackernews/items/" + encodeURIComponent(item.fullname) + "/thread"
+  : item && item.source === "reddit"
+    ? "/reddit/items/" + encodeURIComponent(item.fullname) + "/thread"
+    : "";
 function preloadNext(opened) {
   if (!opened) return;
   const i = state.items.indexOf(opened);
   if (i < 0) return;
-  let next = null;                                  // nearest following reddit item (small look-ahead)
+  let next = null;                                  // nearest following discussion item (small look-ahead)
   for (let j = i + 1; j < state.items.length && j <= i + 4; j++) {
-    if (state.items[j].source === "reddit") { next = state.items[j]; break; }
+    if (state.items[j].source === "reddit" || state.items[j].source === "hackernews") { next = state.items[j]; break; }
   }
   if (!next) return;
   const mu = imageUrl(next);                         // prime media (CDN/local — no rate-limit concern)
@@ -311,7 +316,8 @@ function preloadNext(opened) {
   if (_preloadCtl) { try { _preloadCtl.abort(); } catch (_e) {} }
   _preloadCtl = new AbortController();
   // sort is irrelevant for warming (hydration caches the whole thread; sort is applied at read time)
-  fetch("/reddit/items/" + encodeURIComponent(next.fullname) + "/thread", { signal: _preloadCtl.signal }).catch(() => {});
+  const path = threadPath(next);
+  if (path) fetch(path, { signal: _preloadCtl.signal }).catch(() => {});
 }
 
 /* ---- media lightbox ---- */

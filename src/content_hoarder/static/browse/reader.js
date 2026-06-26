@@ -1,11 +1,11 @@
-/* browse/reader.js — in-app Reddit reader ("inline viewing").
+/* browse/reader.js — in-app thread reader ("inline viewing").
 
-   Tap a saved Reddit item → a full-screen sheet with the post + a collapsible
-   comment thread, instead of bouncing out to a Firefox custom tab / Relay. The
+   Tap a saved Reddit or Hacker News item → a full-screen sheet with the post +
+   a collapsible comment thread, instead of bouncing out to an external tab. The
    post always renders from the already-loaded list item (zero-network, never
    blank); the comment thread loads from the cached /thread endpoint and hydrates
-   on a cache miss (POST /hydrate). "Open original ↗" stays in the header for the
-   cases inline can't handle (polls, crossposts, deleted threads, no reddit auth).
+   on a cache miss. "Open original ↗" stays in the header for the cases inline
+   can't handle (polls, crossposts, deleted threads, no auth/network).
    Swipe-right or the system back-gesture returns to the feed.
 
    Spec: docs/design/inline-reddit-reader/spec.md.
@@ -15,14 +15,14 @@
    nesting, nested collapse, leaf collapse, escaping, OP badge, empty) before
    inlining. Only addition over the generated form: the `c.author &&` OP guard. */
 
-import { esc, ago, isTypingTarget } from "../core/util.js";
+import { esc, ago, isTypingTarget, safeUrl } from "../core/util.js";
 import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
 import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
 import { isNsfw } from "./render.js";
-import { shareItem } from "../core/render.js";
+import { hnUserUrl, itemUrl, shareItem } from "../core/render.js";
 import { toast } from "../core/toast.js";
 import { pushOverlay, settleTop } from "../core/overlaynav.js";
 
@@ -80,11 +80,7 @@ export function renderThread(comments, collapsed, helpers) {
     html += '<button type="button" class="rd-ctoggle" data-ci="' + i + '" aria-label="' +
       (isC ? "Expand" : "Collapse") + ' thread">' + (isC ? "+" : "−") + "</button>";
     html += '<div class="rd-cmain"><div class="rd-cby">';
-    const au = helpers.esc(c.author);              // reddit usernames are [A-Za-z0-9_-] → URL-safe
-    html += (c.author && c.author !== "[deleted]")
-      ? '<a class="rd-au" href="https://www.reddit.com/user/' + au +
-        '" target="_blank" rel="noopener noreferrer nofollow">u/' + au + "</a>"
-      : '<span class="rd-au">u/' + au + "</span>";
+    html += helpers.author ? helpers.author(c.author) : '<span class="rd-au">' + helpers.esc(c.author || "") + "</span>";
     if (c.author && c.author === helpers.opAuthor) html += '<span class="rd-op">OP</span>';
     html += '<span class="rd-cscore">' + (+c.score || 0) + "</span>";
     html += '<span class="rd-cage">' + helpers.ago(c.created_utc) + "</span>";
@@ -110,6 +106,106 @@ const absReddit = (p) => {
   if (/^https?:\/\//i.test(p)) return p;
   return p.startsWith("/") ? "https://www.reddit.com" + p : p;
 };
+
+const decodeEntity = (ent) => {
+  const e = String(ent || "");
+  if (e[0] === "#") {
+    const hex = e[1] && e[1].toLowerCase() === "x";
+    const n = parseInt(hex ? e.slice(2) : e.slice(1), hex ? 16 : 10);
+    return Number.isFinite(n) ? String.fromCodePoint(n) : "&" + e + ";";
+  }
+  return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'" })[e] || "&" + e + ";";
+};
+const decodeEntities = (s) => String(s || "").replace(/&([a-zA-Z]+|#x[0-9a-fA-F]+|#\d+);/g, (_, e) => decodeEntity(e));
+const stripTags = (s) => String(s || "").replace(/<[^>]*>/g, "");
+const hnHref = (href) => {
+  let h = decodeEntities(href || "").trim();
+  if (!h) return "";
+  if (/^(item|user)\?/i.test(h)) h = "https://news.ycombinator.com/" + h;
+  else if (h.startsWith("/")) h = "https://news.ycombinator.com" + h;
+  return safeUrl(h) || "";
+};
+
+export function hnHtmlToMarkdown(src) {
+  let s = String(src == null ? "" : src);
+  if (!s.trim()) return "";
+  s = s.replace(/<script\b[\s\S]*?<\/script>/gi, "")
+       .replace(/<style\b[\s\S]*?<\/style>/gi, "");
+  s = s.replace(/<a\b[^>]*href=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_m, _q, href, label) => {
+    const text = decodeEntities(stripTags(label)).replace(/\s+/g, " ").trim();
+    const url = hnHref(href);
+    return url ? "[" + (text || url).replace(/[\[\]]/g, "") + "](" + url + ")" : text;
+  });
+  s = s.replace(/<br\s*\/?>/gi, "\n")
+       .replace(/<\/p\s*>/gi, "\n\n")
+       .replace(/<p\b[^>]*>/gi, "")
+       .replace(/<\/?(pre|code)\b[^>]*>/gi, "`")
+       .replace(/<[^>]*>/g, "");
+  return decodeEntities(s).replace(/\n{3,}/g, "\n\n").trim();
+}
+
+export function renderHnHtml(src) {
+  return renderMarkdown(hnHtmlToMarkdown(src), {});
+}
+
+export function normalizeThreadComments(raw, source) {
+  const out = [];
+  const walk = (nodes, fallbackDepth) => {
+    for (const node of Array.isArray(nodes) ? nodes : []) {
+      if (!node || typeof node !== "object") continue;
+      const rawDepth = Number.isFinite(+node.depth) ? +node.depth : fallbackDepth;
+      const depth = source === "hackernews" ? Math.max(0, rawDepth - 1) : rawDepth;
+      const score = Number.isFinite(+node.score) ? +node.score
+        : (Number.isFinite(+node.points) ? +node.points : 0);
+      out.push({
+        ...node,
+        body: node.body != null ? node.body : (node.text != null ? node.text : ""),
+        score,
+        depth,
+      });
+      if (Array.isArray(node.children) && node.children.length) walk(node.children, rawDepth + 1);
+    }
+  };
+  walk(raw, 0);
+  return out;
+}
+
+const SOURCE_META = {
+  reddit: {
+    label: "Reddit",
+    led: "var(--source-reddit)",
+    threadPath: (fn, sort) => "/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
+    hydratePath: (fn) => "/reddit/items/" + encodeURIComponent(fn) + "/hydrate",
+    originalHref: (it) => absReddit(it.metadata && it.metadata.permalink) || it.url || "",
+    author: (author) => {
+      const au = esc(author || "");
+      return author && author !== "[deleted]"
+        ? '<a class="rd-au" href="https://www.reddit.com/user/' + au +
+          '" target="_blank" rel="noopener noreferrer nofollow">u/' + au + "</a>"
+        : '<span class="rd-au">u/' + au + "</span>";
+    },
+    scoreText: (n) => "▲ " + fmtScore(n),
+    bodyHtml: (body, media) => renderMarkdown(body, { media }),
+  },
+  hackernews: {
+    label: "HN",
+    led: "var(--source-hackernews)",
+    threadPath: (fn, sort) => "/hackernews/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
+    hydratePath: null,
+    originalHref: (it) => itemUrl(it) || it.url || "",
+    author: (author) => {
+      const url = hnUserUrl(author);
+      const au = esc(author || "");
+      return url
+        ? '<a class="rd-au" href="' + esc(url) +
+          '" target="_blank" rel="noopener noreferrer nofollow">' + au + "</a>"
+        : '<span class="rd-au">' + au + "</span>";
+    },
+    scoreText: (n) => fmtScore(n) + " pts",
+    bodyHtml: (body) => renderHnHtml(body),
+  },
+};
+const sourceMeta = (it) => SOURCE_META[it && it.source] || SOURCE_META.reddit;
 
 /* ---- manual tag editor (reader header/meta area) ----
    Mirror of the triage card editor: existing tags as removable chips + a "＋ tag"
@@ -147,6 +243,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   const postEl = $("#reader-post");
   const cmtsEl = $("#reader-comments");
   const ooEl = $("#reader-open-original");
+  const ledEl = reader.querySelector(".led");
   const scrollEl = reader.querySelector(".rd-scroll");
 
   let item = null, fullname = null, ooHref = "";
@@ -265,20 +362,22 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   }
   function renderPost(post) {
     const m = item.metadata || {};
-    subEl.textContent = m.subreddit ? "r/" + m.subreddit : (item.source || "reddit");
+    const sm = sourceMeta(item);
+    subEl.textContent = item.source === "reddit" && m.subreddit ? "r/" + m.subreddit : sm.label;
     const author = (post && post.author) || m.author || item.author || "";
     const scoreRaw = (post && Number.isFinite(post.score)) ? post.score
+      : (post && Number.isFinite(post.points)) ? post.points
       : (Number.isFinite(m.score) ? m.score : null);
     const created = (post && post.created_utc) || item.created_utc || 0;
-    const body = (post && post.selftext) || item.body || "";
+    const body = (post && (post.selftext || post.text)) || item.body || "";
     let h = '<h1 class="rd-ttl">' + esc(item.title || "(untitled)") + "</h1>";
     h += '<div class="rd-by">';
-    if (author) h += '<span class="rd-au">u/' + esc(author) + "</span>";
-    if (scoreRaw != null) h += '<span class="rd-pscore">▲ ' + fmtScore(scoreRaw) + "</span>";
+    if (author) h += sm.author(author);
+    if (scoreRaw != null) h += '<span class="rd-pscore">' + sm.scoreText(scoreRaw) + "</span>";
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
     h += mediaTileHtml();
-    if (String(body).trim()) h += '<div class="rd-body">' + renderMarkdown(body, { media: post && post.media }) + "</div>";
+    if (String(body).trim()) h += '<div class="rd-body">' + sm.bodyHtml(body, post && post.media) + "</div>";
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
@@ -321,11 +420,14 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     cmtsEl.innerHTML = commentsHead(comments.length) +
       (comments.length
         ? renderThread(comments, collapsed, {
-            esc, md: (body, media) => renderMarkdown(body, { media }), ago, opAuthor })
+            esc,
+            author: (author) => sourceMeta(item).author(author),
+            md: (body, media) => sourceMeta(item).bodyHtml(body, media),
+            ago, opAuthor })
         : '<div class="rd-cmtstate">No comments on this post.</div>');
   }
   function applyThread(res, justHydrated) {
-    comments = Array.isArray(res.comments) ? res.comments : [];
+    comments = normalizeThreadComments(res.comments, item.source);
     collapsed = deadThreadCollapseSet(comments);   // auto-collapse fully-dead (deleted) threads on load
     opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
     if (!videoEl) renderPost(res.post || null);  // don't clobber a playing inline video
@@ -333,23 +435,26 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     renderComments();
   }
   function failState() {
-    cmtsEl.innerHTML = '<div class="rd-cmtstate err">Couldn’t load the live thread.' +
+    const sm = sourceMeta(item);
+    cmtsEl.innerHTML = '<div class="rd-cmtstate err">Couldn’t load the ' + esc(sm.label) + ' thread.' +
       '<a class="rd-oolink" href="' + esc(ooHref || "#") + '" target="_blank" rel="noopener">' +
       "Open original ↗</a></div>";
   }
   async function load() {
     const fn = fullname;
     cmtsEl.innerHTML = '<div class="rd-cmtstate">loading thread…</div>';
+    const sm = sourceMeta(item);
     let res;
-    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + threadSort); }
+    try { res = await api.getJSON(sm.threadPath(fn, threadSort)); }
     catch (e) { if (fullname === fn) failState(); return; }
     if (fullname !== fn) return;                       // closed / switched mid-fetch
-    if (res && res.cached) { applyThread(res, false); return; }
+    if (res && res.cached) { applyThread(res, res.hydrate_status === "hydrated"); return; }
+    if (!sm.hydratePath) { failState(); return; }
     cmtsEl.innerHTML = '<div class="rd-cmtstate">fetching the live thread…</div>';
-    try { await api.postJSON("/reddit/items/" + encodeURIComponent(fn) + "/hydrate", {}); }
+    try { await api.postJSON(sm.hydratePath(fn), {}); }
     catch (e) { if (fullname === fn) failState(); return; }   // 401 no-auth, 502 network, …
     if (fullname !== fn) return;
-    try { res = await api.getJSON("/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + threadSort); }
+    try { res = await api.getJSON(sm.threadPath(fn, threadSort)); }
     catch (e) { if (fullname === fn) failState(); return; }
     if (fullname !== fn) return;
     if (res && res.cached) applyThread(res, true); else failState();
@@ -361,7 +466,12 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
     item = it; fullname = it.fullname;
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
-    ooHref = absReddit(it.metadata && it.metadata.permalink) || it.url || "";
+    const sm = sourceMeta(it);
+    reader.dataset.source = it.source || "";
+    reader.setAttribute("aria-label", sm.label + " thread reader");
+    if (ledEl) ledEl.style.setProperty("--reader-led", sm.led);
+    if (ooEl) ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
+    ooHref = sm.originalHref(it);
     if (ooEl) ooEl.href = ooHref || "#";
     renderPost(null);                                 // instant, from the list item
     reader.style.transition = ""; reader.style.transform = "";
