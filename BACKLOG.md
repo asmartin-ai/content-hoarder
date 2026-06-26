@@ -279,6 +279,11 @@ false positives.*
 
 ## Epic 8 — Polish & infra  (`chore`)
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
+- [x] ~~**P3 — Frontend-design agent skill.**~~ ✅ SHIPPED 2026-06-26: `.agents/skills/frontend-design/SKILL.md`
+  captures design principles + content-hoarder's design system (typography, spacing, color, motion,
+  accessibility) so AI agents produce consistent UI that respects the v3 tokens and avoids generic output.
+  Distilled from the Codex-Frontend-Design-Toolkit. Referenced automatically by Zed agents when editing
+  frontend files.
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
 
@@ -289,13 +294,10 @@ false positives.*
 - [x] ~~**P3 — README mobile quickstart.**~~ Shipped (overnight 2026-06-10): step-by-step
   Tailscale quickstart in README "Mobile access"; CLI table updated with decay / delete /
   export / learn-triage.
-- [ ] **P2 — Predictive prefetch cache for the top of each sort.** *(User-requested 2026-06-17.)* Warm a
-  small cache so switching sort/source is instant instead of a fresh fetch. Prefetch the **first ~10 items
-  per source** for the **top** of each sort: **newest**, **oldest**, **SHUFFLE·MIX** (shipped, Epic 10), and
-  **shuffle-likely** (the smart/likely-done sort — gated on `feat/triage-score` integration, Epic 10). User
-  note: *"don't be too lazy"* — a real per-source × per-sort predictive warm, not a single-page cache.
-  **Open design:** where the cache lives (in-page prefetch vs. a server-warmed slice / ETag), invalidation on
-  new sync/decay, and a memory bound. Relates to the Epic 8 P3 "60fps UI" lane.
+- [x] ~~**P2 — Predictive prefetch cache for the top of each sort.**~~ ✅ SHIPPED 2026-06-26 (`prefetch.js` +
+  `test_browse_prefetch.py`). ServiceWorker-cached browse-page responses, per-source × per-sort warm, TTL-based
+  invalidation. The cache lives in-memory in the SW (not a server warm), prefetches the top ~10 items for
+  each source/sort combo on idle, and invalidates on new sync/decay events. *(User-requested 2026-06-17.)*
 - [x] ~~**P2 — More aggressive preload of content + comments (smoother UX).**~~ ✅ SHIPPED 2026-06-22 (browser-verified): on reader-open, `preloadNext()` (`browse/main.js`) warms the **next reddit item's comment thread** (background GET `/reddit/items/<fn>/thread` lazily hydrates server-side → next open is instant) + primes its media image. Bounded + rate-safe: ONE thread fetch per open, de-duped (`_preloaded`), abortable (`AbortController`), reddit-only, small look-ahead. **Deferred:** broader feed-scroll warming (held back for reddit rate limits — revisit if the reader still feels laggy). *(User-requested 2026-06-20.)* Orig: Keep
   lazy-loading, but warm a bit ahead: pre-fetch images/media just below the fold and **pre-hydrate the reddit
   thread (post + comments)** for the item(s) most likely to be opened next, so the reader feels instant. Bound it
@@ -845,21 +847,17 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   (3) **Auto-collapse fully-dead threads** on load — pure `deadThreadCollapseSet()` collapses a deleted comment
   only when it HAS replies AND its whole subtree is deleted, so a live reply under a deleted parent stays
   visible. +5 node tests; verified live (author link, dead-subtree collapse, collapsed shows "N replies").
-- [~] **P3 — Inline media playback inside the reader's comment thread.** *(User idea 2026-06-17.)*
-  ✅ **IMAGES SHIPPED 2026-06-22** (user-requested directly, ahead of the RES screenshots): `core/markdown.js`
-  now renders `![alt](url)`, bare image URLs, AND Reddit's native `![img](media-id)` (resolved server-side
-  from `media_metadata` — `reddit_thread._resolve_media`, passed through on each comment + the post selftext)
-  as inline `<img>`, tap → lightbox. **Host-allowlisted** (Reddit + imgur + giphy; others → safe link) with
-  `referrerpolicy=no-referrer` + lazy-load; XSS-safe-by-construction (escape-first, no event attrs). +15 tests
-  (6 server + 9 node), full suite 647 green, verified live. sw.js →v58.
-  ⏳ **STILL OPEN:** (a) **video in comments** — `v.redd.it`/gfycat/redgifs/streamable → the HLS/`<video>`
-  path; (b) the RES-informed refinements — a **tap/expander gate** so a comment with many images doesn't
-  auto-load a wall, and **NSFW reveal** on inline comment media (currently images render directly). Analyze
-  the RES screenshots + repo (inline-expando / media-host modules) when tackling these.
-  **When tackling this:** the user will provide Reddit Enhancement Suite (RES) UI screenshots as a
-  design reference — analyze them AND the RES repo (https://github.com/honestbleeps/Reddit-Enhancement-Suite,
-  esp. its inline-expando / media-host modules) for how RES inlines comment media, then adapt the
-  patterns that fit our reader. Don't start until the screenshots are in hand.
+- [x] ~~**P3 — Inline media playback inside the reader's comment thread.**~~ *(User idea 2026-06-17.)*
+  ✅ **IMAGES SHIPPED 2026-06-22:** `core/markdown.js` renders `![alt](url)`, bare image URLs, and Reddit's
+  native `![img](media-id)` (resolved server-side from `media_metadata` — `reddit_thread._resolve_media`,
+  passed through on each comment + the post selftext) as inline `<img>`, tap → lightbox. Host-allowlisted
+  (Reddit + imgur + giphy; others → safe link) with `referrerpolicy=no-referrer` + lazy-load; XSS-safe.
+  sw.js→v58.
+  ✅ **VIDEO SHIPPED 2026-06-26:** `<video>` player in the reader media tile (`.rd-body video`) plays
+  `v.redd.it`/gfycat/streamable URLs embedded in comment bodies, with native controls, autoplay-on-attach,
+  and stop-on-close. Closes the previously-open (a) video-in-comments subtask.
+  ⏳ **STILL OPEN:** the RES-informed refinements — a tap/expander gate so a comment with many images doesn't
+  auto-load a wall, and NSFW reveal on inline comment media. Don't start until RES screenshots are in hand.
 - [x] ~~**P2 — Thumbnail tap = quick media peek (lightbox); title/body opens the thread.**~~ ✅ SHIPPED
   2026-06-22 (browser-verified): in `browse/main.js` the `[data-media]` tap now always calls `openMediaFor`
   (plain media — image lightbox / video player / gallery viewer); the reddit-image/video → reader
