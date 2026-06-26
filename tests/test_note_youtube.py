@@ -104,6 +104,30 @@ def test_migrate_dry_run_writes_nothing():
         assert "promoted_to" not in _md(note_row)
 
 
+def test_multi_video_notes_are_not_promoted():
+    with db.connect(":memory:") as c:
+        db.merge_upsert(
+            c,
+            mk(
+                source="keep",
+                source_id="multi",
+                kind="note",
+                title="Multi video note",
+                body=(
+                    "https://youtu.be/dQw4w9WgXcQ\n"
+                    "https://www.youtube.com/watch?v=aaaaaaaaaaa"
+                ),
+                now=1000,
+            ),
+        )
+
+        assert note_youtube.plan(c) == {"orphan": [], "companion": []}
+        res = note_youtube.migrate(c, apply=True)
+        assert res["candidates"] == 0
+        assert c.execute("SELECT COUNT(*) FROM items WHERE source='youtube'").fetchone()[0] == 0
+        assert "promoted_to" not in _md(db.get_item(c, "keep:multi"))
+
+
 def test_migrate_apply_creates_and_stamps():
     with db.connect(":memory:") as c:
         vid = "dQw4w9WgXcQ"

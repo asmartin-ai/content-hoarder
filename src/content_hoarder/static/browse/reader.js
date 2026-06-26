@@ -350,6 +350,7 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   let revealed = false, isOpen = false;
   let returnTo = "";
   let postData = null, bodyEditing = false, bodyDraft = "", bodySaving = false;
+  let noteVideoActive = "";
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
@@ -511,6 +512,9 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       const wrap = frame.closest(".rd-note-video-wrap") || frame;
       wrap.remove();
     });
+    postEl.querySelectorAll(".rd-note-video-multi iframe").forEach((frame) => {
+      try { frame.removeAttribute("src"); } catch (e) { /* no-op */ }
+    });
   }
 
   /* ---- render ---- */
@@ -523,6 +527,16 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       '<iframe src="' + esc(src) + '" title="YouTube video" loading="lazy" ' +
       'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>';
   }
+  function noteVideoMultiHtml(ids) {
+    if (!ids.length) return "";
+    if (ids.indexOf(noteVideoActive) === -1) noteVideoActive = ids[0];
+    return '<div class="rd-note-video-multi" data-note-videos="1">' +
+      noteVideoEmbedHtml(noteVideoActive) +
+      '<div class="rd-note-video-tabs" role="tablist" aria-label="Videos in this note">' +
+      ids.map((id, i) => '<button type="button" class="rd-note-video-tab" data-note-video="' +
+        esc(id) + '" aria-selected="' + (id === noteVideoActive) + '">Video ' + (i + 1) + "</button>").join("") +
+      "</div></div>";
+  }
   function noteVideoIdForBody(body) {
     const ids = noteYoutubeIds(body);
     if (ids.length === 1) return ids[0];
@@ -530,7 +544,7 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     return "";
   }
   function isNoteVideoMode(body) {
-    return !!noteVideoIdForBody(body);
+    return noteYoutubeIds(body).length > 0;
   }
   function renderNoteBodyRegion(body, post) {
     if (!isNoteVideoMode(body)) return;
@@ -539,8 +553,9 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       : '<div class="rd-note-body-region">' + bodyHtml(body, post) + "</div>";
   }
   function mediaTileHtml(body) {
-    const noteVid = noteVideoIdForBody(body);
-    if (noteVid) return noteVideoEmbedHtml(noteVid);
+    const noteIds = noteYoutubeIds(body);
+    if (noteIds.length === 1) return noteVideoEmbedHtml(noteIds[0]);
+    if (noteIds.length > 1) return noteVideoMultiHtml(noteIds);
     const mt = mediaType(item);
     if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
@@ -676,7 +691,7 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     item = it; fullname = it.fullname;
     returnTo = opts.from === "triage" ? "/triage" : "";
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
-    postData = null; bodyEditing = false; bodyDraft = ""; bodySaving = false;
+    postData = null; bodyEditing = false; bodyDraft = ""; bodySaving = false; noteVideoActive = "";
     const sm = sourceMeta(it);
     reader.dataset.source = it.source || "";
     reader.classList.toggle("from-triage", !!returnTo);
@@ -818,6 +833,12 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     if (editBody) { openBodyEditor(); return; }
     if (e.target.closest("[data-rd-body-save]")) { saveBodyEditor(); return; }
     if (e.target.closest("[data-rd-body-cancel]")) { cancelBodyEditor(); return; }
+    const noteVideo = e.target.closest("[data-note-video]");
+    if (noteVideo) {
+      noteVideoActive = noteVideo.getAttribute("data-note-video") || "";
+      renderPost(postData);
+      return;
+    }
     // ---- inline markdown image (comment / selftext) → open it in the lightbox ----
     const mdImg = e.target.closest(".md-img[data-img]");
     if (mdImg) {

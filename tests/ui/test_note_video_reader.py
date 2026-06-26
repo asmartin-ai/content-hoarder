@@ -13,6 +13,7 @@ from content_hoarder.web import create_app
 pytestmark = pytest.mark.ui
 
 VIDEO_ID = "dQw4w9WgXcQ"
+VIDEO_ID_2 = "aaaaaaaaaaa"
 
 
 def _free_port() -> int:
@@ -49,6 +50,19 @@ def note_app_base_url(tmp_path_factory) -> str:
             title="Plain note",
             body="A note with no video link, just text.",
             now=1001,
+        ))
+        db.merge_upsert(conn, models.new_item(
+            source="keep",
+            source_id="multi-video-note",
+            kind="note",
+            title="Multi video note",
+            body=(
+                "Notes above several links.\n\n"
+                f"https://youtu.be/{VIDEO_ID}\n"
+                f"https://www.youtube.com/watch?v={VIDEO_ID_2}\n\n"
+                "Notes after the links."
+            ),
+            now=1002,
         ))
 
     app = create_app(db_path=str(db_path))
@@ -103,3 +117,24 @@ def test_note_without_youtube_link_keeps_existing_note_reader(note_page):
     expect(page.locator("#reader-post .rd-body")).to_contain_text(
         "A note with no video link, just text."
     )
+
+
+def test_note_with_multiple_youtube_links_uses_one_active_iframe(note_page):
+    page = note_page
+    page.locator('.row[data-fullname="keep:multi-video-note"] .title').click()
+
+    expect(page.locator("#reader")).to_have_class(re.compile(r"\bshow\b"))
+    expect(page.locator("#reader-post .rd-note-video-wrap iframe")).to_have_count(1)
+    expect(page.locator("#reader-post .rd-note-video-tab")).to_have_count(2)
+    expect(page.locator("#reader-post .rd-note-video-wrap iframe")).to_have_attribute(
+        "src",
+        f"https://www.youtube-nocookie.com/embed/{VIDEO_ID}",
+    )
+
+    page.locator('#reader-post [data-note-video="' + VIDEO_ID_2 + '"]').click()
+    expect(page.locator("#reader-post .rd-note-video-wrap iframe")).to_have_count(1)
+    expect(page.locator("#reader-post .rd-note-video-wrap iframe")).to_have_attribute(
+        "src",
+        f"https://www.youtube-nocookie.com/embed/{VIDEO_ID_2}",
+    )
+    expect(page.locator("#reader-comments .rd-body")).to_contain_text("Notes after the links.")
