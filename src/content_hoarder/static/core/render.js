@@ -15,6 +15,7 @@ export const CH_SOURCES = {
   obsidian:   { glyph: "◇",  token: "--source-obsidian" },
   keep:       { glyph: "✎",  token: "--source-keep" },
   firefox:    { icon: "firefox", token: "--source-firefox" },
+  twitter:    { glyph: "X",  token: "--source-twitter" },
 };
 export const srcAccent = (source) => {
   const m = CH_SOURCES[source];
