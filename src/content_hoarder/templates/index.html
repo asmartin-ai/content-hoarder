@@ -197,6 +197,7 @@
     </div>
     <div class="set-group"><div class="lab">COLLECTION</div>
       <button type="button" class="setbtn" id="open-stats">Stats &mdash; the shape of the collection</button>
+      <button type="button" class="setbtn" id="open-dupes">Duplicates &mdash; review matching saves</button>
       <button type="button" class="setbtn" id="open-sync">Sync newest &mdash; pull saved items from Reddit</button>
     </div>
     <p class="set-note">The panel stays put while you fiddle. Esc closes.</p>
@@ -205,6 +206,15 @@
   <aside class="sheetpanel" id="statsheet" aria-label="Stats">
     <h2>Stats</h2>
     <div class="stats-list" id="stats-list">Loading&hellip;</div>
+  </aside>
+
+  <aside class="sheetpanel" id="dupesheet" aria-label="Duplicate review">
+    <h2>Duplicates</h2>
+    <div class="dup-tools">
+      <button type="button" class="minibtn" data-dupe-by="url" aria-pressed="true">By URL</button>
+      <button type="button" class="minibtn" data-dupe-by="title" aria-pressed="false">By title</button>
+    </div>
+    <div class="dup-list" id="dup-list">Loading&hellip;</div>
   </aside>
 
   <!-- mobile "Jump" drawer — the phone expression of the desktop .rail.

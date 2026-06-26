@@ -43,6 +43,15 @@ export const bulkUndo = (fullnames) =>
     failed: rs.map((r, i) => (r.status === "rejected" ? fullnames[i] : null)).filter(Boolean),
   }));
 
+export const fetchDuplicates = (params) =>
+  getJSON("/duplicates" + (params ? "?" + new URLSearchParams(params) : ""));
+
+export const resolveDuplicates = (keep, archive) =>
+  postJSON("/duplicates/resolve", { keep, archive });
+
+export const undoDuplicates = (fullnames) =>
+  postJSON("/duplicates/undo", { fullnames });
+
 /* ---- lists / counts ---- */
 export const fetchItems = (params) =>
   getJSON("/items" + (params ? "?" + new URLSearchParams(params) : ""));

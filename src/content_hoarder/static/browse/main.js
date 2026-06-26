@@ -854,7 +854,7 @@ document.addEventListener("keydown", (e) => {
 const scrim = $("#scrim");
 function openPanel(id) { closeSheets(); $(id).classList.add("show"); scrim.classList.add("show"); }
 function closeSheets() {
-  ["#settings", "#navdrawer", "#kbd", "#statsheet", "#rowmenu"].forEach((s) => $(s).classList.remove("show"));
+  ["#settings", "#navdrawer", "#kbd", "#statsheet", "#dupesheet", "#rowmenu"].forEach((s) => $(s).classList.remove("show"));
   if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
 }
@@ -1154,7 +1154,7 @@ function attachSheetDismiss(panel) {
   panel.addEventListener("touchend", end);
   panel.addEventListener("touchcancel", end);
 }
-["#settings", "#statsheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
+["#settings", "#statsheet", "#dupesheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
 
 /* ---- stats sheet (Epic 14: Stats lives in the settings menu) ---- */
 function statsBarRows(obj, max) {
@@ -1185,6 +1185,71 @@ $("#open-stats").addEventListener("click", async () => {
   openPanel("#statsheet");
   try { list.innerHTML = statsHtml(await api.fetchStats()); }
   catch (e) { list.textContent = "Couldn't load stats — try again."; }
+});
+
+let dupeBy = "url";
+let dupeGroups = [];
+function dupeItemHtml(it, keep) {
+  const title = it.title || it.url || it.fullname;
+  return '<div class="dup-item' + (it.fullname === keep ? " keep" : "") + '">' +
+    '<span class="dup-src">' + esc(it.source || "") + "</span>" +
+    '<span class="dup-title">' + esc(title) + "</span>" +
+    (it.fullname === keep ? '<span class="dup-keep">keep</span>' : "") +
+    "</div>";
+}
+function dupesHtml(groups) {
+  if (!groups.length) return '<div class="dup-empty">No duplicate groups in Inbox.</div>';
+  return groups.map((g, i) => {
+    const keep = g.suggested_keep;
+    const archive = (g.items || []).filter((it) => it.fullname !== keep).map((it) => it.fullname);
+    return '<section class="dup-group" data-dupe-idx="' + i + '">' +
+      '<div class="dup-head"><b>' + esc(g.key || "") + "</b><span>" + g.count + " items</span></div>" +
+      '<div class="dup-items">' + (g.items || []).map((it) => dupeItemHtml(it, keep)).join("") + "</div>" +
+      '<button type="button" class="ambbtn primary" data-dupe-resolve="' + i + '"' +
+        (archive.length ? "" : " disabled") + ">Archive others</button>" +
+      "</section>";
+  }).join("");
+}
+async function loadDupes() {
+  const list = $("#dup-list");
+  list.textContent = "Finding duplicate saves...";
+  try {
+    const data = await api.fetchDuplicates({ by: dupeBy, status: "inbox" });
+    dupeGroups = data.groups || [];
+    list.innerHTML = dupesHtml(dupeGroups);
+  } catch (e) {
+    list.textContent = "Couldn't load duplicates.";
+  }
+}
+$("#open-dupes").addEventListener("click", () => { openPanel("#dupesheet"); loadDupes(); });
+$("#dupesheet").addEventListener("click", async (e) => {
+  const by = e.target.closest("[data-dupe-by]");
+  if (by) {
+    dupeBy = by.dataset.dupeBy || "url";
+    $$("#dupesheet [data-dupe-by]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b === by)));
+    loadDupes();
+    return;
+  }
+  const btn = e.target.closest("[data-dupe-resolve]");
+  if (!btn) return;
+  const group = dupeGroups[parseInt(btn.dataset.dupeResolve, 10)];
+  if (!group) return;
+  const keep = group.suggested_keep;
+  const archive = (group.items || []).filter((it) => it.fullname !== keep).map((it) => it.fullname);
+  if (!archive.length) return;
+  btn.disabled = true;
+  try {
+    await api.resolveDuplicates(keep, archive);
+    snackbar("Archived " + archive.length + " duplicate" + (archive.length === 1 ? "." : "s."), async () => {
+      await api.undoDuplicates(archive);
+      loadDupes(); loadItems(true); loadCounts(); refreshPulse();
+    });
+    loadDupes(); loadItems(true); loadCounts(); refreshPulse();
+  } catch (err) {
+    toast("Duplicate resolve failed.");
+    btn.disabled = false;
+  }
 });
 
 $$("#set-theme button").forEach((b) => b.addEventListener("click", () => {
