@@ -121,6 +121,20 @@ titles/durations. (OneTab / `recovery.jsonlz4` remain future inputs.)
 
 ---
 
+## Twitter / X bookmarks
+
+Use a browser-side bookmark exporter that writes JSON or CSV, then import the file:
+```bash
+python -m content_hoarder import "path\to\x-bookmarks.json" --source twitter
+```
+
+The connector stores each tweet as `twitter:<tweet_id>` with tweet text, author handle/display
+name, canonical permalink, creation time when present, and media URLs (`pbs.twimg.com` images are
+normalized to `?name=orig`). It does not call the X API and it does not invent a bookmark timestamp;
+exports that include only ordering get `metadata.bookmark_index` instead.
+
+---
+
 ## Google Keep  ⏳ (deferred — do later)
 When ready: <https://takeout.google.com> → deselect all → select **Keep** → export → unzip, then:
 ```bash

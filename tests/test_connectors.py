@@ -8,6 +8,7 @@ from content_hoarder.connectors.hackernews import HNConnector
 from content_hoarder.connectors.keep import KeepConnector
 from content_hoarder.connectors.obsidian import ObsidianConnector
 from content_hoarder.connectors.reddit import RedditConnector
+from content_hoarder.connectors.twitter import TwitterConnector
 from content_hoarder.connectors.youtube import YouTubeConnector
 
 
@@ -101,6 +102,14 @@ def test_keep(fixtures):
     assert "home" in md(it)["labels"]
 
 
+def test_twitter(fixtures):
+    it = items(TwitterConnector(), fixtures / "twitter" / "bookmarks.json")[0]
+    assert it["fullname"] == "twitter:1777777777777777777"
+    assert it["kind"] == "tweet"
+    assert it["url"] == "https://x.com/db_notes/status/1777777777777777777"
+    assert md(it)["media_urls"][0].endswith("?name=orig")
+
+
 def test_hackernews_import_and_enrich(fixtures, monkeypatch):
     c = HNConnector()
     its = items(c, fixtures / "hackernews" / "ids.json")
@@ -157,6 +166,7 @@ def test_dispatch_routes(fixtures):
         fixtures / "hackernews" / "ids.json": "hackernews",
         fixtures / "obsidian" / "vault": "obsidian",
         fixtures / "keep" / "Keep": "keep",
+        fixtures / "twitter" / "bookmarks.json": "twitter",
     }
     for path, sid in cases.items():
         assert connectors.dispatch(path).id == sid, (path, sid)
@@ -164,7 +174,7 @@ def test_dispatch_routes(fixtures):
 
 def test_registry():
     assert set(connectors.REGISTRY) == {
-        "reddit", "youtube", "hackernews", "obsidian", "keep", "firefox"}
+        "reddit", "youtube", "hackernews", "obsidian", "keep", "firefox", "twitter"}
     # firefox now imports "Export Tabs URLs" .txt (see test_firefox.py); a bogus path is ignored.
     assert connectors.get("firefox").can_import(Path("x")) is False
 

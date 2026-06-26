@@ -10,8 +10,8 @@ Phase-2 items shipped include the v3 browse UI, LLM assist, Obsidian export, Red
 inline reader. The offline PWA already ships.
 
 ## Features
-- Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep, and
-  **Firefox tabs** into one local SQLite database.
+- Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep,
+  **Firefox tabs**, and browser-exported Twitter/X bookmarks into one local SQLite database.
 - Full-text **and** fuzzy (typo-tolerant) search, with discoverable Gmail/Discord-style **operators**
   (`source:`, `tag:`, `status:`, `is:swept`, `has:video`, `before:`, `score:>100`, `"exact"`, `-exclude`)
   surfaced by an autocomplete popover, plus a **shuffle/mix** browse mode that interleaves sources.
@@ -61,7 +61,7 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | Command | Description |
 |---------|-------------|
 | `init-db` | Create the local SQLite database + FTS5 search tables. |
-| `import <path> [--source ID]` | Import a file/dir; auto-detects the source (Reddit DB/CSV/JSON, YouTube yt-dlp JSON, HN DB/txt, Obsidian/Keep folders, Firefox "Export Tabs URLs" .txt), or force with `--source`. |
+| `import <path> [--source ID]` | Import a file/dir; auto-detects the source (Reddit DB/CSV/JSON, YouTube yt-dlp JSON, HN DB/txt, Obsidian/Keep folders, Firefox "Export Tabs URLs" .txt, Twitter/X bookmark JSON/CSV), or force with `--source`. |
 | `categorize [--source youtube\|reddit\|firefox\|hackernews] [--topics] [--dry-run] [--all] [--limit N]` | Tag items by heuristics. `--source youtube` → processing areas *listenable* / *watch* / *wotagei* on `metadata.category`; `--topics` (youtube) / `--source reddit\|firefox\|hackernews` → multi-label topic tags (gaming/defense/investing/…) on `metadata.tags` (host + title keywords; `--dry-run` previews accuracy without writing). |
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `scan-media [--status S] [--limit N] [--apply] [--recheck] [--workers N] [--batch N]` | Probe saved Reddit image/gallery items for deleted media and classify them on `metadata.media_status` (`gone` / `salvageable`, recording the salvageable preview URL for the `archive-media` pass). `--apply` writes (+ a `deleted` tag on gone items, surfaced by `is:deleted`); dry-run by default, crash-safe + resumable (skips already-classified unless `--recheck`). |
@@ -148,6 +148,9 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 - **Google Keep** is imported from an official **Google Takeout** export (one per account). The
   unofficial `gkeepapi` is intentionally **not** used (ToS / account-lockout risk).
 - **Firefox tabs** are imported from the "Export Tabs URLs" extension's `.txt` (Rich format);
+  YouTube tabs are promoted to canonical `youtube:<id>` rows.
+- **Twitter/X bookmarks** are imported from a browser-side JSON/CSV export, not the paid API;
+  rows are keyed as `twitter:<tweet_id>` and retain tweet text, author, permalink, and media URLs.
   re-importing the overlapping daily exports de-dups by URL.
 
 ## Privacy & data safety
