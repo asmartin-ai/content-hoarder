@@ -1,0 +1,18 @@
+[
+  {
+    "tweet_id": "1777777777777777777",
+    "full_text": "Useful thread about SQLite FTS5 trigram indexes",
+    "screen_name": "db_notes",
+    "author_name": "Database Notes",
+    "created_at": "2024-05-01T12:34:56Z",
+    "url": "https://x.com/db_notes/status/1777777777777777777",
+    "media_urls": ["https://pbs.twimg.com/media/abc123.jpg?format=jpg&name=small"]
+  },
+  {
+    "tweet_id": "1888888888888888888",
+    "text": "A second bookmarked tweet",
+    "username": "curator",
+    "created_at": 1714653296000,
+    "permalink": "https://twitter.com/curator/status/1888888888888888888"
+  }
+]
