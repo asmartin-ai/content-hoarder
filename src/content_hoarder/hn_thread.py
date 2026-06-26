@@ -95,6 +95,7 @@ def parse_thread(raw_json: str, item: dict, sort: str = "top") -> dict:
         "url": data.get("url", ""),
         "author": data.get("author", ""),
         "points": int(data.get("points", 0)),
+        "selftext": data.get("text", "") or "",
         "created_utc": int(data.get("created_at_i", 0)),  # epoch seconds
     }
 
