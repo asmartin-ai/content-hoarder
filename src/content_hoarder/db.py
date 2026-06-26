@@ -95,6 +95,34 @@ CREATE TABLE IF NOT EXISTS reddit_threads (
     thread_json TEXT NOT NULL,      -- raw Reddit <permalink>.json (post + comment tree)
     hydrated_at INTEGER             -- when the thread was fetched/cached
 );
+
+CREATE TABLE IF NOT EXISTS tag_suggestions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    fullname        TEXT NOT NULL,
+    suggested_tag   TEXT NOT NULL,
+    source          TEXT NOT NULL DEFAULT 'rule',  -- 'rule' | 'ai' | 'user' | 'discovery'
+    reason          TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'applied' | 'rejected' | 'dismissed'
+    created_utc     INTEGER NOT NULL,
+    resolved_utc    INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_suggestions_status      ON tag_suggestions(status);
+CREATE INDEX IF NOT EXISTS idx_tag_suggestions_fullname    ON tag_suggestions(fullname);
+CREATE INDEX IF NOT EXISTS idx_tag_suggestions_tag_status  ON tag_suggestions(suggested_tag, status);
+
+CREATE TABLE IF NOT EXISTS folders (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL UNIQUE,
+    query_def       TEXT NOT NULL DEFAULT '{}',
+    description     TEXT NOT NULL DEFAULT '',
+    created_utc     INTEGER NOT NULL,
+    updated_utc     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_items_folder ON items(
+    json_extract(metadata, '$.folder')
+);
 """
 
 _FTS_SCHEMA = """
@@ -154,9 +182,9 @@ _SORT_COLUMNS = {
     "source": "source",
     "duration": "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
     "position": "CAST(json_extract(metadata, '$.position') AS INTEGER)",  # YouTube playlist order
-    "score": "CAST(json_extract(metadata, '$.score') AS INTEGER)",        # Reddit upvotes
-    "smart": "CAST(json_extract(metadata, '$.triage_score') AS REAL)",    # learned likely-to-process (Epic 10)
-    "subreddit": "json_extract(metadata, '$.subreddit')",                 # Reddit subreddit (A–Z)
+    "score": "CAST(json_extract(metadata, '$.score') AS INTEGER)",  # Reddit upvotes
+    "smart": "CAST(json_extract(metadata, '$.triage_score') AS REAL)",  # learned likely-to-process (Epic 10)
+    "subreddit": "json_extract(metadata, '$.subreddit')",  # Reddit subreddit (A–Z)
     "kind": "kind",
 }
 
@@ -164,6 +192,7 @@ _SORT_COLUMNS = {
 # ---------------------------------------------------------------------------
 # Connection / init
 # ---------------------------------------------------------------------------
+
 
 def connect(path: str | None = None) -> sqlite3.Connection:
     """Open (creating dirs as needed), configure, and initialize the database."""
@@ -218,8 +247,11 @@ def _ensure_fts_built(conn: sqlite3.Connection) -> None:
     once after upgrade (populating any FTS table added since), then store _FTS_VERSION.
     """
     try:  # missing row -> fetchone() is None -> TypeError -> treat as version 0
-        marker = int(conn.execute(
-            "SELECT value FROM settings WHERE key='fts_built'").fetchone()[0])
+        marker = int(
+            conn.execute("SELECT value FROM settings WHERE key='fts_built'").fetchone()[
+                0
+            ]
+        )
     except (TypeError, ValueError):
         marker = 0
     if marker >= _FTS_VERSION:
@@ -228,20 +260,25 @@ def _ensure_fts_built(conn: sqlite3.Connection) -> None:
     if has_rows:
         conn.execute("INSERT INTO items_fts(items_fts) VALUES('rebuild')")
         conn.execute("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')")
-    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', ?)",
-                 (str(_FTS_VERSION),))
+    conn.execute(
+        "INSERT OR REPLACE INTO settings(key, value) VALUES('fts_built', ?)",
+        (str(_FTS_VERSION),),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
 
+
 def get_setting(conn: sqlite3.Connection, key: str, default=None):
     row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return row[0] if row else default
 
 
-def set_setting(conn: sqlite3.Connection, key: str, value: str, *, commit: bool = True) -> None:
+def set_setting(
+    conn: sqlite3.Connection, key: str, value: str, *, commit: bool = True
+) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", (key, str(value))
     )
@@ -249,10 +286,14 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str, *, commit: bool 
         conn.commit()
 
 
-_SAVED_ORDER_KEY = "reddit_saved_order_top"  # highest synthetic saved_utc rank allocated so far
+_SAVED_ORDER_KEY = (
+    "reddit_saved_order_top"  # highest synthetic saved_utc rank allocated so far
+)
 
 
-def allocate_saved_order(conn: sqlite3.Connection, n: int, *, commit: bool = True) -> int:
+def allocate_saved_order(
+    conn: sqlite3.Connection, n: int, *, commit: bool = True
+) -> int:
     """Reserve a contiguous block of ``n`` synthetic ``saved_utc`` ranks ABOVE every block
     allocated before, and return the block's TOP value; callers assign ``top, top-1, …,
     top-(n-1)`` in newest-saved-first order.
@@ -270,11 +311,14 @@ def allocate_saved_order(conn: sqlite3.Connection, n: int, *, commit: bool = Tru
 
 
 _DECAY_WAVE_KEY = "decay_wave_seq"  # highest decay-wave id allocated so far (monotonic)
-_SNOOZE_WAVE_KEY = "snooze_wave_seq"  # highest snooze-wave id allocated so far (monotonic)
+_SNOOZE_WAVE_KEY = (
+    "snooze_wave_seq"  # highest snooze-wave id allocated so far (monotonic)
+)
 
 
-def _allocate_decay_wave(conn: sqlite3.Connection, *, now: int,
-                         commit: bool = False) -> int:
+def _allocate_decay_wave(
+    conn: sqlite3.Connection, *, now: int, commit: bool = False
+) -> int:
     """Reserve a UNIQUE monotonic decay-wave id and return it (mirrors
     ``allocate_saved_order``). Each ``decay`` apply gets a distinct id even when two
     calls land in the same wall-clock second — ``max(now, last + 1)`` guarantees a
@@ -290,8 +334,9 @@ def _allocate_decay_wave(conn: sqlite3.Connection, *, now: int,
     return wave
 
 
-def _allocate_snooze_wave(conn: sqlite3.Connection, *, now: int,
-                          commit: bool = False) -> int:
+def _allocate_snooze_wave(
+    conn: sqlite3.Connection, *, now: int, commit: bool = False
+) -> int:
     """Reserve a UNIQUE monotonic snooze-wave id.
 
     Mirrors ``_allocate_decay_wave`` so an undo can target exactly one snooze wave even
@@ -306,6 +351,7 @@ def _allocate_snooze_wave(conn: sqlite3.Connection, *, now: int,
 # ---------------------------------------------------------------------------
 # Row helpers
 # ---------------------------------------------------------------------------
+
 
 def _row_to_raw(row: sqlite3.Row) -> dict:
     """Row -> dict with metadata left as a JSON string (for internal merge)."""
@@ -336,7 +382,10 @@ def _tag_list(value) -> list[str]:
 
 
 def metadata_with_category_tag(metadata, category: str) -> dict:
-    """Mirror a legacy category into metadata.tags, preserving unrelated tags."""
+    """Dual-write: mirror ``category`` into ``metadata.tags`` so single-select
+    processing areas filter through the multi-label tag rail. This is the
+    **intended bridge** (see ``categorize.py`` module docstring), not a legacy shim.
+    Preserves unrelated (non-processing) tags."""
     md = parse_metadata(metadata)
     cat = (category or "").strip().lower()
     tags = [t for t in _tag_list(md.get("tags")) if t not in PROCESSING_TAGS]
@@ -364,7 +413,11 @@ def _update_metadata(conn: sqlite3.Connection, row: dict, metadata: dict) -> Non
 
 
 def patch_item_metadata(
-    conn: sqlite3.Connection, fullname: str, updates: dict, *, only_if_missing: bool = False
+    conn: sqlite3.Connection,
+    fullname: str,
+    updates: dict,
+    *,
+    only_if_missing: bool = False,
 ) -> bool:
     """Shallow-merge ``updates`` into an item's metadata (+ rebuild search_text) WITHOUT
     touching last_seen_utc, so a background backfill (e.g. lazy thumbnail capture) never
@@ -394,7 +447,9 @@ def patch_item_metadata(
 
 
 def set_category(conn: sqlite3.Connection, fullname: str, category: str) -> bool:
-    """Set metadata.category and keep the processing-area tag mirror in sync."""
+    """Set ``metadata.category`` (single-select) and keep the dual-write tag mirror in
+    sync. See :func:`metadata_with_category_tag` and the ``categorize.py`` module
+    docstring for the three-system taxonomy model."""
     row = get_item(conn, fullname)
     if row is None:
         return False
@@ -409,7 +464,9 @@ def _norm_user_tag(t) -> str:
     return str(t or "").strip().lower()[:40]
 
 
-def set_tags(conn: sqlite3.Connection, fullname: str, *, add=None, remove=None) -> list[str] | None:
+def set_tags(
+    conn: sqlite3.Connection, fullname: str, *, add=None, remove=None
+) -> list[str] | None:
     """Add/remove **user** tags on an item, non-destructively.
 
     Manual tags live in ``metadata.tags`` (the displayed list) AND are stamped in
@@ -454,7 +511,9 @@ def set_tags(conn: sqlite3.Connection, fullname: str, *, add=None, remove=None) 
 
 
 def normalize_processing_tags(conn: sqlite3.Connection) -> int:
-    """Backfill category-derived processing tags for existing rows, idempotently."""
+    """One-time backfill: ensure the category→tag dual-write is populated for rows
+    that have a ``metadata.category`` but may be missing the tag mirror.
+    Idempotent — safe to re-run."""
     rows = conn.execute(
         "SELECT * FROM items WHERE json_extract(metadata, '$.category') IS NOT NULL"
     ).fetchall()
@@ -620,6 +679,7 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
 # Search
 # ---------------------------------------------------------------------------
 
+
 def _fts_query(
     q: str,
     *,
@@ -682,8 +742,10 @@ def _order_clause(sort: str, order: str, alias: str = "") -> str:
         # "Mixed-content" browse (Epic 10): interleave sources round-robin so a page is a
         # varied MIX instead of grouped/recency. Deterministic (nth-item-of-each-source,
         # then source) so infinite-scroll pages don't dup/skip — unlike ORDER BY RANDOM().
-        return (f"ORDER BY row_number() OVER (PARTITION BY {a}source "
-                f"ORDER BY {a}first_seen_utc DESC, {a}rowid), {a}source")
+        return (
+            f"ORDER BY row_number() OVER (PARTITION BY {a}source "
+            f"ORDER BY {a}first_seen_utc DESC, {a}rowid), {a}source"
+        )
     col = _SORT_COLUMNS.get(sort or "", "last_seen_utc")
     direction = "ASC" if (order or "desc").lower() == "asc" else "DESC"
     # Expression sort keys (json_extract/CAST) must not be table-alias-prefixed, and
@@ -793,13 +855,15 @@ def search_items(
         # absent over_18 from NULL-propagating through `NOT (… OR …)` and hiding SFW rows.
         if nsfw or hide_nsfw:
             ph = ",".join("?" for _ in NSFW_TAGS)
-            pred = (f"(EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
-                    f" OR COALESCE(json_extract({a}metadata, '$.over_18'), 0) = 1)")
+            pred = (
+                f"(EXISTS (SELECT 1 FROM json_each({a}metadata, '$.tags') WHERE value IN ({ph}))"
+                f" OR COALESCE(json_extract({a}metadata, '$.over_18'), 0) = 1)"
+            )
         if nsfw:
             filters.append(pred)
             params.extend(NSFW_TAGS)
         if hide_nsfw:
-            filters.append("NOT " + pred)        # exact inverse of the include filter above
+            filters.append("NOT " + pred)  # exact inverse of the include filter above
             params.extend(NSFW_TAGS)
         if has_media:
             # has:video|image|gallery — facet over metadata.media_type. "video" means
@@ -836,10 +900,14 @@ def search_items(
         if subreddit:
             if isinstance(subreddit, list):
                 ph = ",".join("?" for _ in subreddit)
-                filters.append(f"json_extract({a}metadata, '$.subreddit') IN ({ph}) COLLATE NOCASE")
+                filters.append(
+                    f"json_extract({a}metadata, '$.subreddit') IN ({ph}) COLLATE NOCASE"
+                )
                 params.extend(subreddit)
             else:
-                filters.append(f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE")
+                filters.append(
+                    f"json_extract({a}metadata, '$.subreddit') = ? COLLATE NOCASE"
+                )
                 params.append(subreddit)
         if author:
             # author is a first-class column (filled for reddit/HN); matched case-insensitively
@@ -874,11 +942,12 @@ def search_items(
         if is_saved is not None:
             filters.append(f"{a}is_saved = ?")
             params.append(int(is_saved))
-        if open_in_firefox:  # the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
+        if (
+            open_in_firefox
+        ):  # the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
             filters.append(f"json_extract({a}metadata, '$.open_in_firefox') = 1")
         if not include_consolidated:
-            filters.append(
-                f"json_extract({a}metadata, '$.consolidated_into') IS NULL")
+            filters.append(f"json_extract({a}metadata, '$.consolidated_into') IS NULL")
 
     q = (q or "").strip()
     exact = exact or []
@@ -933,7 +1002,12 @@ def search_items(
         # silently dropped. (`\W+` tokens are word-chars only, so escape just LIKE's `_`.)
         for term in exclude:
             for tk in (t for t in re.split(r"\W+", term or "") if t):
-                esc = tk.lower().replace("\\", r"\\").replace("_", r"\_").replace("%", r"\%")
+                esc = (
+                    tk.lower()
+                    .replace("\\", r"\\")
+                    .replace("_", r"\_")
+                    .replace("%", r"\%")
+                )
                 filters.append(r"LOWER(search_text) NOT LIKE ? ESCAPE '\'")
                 params.append("%" + esc + "%")
         where = (" WHERE " + " AND ".join(filters)) if filters else ""
@@ -988,8 +1062,11 @@ def get_random_batch(
     n = int(n)
     k_score = max(1, round(n * smart_mix))
     k_recent = max(0, n - k_score)
-    score_where = where + (" AND " if where else " WHERE ") + \
-        "json_extract(metadata, '$.triage_score') IS NOT NULL"
+    score_where = (
+        where
+        + (" AND " if where else " WHERE ")
+        + "json_extract(metadata, '$.triage_score') IS NOT NULL"
+    )
     score_pool = conn.execute(
         f"SELECT * FROM items{score_where} "
         f"ORDER BY json_extract(metadata, '$.triage_score') DESC LIMIT ?",
@@ -1023,6 +1100,7 @@ def get_random_batch(
 # ---------------------------------------------------------------------------
 # Triage operations
 # ---------------------------------------------------------------------------
+
 
 def _unsave_enabled(conn: sqlite3.Connection) -> bool:
     """Whether marking a reddit item 'done' should queue it for unsaving on Reddit."""
@@ -1097,6 +1175,7 @@ def repair_reddit_comment_prefixes(conn: sqlite3.Connection) -> int:
     skipped (no PK collision). Idempotent (fixed rows no longer match ``t3_``). Returns the number of
     items corrected; commits."""
     from content_hoarder.connectors.reddit import _sid_from_permalink
+
     rows = conn.execute(
         "SELECT fullname, source_id, json_extract(metadata, '$.permalink') AS permalink "
         "FROM items WHERE source='reddit' AND source_id LIKE 't3\\_%' ESCAPE '\\'"
@@ -1110,14 +1189,22 @@ def repair_reddit_comment_prefixes(conn: sqlite3.Connection) -> int:
             continue
         old_fullname = r["fullname"]
         new_fullname = "reddit:" + correct
-        if conn.execute("SELECT 1 FROM items WHERE fullname=?", (new_fullname,)).fetchone():
-            continue                       # corrected row already exists — don't collide the PK
-        conn.execute("UPDATE items SET source_id=?, fullname=? WHERE fullname=?",
-                     (correct, new_fullname, old_fullname))
-        conn.execute("UPDATE reddit_unsave SET fullname=?, reddit_id=? WHERE fullname=?",
-                     (new_fullname, correct, old_fullname))
-        conn.execute("UPDATE reddit_threads SET fullname=? WHERE fullname=?",
-                     (new_fullname, old_fullname))
+        if conn.execute(
+            "SELECT 1 FROM items WHERE fullname=?", (new_fullname,)
+        ).fetchone():
+            continue  # corrected row already exists — don't collide the PK
+        conn.execute(
+            "UPDATE items SET source_id=?, fullname=? WHERE fullname=?",
+            (correct, new_fullname, old_fullname),
+        )
+        conn.execute(
+            "UPDATE reddit_unsave SET fullname=?, reddit_id=? WHERE fullname=?",
+            (new_fullname, correct, old_fullname),
+        )
+        conn.execute(
+            "UPDATE reddit_threads SET fullname=? WHERE fullname=?",
+            (new_fullname, old_fullname),
+        )
         fixed += 1
     conn.commit()
     return fixed
@@ -1142,6 +1229,7 @@ def dedupe_reddit_comment_twins(conn: sqlite3.Connection) -> dict:
     Distinct from :func:`repair_reddit_comment_prefixes`, which RENAMES a t3_ comment that has NO
     t1_ twin. Idempotent. Returns ``{"removed", "status_moved", "requeued"}``; commits."""
     from content_hoarder.connectors.reddit import _sid_from_permalink
+
     rows = conn.execute(
         "SELECT fullname, source_id, status, json_extract(metadata,'$.permalink') AS permalink "
         "FROM items WHERE source='reddit' AND source_id LIKE 't3\\_%' ESCAPE '\\'"
@@ -1152,15 +1240,21 @@ def dedupe_reddit_comment_twins(conn: sqlite3.Connection) -> dict:
         if not (correct.startswith("t1_") and correct[3:] == r["source_id"][3:]):
             continue
         twin_fullname = "reddit:" + correct
-        twin = conn.execute("SELECT status FROM items WHERE fullname=?", (twin_fullname,)).fetchone()
+        twin = conn.execute(
+            "SELECT status FROM items WHERE fullname=?", (twin_fullname,)
+        ).fetchone()
         if not twin:
-            continue                       # no twin -> a true orphan; repair_reddit_comment_prefixes
+            continue  # no twin -> a true orphan; repair_reddit_comment_prefixes
         phantom = r["fullname"]
         if twin["status"] == "inbox" and r["status"] != "inbox":
-            set_status(conn, twin_fullname, r["status"])   # move the only triage signal onto the real row
+            set_status(
+                conn, twin_fullname, r["status"]
+            )  # move the only triage signal onto the real row
             status_moved += 1
-        if conn.execute("SELECT 1 FROM reddit_unsave WHERE fullname=?", (phantom,)).fetchone():
-            enqueue_unsave(conn, twin_fullname)            # queue the REAL comment (valid id)
+        if conn.execute(
+            "SELECT 1 FROM reddit_unsave WHERE fullname=?", (phantom,)
+        ).fetchone():
+            enqueue_unsave(conn, twin_fullname)  # queue the REAL comment (valid id)
             requeued += 1
         conn.execute("DELETE FROM reddit_unsave WHERE fullname=?", (phantom,))
         conn.execute("DELETE FROM reddit_threads WHERE fullname=?", (phantom,))
@@ -1177,7 +1271,9 @@ def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> int:
     Does NOT drain or make any network call.  Returns the number newly enqueued.
     """
     before = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
-    items = search_items(conn, "", source="reddit", is_saved=1, tags=[tag], limit=100_000)
+    items = search_items(
+        conn, "", source="reddit", is_saved=1, tags=[tag], limit=100_000
+    )
     for item in items:
         enqueue_unsave(conn, item["fullname"])
     conn.commit()
@@ -1231,15 +1327,20 @@ def reconcile_reddit_saves(
         present = present_by_kind.get(kind) or set()
         cap_reached = len(present) >= cap
         explicit = truncated_by_kind.get(kind) if truncated_by_kind else None
-        info = {"present": len(present), "capped": cap_reached, "skipped": None,
-                "unsaved": 0, "fullnames": []}
+        info = {
+            "present": len(present),
+            "capped": cap_reached,
+            "skipped": None,
+            "unsaved": 0,
+            "fullnames": [],
+        }
         if not present:
             info["capped"] = False
             info["skipped"] = "no_export_rows"
         elif explicit is True:
-            info["skipped"] = "source_truncated"           # caller knows the listing was cut off
+            info["skipped"] = "source_truncated"  # caller knows the listing was cut off
         elif explicit is None and cap_reached:
-            info["skipped"] = "cap_reached"                 # legacy row-count inference
+            info["skipped"] = "cap_reached"  # legacy row-count inference
         # explicit is False -> reconcile even at/above cap (a known-complete export)
         if not info["skipped"]:
             # Only previously-seen-in-a-snapshot rows are reconcile candidates (delta reconcile).
@@ -1277,8 +1378,9 @@ _STRIP_DECAY_SQL = (
 )
 
 
-def set_status(conn: sqlite3.Connection, fullname: str, status: str,
-               *, queue_unsave: bool = True) -> dict | None:
+def set_status(
+    conn: sqlite3.Connection, fullname: str, status: str, *, queue_unsave: bool = True
+) -> dict | None:
     """Set an item's triage status; record the previous one for undo.
 
     ``queue_unsave`` (default True) controls whether a transition to ``done`` enqueues a Reddit
@@ -1294,7 +1396,9 @@ def set_status(conn: sqlite3.Connection, fullname: str, status: str,
         return None
     old = row[0]
     if status == old:
-        return _public_by_fullname(conn, fullname)  # idempotent; don't clobber status_prev
+        return _public_by_fullname(
+            conn, fullname
+        )  # idempotent; don't clobber status_prev
     now = int(time.time())
     processed = None if status == "inbox" else now
     conn.execute(
@@ -1335,9 +1439,7 @@ def undo_status(conn: sqlite3.Connection, fullname: str) -> dict | None:
     return _public_by_fullname(conn, fullname)
 
 
-def bulk_set_status(
-    conn: sqlite3.Connection, fullnames: list[str], status: str
-) -> int:
+def bulk_set_status(conn: sqlite3.Connection, fullnames: list[str], status: str) -> int:
     """Apply a status to many items; returns the number updated."""
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid status: {status!r}")
@@ -1497,7 +1599,10 @@ def unsnooze(
     fns = _dedupe_fullnames(fullnames)
     if (snoozed_wave is None and not fns) or (snoozed_wave is not None and fns):
         raise ValueError("select either snoozed_wave or fullnames")
-    clauses = ["status='inbox'", "json_extract(metadata, '$.snoozed_until') IS NOT NULL"]
+    clauses = [
+        "status='inbox'",
+        "json_extract(metadata, '$.snoozed_until') IS NOT NULL",
+    ]
     params: list = []
     if snoozed_wave is not None:
         clauses.append("json_extract(metadata, '$.snoozed_wave') = ?")
@@ -1511,7 +1616,9 @@ def unsnooze(
         f"SELECT fullname, title FROM items WHERE {where} ORDER BY fullname LIMIT ?",
         params + [int(samples)],
     ).fetchall()
-    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM items WHERE {where}", params
+    ).fetchone()[0]
     res = {
         "total": total,
         "applied": False,
@@ -1575,7 +1682,9 @@ def _decay_where(tags, subreddits, before_utc, source) -> tuple[str, list]:
     sel = []
     if tags:
         ph = ",".join("?" for _ in tags)
-        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        sel.append(
+            f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))"
+        )
         params.extend(tags)
     if subreddits:
         ph = ",".join("?" for _ in subreddits)
@@ -1625,9 +1734,13 @@ def decay(
     distinct-row count, never ``sum(by_tag)``.
     """
     if not (tags or subreddits or before_utc):
-        raise ValueError("decay needs at least one selector (tags/subreddits/before_utc)")
+        raise ValueError(
+            "decay needs at least one selector (tags/subreddits/before_utc)"
+        )
     where, params = _decay_where(tags, subreddits, before_utc, source)
-    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM items WHERE {where}", params
+    ).fetchone()[0]
 
     by_tag: dict = {}
     for t in tags or []:
@@ -1655,9 +1768,15 @@ def decay(
         f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
         f"SUM(CASE WHEN {_AGE_EXPR} < ? AND {_AGE_EXPR} >= ? THEN 1 ELSE 0 END), "
         f"SUM(CASE WHEN {_AGE_EXPR} < ? THEN 1 ELSE 0 END) FROM items WHERE {where}",
-        [now - yr, now - yr, now - 2 * yr, now - 2 * yr, now - 4 * yr, now - 4 * yr] + params,
+        [now - yr, now - yr, now - 2 * yr, now - 2 * yr, now - 4 * yr, now - 4 * yr]
+        + params,
     ).fetchone()
-    age_bands = {"<1y": b[0] or 0, "1-2y": b[1] or 0, "2-4y": b[2] or 0, ">=4y": b[3] or 0}
+    age_bands = {
+        "<1y": b[0] or 0,
+        "1-2y": b[1] or 0,
+        "2-4y": b[2] or 0,
+        ">=4y": b[3] or 0,
+    }
 
     sample = [
         f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
@@ -1668,9 +1787,16 @@ def decay(
         ).fetchall()
     ]
 
-    res = {"total": total, "applied": False, "decayed_at": None, "label": label,
-           "by_tag": by_tag, "by_subreddit": by_subreddit, "age_bands": age_bands,
-           "sample": sample}
+    res = {
+        "total": total,
+        "applied": False,
+        "decayed_at": None,
+        "label": label,
+        "by_tag": by_tag,
+        "by_subreddit": by_subreddit,
+        "age_bands": age_bands,
+        "sample": sample,
+    }
     if apply:
         res["applied"] = True
         if total:
@@ -1769,7 +1895,10 @@ def undecay(
     "stamped == currently decayed" holds; ``processed_utc`` returns to NULL (inbox
     semantics, as set_status).
     """
-    clauses = ["status='archived'", "json_extract(metadata, '$.decayed_at') IS NOT NULL"]
+    clauses = [
+        "status='archived'",
+        "json_extract(metadata, '$.decayed_at') IS NOT NULL",
+    ]
     params: list = []
     if decayed_after is not None:
         clauses.append("json_extract(metadata, '$.decayed_at') >= ?")
@@ -1778,7 +1907,9 @@ def undecay(
         clauses.append("json_extract(metadata, '$.decayed_at') < ?")
         params.append(int(decayed_before))
     where = " AND ".join(clauses)
-    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM items WHERE {where}", params
+    ).fetchone()[0]
     sample = [
         f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
         for r in conn.execute(
@@ -1835,7 +1966,9 @@ def delete_items(
     are removed so a later drain can't unsave something the user only deleted locally;
     drained history rows are kept as audit.
     """
-    if not (tags or subreddits or before_utc or fullnames or swept or decayed or status):
+    if not (
+        tags or subreddits or before_utc or fullnames or swept or decayed or status
+    ):
         raise ValueError("delete_items needs at least one selector")
     clauses = ["source=?"]
     params: list = [source]
@@ -1853,7 +1986,9 @@ def delete_items(
     sel = []
     if tags:
         ph = ",".join("?" for _ in tags)
-        sel.append(f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))")
+        sel.append(
+            f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))"
+        )
         params.extend(tags)
     if subreddits:
         ph = ",".join("?" for _ in subreddits)
@@ -1866,24 +2001,35 @@ def delete_items(
         params.append(int(before_utc))
     where = " AND ".join(clauses)
 
-    victims = [r[0] for r in conn.execute(
-        f"SELECT fullname FROM items WHERE {where}", params).fetchall()]
+    victims = [
+        r[0]
+        for r in conn.execute(
+            f"SELECT fullname FROM items WHERE {where}", params
+        ).fetchall()
+    ]
     total = len(victims)
     sample = [
         f"r/{r[0] or '?'}: {(r[1] or '')[:60]}"
         for r in conn.execute(
             f"SELECT json_extract(metadata, '$.subreddit'), title FROM items "
-            f"WHERE {where} ORDER BY RANDOM() LIMIT ?", params + [int(samples)],
+            f"WHERE {where} ORDER BY RANDOM() LIMIT ?",
+            params + [int(samples)],
         ).fetchall()
     ]
-    res = {"total": total, "applied": False, "threads_deleted": 0,
-           "unsave_enqueued": 0, "sample": sample}
+    res = {
+        "total": total,
+        "applied": False,
+        "threads_deleted": 0,
+        "unsave_enqueued": 0,
+        "sample": sample,
+    }
     if not apply:
         return res
     if total > max_rows:
         raise ValueError(
             f"refusing to delete {total} rows (> max_rows={max_rows}); "
-            f"raise max_rows deliberately if this is intended")
+            f"raise max_rows deliberately if this is intended"
+        )
     res["applied"] = True
     if not total:
         return res
@@ -1893,18 +2039,23 @@ def delete_items(
         before_q = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
         for fn in victims:  # must happen while the item rows still exist
             enqueue_unsave(conn, fn)
-        enqueued = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] - before_q
+        enqueued = (
+            conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] - before_q
+        )
 
     threads = 0
     for i in range(0, total, 500):  # chunk IN lists well under SQLite's variable cap
-        chunk = victims[i:i + 500]
+        chunk = victims[i : i + 500]
         ph = ",".join("?" for _ in chunk)
-        cur = conn.execute(f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk)
+        cur = conn.execute(
+            f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk
+        )
         threads += cur.rowcount
         if not also_unsave:
             conn.execute(
                 f"DELETE FROM reddit_unsave WHERE fullname IN ({ph}) AND state='pending'",
-                chunk)
+                chunk,
+            )
         conn.execute(f"DELETE FROM items WHERE fullname IN ({ph})", chunk)
     conn.commit()
     res.update(threads_deleted=threads, unsave_enqueued=enqueued)
@@ -1940,7 +2091,9 @@ def purge_done(
     where = "status='done' AND processed_utc IS NOT NULL AND processed_utc < ?"
     params: list = [cutoff]
 
-    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM items WHERE {where}", params
+    ).fetchone()[0]
     sample = [
         f"{r[0]}: {(r[1] or '')[:60]}"
         for r in conn.execute(
@@ -1948,29 +2101,43 @@ def purge_done(
             params,
         ).fetchall()
     ]
-    res = {"total": total, "applied": False, "retention_days": retention_days,
-           "cutoff": cutoff, "threads_deleted": 0, "sample": sample}
+    res = {
+        "total": total,
+        "applied": False,
+        "retention_days": retention_days,
+        "cutoff": cutoff,
+        "threads_deleted": 0,
+        "sample": sample,
+    }
     if not apply:
         return res
     if total > max_rows:
         raise ValueError(
             f"refusing to purge {total} done rows (> max_rows={max_rows}); "
-            f"raise max_rows deliberately if this is intended")
+            f"raise max_rows deliberately if this is intended"
+        )
     res["applied"] = True
     if not total:
         return res
 
-    victims = [r[0] for r in conn.execute(
-        f"SELECT fullname FROM items WHERE {where}", params).fetchall()]
+    victims = [
+        r[0]
+        for r in conn.execute(
+            f"SELECT fullname FROM items WHERE {where}", params
+        ).fetchall()
+    ]
     threads = 0
     for i in range(0, len(victims), 500):  # chunk IN lists under SQLite's variable cap
-        chunk = victims[i:i + 500]
+        chunk = victims[i : i + 500]
         ph = ",".join("?" for _ in chunk)
-        cur = conn.execute(f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk)
+        cur = conn.execute(
+            f"DELETE FROM reddit_threads WHERE fullname IN ({ph})", chunk
+        )
         threads += cur.rowcount
         conn.execute(
             f"DELETE FROM reddit_unsave WHERE fullname IN ({ph}) AND state='pending'",
-            chunk)
+            chunk,
+        )
         conn.execute(f"DELETE FROM items WHERE fullname IN ({ph})", chunk)
     conn.commit()
     res["threads_deleted"] = threads
@@ -1987,10 +2154,12 @@ def _public_by_fullname(conn: sqlite3.Connection, fullname: str) -> dict | None:
 # stays cheap — the JSON blobs are large). See AGENTS.md "Reddit management view".
 # ---------------------------------------------------------------------------
 
+
 def get_reddit_thread(conn: sqlite3.Connection, fullname: str) -> dict | None:
     """Return the cached thread for an item, or None. Keys: thread_json, hydrated_at."""
     row = conn.execute(
-        "SELECT thread_json, hydrated_at FROM reddit_threads WHERE fullname=?", (fullname,)
+        "SELECT thread_json, hydrated_at FROM reddit_threads WHERE fullname=?",
+        (fullname,),
     ).fetchone()
     if not row:
         return None
@@ -2014,13 +2183,19 @@ def set_reddit_thread(
         "INSERT INTO reddit_threads(fullname, thread_json, hydrated_at) VALUES(?, ?, ?) "
         "ON CONFLICT(fullname) DO UPDATE SET "
         "thread_json=excluded.thread_json, hydrated_at=excluded.hydrated_at",
-        (fullname, compressed, hydrated_at if hydrated_at is not None else int(time.time())),
+        (
+            fullname,
+            compressed,
+            hydrated_at if hydrated_at is not None else int(time.time()),
+        ),
     )
     if commit:
         conn.commit()
 
 
-def reddit_subreddit_counts(conn: sqlite3.Connection, status: str | None = None) -> list[dict]:
+def reddit_subreddit_counts(
+    conn: sqlite3.Connection, status: str | None = None
+) -> list[dict]:
     """Per-subreddit item counts for reddit items (descending), for the sidebar."""
     sub = "json_extract(metadata, '$.subreddit')"
     where = f"source='reddit' AND {sub} IS NOT NULL AND {sub} <> ''"
@@ -2044,8 +2219,11 @@ def pulse(conn: sqlite3.Connection, *, now: int | None = None) -> dict:
     day's worth of cleared items."""
     now = int(now or time.time())
     lt = time.localtime(now)
-    midnight = int(time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0,
-                                lt.tm_wday, lt.tm_yday, -1)))
+    midnight = int(
+        time.mktime(
+            (lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, lt.tm_wday, lt.tm_yday, -1)
+        )
+    )
     new_today = conn.execute(
         "SELECT COUNT(*) FROM items WHERE first_seen_utc >= ?", (midnight,)
     ).fetchone()[0]
@@ -2058,8 +2236,139 @@ def pulse(conn: sqlite3.Connection, *, now: int | None = None) -> dict:
         "SELECT COUNT(*) FROM items WHERE json_extract(metadata, '$.decayed_at') >= ?",
         (now - 30 * 86400,),
     ).fetchone()[0]
-    return {"new_today": new_today, "cleared_today": cleared_today,
-            "swept_recent": swept_recent}
+    return {
+        "new_today": new_today,
+        "cleared_today": cleared_today,
+        "swept_recent": swept_recent,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Folders (Epic 26) — registry + item assignment
+# ---------------------------------------------------------------------------
+
+
+def list_folders(conn: sqlite3.Connection) -> list[dict]:
+    """All registered folders, ordered by name."""
+    rows = conn.execute(
+        "SELECT id, name, query_def, description, created_utc, updated_utc "
+        "FROM folders ORDER BY name COLLATE NOCASE ASC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["query_def"] = json.loads(d["query_def"])
+        except (ValueError, TypeError):
+            d["query_def"] = {}
+        out.append(d)
+    return out
+
+
+def create_folder(
+    conn: sqlite3.Connection,
+    name: str,
+    query_def: dict | None = None,
+    description: str = "",
+) -> dict:
+    """Create a folder from a saved-query definition. Returns the folder dict.
+    Raises ValueError on duplicate name. Names are lowercased for consistency."""
+    import time as _time
+
+    qd = json.dumps(query_def or {}, ensure_ascii=False)
+    now = int(_time.time())
+    norm_name = name.strip().lower()[:100]
+    if not norm_name:
+        raise ValueError("Folder name cannot be empty")
+    try:
+        conn.execute(
+            "INSERT INTO folders (name, query_def, description, created_utc) VALUES (?, ?, ?, ?)",
+            (norm_name, qd, (description or "").strip()[:200], now),
+        )
+        conn.commit()
+    except Exception as exc:
+        raise ValueError(f"Folder {name!r} already exists") from exc
+    return get_folder_by_name(conn, norm_name)
+
+
+def get_folder_by_name(conn: sqlite3.Connection, name: str) -> dict | None:
+    """Look up a folder by exact name."""
+    row = conn.execute(
+        "SELECT id, name, query_def, description, created_utc, updated_utc "
+        "FROM folders WHERE name=?",
+        (name.strip().lower()[:100],),
+    ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    try:
+        d["query_def"] = json.loads(d["query_def"])
+    except (ValueError, TypeError):
+        d["query_def"] = {}
+    return d
+
+
+def delete_folder(conn: sqlite3.Connection, folder_id: int) -> bool:
+    """Delete a folder by id. Returns True if deleted, False if not found.
+    Does NOT clear the folder field from items — they keep their assignment."""
+    cur = conn.execute("DELETE FROM folders WHERE id=?", (folder_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def rename_folder(
+    conn: sqlite3.Connection, folder_id: int, new_name: str
+) -> dict | None:
+    """Rename a folder. Returns updated folder dict, or None if not found."""
+    import time as _time
+
+    now = int(_time.time())
+    norm_name = new_name.strip().lower()[:100]
+    if not norm_name:
+        raise ValueError("Folder name cannot be empty")
+    try:
+        cur = conn.execute(
+            "UPDATE folders SET name=?, updated_utc=? WHERE id=?",
+            (norm_name, now, folder_id),
+        )
+        conn.commit()
+    except Exception:
+        raise ValueError(f"Folder name {new_name!r} already exists")
+    if cur.rowcount == 0:
+        return None
+    return get_folder_by_name(conn, new_name.strip()[:100])
+
+
+def set_item_folder(
+    conn: sqlite3.Connection, fullname: str, folder_name: str | None
+) -> bool:
+    """Set or clear ``metadata.folder`` on an item. Setting to None clears it.
+    Returns True if the item was found and updated."""
+    row = conn.execute(
+        "SELECT metadata FROM items WHERE fullname=?", (fullname,)
+    ).fetchone()
+    if row is None:
+        return False
+    md = parse_metadata(row["metadata"])
+    if folder_name:
+        md["folder"] = folder_name.strip().lower()[:100]
+    else:
+        md.pop("folder", None)
+    conn.execute(
+        "UPDATE items SET metadata=? WHERE fullname=?",
+        (json.dumps(md, ensure_ascii=False), fullname),
+    )
+    return True
+
+
+def folder_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Number of items assigned to each folder."""
+    rows = conn.execute(
+        "SELECT json_extract(metadata, '$.folder') AS folder, COUNT(*) AS c "
+        "FROM items WHERE json_extract(metadata, '$.folder') IS NOT NULL "
+        "GROUP BY folder ORDER BY c DESC"
+    ).fetchall()
+    return {r["folder"]: r["c"] for r in rows}
 
 
 def user_tag_vocab(conn: sqlite3.Connection) -> list[str]:
@@ -2098,7 +2407,9 @@ def tag_counts(
 
     facet_tags = list(FILTER_TAGS)
     seen = set(facet_tags)
-    for t in user_tag_vocab(conn):          # user-created tags join the curated facet vocabulary
+    for t in user_tag_vocab(
+        conn
+    ):  # user-created tags join the curated facet vocabulary
         if t not in seen:
             facet_tags.append(t)
             seen.add(t)
@@ -2114,8 +2425,9 @@ def tag_counts(
     rows = conn.execute(
         "SELECT je.value AS tag, COUNT(*) AS c "
         "FROM items, json_each(items.metadata, '$.tags') je "
-        "WHERE " + " AND ".join(where) +
-        " GROUP BY je.value ORDER BY c DESC, je.value COLLATE NOCASE ASC",
+        "WHERE "
+        + " AND ".join(where)
+        + " GROUP BY je.value ORDER BY c DESC, je.value COLLATE NOCASE ASC",
         params,
     ).fetchall()
     return {r["tag"]: r["c"] for r in rows}
@@ -2125,15 +2437,19 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
     """Reddit-only stats for the management view's stats modal."""
     sub = "json_extract(metadata, '$.subreddit')"
     by_kind = {
-        r["k"]: r["c"] for r in conn.execute(
-            "SELECT kind AS k, COUNT(*) AS c FROM items WHERE source='reddit' GROUP BY kind")
+        r["k"]: r["c"]
+        for r in conn.execute(
+            "SELECT kind AS k, COUNT(*) AS c FROM items WHERE source='reddit' GROUP BY kind"
+        )
     }
     by_status = _group_counts(conn, "status", "reddit")
     top_subs = [
-        {"subreddit": r["s"], "count": r["c"]} for r in conn.execute(
+        {"subreddit": r["s"], "count": r["c"]}
+        for r in conn.execute(
             f"SELECT {sub} AS s, COUNT(*) AS c FROM items "
             f"WHERE source='reddit' AND {sub} IS NOT NULL AND {sub} <> '' "
-            f"GROUP BY {sub} COLLATE NOCASE ORDER BY c DESC LIMIT 15")
+            f"GROUP BY {sub} COLLATE NOCASE ORDER BY c DESC LIMIT 15"
+        )
     ]
     distinct_subs = conn.execute(
         f"SELECT COUNT(DISTINCT {sub} COLLATE NOCASE) FROM items "
@@ -2147,9 +2463,11 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
         "SELECT COUNT(*) FROM items WHERE source='reddit' AND url <> ''"
     ).fetchone()[0]
     by_year = [
-        {"year": r["y"], "count": r["c"]} for r in conn.execute(
+        {"year": r["y"], "count": r["c"]}
+        for r in conn.execute(
             "SELECT CAST(strftime('%Y', created_utc, 'unixepoch') AS INTEGER) AS y, COUNT(*) AS c "
-            "FROM items WHERE source='reddit' AND created_utc > 0 GROUP BY y ORDER BY y")
+            "FROM items WHERE source='reddit' AND created_utc > 0 GROUP BY y ORDER BY y"
+        )
     ]
     return {
         "total": sum(by_status.values()),  # 0 when there are no reddit items
@@ -2167,6 +2485,7 @@ def reddit_stats(conn: sqlite3.Connection) -> dict:
 # ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
+
 
 def _group_counts(
     conn: sqlite3.Connection,
@@ -2231,10 +2550,7 @@ def category_counts(
     if status:
         where.append("status = ?")
         params.append(status)
-    sql = (
-        "SELECT json_extract(metadata, '$.category') AS k, COUNT(*) AS c "
-        "FROM items"
-    )
+    sql = "SELECT json_extract(metadata, '$.category') AS k, COUNT(*) AS c FROM items"
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " GROUP BY k"
@@ -2282,7 +2598,11 @@ def get_counts(
         # Hot path: the browse rail refreshes status counts after every triage action. It only
         # needs by_status (index-backed, ~3ms) — skip the unindexed full-table scans below
         # (by_kind / processed_this_week / with_url, ~170ms total) that only the Stats modal uses.
-        return {"total": total, "inbox": by_status.get("inbox", 0), "by_status": by_status}
+        return {
+            "total": total,
+            "inbox": by_status.get("inbox", 0),
+            "by_status": by_status,
+        }
     by_source = _group_counts(conn, "source")  # global — drives the Stats modal chart
     source_extra = " AND source = ?" if source else ""
     source_params = (source,) if source else ()
