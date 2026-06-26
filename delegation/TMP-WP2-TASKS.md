@@ -7,7 +7,7 @@ Agent profile: has a sandboxed checkout of the code, can run offline tests with 
 | 1 | 26 P2 | Taxonomy model reorg — unify categories (`metadata.category`) ↔ tags (`metadata.tags`) | ~~Q1 (namespace vs separate field)~~ **DONE**: three-system model formalized in `docs/taxonomy.md`, `categorize.py` module docstring, `db.py` dual-write comments. Categories stay first-class (no collapse). |
 | 2 | 26 P2 | Folders at save time — folder primitive alongside categories + tags | ~~Q1 (reserved namespace vs `metadata.folder`)~~ **DONE**: `metadata.folder` field + `folders` registry table + derived-rule evaluation engine (`folders.py`) + CLI (`folder list/create/rename/delete/evaluate/assign/stats`) + 6 web routes + 24 tests. Derived from saved queries (not save-time picker), per B5/Epic 21 constraint. Docs updated in `docs/taxonomy.md`. |
 | 3 | 26 P2 | Rule-based + AI-based tagging + new-tag suggestions (reviewable queue) | ~~Q1 (model shape)~~ `tag_suggest.py` done; rule-suggest, discovery, LLM-suggest, queue API + CLI + web routes + 28 tests. Model shape still pending for task 1–2. |
-| 4 | 26 P3 | User-tag table — pre-create empty tags, rename-in-vocabulary, delete-from-vocab | Q1 (table vs inline) |
+| 4 | 26 P3 | User-tag table — pre-create empty tags, rename-in-vocabulary, delete-from-vocab | Q1 resolved: inline via `tags_manual` stamp (shipped 2026-06-22). Table still needed for pre-create + rename (P3 backlog). |
 | 5 | 12 P3 | OCR enrich pass (`enrich --ocr`) + fold `metadata.ocr_text` into `items_fts` | Q3 (engine), `has:ocr`/`has:text` operator |
 | 6 | 5 P2 | Rework keyboard controls — new ergonomic one-hand scheme | Q2 |
 | 7 | 5 P3 | Drag-and-drop to buckets (SortableJS ~20KB vs html5sortable ~4KB) | — |
@@ -36,13 +36,12 @@ Agent profile: has a sandboxed checkout of the code, can run offline tests with 
 | 30 | 5 P3 | Image/gallery lightbox zoom + pan (pinch-to-zoom on mobile) | — |
 
 ## Decision gates needing user input before these can start cleanly
-- **Q1** → tasks 1–4 (taxonomy reorg is the big structural one)
 - **Q3** → task 5 (OCR engine)
 - **Q4** → tasks 21–22 (triage-app architecture)
 - **Q7** → task 13 (vault root storage)
 
 ## Open user questions (decision gates), restated
-- **Q1 — Taxonomy/folders (Epic 26):** processing categories as reserved tag namespace vs separate `metadata.category` field? Folders as reserved single-select namespace vs first-class `metadata.folder`?
+- ~~**Q1 — Taxonomy/folders (Epic 26):** processing categories as reserved tag namespace vs separate `metadata.category` field? Folders as reserved single-select namespace vs first-class `metadata.folder`?~~ **RESOLVED 2026-06-26**: Categories stay first-class (`metadata.category`). Folders = first-class field + `folders` registry, derived from saved queries. See `docs/taxonomy.md`.
 - **Q2 — Keyboard (Epic 5):** target ergonomic scheme, or have the agent propose 2–3 options?
 - **Q3 — OCR engine (Epic 12):** Tesseract via `pytesseract` (binary on PATH, no GPU) vs local vision model over `local-llm-bridge` (GPU, better on meme text)? Or have WP1 spot-check accuracy first?
 - **Q4 — Triage-app architecture (Epic 22):** (a) same Flask app, pluggable card sources; (b) sibling service reading `app.db`; (c) separate app consuming an HTTP API. Overlaps the PKMS capture-endpoint question (Epic 21 icebox) — answer together.
