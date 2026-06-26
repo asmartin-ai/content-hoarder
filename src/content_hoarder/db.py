@@ -270,6 +270,7 @@ def allocate_saved_order(conn: sqlite3.Connection, n: int, *, commit: bool = Tru
 
 
 _DECAY_WAVE_KEY = "decay_wave_seq"  # highest decay-wave id allocated so far (monotonic)
+_SNOOZE_WAVE_KEY = "snooze_wave_seq"  # highest snooze-wave id allocated so far (monotonic)
 
 
 def _allocate_decay_wave(conn: sqlite3.Connection, *, now: int,
@@ -286,6 +287,19 @@ def _allocate_decay_wave(conn: sqlite3.Connection, *, now: int,
     last = int(get_setting(conn, _DECAY_WAVE_KEY, 0) or 0)
     wave = max(int(now), last + 1)
     set_setting(conn, _DECAY_WAVE_KEY, str(wave), commit=commit)
+    return wave
+
+
+def _allocate_snooze_wave(conn: sqlite3.Connection, *, now: int,
+                          commit: bool = False) -> int:
+    """Reserve a UNIQUE monotonic snooze-wave id.
+
+    Mirrors ``_allocate_decay_wave`` so an undo can target exactly one snooze wave even
+    when multiple snoozes happen in the same wall-clock second.
+    """
+    last = int(get_setting(conn, _SNOOZE_WAVE_KEY, 0) or 0)
+    wave = max(int(now), last + 1)
+    set_setting(conn, _SNOOZE_WAVE_KEY, str(wave), commit=commit)
     return wave
 
 
@@ -461,6 +475,14 @@ def normalize_processing_tags(conn: sqlite3.Connection) -> int:
 
 _OVERLAY_FIELDS = ("title", "body", "url", "author")
 _TIME_FIELDS = ("created_utc", "saved_utc")
+_USER_STATE_METADATA_KEYS = {
+    "karakeep_id",
+    "decayed_at",
+    "decay_label",
+    "snoozed_until",
+    "snoozed_wave",
+    "snooze_count",
+}
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _INLINE_TAG_RE = re.compile(r"(?<![:/\w])#([\w\-/]+)")
 
@@ -552,6 +574,8 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
     # partial-tags caller would clobber e.g. NSFW tags: change deliberately (with tests)
     # or send category alongside. Pinned by test_merge_upsert_tags_semantics.
     for k, v in incoming_md.items():
+        if k in _USER_STATE_METADATA_KEYS and k in emd:
+            continue
         if k == "tags" and incoming_category:
             tags = _tag_list(emd.get("tags"))
             for t in _tag_list(v):
@@ -687,6 +711,7 @@ def search_items(
     hide_nsfw: bool = False,
     decayed: bool = False,
     swept: bool = False,
+    snoozed: bool = False,
     deleted: bool = False,
     has_media: str | list[str] | None = None,
     before: int | None = None,
@@ -793,6 +818,10 @@ def search_items(
         if swept:
             # swept (is:swept): decayed in the labeled initial backfill pass specifically.
             filters.append(f"json_extract({a}metadata, '$.decay_label') = 'swept'")
+        if snoozed:
+            # snoozed (is:snoozed): currently hidden from triage until a future UTC.
+            filters.append(f"json_extract({a}metadata, '$.snoozed_until') > ?")
+            params.append(int(time.time()))
         if deleted:
             # deleted (is:deleted): media probed gone (scan-deleted-media). media_status is the
             # durable SSOT — the mirrored `deleted` tag is wiped by a categorize retag.
@@ -934,6 +963,11 @@ def get_random_batch(
     params: list = []
     if unprocessed:
         filters.append("status = 'inbox'")
+        filters.append(
+            "(json_extract(metadata, '$.snoozed_until') IS NULL "
+            "OR json_extract(metadata, '$.snoozed_until') <= ?)"
+        )
+        params.append(int(time.time()))
     if source:
         filters.append("source = ?")
         params.append(source)
@@ -1223,13 +1257,17 @@ def reconcile_reddit_saves(
     return summary
 
 
-# Any MANUAL status transition exits the decayed state (see decay/undecay): strip the
-# wave marks so "stamped == currently decayed" holds and is:swept never matches a rescued
-# item. One definition for every status writer — a future writer that forgets this breaks
-# the invariant silently. No json_valid guard needed: the functional duration index makes
-# SQLite validate metadata JSON on every write, so a malformed row can never exist here
-# (pinned by test_malformed_metadata_cannot_enter_the_db).
-_STRIP_DECAY_SQL = "json_remove(metadata, '$.decayed_at', '$.decay_label')"
+# Any MANUAL status transition exits transient triage states (see decay/undecay and
+# snooze/unsnooze): strip wave marks so "stamped == currently decayed/snoozed" holds.
+# ``snooze_count`` deliberately survives as cumulative history; a manual decision only
+# clears the active deferral. One definition for every status writer — a future writer
+# that forgets this breaks the invariant silently. No json_valid guard needed: the
+# functional duration index makes SQLite validate metadata JSON on every write, so a
+# malformed row can never exist here (pinned by test_malformed_metadata_cannot_enter_the_db).
+_STRIP_DECAY_SQL = (
+    "json_remove(metadata, '$.decayed_at', '$.decay_label', "
+    "'$.snoozed_until', '$.snoozed_wave')"
+)
 
 
 def set_status(conn: sqlite3.Connection, fullname: str, status: str,
@@ -1319,6 +1357,171 @@ def bulk_set_status(
             pass
     conn.commit()
     return count
+
+
+def _dedupe_fullnames(fullnames: list[str] | None) -> list[str]:
+    out: list[str] = []
+    for fn in fullnames or []:
+        s = str(fn or "").strip()
+        if s and s not in out:
+            out.append(s)
+    return out
+
+
+def _sample_items(rows, *, samples: int = 5) -> list[str]:
+    return [f"{r['fullname']}: {(r['title'] or '')[:60]}" for r in list(rows)[:samples]]
+
+
+def _inbox_rows_for_fullnames(conn: sqlite3.Connection, fullnames: list[str]):
+    fns = _dedupe_fullnames(fullnames)
+    if not fns:
+        raise ValueError("fullnames must not be empty")
+    ph = ",".join("?" for _ in fns)
+    rows = conn.execute(
+        f"SELECT fullname, status, title, metadata FROM items WHERE fullname IN ({ph})",
+        fns,
+    ).fetchall()
+    by_fn = {r["fullname"]: r for r in rows}
+    missing = [fn for fn in fns if fn not in by_fn]
+    if missing:
+        raise ValueError(f"unknown item(s): {', '.join(missing[:5])}")
+    non_inbox = [fn for fn in fns if by_fn[fn]["status"] != "inbox"]
+    if non_inbox:
+        raise ValueError(f"can only snooze inbox item(s): {', '.join(non_inbox[:5])}")
+    return [by_fn[fn] for fn in fns]
+
+
+def snooze(
+    conn: sqlite3.Connection,
+    *,
+    fullnames: list[str],
+    until_utc: int,
+    window_days: int = 7,
+    escalate_after: int = 3,
+    apply: bool = False,
+    samples: int = 5,
+) -> dict:
+    """Stamp inbox items as snoozed without changing status.
+
+    ``metadata.snoozed_until`` hides the item from triage batches until that UTC, and
+    ``metadata.snoozed_wave`` makes one snooze wave reversible via ``unsnooze``.
+    ``metadata.snooze_count`` is cumulative: unsnooze and manual decisions do not
+    decrement it. When a snooze would make the count reach ``escalate_after``, the
+    item silently follows the decay path instead (archived with
+    ``decay_label='snooze-escalated'``), still by direct UPDATE and never via
+    ``bulk_set_status``.
+    """
+    if escalate_after < 1:
+        raise ValueError("escalate_after must be >= 1")
+    rows = _inbox_rows_for_fullnames(conn, fullnames)
+    to_snooze: list[str] = []
+    escalated: list[str] = []
+    for r in rows:
+        md = parse_metadata(r["metadata"])
+        count = int(md.get("snooze_count") or 0) + 1
+        if count >= int(escalate_after):
+            escalated.append(r["fullname"])
+        else:
+            to_snooze.append(r["fullname"])
+
+    res = {
+        "total": len(rows),
+        "applied": False,
+        "until_utc": int(until_utc),
+        "window_days": int(window_days),
+        "snoozed_wave": None,
+        "decayed_at": None,
+        "escalated": escalated,
+        "snoozed": to_snooze,
+        "sample": _sample_items(rows, samples=samples),
+    }
+    if not apply:
+        return res
+
+    res["applied"] = True
+    now = int(time.time())
+    applied_total = 0
+    if to_snooze:
+        wave = _allocate_snooze_wave(conn, now=now, commit=False)
+        ph = ",".join("?" for _ in to_snooze)
+        cur = conn.execute(
+            "UPDATE items SET metadata=json_set("
+            "metadata, '$.snoozed_until', ?, "
+            "'$.snooze_count', CAST(COALESCE(json_extract(metadata, '$.snooze_count'), 0) AS INTEGER) + 1, "
+            "'$.snoozed_wave', ?) "
+            f"WHERE status='inbox' AND fullname IN ({ph})",
+            [int(until_utc), wave] + to_snooze,
+        )
+        applied_total += cur.rowcount
+        res["snoozed_wave"] = wave
+    if escalated:
+        wave = _allocate_decay_wave(conn, now=now, commit=False)
+        ph = ",".join("?" for _ in escalated)
+        cur = conn.execute(
+            "UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
+            "metadata=json_set("
+            "json_remove(metadata, '$.snoozed_until', '$.snoozed_wave'), "
+            "'$.snooze_count', CAST(COALESCE(json_extract(metadata, '$.snooze_count'), 0) AS INTEGER) + 1, "
+            "'$.decayed_at', ?, '$.decay_label', ?) "
+            f"WHERE status='inbox' AND fullname IN ({ph})",
+            [now, wave, "snooze-escalated"] + escalated,
+        )
+        applied_total += cur.rowcount
+        res["decayed_at"] = wave
+    conn.commit()
+    res["total"] = applied_total
+    return res
+
+
+def unsnooze(
+    conn: sqlite3.Connection,
+    *,
+    snoozed_wave: int | None = None,
+    fullnames: list[str] | None = None,
+    apply: bool = False,
+    samples: int = 5,
+) -> dict:
+    """Clear active snooze marks for one wave or explicit inbox items.
+
+    ``snooze_count`` is intentionally not decremented; it is a cumulative signal used
+    for repeat-snooze escalation. This function never changes status and never touches
+    the Reddit unsave queue.
+    """
+    fns = _dedupe_fullnames(fullnames)
+    if (snoozed_wave is None and not fns) or (snoozed_wave is not None and fns):
+        raise ValueError("select either snoozed_wave or fullnames")
+    clauses = ["status='inbox'", "json_extract(metadata, '$.snoozed_until') IS NOT NULL"]
+    params: list = []
+    if snoozed_wave is not None:
+        clauses.append("json_extract(metadata, '$.snoozed_wave') = ?")
+        params.append(int(snoozed_wave))
+    else:
+        ph = ",".join("?" for _ in fns)
+        clauses.append(f"fullname IN ({ph})")
+        params.extend(fns)
+    where = " AND ".join(clauses)
+    rows = conn.execute(
+        f"SELECT fullname, title FROM items WHERE {where} ORDER BY fullname LIMIT ?",
+        params + [int(samples)],
+    ).fetchall()
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", params).fetchone()[0]
+    res = {
+        "total": total,
+        "applied": False,
+        "snoozed_wave": snoozed_wave,
+        "sample": _sample_items(rows, samples=samples),
+    }
+    if apply:
+        res["applied"] = True
+        if total:
+            cur = conn.execute(
+                "UPDATE items SET metadata=json_remove(metadata, '$.snoozed_until', '$.snoozed_wave') "
+                f"WHERE {where}",
+                params,
+            )
+            conn.commit()
+            res["total"] = cur.rowcount
+    return res
 
 
 # Item age: content creation time when known, else when we first synced it. (Reddit/YouTube
@@ -1478,6 +1681,63 @@ def decay(
                 f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
                 f"metadata={set_md} WHERE {where}",
                 [now] + md_params + params,
+            )
+            conn.commit()
+            res.update(total=cur.rowcount, decayed_at=wave)
+    return res
+
+
+def decay_fullnames(
+    conn: sqlite3.Connection,
+    *,
+    fullnames: list[str],
+    label: str | None = None,
+    apply: bool = False,
+    samples: int = 5,
+) -> dict:
+    """Decay explicit inbox items by fullname, using the same reversible stamp shape.
+
+    This is the exact-selection hook for repeat-snooze escalation. It deliberately uses
+    a direct UPDATE like ``decay`` and never routes through ``bulk_set_status``, so it
+    cannot enqueue Reddit unsaves.
+    """
+    fns = _dedupe_fullnames(fullnames)
+    if not fns:
+        raise ValueError("fullnames must not be empty")
+    ph = ",".join("?" for _ in fns)
+    where = f"status='inbox' AND fullname IN ({ph})"
+    rows = conn.execute(
+        f"SELECT fullname, title FROM items WHERE {where} ORDER BY fullname LIMIT ?",
+        fns + [int(samples)],
+    ).fetchall()
+    total = conn.execute(f"SELECT COUNT(*) FROM items WHERE {where}", fns).fetchone()[0]
+    res = {
+        "total": total,
+        "applied": False,
+        "decayed_at": None,
+        "label": label,
+        "sample": _sample_items(rows, samples=samples),
+    }
+    if apply:
+        res["applied"] = True
+        if total:
+            now = int(time.time())
+            wave = _allocate_decay_wave(conn, now=now, commit=False)
+            set_md = (
+                "json_set(json_remove(metadata, '$.snoozed_until', '$.snoozed_wave'), "
+                "'$.decayed_at', ?)"
+            )
+            md_params = [wave]
+            if label:
+                set_md = (
+                    "json_set(json_remove(metadata, '$.snoozed_until', '$.snoozed_wave'), "
+                    "'$.decayed_at', ?, '$.decay_label', ?)"
+                )
+                md_params = [wave, label]
+            cur = conn.execute(
+                f"UPDATE items SET status='archived', status_prev='inbox', processed_utc=?, "
+                f"metadata={set_md} WHERE {where}",
+                [now] + md_params + fns,
             )
             conn.commit()
             res.update(total=cur.rowcount, decayed_at=wave)
