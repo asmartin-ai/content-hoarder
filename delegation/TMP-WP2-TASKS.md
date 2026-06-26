@@ -28,11 +28,11 @@ Agent profile: has a sandboxed checkout of the code, can run offline tests with 
 | 22 | 22 P3 | Anki interleave prototype (AnkiConnect JSON-RPC localhost:8765) | Q4 + port collision with PKMS (8765) |
 | 23 | 24 icebox | Comments table normalization design (blob → normalized `comments` table) | Reactivation: want sort-in-SQL / single-comment writes |
 | 24 | 25 P3 | Human-mimic jitter (log-normal / two-state Markov / empirical sampling) | — (user's own learning project) |
-| 25 | 4 P2 | RedGifs resolver implementation (connector + metadata rewrite) | WP1#3 (API validated first) |
-| 26 | 7 P2 | Twitter/X bookmarks connector (`twitter:<tweet_id>`) | Q9 + browser-export format research. Handoff doc shipped in patch (`twitter-x-bookmarks-handoff.md`). Connector implementation pending Q9. |
+| 25 | 4 P2 | RedGifs resolver implementation (connector + metadata rewrite) | ~~WP1#3 (API validated first)~~ **DONE**: `src/content_hoarder/redgifs_resolver.py` + `tests/test_redgifs_resolver.py` (12 tests). Resolves dead Gfycat URLs via RedGifs API, rewrites `metadata.media_url`. |
+| 26 | 7 P2 | Twitter/X bookmarks connector (`twitter:<tweet_id>`) | ~~Q9 + browser-export format research~~ **DONE**: `src/content_hoarder/connectors/twitter.py` registered in `connectors/__init__.py` (dispatch before Reddit), `tests/test_twitter.py`. Parser-only (no X API). Handoff doc removed (one-time, work complete). |
 | 27 | 7 P3 | Live Firefox tab integration (WebExtension / sessionstore / bookmarklet) | Shape choice (a/b/c) |
 | 28 | 21 P3 | LLM identity-vs-actionable classifier (resurfacing candidate quality) | Local-LLM/GPU availability |
-| 29 | 20 P3 | Unused `app.css` selectors audit (per-selector usage checks before deletion) | — |
+| 29 | 20 P3 | Unused `app.css` selectors audit (per-selector usage checks before deletion) | ~~—~~ **DONE**: `scripts/wp2_t29_css_audit.py` + `docs/app-css-audit-2026-06-26.md`. 522 selectors audited; `.comp-*`/`.ai-*` verified LIVE (not orphaned); 4 groups confirmed safe to prune. |
 | 30 | 5 P3 | Image/gallery lightbox zoom + pan (pinch-to-zoom on mobile) | — |
 
 ## Decision gates needing user input before these can start cleanly
