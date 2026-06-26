@@ -348,6 +348,36 @@ def cmd_learn_triage(args) -> int:
     return 0
 
 
+def cmd_triage_drift(args) -> int:
+    from content_hoarder import triage_score
+    with _connect() as conn:
+        res = triage_score.drift_report(
+            conn,
+            apply=args.apply,
+            min_support=args.min_support,
+            alpha=args.alpha,
+            limit=args.limit,
+            since_processed=args.since_processed,
+        )
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        if res["has_previous"] and res["drift"]:
+            print(
+                f"(dry run - drift_score {res['drift']['drift_score']} across "
+                f"{res['drift']['rate_drift']['shared']} shared feature(s); "
+                f"{res['new_decisions']} new decision(s) since the comparison point. "
+                f"Re-run with --apply to refit, rescore inbox items, and persist.)",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "(dry run - no persisted triage model found; re-run with --apply to fit, "
+                "score inbox items, and persist.)",
+                file=sys.stderr,
+            )
+    return 0
+
+
 def cmd_delete(args) -> int:
     """PERMANENT delete with the money-action safety shape: dry-run is the default and
     the confirmation surface; --apply alone refuses (exit 3); --apply --yes executes
@@ -1145,6 +1175,22 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--status", action="store_true",
                     help="Print OAuth status (configured? username? — the default with no flag).")
     po.set_defaults(func=cmd_reddit_oauth)
+
+    ptd = sub.add_parser(
+        "triage-drift",
+        help="Compare the persisted triage model with a fresh fit; dry-run default, "
+             "--apply refits and rescores inbox items.",
+    )
+    ptd.add_argument("--min-support", type=int, default=20,
+                     help="Drop features seen fewer times than this (default 20).")
+    ptd.add_argument("--alpha", type=float, default=50.0,
+                     help="Smoothing weight toward the global prior (default 50).")
+    ptd.add_argument("--limit", type=int, help="With --apply, score at most N inbox items.")
+    ptd.add_argument("--since-processed", type=int, default=None,
+                     help="Override the UTC cutoff used for the new-decisions count.")
+    ptd.add_argument("--apply", action="store_true",
+                     help="Refit, rescore inbox items, and persist the model (default: dry run).")
+    ptd.set_defaults(func=cmd_triage_drift)
 
     return p
 
