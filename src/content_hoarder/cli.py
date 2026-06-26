@@ -319,6 +319,111 @@ def cmd_decay(args) -> int:
     return 0
 
 
+def cmd_snooze(args) -> int:
+    """Timed inbox deferral with the same money-action safety shape as decay/delete."""
+    import time as _time
+    from pathlib import Path
+
+    from content_hoarder import db, resurface
+
+    if args.undo:
+        if args.wave is None:
+            print("error: --undo needs --wave", file=sys.stderr)
+            return 2
+        with _connect() as conn:
+            plan = db.unsnooze(conn, snoozed_wave=args.wave, apply=False)
+            if not args.apply:
+                print(json.dumps(plan, indent=2))
+                print(f"(dry run — {plan['total']} snoozed item(s) would be unsnoozed; "
+                      f"re-run with --apply --yes to commit.)", file=sys.stderr)
+                return 0
+            if not args.yes:
+                print(json.dumps(plan, indent=2))
+                print("refusing: snooze undo needs BOTH --apply and --yes.", file=sys.stderr)
+                return 3
+            bak = _backup_db(conn, "pre-unsnooze")
+            res = db.unsnooze(conn, snoozed_wave=args.wave, apply=True)
+            res["backup"] = str(bak)
+            audit_path = Path(config.db_path()).with_name("snooze-audit.jsonl")
+            audit = {"ts": int(_time.time()), "op": "unsnooze", "wave": args.wave,
+                     "total": res["total"], "backup": str(bak), "sample": res["sample"]}
+            with audit_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+        print(json.dumps(res, indent=2))
+        return 0
+
+    if args.escalate:
+        with _connect() as conn:
+            plan = resurface.escalate_snoozed(
+                conn, escalate_after=args.escalate_after, apply=False, limit=args.limit
+            )
+            if not args.apply:
+                print(json.dumps(plan, indent=2))
+                print(f"(dry run — {plan['total']} repeat-snoozed item(s) would decay; "
+                      f"re-run with --apply --yes to commit.)", file=sys.stderr)
+                return 0
+            if not args.yes:
+                print(json.dumps(plan, indent=2))
+                print("refusing: snooze escalation needs BOTH --apply and --yes.",
+                      file=sys.stderr)
+                return 3
+            bak = _backup_db(conn, "pre-snooze-escalate")
+            res = resurface.escalate_snoozed(
+                conn, escalate_after=args.escalate_after, apply=True, limit=args.limit
+            )
+            res["backup"] = str(bak)
+            audit_path = Path(config.db_path()).with_name("snooze-audit.jsonl")
+            audit = {"ts": int(_time.time()), "op": "escalate",
+                     "escalate_after": args.escalate_after, "total": res["total"],
+                     "decayed_at": res["decayed_at"], "backup": str(bak),
+                     "sample": res["sample"]}
+            with audit_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+        print(json.dumps(res, indent=2))
+        return 0
+
+    if not args.fullname:
+        print("error: snooze needs at least one --fullname (or --undo/--escalate)",
+              file=sys.stderr)
+        return 2
+    now = int(_time.time())
+    if args.until is not None:
+        until_utc = int(args.until)
+        window_days = max(0, round((until_utc - now) / 86400))
+    else:
+        window_days = int(args.window_days)
+        until_utc = now + window_days * 86400
+
+    selectors = dict(fullnames=args.fullname, until_utc=until_utc,
+                     window_days=window_days, escalate_after=args.escalate_after)
+    with _connect() as conn:
+        plan = db.snooze(conn, **selectors, apply=False)
+        if not args.apply:
+            print(json.dumps(plan, indent=2))
+            print(f"(dry run — {len(plan['snoozed'])} item(s) would snooze and "
+                  f"{len(plan['escalated'])} would decay; re-run with --apply --yes "
+                  f"to commit.)", file=sys.stderr)
+            return 0
+        if not args.yes:
+            print(json.dumps(plan, indent=2))
+            print("refusing: snooze needs BOTH --apply and --yes.", file=sys.stderr)
+            return 3
+        bak = _backup_db(conn, "pre-snooze")
+        res = db.snooze(conn, **selectors, apply=True)
+        res["backup"] = str(bak)
+        audit_path = Path(config.db_path()).with_name("snooze-audit.jsonl")
+        audit = {"ts": int(_time.time()), "op": "snooze", "fullnames": args.fullname,
+                 "until_utc": until_utc, "window_days": window_days,
+                 "escalate_after": args.escalate_after, "total": res["total"],
+                 "snoozed_wave": res["snoozed_wave"], "decayed_at": res["decayed_at"],
+                 "escalated": res["escalated"], "backup": str(bak),
+                 "sample": res["sample"]}
+        with audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(audit, ensure_ascii=False) + "\n")
+    print(json.dumps(res, indent=2))
+    return 0
+
+
 def cmd_promote(args) -> int:
     from content_hoarder.bridge import karakeep
     with _connect() as conn:
@@ -1191,6 +1296,34 @@ def build_parser() -> argparse.ArgumentParser:
     ptd.add_argument("--apply", action="store_true",
                      help="Refit, rescore inbox items, and persist the model (default: dry run).")
     ptd.set_defaults(func=cmd_triage_drift)
+
+    psz = sub.add_parser(
+        "snooze",
+        help="Timed inbox deferral via metadata.snoozed_until (dry-run default; "
+             "execution needs --apply AND --yes; auto backup + audit log).",
+    )
+    psz.add_argument("--fullname", action="append",
+                     help="Exact inbox item to snooze (repeatable).")
+    until_group = psz.add_mutually_exclusive_group()
+    until_group.add_argument("--until", type=int,
+                             help="UTC epoch second when the snooze expires.")
+    until_group.add_argument("--window-days", type=int, default=7,
+                             help="Snooze window in days (default 7).")
+    psz.add_argument("--escalate-after", type=int, default=3,
+                     help="Decay instead of snoozing once snooze_count reaches this (default 3).")
+    psz.add_argument("--undo", action="store_true",
+                     help="Undo a snooze wave selected with --wave.")
+    psz.add_argument("--wave", type=int,
+                     help="Snooze wave id for --undo.")
+    psz.add_argument("--escalate", action="store_true",
+                     help="Bulk sweep rows whose snooze_count already reached --escalate-after.")
+    psz.add_argument("--limit", type=int,
+                     help="With --escalate, cap rows handled this run.")
+    psz.add_argument("--apply", action="store_true",
+                     help="Execute (with --yes). Default: dry run.")
+    psz.add_argument("--yes", action="store_true",
+                     help="Second confirmation; --apply alone shows the plan and refuses.")
+    psz.set_defaults(func=cmd_snooze)
 
     return p
 
