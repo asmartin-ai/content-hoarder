@@ -12,21 +12,27 @@ import { pushOverlay, settleTop } from "./overlaynav.js";
    + lightbox serve our bytes — survivable, cacheable, fast. setArchivePref() is called by the page
    on load + when the toggle flips; off => localUrl is a pure pass-through (zero cost). */
 let _archive = false;
-export const setArchivePref = (on) => { _archive = !!on; };
+export const setArchivePref = (on) => {
+  _archive = !!on;
+};
 export const localUrl = (item, url) => {
   if (!_archive) return url;
   const am = (item && item.metadata && item.metadata.archived_media) || null;
   if (!am) return url;
-  if (am[url]) return "/media/" + am[url];                 // exact archived match (galleries map 1:1)
-  const vals = Object.values(am);                          // salvageable: shown URL (dead original)
-  return vals.length === 1 ? "/media/" + vals[0] : url;    // ≠ the archived key → use the lone blob
+  if (am[url]) return "/media/" + am[url]; // exact archived match (galleries map 1:1)
+  const vals = Object.values(am); // salvageable: shown URL (dead original)
+  return vals.length === 1 ? "/media/" + vals[0] : url; // ≠ the archived key → use the lone blob
 };
 
 /* ---- thumbnails ---- */
 /* density: "card" gets the crisp maxres variant (onerror-falls back to mqdefault
    via ytFallback); everything else gets the light bar-free mqdefault (~10KB). */
 const _galleryThumb = (m) => {
-  if (Array.isArray(m.gallery_preview) && m.gallery_preview.length && safeUrl(m.gallery_preview[0]))
+  if (
+    Array.isArray(m.gallery_preview) &&
+    m.gallery_preview.length &&
+    safeUrl(m.gallery_preview[0])
+  )
     return m.gallery_preview[0];
   if (Array.isArray(m.gallery) && m.gallery.length && safeUrl(m.gallery[0]))
     return m.gallery[0];
@@ -47,7 +53,7 @@ export const thumb = (item, density) => {
     // and the locally-archived copy over either when present (Epic 4 P1)
     return localUrl(item, _galleryThumb(m));
   let t = _usableThumb(m.thumbnail);
-  if (!t && item.source === "hackernews") t = m.og_image || "";  // article preview (Epic 15 P3)
+  if (!t && item.source === "hackernews") t = m.og_image || ""; // article preview (Epic 15 P3)
   if (!t) t = _galleryThumb(m);
   if (!t) {
     const url = item.url || "";
@@ -59,18 +65,20 @@ export const thumb = (item, density) => {
     const variant = density === "card" ? "maxresdefault" : "mqdefault";
     t = t.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/" + variant + ".jpg");
   }
-  return localUrl(item, t);  // prefer the locally-archived copy when present (Epic 4 P1)
+  return localUrl(item, t); // prefer the locally-archived copy when present (Epic 4 P1)
 };
 
 /* YouTube maxres thumbs 404 on some videos → onerror-fall-back to mqdefault. */
-export const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.test(t)
-  ? " onerror=\"this.onerror=null;this.src=this.src.replace('maxresdefault','mqdefault')\""
-  : "";
+export const ytFallback = (t) =>
+  /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.test(t)
+    ? " onerror=\"this.onerror=null;this.src=this.src.replace('maxresdefault','mqdefault')\""
+    : "";
 
 /* Full image URL to open in a lightbox (direct images / i.redd.it), else "". */
 export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov)(\?|#|$)/i;
-const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
+const _directImg = (u) =>
+  IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
 export const imageUrls = (item) => {
   const m = item.metadata || {};
   if (Array.isArray(m.media_urls))
@@ -80,7 +88,9 @@ export const imageUrls = (item) => {
 export const videoUrls = (item) => {
   const m = item.metadata || {};
   if (Array.isArray(m.media_urls))
-    return m.media_urls.filter((u) => VIDEO_EXT.test(u || "")).map((u) => localUrl(item, u));
+    return m.media_urls
+      .filter((u) => VIDEO_EXT.test(u || ""))
+      .map((u) => localUrl(item, u));
   return [];
 };
 export const imageUrl = (item) => {
@@ -99,31 +109,50 @@ export const imageUrl = (item) => {
 /* ---- media/content classification (from reddit.js — drives the Epic 13:344
    native-embed pass: galleries/video from archived metadata, no reddit iframe). */
 export const mediaType = (item) => {
-  if (item.kind === "comment") return { cls: "comment", icon: "💬", label: "Comment" };
+  if (item.kind === "comment")
+    return { cls: "comment", icon: "💬", label: "Comment" };
   const m = item.metadata || {};
   // Reddit-hosted video: item.url is the permalink (→ "text" below), so the v.redd.it
   // evidence lives in metadata.media_url. Trust it directly (the archive signal the
   // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
   if ((m.media_url || "").includes("v.redd.it"))
     return { cls: "video", icon: "🎬", label: "Video" };
+  // Direct video file in metadata.media_url (e.g. a RedGifs-resolved .mp4 for a
+  // dead-Gfycat permalink item): item.url is the permalink, so the url-heuristic
+  // below can't see it. Trust the archive signal like the v.redd.it check above.
+  if (VIDEO_EXT.test(m.media_url || ""))
+    return { cls: "video", icon: "🎬", label: "Video" };
   if (videoUrls(item).length)
     return { cls: "video", icon: "▶", label: "Video" };
-  if ((Array.isArray(m.gallery) && m.gallery.length) || m.media_type === "gallery")
+  if (
+    (Array.isArray(m.gallery) && m.gallery.length) ||
+    m.media_type === "gallery"
+  )
     return { cls: "gallery", icon: "🖼️", label: "Gallery" };
   // Image evidence in metadata.media_url (harvested from feat/reddit-media-v13): the
   // ~25.8k reddit_media-catch-all posts whose item.url is the permalink, not the image.
   if (_directImg(m.media_url) || imageUrls(item).length)
     return { cls: "image", icon: "🖼️", label: "Image" };
   const url = (item.url || "").toLowerCase();
-  if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com"))
+  if (
+    /\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) ||
+    url.includes("i.redd.it") ||
+    url.includes("i.imgur.com")
+  )
     return { cls: "image", icon: "🖼️", label: "Image" };
   if (url.includes("/gallery/") || url.includes("imgur.com/a/"))
     return { cls: "gallery", icon: "🖼️", label: "Gallery" };
-  if (/\.(mp4|webm|mov)(\?|$)/.test(url) || url.includes("v.redd.it") || url.includes("gfycat.com") || url.includes("redgifs.com"))
+  if (
+    /\.(mp4|webm|mov)(\?|$)/.test(url) ||
+    url.includes("v.redd.it") ||
+    url.includes("gfycat.com") ||
+    url.includes("redgifs.com")
+  )
     return { cls: "video", icon: "🎬", label: "Video" };
   if (url.includes("youtube.com") || url.includes("youtu.be"))
     return { cls: "video", icon: "🎬", label: "YouTube" };
-  const isSelf = !url || url.includes("reddit.com/r/") || url.includes("/comments/");
+  const isSelf =
+    !url || url.includes("reddit.com/r/") || url.includes("/comments/");
   if (isSelf) return { cls: "text", icon: "📝", label: "Text post" };
   return { cls: "link", icon: "🔗", label: "External link" };
 };
@@ -138,8 +167,13 @@ export const redditUrl = (permalink) => {
   return "https://www.reddit.com" + (p.charAt(0) === "/" ? p : "/" + p);
 };
 export const redditEmbedUrl = (permalink) => {
-  const base = redditUrl(permalink).split("#")[0].split("?")[0]
-    .replace(/^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i, "https://www.redditmedia.com");
+  const base = redditUrl(permalink)
+    .split("#")[0]
+    .split("?")[0]
+    .replace(
+      /^https?:\/\/([a-z0-9-]+\.)?reddit\.com/i,
+      "https://www.redditmedia.com",
+    );
   return base + "?ref_source=embed&ref=share&embed=true&theme=dark";
 };
 
@@ -162,7 +196,7 @@ export const playableVideoSrc = (item) => {
   if (mediaType(item).cls !== "video") return "";
   const m = item.metadata || {};
   const src = m.media_url || videoUrls(item)[0] || item.url || "";
-  return (hlsManifestUrl(src) || VIDEO_EXT.test(src)) ? localUrl(item, src) : "";
+  return hlsManifestUrl(src) || VIDEO_EXT.test(src) ? localUrl(item, src) : "";
 };
 
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.
@@ -179,7 +213,9 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   const hlsUrl = hlsManifestUrl(srcUrl);
   const poster = posterUrl && safeUrl(posterUrl) ? posterUrl : "";
   const fallbackUrl = esc(srcUrl);
-  const fallbackHtml = '<a class="media-fallback" href="' + fallbackUrl +
+  const fallbackHtml =
+    '<a class="media-fallback" href="' +
+    fallbackUrl +
     '" target="_blank" rel="noopener">Open original ↗</a>';
 
   const video = document.createElement("video");
@@ -188,7 +224,9 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   video.setAttribute("playsinline", "");
   video.setAttribute("preload", "metadata");
   if (poster) video.setAttribute("poster", poster);
-  const tryPlay = () => { if (autoplay) video.play().catch(() => {}); };  // guard rejection (no gesture)
+  const tryPlay = () => {
+    if (autoplay) video.play().catch(() => {});
+  }; // guard rejection (no gesture)
 
   if (!hlsUrl) {
     video.src = srcUrl;
@@ -212,19 +250,26 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   const showFailed = (why) => {
     if (!document.body.contains(video)) return;
     clearTimeout(watchdog);
-    container.innerHTML = '<p class="media-fallback">Couldn’t load this video' +
-      (why ? " (" + esc(String(why)) + ")" : "") + ". " +
-      '<a href="' + fallbackUrl + '" target="_blank" rel="noopener">Open on Reddit ↗</a></p>';
+    container.innerHTML =
+      '<p class="media-fallback">Couldn’t load this video' +
+      (why ? " (" + esc(String(why)) + ")" : "") +
+      ". " +
+      '<a href="' +
+      fallbackUrl +
+      '" target="_blank" rel="noopener">Open on Reddit ↗</a></p>';
   };
   // Watchdog: if no frame has decoded after 14s, the spinner is dead — surface the
   // fallback with whatever the last error was (so a silent stall becomes reportable).
   watchdog = setTimeout(() => {
-    if (document.body.contains(video) && video.readyState < 2) showFailed(lastErr || "stalled — no video data");
+    if (document.body.contains(video) && video.readyState < 2)
+      showFailed(lastErr || "stalled — no video data");
   }, 14000);
   const clearWatch = () => clearTimeout(watchdog);
   video.addEventListener("playing", clearWatch, { once: true });
   video.addEventListener("loadeddata", clearWatch, { once: true });
-  video.addEventListener("error", () => showFailed("media error " + (video.error ? video.error.code : "?")));
+  video.addEventListener("error", () =>
+    showFailed("media error " + (video.error ? video.error.code : "?")),
+  );
 
   // Decide the HLS path. PREFER hls.js when Hls.isSupported(): Android/desktop Chrome and
   // Firefox have NO native HLS, yet video.canPlayType('application/vnd.apple.mpegurl') can
@@ -235,29 +280,46 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   // redirect (srcUrl) — it 302s, it isn't a playable file.
   let activeHls = null;
   const attachHls = (Hls) => {
-    if (!document.body.contains(video)) return;       // closed/replaced before the loader resolved
-    if (!Hls) { showFailed("player unavailable"); return; }   // hls.js script failed to load
+    if (!document.body.contains(video)) return; // closed/replaced before the loader resolved
+    if (!Hls) {
+      showFailed("player unavailable");
+      return;
+    } // hls.js script failed to load
     if (Hls.isSupported()) {
       const h = new Hls();
       activeHls = h;
-      h.on(Hls.Events.ERROR, (_e, data) => {            // record every error; bail out on a fatal one
+      h.on(Hls.Events.ERROR, (_e, data) => {
+        // record every error; bail out on a fatal one
         if (!data) return;
         lastErr = data.details || data.type || "hls error";
-        if (data.fatal) { try { h.destroy(); } catch (_err) {} activeHls = null; showFailed(lastErr); }
+        if (data.fatal) {
+          try {
+            h.destroy();
+          } catch (_err) {}
+          activeHls = null;
+          showFailed(lastErr);
+        }
       });
       h.loadSource(hlsUrl);
       h.attachMedia(video);
-      tryPlay();  // play AFTER the source is attached (fixes the Chrome/Android tap-autoplay race)
+      tryPlay(); // play AFTER the source is attached (fixes the Chrome/Android tap-autoplay race)
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = hlsUrl;   // genuine native HLS (iOS Safari)
+      video.src = hlsUrl; // genuine native HLS (iOS Safari)
       tryPlay();
     } else {
       showFailed("HLS not supported by this browser");
     }
   };
-  if (window.Hls) attachHls(window.Hls); else loadHls().then(attachHls);
+  if (window.Hls) attachHls(window.Hls);
+  else loadHls().then(attachHls);
 
-  const destroy = () => { clearWatch(); if (activeHls) { activeHls.destroy(); activeHls = null; } };
+  const destroy = () => {
+    clearWatch();
+    if (activeHls) {
+      activeHls.destroy();
+      activeHls = null;
+    }
+  };
   return { video, destroy };
 }
 
@@ -265,13 +327,17 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
    browser without native HLS). Resolves to window.Hls, or null if it fails to load. */
 let _hlsPromise = null;
 const loadHls = () => {
-  if (typeof window !== "undefined" && window.Hls) return Promise.resolve(window.Hls);
+  if (typeof window !== "undefined" && window.Hls)
+    return Promise.resolve(window.Hls);
   if (_hlsPromise) return _hlsPromise;
   _hlsPromise = new Promise((resolve) => {
     const s = document.createElement("script");
     s.src = "/static/vendor/hls.min.js";
     s.onload = () => resolve(window.Hls || null);
-    s.onerror = () => { _hlsPromise = null; resolve(null); };
+    s.onerror = () => {
+      _hlsPromise = null;
+      resolve(null);
+    };
     document.head.appendChild(s);
   });
   return _hlsPromise;
@@ -281,17 +347,26 @@ const loadHls = () => {
    createLightbox({modal, body}) — modal: the overlay element (with `hidden`),
    body: the content container inside it. Esc + backdrop-click close built in. */
 export function createLightbox(opts) {
-  const modal = typeof opts.modal === "string" ? document.querySelector(opts.modal) : opts.modal;
-  const body = typeof opts.body === "string" ? document.querySelector(opts.body) : opts.body;
+  const modal =
+    typeof opts.modal === "string"
+      ? document.querySelector(opts.modal)
+      : opts.modal;
+  const body =
+    typeof opts.body === "string"
+      ? document.querySelector(opts.body)
+      : opts.body;
 
-  let videoTeardown = null;  // teardown function for the open video's hls.js instance
+  let videoTeardown = null; // teardown function for the open video's hls.js instance
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
   const closeVisual = () => {
     if (modal.hidden) return;
-    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
-    body.innerHTML = "";  // stop playback
+    if (videoTeardown) {
+      videoTeardown();
+      videoTeardown = null;
+    } // stop HLS buffering
+    body.innerHTML = ""; // stop playback
     modal.hidden = true;
-    if (typeof opts.onClose === "function") opts.onClose();  // e.g. re-blur the source thumbnail (Epic 13 P2)
+    if (typeof opts.onClose === "function") opts.onClose(); // e.g. re-blur the source thumbnail (Epic 13 P2)
   };
   // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
   const close = () => {
@@ -308,25 +383,43 @@ export function createLightbox(opts) {
 
   // Open over the page + register with the coordinator so the OS back-button closes the lightbox
   // (returns to the feed/inbox) instead of navigating away / exiting the PWA.
-  const open = (html) => { body.innerHTML = html; modal.hidden = false; pushOverlay(closeVisual); };
+  const open = (html) => {
+    body.innerHTML = html;
+    modal.hidden = false;
+    pushOverlay(closeVisual);
+  };
 
   return {
     close,
     /* Open arbitrary HTML in the lightbox (for caller-constructed content like a gallery
        placeholder). Registers with the overlay coordinator so OS-back closes it. */
-    openHtml(html) { open(html); },
+    openHtml(html) {
+      open(html);
+    },
     /* Reddit permalink → redditmedia iframe (online-only; permalink is the fallback). */
     openMedia(permalink) {
       const url = redditUrl(permalink);
       if (!safeUrl(url)) return;
-      open('<iframe class="reddit-embed-frame" src="' + esc(redditEmbedUrl(permalink)) + '" loading="lazy"></iframe>' +
-        '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open on Reddit ↗</a>');
+      open(
+        '<iframe class="reddit-embed-frame" src="' +
+          esc(redditEmbedUrl(permalink)) +
+          '" loading="lazy"></iframe>' +
+          '<a class="media-fallback" href="' +
+          esc(url) +
+          '" target="_blank" rel="noopener">Open on Reddit ↗</a>',
+      );
     },
     /* Direct image → simple lightbox (reliable; no Reddit dependency). */
     openImage(url) {
       if (!safeUrl(url)) return;
-      open('<img class="media-img" src="' + esc(url) + '" alt="">' +
-        '<a class="media-fallback" href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a>');
+      open(
+        '<img class="media-img" src="' +
+          esc(url) +
+          '" alt="">' +
+          '<a class="media-fallback" href="' +
+          esc(url) +
+          '" target="_blank" rel="noopener">Open original ↗</a>',
+      );
     },
     /* Gallery → plain STACKED lightbox (restored 2026-06-22 per user pref — reverts the
        IntersectionObserver + min-height:50vh placeholder version, which felt jumpy/popped-in).
@@ -337,16 +430,29 @@ export function createLightbox(opts) {
       const full = (urls || []).filter(safeUrl);
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
-      const srcs = sized.length === full.length ? sized : full;   // prefer the smaller sized variants
-      open('<div class="media-gallery">' +
-        srcs.map((u, i) =>
-          '<img class="media-img gallery-img" loading="lazy" decoding="async" ' +
-          'src="' + esc(u) + '" data-full="' + esc(full[i]) + '" alt="">').join("") +
-        '</div><p class="media-fallback">' + full.length + " images</p>");
+      const srcs = sized.length === full.length ? sized : full; // prefer the smaller sized variants
+      open(
+        '<div class="media-gallery">' +
+          srcs
+            .map(
+              (u, i) =>
+                '<img class="media-img gallery-img" loading="lazy" decoding="async" ' +
+                'src="' +
+                esc(u) +
+                '" data-full="' +
+                esc(full[i]) +
+                '" alt="">',
+            )
+            .join("") +
+          '</div><p class="media-fallback">' +
+          full.length +
+          " images</p>",
+      );
       // tap an image → swap the sized preview up to the full original
       [...body.querySelectorAll(".gallery-img")].forEach((im) => {
         im.addEventListener("click", () => {
-          if (im.dataset.full && im.src !== im.dataset.full) im.src = im.dataset.full;
+          if (im.dataset.full && im.src !== im.dataset.full)
+            im.src = im.dataset.full;
         });
       });
     },
@@ -356,7 +462,7 @@ export function createLightbox(opts) {
        <video src>. See mountVideo for why hls.js wins over a canPlayType check. */
     openVideo(srcUrl, posterUrl) {
       if (!safeUrl(srcUrl)) return;
-      open("");  // clear first and show (open() sets modal.hidden = false)
+      open(""); // clear first and show (open() sets modal.hidden = false)
       const { video, destroy } = mountVideo(body, srcUrl, posterUrl);
       if (!video) return;
       videoTeardown = destroy;
@@ -375,14 +481,19 @@ export function createNsfw(isNsfw) {
     wrap(item, inner) {
       if (!inner) return "";
       if (!isNsfw(item) || revealed.has(item.fullname)) return inner;
-      return '<div class="item-media nsfw" data-nsfw-media="1">' + inner +
-        '<span class="nsfw-tag">NSFW</span></div>';
+      return (
+        '<div class="item-media nsfw" data-nsfw-media="1">' +
+        inner +
+        '<span class="nsfw-tag">NSFW</span></div>'
+      );
     },
     reveal(fullname, row) {
       revealed.add(fullname);
       if (!row) return;
       row.dataset.revealed = "1";
-      row.querySelectorAll(".item-media.nsfw").forEach((el) => el.classList.remove("nsfw"));
+      row
+        .querySelectorAll(".item-media.nsfw")
+        .forEach((el) => el.classList.remove("nsfw"));
     },
   };
 }
