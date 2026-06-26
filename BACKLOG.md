@@ -167,10 +167,10 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 
 - [x] ~~**Card-view text clipping.**~~ Fixed in the v2 row pass: card is now card-head + adaptive
   hero + a bottom tag/action row (no fixed crop, no title overlap).
-- [ ] **P2 — Categories in the sidebar / as a tag type.** Move the category facet into the left rail
-  (like status + tags); consider modeling "processing areas" as a reserved tag namespace so one filter
-  UI covers both. Touches `categorize.py` buckets + the rail + `search_items`.
-  **→ folded into Epic 26 (tag & category taxonomy reorganization, 2026-06-17).**
+- [x] ~~**P2 — Categories in the sidebar / as a tag type.**~~ ✅ SHIPPED / FOLDED:
+  processing categories are mirrored into the curated tag vocabulary (`PROCESSING_TAGS`), `/categories`
+  cross-filters by source/status, and the browse rail/drawer exposes categories alongside source/tag rows.
+  The larger structural model question remains tracked under Epic 26's overall taxonomy reorg.
 - [ ] **P3 — Zoom into the image / gallery modal.** Scroll/pinch-to-zoom (+ pan) in the media lightbox
   and gallery viewer (`openImage`/`openGallery` in `app.js`).
 - [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
@@ -204,8 +204,10 @@ false positives.*
 ## Epic 7 — More sources & live sync  (`enhancement`, `area:connectors`)
 - [ ] **P2 — Import WL3 + Watch Later.** WL3 via the same `yt-dlp --flat-playlist` flow; main Watch
   Later via a browser-extension export (the connector already accepts a flat array).
-- [ ] **P2 — Google Keep import.** Per-account Takeout → `import path/to/Keep` (connector exists;
-  just needs the export).
+- [x] ~~**P2 — Google Keep import.**~~ ✅ SHIPPED: `KeepConnector` imports Google Takeout `Keep/`
+  directories or individual note JSON files into `keep:<createdTimestampMs>` note items, including
+  checklist body rendering, labels, timestamps, color/archive/trash/pin metadata, URL extraction, and
+  conservative dispatch tests. User-data work is only the external Takeout export/import run.
   - [x] ~~Dispatch-hazard fix~~ (quad batch 2 winner Kimi K2.6, `9fa3c04` on main): `KeepConnector`
     no longer claims *any* `.json` directory — it now samples for actual Keep-note markers
     (mirrors `RedditConnector._can_import_dir`), so a BDFR/generic json tree falls through to the
@@ -242,28 +244,13 @@ false positives.*
   opt-in and manual — no always-on capture (the project's zero-new-friction guardrail).
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
-- [ ] **P2 — HN favorites-page auto-sync (Harmonic → `favorites?id=<user>`).** *(User-requested 2026-06-17;
-  path DECIDED 2026-06-22 — user retired Materialistic, migrated HN browsing to **Harmonic**.)* **Build the
-  `favorites?id=<user>` scraper** as the keyless, server-side, scheduled HN sync — the HN analogue of the
-  Reddit auto-sync. Background:
-  - **Why this is now the path:** Materialistic's "save" was **local-only** (never hit the HN account → needed
-    a per-device `adb backup`). **Harmonic favorites stories to the HN account server-side**, so they appear on
-    the **public** `news.ycombinator.com/favorites?id=<user>` page — pullable from the server with no phone.
-    *(One-time CONFIRM still pending: Harmonic's README/Play listing group "favorites" under account actions
-    alongside vote/comment/submit/see-upvoted, which strongly implies server-side, but verify empirically —
-    favorite one story, then check the favorites URL. HN's API is read-only, so favoriting is a website action.)*
-  - **Build:** fetch `favorites?id=<user>` paginated via `&p=N` (plain HTML; the connector's existing
-    `item?id=`/`athing` parsers already read it) → upsert as `hackernews` items → `enrich()` hydrates
-    title/score/author + og:image. Incremental (stop at a high-water mark like reddit saved-sync) and
-    schedulable (mirror `reddit_sync.SyncScheduler` / `auto_sync`). Needs only the user's **HN username** (the
-    page is public — no cookie). Add a `hn-sync` CLI + a settings field for the username.
-  - **Note:** favorites ≠ Materialistic-local "saved", but that's now moot — the user's workflow IS favoriting
-    in Harmonic going forward. `/upvoted?id=<user>` (needs a login cookie) covers upvotes, a separate optional
-    list. The `adb backup` Materialistic path is **legacy/reference** (see `docs/IMPORTING.md`); all old saves
-    already imported.
-  Mirror the reddit saved-sync shape (`reddit-oauth` / `connectors/reddit.py`, Epic 9). Refs:
-  [Harmonic](https://github.com/SimonHalvdansson/Harmonic-HN), [hnrss favorites feed](https://hnrss.org/),
-  [reactual/hacker-news-favorites-api](https://github.com/reactual/hacker-news-favorites-api).
+- [x] ~~**P2 — HN favorites-page auto-sync (Harmonic → `favorites?id=<user>`).**~~ ✅ SHIPPED:
+  `hn_sync.py` + `hn-sync --user <name>` fetch the public HN favorites HTML, follow the "More"
+  pagination link, insert bare `hackernews:<id>` rows with `metadata.hn_list='saved'`, and stop at a
+  JSON high-water mark (`settings.hn_sync_newest`). Network is behind injectable `getf=`; tests cover
+  id extraction, pagination, caught-up stops, first-run marks, idempotent reruns, and soft network errors.
+  Enrichment remains the existing `enrich --source hackernews` pass. The one-time Harmonic server-side
+  confirmation is still a user workflow check, not a code blocker.
 - [x] ~~**Differentiate posted / added-in-source / synced dates (UI).**~~ Shipped: the triage card and
   the browse list now label **posted** (`created_utc`), **added in source** (`saved_utc` — shown only
   when a source actually provides a real save timestamp; today HN/Obsidian/Keep do, Reddit/YouTube
@@ -282,36 +269,13 @@ false positives.*
   (Epic 4 spec); (b) the true **"date added to Watch Later"** for YouTube (`playlistItems.publishedAt`)
   still needs OAuth. Keyless stopgaps already shipped: galleries relabel to "🖼 Gallery"; sort by
   **playlist position**; score/upvote hydration via the archives (`enrich --source reddit --scores`).
-- [ ] **P2 — Twitter / X bookmarks as a content source (new connector).** *(User-requested 2026-06-22;
-  preliminary research done.)* Ingest the user's **X bookmarks** as `twitter:<tweet_id>` items. **Ingest path =
-  browser export, NOT the API** (mirrors the Firefox-tabs connector — keyless, manual ramp):
-  - **Why not the official API:** the bookmarks endpoint (`GET /2/users/{id}/bookmarks`, OAuth2 user-context +
-    `bookmark.read`) is **paid-only since 2026-02-06** (no free tier; pay-per-use "owned reads" at $0.001/resource,
-    legacy Basic $200 / Pro $5000 for existing subs only) **and hard-capped at ~800 bookmarks**. Wrong fit for a
-    keyless, complete-archive tool.
-  - **Why not the data-archive export:** X's official "download your data" archive **does not include bookmarks**
-    at all (it has your own *posted* tweets + `tweets_media/`, likes, DMs — not bookmarks). So the GDPR-export
-    trick used for Reddit doesn't apply here.
-  - **The fit — browser-side export:** tools like the open-source **`twitter-web-exporter`** (prinsss; a userscript
-    that installs a network interceptor and captures the X web app's own **GraphQL** bookmark responses as you
-    scroll) export **all** bookmarks to **JSON/CSV**, keyless, client-side, bypassing the 800 cap. Plan: user runs
-    such an export → drop the JSON into `import --source twitter` → a new connector parses it into
-    `twitter:<tweet_id>` items. (Later optional: our own minimal userscript/bookmarklet that POSTs to a local
-    `/import/x-bookmarks` endpoint, like the proposed live-Firefox-tabs ramp.)
-  - **Item shape:** `twitter:<tweet_id>`; fields = author handle/display name, text, `created_utc`, permalink
-    (`x.com/<user>/status/<id>`), and media URLs (`pbs.twimg.com` images — use `?name=orig` for full res;
-    `video.twimg.com` for video). De-dup by tweet id. **No bookmark timestamp** is exposed by the web export
-    (GraphQL gives a sort/order index, not a saved-at time) — same situation as Reddit saved; synthesize order,
-    don't fake a date (reuse `db.allocate_saved_order`).
-  - **Hoard the bytes (ties to Epic 4 P1):** `pbs.twimg.com` / `video.twimg.com` media is **purged within days of
-    a tweet's deletion**, so X media is as ephemeral as Reddit's — fold tweet media into the `archive-media` pass
-    (another durable-while-live CDN; archive proactively at import/sync, don't rely on post-hoc recovery).
-  - **Open:** quote-tweet / thread context (the web export may flatten these); NSFW handling (reuse the `nsfw_*`
-    opt-in); whether to promote tweet-embedded YouTube links into `youtube:` items (Epic 11 pattern).
-  Relates to Epic 7 (connectors), Epic 4 P1 (media bytes), Epic 11 (cross-source promotion). Refs:
-  [twitter-web-exporter (GitHub)](https://github.com/prinsss/twitter-web-exporter),
-  [X API pricing 2026](https://api.sorsa.io/blog/twitter-api-pricing-2026),
-  [X Get Bookmarks docs](https://docs.x.com/x-api/users/get-bookmarks).
+- [x] ~~**P2 — Twitter / X bookmarks as a content source (new connector).**~~ ✅ SHIPPED:
+  `TwitterConnector` parses browser-exported JSON/CSV and nested X GraphQL tweet shapes into
+  `twitter:<tweet_id>` rows without API calls or DB writes. It captures tweet text, author handle/name,
+  canonical permalink, created time, outbound links, quote/reply context, images normalized to
+  `?name=orig`, highest-bitrate MP4 video variants, and poster thumbnails; dispatch is conservative and
+  fixture-tested. Follow-ups remain optional: local capture userscript/bookmarklet, NSFW policy, and richer
+  quote/thread UI.
 
 ## Epic 8 — Polish & infra  (`chore`)
 - [x] ~~**`.gitattributes`**~~ Shipped (`* text=auto eol=lf` + binary excludes) — stops CRLF warnings.
@@ -398,8 +362,9 @@ false positives.*
   members, root or nested — winner GLM-5.1) + **BDFR single-JSON** (single-dict shape through
   `child_to_item`) + **recursive directory walk** (`can_import`/`import_file` on dirs, strict
   reddit head-sniff so Keep Takeout dirs still dispatch to Keep — winner DeepSeek V4). 17 new tests.
-- [ ] **P3 — Duplicates review UI** (also Epic 6 P3). Title-dedup flagged ~5.2k loose matches across ~1.8k
-  groups on the real corpus — too many to auto-resolve; needs the group-review surface before resolving.
+- [x] ~~**P3 — Duplicates review UI**~~ ✅ SHIPPED 2026-06-26 under Epic 6: Settings → Duplicates
+  opens `#dupesheet`, backed by `/duplicates`, `/duplicates/resolve`, and `/duplicates/undo`, with By URL /
+  By Title grouping, per-group "Archive others", and undo snackbar.
 - [x] ~~**P3 — OAuth go-live.**~~ ✅ COMPLETE 2026-06-16 (PR #2). READ half shipped via Epic 25 (F5);
   then the WRITE half: OAuth grant widened to the full RedReader scope set (`read history identity
   save` — Reddit grants scopes per-authorize-request, so the public installed-app id needs no Reddit
@@ -564,7 +529,8 @@ need separate filter controls.*
   `^r/<sub>$` token in `search_query.parse` now maps to the subreddit filter, equivalent to
   `subreddit:<sub>` (matched COLLATE NOCASE downstream). Resolved as an **alias** — `subreddit:` is
   unchanged, not deprecated. Anchored to a standalone token so reddit URLs / mid-text `r/…` aren't captured.
-  5 tests. **Still open (deferred):** `u/<user>` → author shorthand, and the operator-rename pass (Icebox below).
+  5 tests. **Follow-up shipped:** `author:` and bare `u/<user>` now filter the first-class `author` column
+  case-insensitively, including comma/pipe OR forms. The operator-rename pass remains in the Icebox below.
 - [x] ~~**P3 — `Exact` checkbox shouldn't close the operator suggestions popover.**~~ ✅ Done 2026-06-20 (Task C): `scheduleClose` now re-checks `document.activeElement` when the timer fires (clicking the in-popover checkbox blurs the input with a null `relatedTarget`). *(User-reported
   2026-06-17.)* Clicking the **Exact-only** checkbox in the search bar dismisses the `#oppop` suggestions. The
   toggle shouldn't blur/close the popover — keep suggestions open so the user can keep building the query.
@@ -690,17 +656,13 @@ need separate filter controls.*
   Changed base `.title` (used by ledger) + `.items.density-comfortable .title`, and dropped the now-redundant mobile
   override (comfortable was already `--fs-md` there). Card/Pinboard title (`.pin h3`) unchanged. Verified both
   rendered sizes in the preview.
-- [ ] **P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).** *(User-reported
+- [x] ~~**P2 — Album/gallery thumbnail doesn't load (e.g. r/TankPorn M1A1 Abrams).**~~ ✅ VERIFIED
+  SHIPPED: gallery thumbnail fallback is now covered by the gallery preview/fallback path; poster-less or
+  unavailable gallery media renders a clean fallback tile instead of a broken/missing thumbnail. *(User-reported
   2026-06-17.)* Repro item:
-  `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/` — the gallery card
-  shows no thumbnail. Likely the archive fetch didn't populate `metadata.gallery`/`thumbnail` for this item
-  (or the thumb URL 404s). Check the gallery extraction (`providers._gallery`, Epic 4) for this post + the
-  thumbnail fallback when `media_metadata` is missing. Verify against the live row before fixing.
-  **Re-reported 2026-06-19 (same post):** the user also reports it **doesn't render properly** in the reader
-  (beyond the missing thumbnail) — but suspects it **may already be fixed** since. **Double-check the live row
-  first:** confirm whether the gallery now renders/opens correctly, and only then chase (a) the still-missing
-  card thumbnail and (b) any remaining render glitch. May already be partly resolved by the shipped gallery
-  lightbox (Epic 13 P1 / Epic 4 inline-gallery).
+  `reddit.com/r/TankPorn/comments/1u3tphi/ukrainian_m1a1_aim_abrams_with_anti_drone_cages/`. The
+  original report covered both the card thumbnail and reader rendering; both are now handled by the shipped
+  gallery preview/lightbox fallback path.
 - [x] ~~**P3 — Pinboard portrait images anchored top-left (visual polish).**~~ ✅ Fixed 2026-06-20
   (`frontend-staging`). *(User-reported 2026-06-17; **cover** chosen by the user 2026-06-20.)* In the **card /
   "Pinboard"** density, portrait (tall) images showed pillarbox gutters in the column. **Real root cause (found
@@ -905,10 +867,17 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   lightbox already registers with the overlay coordinator (`core/media.js` `pushOverlay`), so OS/back closes
   it and returns to the feed (verified). SW v66. *(User-requested 2026-06-17.)* (HN article thumbnails: they
   use the title-`<a>` route, not `[data-media]`, so they're unaffected.)
-- [ ] **P2 — Video plays inline in the reader (no lightbox).** *(User-requested 2026-06-17.)* In
-  `section#reader` a video currently opens the lightbox; play it **inline in the reader's media tile** instead
-  (reuse the HLS/`<video>` path from `core/media.js`). The lightbox stays for the browse-list peek (above);
-  this is reader-only.
+- [x] ~~**P2 — Broad reader source coverage + local-rich renderers.**~~ ✅ SHIPPED 2026-06-26
+  (`feat/reader-source-coverage`): title/body taps now open the in-app reader for Reddit, HN, Keep,
+  Obsidian, **YouTube**, and **Twitter/X** while media/thumb taps stay media-first. YouTube rows render a
+  lazy `youtube-nocookie.com` iframe from `source_id`/URL plus local metadata (`channel`, duration, playlist,
+  availability, views, categories, description, `metadata.companions`). Twitter/X rows render stored tweet
+  text, author/reply context, quote-tweet block, outlinks, and stored media from `metadata.media_urls` /
+  `thumbnail` with no X network calls. Added node-backed helper tests and Playwright regressions against
+  synthetic UI DB rows; UI tests no longer require a private `data/app.db`.
+- [x] ~~**P2 — Video plays inline in the reader (no lightbox).**~~ ✅ VERIFIED SHIPPED:
+  the reader now mounts playable video inline in the media tile using the shared HLS/`<video>` path; the
+  lightbox remains the browse-list quick peek. *(User-requested 2026-06-17.)*
 - [x] ~~**P3 — Reposition the reader's media preview (takes too much vertical space at top).**~~ ✅ Done 2026-06-20 (Task B): capped `.rd-media img` to 42vh and inline video to 52vh (was 58/70vh; kept `contain`, tap still opens the full lightbox). *(User-requested
   2026-06-17.)* In `section#reader` the post-media tile dominates the top of the view; shrink/reposition it so
   the post + thread are reachable with less scrolling (cap its height, or make it a collapsible/cover-fit
@@ -919,7 +888,10 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.**~~ ✅ SHIPPED
   2026-06-26: single-video notes render a YouTube iframe (`youtube-nocookie.com/embed/<id>`) in the reader's
   media tile with the note body below (**Obsidian** = markdown via `core/markdown.js`; **Keep** = plain text +
-  checklist with line-through). Keep invocation of the Epic 11 standalone heuristic — notes with real content
+  checklist with line-through). **Checklist view-mode toggles shipped 2026-06-26:** Keep-style `[ ]` / `[x]`
+  and Markdown task-list `- [ ]` / `- [x]` lines are clickable in the reader, preserve line shape, and save
+  through the existing `/items/<fn>/body` route with optimistic UI + revert on failure. Keep invocation of the
+  Epic 11 standalone heuristic — notes with real content
   stay as `keep:`/`obsidian:` items, NOT promoted. Iframe tears down on every close path (button/Esc/popstate/
   swipe/F-A-D). Multi-video notes fall back gracefully (the multi-video reader handles them). Node-tested
   `extractYoutubeIds()` + Playwright UI test. *(User-requested 2026-06-19.)*
@@ -928,7 +900,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   `note_youtube.py` now skips multi-video notes in the promote pass (`len(vids) != 1`) — they're exclusively
   this reader's domain. Note body renders below the video tab bar. Playwright UI test covers tab switching +
   body rendering. *(User idea 2026-06-19.)*
-- [ ] **P2 — Edit note bodies as raw markdown, in the reader.** *(User-requested 2026-06-19.)* Let the reader
+- [x] ~~**P2 — Edit note bodies as raw markdown, in the reader.**~~ *(User-requested 2026-06-19.)* Let the reader
   edit a note's body as **raw markdown** (a textarea + rendered live preview reusing the reader's markdown
   renderer above) — **reuse the reader view**, not a separate editor surface. ✅ **Reader editor shipped
   2026-06-25:** Keep/Obsidian items now open in the existing reader with an edit-body toggle, textarea, live
@@ -994,7 +966,7 @@ Absorbs "make the Reddit view more mobile-friendly".*
 - [x] ~~**P1 — Swipe must not trigger horizontal page scroll.**~~ ✅ v3: `body{overflow-x:clip}` (`browse.css:15`) + `swipe.js:27` `touchAction="pan-y"` (transform-only drag + edge-zone guard) — a row swipe can't side-scroll the page. Orig: Lock the layout to the device width
   (fixed viewport, `overflow-x` containment) so swiping a row doesn't side-scroll the page.
 - [x] ~~**P2 — NSFW blur in the inbox/triage**~~ ✅ v3: over-18 media blurred in the browse list (`render.js:13/62` veil + `browse.css:318` `filter:blur(16px)`), reveal-on-tap. Orig: adopt the Reddit view's blur for over-18 media.
-- [ ] **P2 — Tap thumbnail opens the view modal; long-press enters group-select.** ✅ tap-opens-modal SHIPPED on v3 (`main.js:161-180` delegated `[data-media]` → `openMediaFor`); ⏳ the **long-press → group-select** half is still unbuilt (`swipe.js` has no long-press; select is via the avatar `[data-select]` button). Box stays open for that half. Orig: Today a thumbnail
+- [ ] **P2 — DEFERRED: long-press on a thumbnail enters group-select.** ✅ tap-opens-modal SHIPPED on v3 (`main.js:161-180` delegated `[data-media]` → `openMediaFor`). The **long-press → group-select** half is intentionally deferred from the retention/gallery split: `swipe.js` has no long-press, and selection still lives on the avatar `[data-select]` button. Reactivate this when group-select returns to scope. Orig: Today a thumbnail
   tap on mobile doesn't open the modal.
 - [ ] **P3 — ICEBOX: Swipe physics feel.** *(Iceboxed 2026-06-22 — user: "right now it's fine.")* The
   current swipe is a little stiff; could add momentum/spring + better thresholds for a smoother feel.
@@ -1377,15 +1349,16 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   `--also-unsave` enqueues into the unsave queue BEFORE rows vanish, and without it stale
   pending queue rows are purged so a later drain can't unsave a local-only delete. Deletes
   the `reddit_threads` cache rows too. 8 tests.
-- [~] **P2 — Done items auto-delete after a retention window (Gmail-trash style).** ✅ CLI half done 2026-06-20 (commit 08ad3d6): the `purge-done` command wraps `db.purge_done` in the money-action safety shape (dry-run default, `--apply` + `--yes` gate, auto pre-purge backup, `delete-audit.jsonl` with victim fullnames, `--max` blast cap, `--retention-days` to set the window). +2 tests. **STILL OPEN:** the settings-sheet control for the retention window (needs your visual review) + an optional scheduled-sweep entrypoint. *(User-requested
+- [x] ~~**P2 — Done items auto-delete after a retention window (Gmail-trash style).**~~ ✅ VERIFIED
+  SHIPPED: `purge-done` wraps `db.purge_done` in the money-action safety shape (dry-run default, `--apply`
+  + `--yes` gate, auto pre-purge backup, `delete-audit.jsonl`, `--max`, `--retention-days`), and the settings
+  sheet exposes the retention window plus purge preview/action. Optional scheduled sweep remains icebox scope. *(User-requested
   2026-06-17.)* **DB primitive SHIPPED 2026-06-18 (F15 bakeoff, glm-5p2 arm + review fixes):**
   `db.purge_done(conn, *, now, apply, max_rows)` permanently purges `status='done'` items older than
   setting `done_retention_days` (default 30), aging from `processed_utc` (NULL excluded). Direct-delete —
   never routes through `bulk_set_status`/`enqueue_unsave`, so a purge **cannot enqueue a Reddit unsave**
   (mirrors the decay invariant, oracle-pinned); cleans pending `reddit_unsave` + `reddit_threads` rows;
-  `max_rows` blast cap. 8 tests. **REMAINING (the user-facing half):** a CLI / scheduled-sweep entrypoint
-  wrapping it in the `delete` CLI's **auto-backup + `delete-audit.jsonl` + confirmation gate**, and a
-  **settings UI** for the window. `processed_utc` confirmed as the Done-transition timestamp (no schema
+  `max_rows` blast cap. `processed_utc` confirmed as the Done-transition timestamp (no schema
   change needed). Builds on the P3 hard-delete pathway above + the decay machinery.
 - [ ] **P3 — Rolling decay automation (Icebox).** Reactivate after the backfill proves out and
   ~a month of new saves accumulates.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import ipaddress
+import json
 import mimetypes
 import os
 import re
@@ -13,6 +14,7 @@ import subprocess
 import tempfile
 import time
 from contextlib import closing
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -62,6 +64,25 @@ def create_app(db_path: str | None = None) -> Flask:
 
     def conn():
         return closing(db.connect(app.config["DB_PATH"]))
+
+    def _backup_db(suffix: str) -> Path:
+        stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int((time.time() % 1) * 1000):03d}"
+        bak = Path(app.config["DB_PATH"]).with_name(f"app.backup-{suffix}-{stamp}.db")
+        with closing(db.connect(str(bak))) as dst, conn() as src:
+            src.backup(dst)
+        return bak
+
+    def _append_delete_audit(record: dict) -> None:
+        audit_path = Path(app.config["DB_PATH"]).with_name("delete-audit.jsonl")
+        with audit_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    def _parse_retention_days(value) -> int | None:
+        try:
+            days = int(value)
+        except (TypeError, ValueError):
+            return None
+        return days if 1 <= days <= 3650 else None
 
     # Async unsave trickle: a Done enqueues instantly (db.set_status); this background drainer
     # flushes a small capped batch once triage settles (idle debounce). Opt-in via
@@ -481,6 +502,86 @@ def create_app(db_path: str | None = None) -> Flask:
         with conn() as c:
             return jsonify(dedup.undo_resolve(c, fullnames))
 
+    # -- done retention settings / purge ----------------------------------
+
+    @app.get("/settings/done-retention")
+    def done_retention_settings():
+        now = int(time.time())
+        with conn() as c:
+            try:
+                retention_days = int(db.get_setting(c, "done_retention_days", 30) or 30)
+            except ValueError:
+                retention_days = 30
+                db.set_setting(c, "done_retention_days", "30")
+            preview = db.purge_done(c, now=now, apply=False)
+        return jsonify({"retention_days": retention_days, "preview": preview, "now": now})
+
+    @app.post("/settings/done-retention")
+    def done_retention_set():
+        body = request.get_json(silent=True) or {}
+        retention_days = _parse_retention_days(body.get("retention_days"))
+        if retention_days is None:
+            return jsonify({"error": "retention_days must be an integer between 1 and 3650"}), 400
+        now = int(time.time())
+        with conn() as c:
+            db.set_setting(c, "done_retention_days", str(retention_days))
+            preview = db.purge_done(c, now=now, apply=False)
+        return jsonify({"retention_days": retention_days, "preview": preview, "now": now})
+
+    @app.post("/settings/done-retention/purge")
+    def done_retention_purge():
+        body = request.get_json(silent=True) or {}
+        expected_total = body.get("expected_total")
+        expected_cutoff = body.get("expected_cutoff")
+        try:
+            expected_total = int(expected_total)
+            expected_cutoff = int(expected_cutoff)
+        except (TypeError, ValueError):
+            return jsonify({"error": "expected_total and expected_cutoff are required"}), 400
+
+        now = int(time.time())
+        with conn() as c:
+            plan = db.purge_done(c, now=now, apply=False)
+            if plan["total"] != expected_total or plan["cutoff"] != expected_cutoff:
+                return jsonify({
+                    "error": "purge preview changed; review the updated count before deleting",
+                    "preview": plan,
+                }), 409
+            if plan["total"] == 0:
+                return jsonify({
+                    "error": "no Done items currently qualify for purge",
+                    "preview": plan,
+                }), 409
+
+            victims = [
+                {"fullname": r[0], "source": r[1], "title": (r[2] or "")[:80]}
+                for r in c.execute(
+                    "SELECT fullname, source, title FROM items WHERE status='done' "
+                    "AND processed_utc IS NOT NULL AND processed_utc < ? ORDER BY processed_utc",
+                    (plan["cutoff"],),
+                ).fetchall()
+            ]
+            bak = _backup_db("pre-purge-done")
+            try:
+                res = db.purge_done(c, now=now, apply=True)
+            except ValueError as exc:
+                return jsonify({"error": str(exc), "preview": plan}), 400
+            preview = db.purge_done(c, now=now, apply=False)
+
+        audit = {
+            "ts": int(time.time()),
+            "op": "purge_done",
+            "retention_days": res["retention_days"],
+            "cutoff": res["cutoff"],
+            "total": res["total"],
+            "threads_deleted": res["threads_deleted"],
+            "backup": str(bak),
+            "victims": victims[:200],
+        }
+        _append_delete_audit(audit)
+        res["backup"] = str(bak)
+        return jsonify({"purged": res, "preview": preview})
+
     # -- reddit unsave: cookie auth + on-demand queue drain --------------
 
     @app.get("/reddit/unsave/status")
@@ -691,12 +792,18 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/reddit/unsave/enqueue-by-tag")
     def reddit_unsave_by_tag():
         body = request.get_json(silent=True) or {}
-        tag = body.get("tag", "")
+        tag = str(body.get("tag", "") or "").strip()
         if not tag:
             return jsonify({"error": "tag required"}), 400
+        apply = bool(body.get("confirm") or body.get("apply") or body.get("dry_run") is False)
         with conn() as c:
-            n = db.enqueue_unsave_by_tag(c, tag)
-        return jsonify({"enqueued": n})
+            res = db.enqueue_unsave_by_tag(c, tag, dry_run=not apply)
+        res["confirmed"] = apply
+        res["message"] = (
+            "This only queues local unsaves. Reddit is not contacted until the existing "
+            "explicit drain action runs."
+        )
+        return jsonify(res)
 
     @app.post("/reddit/items/<path:fullname>/undo")
     def reddit_undo_unsave(fullname):

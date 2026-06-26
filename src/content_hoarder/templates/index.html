@@ -195,6 +195,23 @@
       </div>
       <p class="set-note">When on, images load from your locally-archived copies (the <code>archive-media</code> pass) instead of Reddit &mdash; survives deletion, works offline. Off by default.</p>
     </div>
+    <div class="set-group" id="done-retention-group"><div class="lab">DONE RETENTION</div>
+      <div class="seg" id="set-done-retention">
+        <button type="button" data-days="7" aria-pressed="false">7 days</button>
+        <button type="button" data-days="30" aria-pressed="true">30 days</button>
+        <button type="button" data-days="90" aria-pressed="false">90 days</button>
+        <button type="button" data-days="180" aria-pressed="false">180 days</button>
+        <button type="button" data-days="365" aria-pressed="false">365 days</button>
+      </div>
+      <p class="set-note" id="done-retention-current">Loading current window&hellip;</p>
+      <div class="set-card" id="done-retention-preview" aria-live="polite">Checking what would be purged&hellip;</div>
+      <label class="set-check" for="done-retention-confirm">
+        <input type="checkbox" id="done-retention-confirm">
+        <span>I understand this permanently deletes Done items older than the current window.</span>
+      </label>
+      <button type="button" class="setbtn warn" id="done-retention-purge" disabled>Purge eligible Done items</button>
+      <p class="set-note" id="done-retention-feedback">The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.</p>
+    </div>
     <div class="set-group"><div class="lab">COLLECTION</div>
       <button type="button" class="setbtn" id="open-stats">Stats &mdash; the shape of the collection</button>
       <button type="button" class="setbtn" id="open-dupes">Duplicates &mdash; review matching saves</button>

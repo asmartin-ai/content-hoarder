@@ -285,6 +285,7 @@ h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
 
 /* ── Toolbar extras: fuzzy checkbox + view toggle ───────────────────────────── */
 .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.toolbar-note { align-self: center; font-size: var(--fs-xs); color: var(--muted); }
 #view-toggle { display: inline-flex; gap: 4px; }
 #view-toggle .btn.active { background: var(--accent); color: #fff; border-color: var(--accent-strong); }
 
