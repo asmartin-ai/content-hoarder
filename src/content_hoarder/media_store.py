@@ -23,10 +23,12 @@ from content_hoarder import config
 _MIME_EXT = {
     "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
     "image/gif": ".gif", "image/webp": ".webp",
+    "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov",
 }
 _EXT_MIME = {".jpg": "image/jpeg", ".png": "image/png", ".gif": "image/gif",
-             ".webp": "image/webp", ".bin": "application/octet-stream"}
-_BLOB_RE = re.compile(r"^[0-9a-f]{64}(\.(jpg|png|gif|webp|bin))?$")
+             ".webp": "image/webp", ".mp4": "video/mp4", ".webm": "video/webm",
+             ".mov": "video/quicktime", ".bin": "application/octet-stream"}
+_BLOB_RE = re.compile(r"^[0-9a-f]{64}(\.(jpg|png|gif|webp|mp4|webm|mov|bin))?$")
 
 
 def media_dir() -> Path:
@@ -39,7 +41,7 @@ def ext_for(mime: str = "", url: str = "") -> str:
     if m in _MIME_EXT:
         return _MIME_EXT[m]
     low = (url or "").lower()
-    for e in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+    for e in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".webm", ".mov"):
         if e in low:
             return ".jpg" if e == ".jpeg" else e
     return ".bin"
@@ -81,7 +83,7 @@ def path_for(blob_id: str, *, base_dir: Path | None = None) -> Path | None:
     if "." in blob_id:
         p = d / blob_id
         return p if p.exists() else None
-    for e in (".jpg", ".png", ".gif", ".webp", ".bin"):  # bare hash → find the stored ext
+    for e in (".jpg", ".png", ".gif", ".webp", ".mp4", ".webm", ".mov", ".bin"):  # bare hash → find the stored ext
         p = d / (base + e)
         if p.exists():
             return p

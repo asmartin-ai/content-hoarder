@@ -90,8 +90,7 @@ def test_twitter_media_urls_classify_and_resolve_images():
     out = _node_eval(
         "import { mediaType, imageUrl, imageUrls } from './core/media.js';"
         "const it = { source: 'twitter', url: 'https://x.com/me/status/1', metadata: {"
-        "  media_urls: ['https://pbs.twimg.com/media/a.jpg?name=orig',"
-        "               'https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4']"
+        "  media_urls: ['https://pbs.twimg.com/media/a.jpg?name=orig']"
         "} };"
         "console.log(JSON.stringify([mediaType(it).cls, imageUrl(it), imageUrls(it)]));"
     )
@@ -111,3 +110,16 @@ def test_twitter_media_urls_prefer_local_archive_when_enabled():
         "  metadata: { media_urls: [u], archived_media: { [u]: 'abc.jpg' } } }));"
     )
     assert out == "/media/abc.jpg"
+
+
+def test_twitter_video_urls_classify_and_prefer_local_archive_when_enabled():
+    out = _node_eval(
+        "import { setArchivePref, mediaType, playableVideoSrc, videoUrls } from './core/media.js';"
+        "const u = 'https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4';"
+        "const it = { source: 'twitter', url: 'https://x.com/me/status/1', metadata: {"
+        "  media_urls: [u], archived_media: { [u]: 'def.mp4' }"
+        "} };"
+        "setArchivePref(true);"
+        "console.log(JSON.stringify([mediaType(it).cls, videoUrls(it), playableVideoSrc(it)]));"
+    )
+    assert json.loads(out) == ["video", ["/media/def.mp4"], "/media/def.mp4"]

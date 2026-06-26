@@ -250,6 +250,10 @@ def test_media_route_serves_blob_and_404s(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.data == b"IMGBYTES"
     assert "image/png" in r.headers["Content-Type"]
     assert "immutable" in r.headers.get("Cache-Control", "")
+    vblob = media_store.store(b"VIDBYTES", mime="video/mp4")
+    vr = cl.get("/media/" + vblob)
+    assert vr.status_code == 200 and vr.data == b"VIDBYTES"
+    assert "video/mp4" in vr.headers["Content-Type"]
     # missing blob + traversal-shaped id both 404 (never touch the filesystem unsafely)
     assert cl.get("/media/" + ("a" * 64) + ".png").status_code == 404
     assert cl.get("/media/notarealhash").status_code == 404

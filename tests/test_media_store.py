@@ -21,14 +21,18 @@ def test_ext_and_mime():
     assert media_store.ext_for("image/jpeg") == ".jpg"
     assert media_store.ext_for("image/webp; charset=binary") == ".webp"
     assert media_store.ext_for("", "https://i.redd.it/x.webp") == ".webp"
+    assert media_store.ext_for("video/mp4") == ".mp4"
+    assert media_store.ext_for("", "https://video.twimg.com/x/v.webm?tag=1") == ".webm"
     assert media_store.ext_for("", "") == ".bin"
     assert media_store.mime_for("abc.png") == "image/png"
+    assert media_store.mime_for("abc.mp4") == "video/mp4"
     assert media_store.mime_for("abc.bin") == "application/octet-stream"
 
 
 def test_id_validation_blocks_traversal(tmp_path):
     h = "a" * 64
-    assert media_store.is_valid_id(h + ".jpg") and media_store.is_valid_id(h)
+    assert media_store.is_valid_id(h + ".jpg") and media_store.is_valid_id(h + ".mp4")
+    assert media_store.is_valid_id(h)
     for bad in ("../etc/passwd", h + ".exe", "nothex.jpg", "", h + "/x"):
         assert not media_store.is_valid_id(bad)
 
@@ -42,3 +46,6 @@ def test_path_for_resolves_and_rejects(tmp_path):
     (d / (h + ".jpg")).write_bytes(b"x")
     assert media_store.path_for(h + ".jpg", base_dir=d).name == h + ".jpg"
     assert media_store.path_for(h, base_dir=d).name == h + ".jpg"  # bare hash finds the ext
+    (d / (h + ".jpg")).unlink()
+    (d / (h + ".mp4")).write_bytes(b"v")
+    assert media_store.path_for(h, base_dir=d).name == h + ".mp4"

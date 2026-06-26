@@ -56,11 +56,18 @@ export const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.
 
 /* Full image URL to open in a lightbox (direct images / i.redd.it), else "". */
 export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
+export const VIDEO_EXT = /\.(mp4|webm|mov)(\?|#|$)/i;
 const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
 export const imageUrls = (item) => {
   const m = item.metadata || {};
   if (Array.isArray(m.media_urls))
     return m.media_urls.filter(_directImg).map((u) => localUrl(item, u));
+  return [];
+};
+export const videoUrls = (item) => {
+  const m = item.metadata || {};
+  if (Array.isArray(m.media_urls))
+    return m.media_urls.filter((u) => VIDEO_EXT.test(u || "")).map((u) => localUrl(item, u));
   return [];
 };
 export const imageUrl = (item) => {
@@ -85,6 +92,8 @@ export const mediaType = (item) => {
   // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
   if (((item.metadata || {}).media_url || "").includes("v.redd.it"))
     return { cls: "video", icon: "🎬", label: "Video" };
+  if (videoUrls(item).length)
+    return { cls: "video", icon: "▶", label: "Video" };
   // Image evidence in metadata.media_url (harvested from feat/reddit-media-v13): the
   // ~25.8k reddit_media-catch-all posts whose item.url is the permalink, not the image.
   if (_directImg((item.metadata || {}).media_url) || imageUrls(item).length)
@@ -136,8 +145,8 @@ export const hlsManifestUrl = (srcUrl) => {
 export const playableVideoSrc = (item) => {
   if (mediaType(item).cls !== "video") return "";
   const m = item.metadata || {};
-  const src = m.media_url || item.url || "";
-  return (hlsManifestUrl(src) || /\.(mp4|webm|mov)(\?|#|$)/i.test(src)) ? src : "";
+  const src = m.media_url || videoUrls(item)[0] || item.url || "";
+  return (hlsManifestUrl(src) || VIDEO_EXT.test(src)) ? localUrl(item, src) : "";
 };
 
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.

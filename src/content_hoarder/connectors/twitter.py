@@ -125,6 +125,15 @@ def _media_url(media: Any) -> str:
     return url
 
 
+def _poster_url(media: Any) -> str:
+    if isinstance(media, str):
+        return media.strip() if "pbs.twimg.com/media/" in media or _looks_img(media) else ""
+    if not isinstance(media, dict):
+        return ""
+    url = _first(media.get("media_url_https"), media.get("media_url"))
+    return url if "pbs.twimg.com/media/" in url or _looks_img(url) else ""
+
+
 def _media_urls(*values: Any) -> list[str]:
     out: list[str] = []
     for value in values:
@@ -133,6 +142,20 @@ def _media_urls(*values: Any) -> list[str]:
             if url and url not in out:
                 out.append(url)
     return out
+
+
+def _poster_urls(*values: Any) -> list[str]:
+    out: list[str] = []
+    for value in values:
+        for media in _as_list(value):
+            url = _poster_url(media)
+            if url and url not in out:
+                out.append(url)
+    return out
+
+
+def _looks_img(url: str) -> bool:
+    return bool(re.search(r"\.(png|jpe?g|gif|webp)(\?|#|$)", url or "", re.I))
 
 
 def _link_url(value: Any) -> str:
@@ -168,6 +191,28 @@ def _orig_image(url: str) -> str:
     return base + "?name=orig"
 
 
+def _tweet_summary(result: dict[str, Any]) -> dict[str, Any]:
+    legacy = result.get("legacy") if isinstance(result.get("legacy"), dict) else {}
+    core = result.get("core") if isinstance(result.get("core"), dict) else {}
+    user_result = ((core.get("user_results") or {}).get("result")
+                   if isinstance(core.get("user_results"), dict) else {})
+    user_legacy = user_result.get("legacy") if isinstance(user_result, dict) else {}
+    if not isinstance(user_legacy, dict):
+        user_legacy = {}
+    tweet_id = _first(result.get("rest_id"), legacy.get("id_str"), legacy.get("id"))
+    handle = _first(user_legacy.get("screen_name"), legacy.get("screen_name")).lstrip("@")
+    if not _ID_RE.match(tweet_id):
+        return {}
+    out = {
+        "tweet_id": tweet_id,
+        "permalink": _permalink(tweet_id, handle),
+        "text": _first(legacy.get("full_text"), legacy.get("text")),
+        "author_handle": handle,
+        "author_name": _first(user_legacy.get("name"), legacy.get("name")),
+    }
+    return {k: v for k, v in out.items() if v}
+
+
 def _flat_item(row: dict[str, Any], *, index: int | None = None) -> dict | None:
     url = _first(row.get("url"), row.get("permalink"), row.get("tweet_url"), row.get("expanded_url"))
     tweet_id = _first(
@@ -196,6 +241,13 @@ def _flat_item(row: dict[str, Any], *, index: int | None = None) -> dict | None:
         row.get("photos"),
         row.get("videos"),
     )]
+    posters = [_orig_image(u) for u in _poster_urls(
+        row.get("media_urls"),
+        row.get("media_url"),
+        row.get("media"),
+        row.get("photos"),
+        row.get("videos"),
+    )]
     outlinks = _link_urls(
         row.get("outlinks"),
         row.get("links"),
@@ -211,9 +263,20 @@ def _flat_item(row: dict[str, Any], *, index: int | None = None) -> dict | None:
     if media:
         meta["media_urls"] = media
         meta["media_type"] = "video" if any("video.twimg.com/" in u for u in media) else "image"
-        meta["thumbnail"] = media[0]
+        meta["thumbnail"] = (posters or media)[0]
     if outlinks:
         meta["outlinks"] = outlinks
+    for dst, *keys in (
+        ("conversation_id", "conversation_id_str", "conversation_id"),
+        ("in_reply_to_status_id", "in_reply_to_status_id_str", "in_reply_to_status_id"),
+        ("in_reply_to_screen_name", "in_reply_to_screen_name"),
+    ):
+        val = _first(*(row.get(k) for k in keys))
+        if val:
+            meta[dst] = val
+    quote = row.get("quote_tweet")
+    if isinstance(quote, dict):
+        meta["quote_tweet"] = quote
     if index is not None:
         meta["bookmark_index"] = index
     return new_item(
@@ -255,7 +318,20 @@ def _graphql_item(result: dict[str, Any], *, index: int | None = None) -> dict |
         "media": (legacy.get("extended_entities") or {}).get("media")
                  or (legacy.get("entities") or {}).get("media"),
         "urls": (legacy.get("entities") or {}).get("urls"),
+        "conversation_id": legacy.get("conversation_id_str") or legacy.get("conversation_id"),
+        "in_reply_to_status_id": legacy.get("in_reply_to_status_id_str")
+                                 or legacy.get("in_reply_to_status_id"),
+        "in_reply_to_screen_name": legacy.get("in_reply_to_screen_name"),
     }
+    quoted = result.get("quoted_status_result")
+    quoted_result = ((quoted.get("result") if isinstance(quoted, dict) else None)
+                     or (quoted.get("tweet_results", {}).get("result")
+                         if isinstance(quoted, dict)
+                         and isinstance(quoted.get("tweet_results"), dict) else None))
+    if isinstance(quoted_result, dict):
+        quote = _tweet_summary(quoted_result)
+        if quote:
+            row["quote_tweet"] = quote
     return _flat_item(row, index=index)
 
 

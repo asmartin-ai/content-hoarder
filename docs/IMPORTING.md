@@ -133,13 +133,18 @@ name, canonical permalink, creation time when present, and media URLs (`pbs.twim
 normalized to `?name=orig`). It does not call the X API and it does not invent a bookmark timestamp;
 exports that include only ordering get `metadata.bookmark_index` instead.
 
+When present, quote/reply context is retained in `metadata.quote_tweet`,
+`metadata.conversation_id`, `metadata.in_reply_to_status_id`, and
+`metadata.in_reply_to_screen_name`. Video exports keep the highest-bitrate MP4 URL plus the poster
+thumbnail when X includes one.
+
 Outbound links are stored in `metadata.outlinks`. Tweets that link to YouTube videos can be folded
 into canonical `youtube:<id>` rows with the shared migration:
 ```bash
 python -m content_hoarder consolidate --apply
 ```
 
-To cache imported tweet images locally for offline/survivable viewing:
+To cache imported tweet images and videos locally for offline/survivable viewing:
 ```bash
 python -m content_hoarder archive-media --twitter --apply
 ```
