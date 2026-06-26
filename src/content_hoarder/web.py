@@ -447,6 +447,40 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"updated": n})
 
+    @app.get("/duplicates")
+    def duplicates_route():
+        from content_hoarder import dedup
+        by = (request.args.get("by") or "url").strip().lower()
+        status = (request.args.get("status") or "inbox").strip().lower()
+        if by not in ("url", "title"):
+            return jsonify({"error": "by must be url or title"}), 400
+        if status not in ("inbox", "keep", "archived", "done"):
+            return jsonify({"error": "invalid status"}), 400
+        with conn() as c:
+            groups = dedup.find_groups(c, by=by, status=status)
+        return jsonify({"groups": groups, "by": by, "status": status})
+
+    @app.post("/duplicates/resolve")
+    def duplicates_resolve_route():
+        from content_hoarder import dedup
+        body = request.get_json(silent=True) or {}
+        keep = str(body.get("keep") or "").strip()
+        archive = body.get("archive") or []
+        if not keep or not isinstance(archive, list):
+            return jsonify({"error": "keep and archive list required"}), 400
+        with conn() as c:
+            return jsonify(dedup.resolve_group(c, keep, archive))
+
+    @app.post("/duplicates/undo")
+    def duplicates_undo_route():
+        from content_hoarder import dedup
+        body = request.get_json(silent=True) or {}
+        fullnames = body.get("fullnames") or []
+        if not isinstance(fullnames, list) or not fullnames:
+            return jsonify({"error": "fullnames list required"}), 400
+        with conn() as c:
+            return jsonify(dedup.undo_resolve(c, fullnames))
+
     # -- reddit unsave: cookie auth + on-demand queue drain --------------
 
     @app.get("/reddit/unsave/status")
