@@ -1,6 +1,7 @@
 import json
 
 from content_hoarder import db, dedup, models
+from content_hoarder.web import create_app
 
 
 def _seed(conn, items):
@@ -55,3 +56,46 @@ def test_flag_auto_resolve_and_clear(tmp_db):
     assert sorted(statuses.values()) == ["archived", "inbox"]  # richer kept, other archived
 
     assert dedup.clear_flags(conn)["cleared"] >= 1
+
+
+def test_resolve_undo_restores_archived_rows_and_clears_dedup_of(tmp_db):
+    conn = db.connect(tmp_db)
+    _seed(conn, [
+        dict(source="reddit", source_id="t3_keep", title="Dup", url="https://ex.com/x", metadata={"score": 5}),
+        dict(source="hackernews", source_id="hn_arch", title="Dup", url="https://ex.com/x"),
+    ])
+    res = dedup.resolve_group(conn, "reddit:t3_keep", ["hackernews:hn_arch"])
+    assert res["archived"] == 1
+    md = json.loads(db.get_item(conn, "hackernews:hn_arch")["metadata"])
+    assert md["dedup_of"] == "reddit:t3_keep"
+
+    undo = dedup.undo_resolve(conn, ["hackernews:hn_arch"])
+    assert undo["restored"] == 1
+    assert db.get_item(conn, "hackernews:hn_arch")["status"] == "inbox"
+    md2 = json.loads(db.get_item(conn, "hackernews:hn_arch")["metadata"])
+    assert "dedup_of" not in md2
+
+
+def test_duplicate_review_routes(tmp_db):
+    conn = db.connect(tmp_db)
+    _seed(conn, [
+        dict(source="reddit", source_id="t3_keep", title="Dup", url="https://ex.com/x", metadata={"score": 5}),
+        dict(source="hackernews", source_id="hn_arch", title="Dup", url="https://ex.com/x"),
+    ])
+    conn.close()
+
+    cl = create_app(tmp_db).test_client()
+    groups = cl.get("/duplicates?by=url&status=inbox").get_json()["groups"]
+    assert len(groups) == 1
+    keep = groups[0]["suggested_keep"]
+    archive = [it["fullname"] for it in groups[0]["items"] if it["fullname"] != keep]
+
+    res = cl.post("/duplicates/resolve", json={"keep": keep, "archive": archive}).get_json()
+    assert res["archived"] == 1
+    assert cl.get("/items/" + archive[0]).get_json()["status"] == "archived"
+
+    undo = cl.post("/duplicates/undo", json={"fullnames": archive}).get_json()
+    assert undo["restored"] == 1
+    item = cl.get("/items/" + archive[0]).get_json()
+    assert item["status"] == "inbox"
+    assert "dedup_of" not in item["metadata"]
