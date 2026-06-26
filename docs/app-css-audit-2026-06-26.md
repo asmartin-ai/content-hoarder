@@ -16,19 +16,47 @@ These are detected as "unused" by the script but are actually used at runtime:
 - `.tcard-*` — triage card layout
 - `.item-*` selectors — v2 item rendering (duplicated from v3)
 
-## Genuinely orphaned (safe to prune after v3 migration)
-- `.items.density-card`, `.items.density-compact`, `.items.density-comfortable`
-- `.progress-strip`, `.pulse-*`, `.streak`
-- `.focus-mode` selectors
-- `.import-help`, `.import-field`, `.import-or`, `.import-preview`, `.import-sample`
-- `.skel`, `.skel-thumb`, `.skel-lines` — skeleton loaders (v3 uses different approach)
-- `.ai-btn`, `.ai-verdict`, `.ai-keep`, `.ai-skip` — old AI suggest UI (never shipped)
-- `.companions`, `.comp-link`, `.comp-lead` — companion items (v3 restructuring)
+**⚠️ Verified 2026-06-26 (per-selector grep against `triage.js`/`triage.html`/`reddit.js`/`reddit.html`):**
+the following were MISCLASSIFIED as orphaned below — they are **LIVE in `triage.js`**, emitted by
+string concatenation the static scanner missed. **Do not delete:**
+- `.companions`, `.comp-link`, `.comp-lead` — LIVE. `companionsHtml()` (`triage.js:337-349`) emits all
+  three; renders the triage-card discussion-thread chips (companion click-through links). NOT a v3
+  restructure leftover — this is the active `/triage` companion render.
+- `.ai-btn` — LIVE. `cardHtml()` (`triage.js:467`) emits `<button class="ai-btn">` (the `🤖 Ask AI`
+  button); click handler at `triage.js:868` (`closest(".ai-btn")`).
+- `.ai-verdict`, `.ai-keep`, `.ai-skip` — LIVE. `aiHtml()` (`triage.js:498-502`) emits
+  `.ai-verdict.ai-<verdict>` when `metadata.llm` exists, so `.ai-keep`/`.ai-skip` activate on the
+  verdict value. The "old AI suggest UI (never shipped)" note below was **wrong**.
+- `.ai-tag`, `.ai-reason` (not in the original orphan list but adjacent) — also LIVE via the same
+  `aiHtml()` path.
+
+## Verified-unused (confirmed not referenced in any `/triage` + `/reddit` template/JS)
+Per-selector grep across `triage.js`, `triage.html`, `reddit.js`, `reddit.html` (2026-06-26).
+Caveat: only the literal class strings were checked; a selector built by dynamic concatenation
+(e.g. `"density-" + mode`) would not be caught — re-run the Playwright UI suite (`pytest -m ui`)
+after deleting any group.
+- `.items.density-card`, `.items.density-compact`, `.items.density-comfortable` — ✅ unused
+  (`/triage` has no density toggle; density lives in v3 `browse.css`).
+- `.progress-strip`, `.pulse-*`, `.streak` — ✅ unused (v3-browse pulse concepts, not wired to triage).
+- `.focus-mode` selectors — ✅ unused in triage/reddit (focus batching is a browse concept).
+- `.import-help`, `.import-field`, `.import-or`, `.import-preview`, `.import-sample` — ✅ unused
+  (the import modal lives in `index.html`/v3, not `/triage`).
+- `.skel`, `.skel-thumb`, `.skel-lines` — ⚠️ **likely unused but LOWER confidence.** The literal
+  `class="skel…"` form is not present, but a bare `.skel` selector could be built dynamically;
+  verify the exact skeleton render path before deleting.
+
+**Moved to known-false positives above (were miscategorized here originally):** `.ai-btn`,
+`.ai-verdict`, `.ai-keep`, `.ai-skip`, `.companions`, `.comp-link`, `.comp-lead` — all LIVE.
 
 ## Recommendation
 Do NOT bulk-delete. Wait for the triage redesign (Epic 20 P2) which will
 rewrite `/triage` and naturally prune the v2 selectors. The 401 "unused"
-figure includes many runtime-referenced selectors that safe deletion would break.
+figure includes many runtime-referenced selectors that safe deletion would break —
+confirmed: `.comp-*` and all `.ai-*` are LIVE despite being flagged orphaned.
+
+If harvesting safe wins now, delete only the four confirmed-unused groups (density,
+pulse/streak, focus-mode, import-) **one group at a time** with `pytest -m ui` green
+after each — and **leave `.comp-*` and `.ai-*` entirely alone.**
 
 To run the audit yourself:
 ```
