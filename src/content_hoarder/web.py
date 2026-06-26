@@ -40,7 +40,11 @@ def _local_host(host: str) -> bool:
         return False
     if h == "localhost" or h.endswith(".localhost") or h.endswith(".ts.net"):
         return True
-    extra = {x.strip().lower() for x in config.get("CONTENT_HOARDER_ALLOWED_HOSTS").split(",") if x.strip()}
+    extra = {
+        x.strip().lower()
+        for x in config.get("CONTENT_HOARDER_ALLOWED_HOSTS").split(",")
+        if x.strip()
+    }
     if h in extra:
         return True
     try:
@@ -68,7 +72,10 @@ def create_app(db_path: str | None = None) -> Flask:
     # reddit_unsave_on_done + bounded (small cap, jitter, audit) — that's the consent, not a
     # per-fire prompt. The big-blast bulk drain keeps its --live --yes gate. See reddit_trickle.
     from content_hoarder import reddit_trickle, reddit_unsave
-    _unsave_audit, _unsave_audit_path = reddit_unsave.audit_appender(app.config["DB_PATH"])
+
+    _unsave_audit, _unsave_audit_path = reddit_unsave.audit_appender(
+        app.config["DB_PATH"]
+    )
     _trickle = reddit_trickle.TrickleDrainer(conn, audit=_unsave_audit)
 
     # Automatic Reddit saved-sync: a background scheduler periodically imports new saves and (on a
@@ -78,11 +85,14 @@ def create_app(db_path: str | None = None) -> Flask:
     # it on takes effect for the foreground PWA-open path immediately; the background thread starts on the
     # next app launch. See reddit_sync.auto_sync / SyncScheduler.
     from content_hoarder import reddit_sync as _reddit_sync
+
     _sync_scheduler = None
     with conn() as _c0:
         if _reddit_sync.is_autosync_enabled(_c0):
             _interval = _int(config.get("REDDIT_AUTOSYNC_INTERVAL"), 600) or 600
-            _sync_scheduler = _reddit_sync.SyncScheduler(conn, interval=_interval).start()
+            _sync_scheduler = _reddit_sync.SyncScheduler(
+                conn, interval=_interval
+            ).start()
             atexit.register(_sync_scheduler.stop)
 
     @app.before_request
@@ -122,7 +132,8 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/manifest.webmanifest")
     def manifest():
         return send_from_directory(
-            app.static_folder, "manifest.webmanifest",
+            app.static_folder,
+            "manifest.webmanifest",
             mimetype="application/manifest+json",
         )
 
@@ -134,13 +145,16 @@ def create_app(db_path: str | None = None) -> Flask:
         ?tag=nsfw_erotic for the migrate-elsewhere set). Accepts the same q/operator
         and param filters as /items; no pagination — the whole match is returned."""
         from content_hoarder import export as export_mod
+
         a = request.args
         parsed = search_query.parse(a.get("q", ""))
         is_saved_param = a.get("is_saved")
         is_saved = (
             parsed.is_saved
             if parsed.is_saved is not None
-            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+            else _int(is_saved_param)
+            if is_saved_param not in (None, "")
+            else None
         )
         tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
         tags_all = parsed.tags_all if parsed.tags else False
@@ -148,13 +162,23 @@ def create_app(db_path: str | None = None) -> Flask:
             rows = db.search_items(
                 c,
                 parsed.text,
-                source=parsed.source if parsed.source is not None else (a.get("source") or None),
-                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
-                status=parsed.status if parsed.status is not None else (a.get("status") or None),
+                source=parsed.source
+                if parsed.source is not None
+                else (a.get("source") or None),
+                kind=parsed.kind
+                if parsed.kind is not None
+                else (a.get("kind") or None),
+                status=parsed.status
+                if parsed.status is not None
+                else (a.get("status") or None),
                 tags=tags,
                 tags_all=tags_all,
-                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
-                author=parsed.author if parsed.author is not None else (a.get("author") or None),
+                subreddit=parsed.subreddit
+                if parsed.subreddit is not None
+                else (a.get("subreddit") or None),
+                author=parsed.author
+                if parsed.author is not None
+                else (a.get("author") or None),
                 is_saved=is_saved,
                 nsfw=parsed.nsfw,
                 decayed=parsed.decayed,
@@ -180,7 +204,9 @@ def create_app(db_path: str | None = None) -> Flask:
         return app.response_class(
             export_mod.to_csv(recs),
             mimetype="text/csv",
-            headers={"Content-Disposition": "attachment; filename=content-hoarder-export.csv"},
+            headers={
+                "Content-Disposition": "attachment; filename=content-hoarder-export.csv"
+            },
         )
 
     @app.get("/items")
@@ -198,25 +224,37 @@ def create_app(db_path: str | None = None) -> Flask:
         is_saved = (
             parsed.is_saved
             if parsed.is_saved is not None
-            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+            else _int(is_saved_param)
+            if is_saved_param not in (None, "")
+            else None
         )
 
         tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
         tags_all = parsed.tags_all if parsed.tags else False
-        status_filter = parsed.status if parsed.status is not None else (a.get("status") or None)
+        status_filter = (
+            parsed.status if parsed.status is not None else (a.get("status") or None)
+        )
 
         with conn() as c:
             rows = db.search_items(
                 c,
                 parsed.text,
-                source=parsed.source if parsed.source is not None else (a.get("source") or None),
-                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
+                source=parsed.source
+                if parsed.source is not None
+                else (a.get("source") or None),
+                kind=parsed.kind
+                if parsed.kind is not None
+                else (a.get("kind") or None),
                 status=status_filter,
                 category=a.get("category") or None,
                 tags=tags,
                 tags_all=tags_all,
-                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
-                author=parsed.author if parsed.author is not None else (a.get("author") or None),
+                subreddit=parsed.subreddit
+                if parsed.subreddit is not None
+                else (a.get("subreddit") or None),
+                author=parsed.author
+                if parsed.author is not None
+                else (a.get("author") or None),
                 is_saved=is_saved,
                 nsfw=parsed.nsfw,
                 decayed=parsed.decayed,
@@ -231,7 +269,8 @@ def create_app(db_path: str | None = None) -> Flask:
                 score_max=parsed.score_max,
                 exact=parsed.exact,
                 exclude=parsed.exclude,
-                open_in_firefox=parsed.open_in_firefox or a.get("open_in_firefox") in ("1", "true"),
+                open_in_firefox=parsed.open_in_firefox
+                or a.get("open_in_firefox") in ("1", "true"),
                 # Fuzzy by default (Epic 12, user decision): bare terms are typo-tolerant;
                 # "quoted phrases" are always exact (parser routes them to exact=);
                 # ?exact=1 (the repurposed checkbox) forces the exact FTS path.
@@ -259,7 +298,9 @@ def create_app(db_path: str | None = None) -> Flask:
         n = min(max(_int(a.get("n"), 20), 1), 100)
         with conn() as c:
             rows = db.get_random_batch(
-                c, n, source=a.get("source") or None,
+                c,
+                n,
+                source=a.get("source") or None,
                 unprocessed=a.get("unprocessed", "1") != "0",
                 mode=a.get("mode") or "random",
             )
@@ -274,14 +315,17 @@ def create_app(db_path: str | None = None) -> Flask:
                 item = db.set_status(c, fullname, status)
                 # Arm the unsave trickle when a reddit item is Done and unsave-on-done is opted in;
                 # read the flag on this same conn (no extra connection in the hot path).
-                arm_trickle = (item is not None and status == "done"
-                               and fullname.startswith("reddit:")
-                               and db.get_setting(c, "reddit_unsave_on_done", "0") == "1")
+                arm_trickle = (
+                    item is not None
+                    and status == "done"
+                    and fullname.startswith("reddit:")
+                    and db.get_setting(c, "reddit_unsave_on_done", "0") == "1"
+                )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         if item is None:
             return jsonify({"error": "not found"}), 404
-        if arm_trickle:                       # (re)arm the idle debounce; returns immediately
+        if arm_trickle:  # (re)arm the idle debounce; returns immediately
             _trickle.note_enqueue()
         return jsonify(item)
 
@@ -304,7 +348,9 @@ def create_app(db_path: str | None = None) -> Flask:
                 )
         except ValueError as exc:
             msg = str(exc)
-            return jsonify({"error": msg}), 404 if msg.startswith("unknown item") else 400
+            return jsonify({"error": msg}), 404 if msg.startswith(
+                "unknown item"
+            ) else 400
         return jsonify(res)
 
     @app.post("/snooze/undo")
@@ -313,15 +359,19 @@ def create_app(db_path: str | None = None) -> Flask:
         try:
             with conn() as c:
                 if isinstance(body.get("snoozed_wave"), int):
-                    return jsonify(db.unsnooze(c, snoozed_wave=body["snoozed_wave"], apply=True))
+                    return jsonify(
+                        db.unsnooze(c, snoozed_wave=body["snoozed_wave"], apply=True)
+                    )
                 if isinstance(body.get("decayed_at"), int):
                     wave = int(body["decayed_at"])
-                    return jsonify(db.undecay(
-                        c,
-                        decayed_after=wave,
-                        decayed_before=wave + 1,
-                        apply=True,
-                    ))
+                    return jsonify(
+                        db.undecay(
+                            c,
+                            decayed_after=wave,
+                            decayed_before=wave + 1,
+                            apply=True,
+                        )
+                    )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"error": "snoozed_wave or decayed_at required"}), 400
@@ -329,6 +379,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/items/<path:fullname>/undo")
     def undo(fullname):
         from content_hoarder import reddit_unsave as ru
+
         with conn() as c:
             # A Done whose unsave already drained was *actually removed from Reddit Saved*;
             # undoing only the local status would leave the two sides silently divergent
@@ -342,19 +393,26 @@ def create_app(db_path: str | None = None) -> Flask:
             item = db.undo_status(c, fullname)
             if item is None:
                 return jsonify({"error": "not found"}), 404
-            if (prior and prior["status"] == "done" and prior["state"] == "done"
-                    and item["status"] != "done"):
+            if (
+                prior
+                and prior["status"] == "done"
+                and prior["state"] == "done"
+                and item["status"] != "done"
+            ):
                 if ru.resave(c, fullname):
                     item = db._public_by_fullname(c, fullname)  # is_saved restored to 1
                 else:
                     item = dict(item)
-                    item["warning"] = ("restored locally, but still unsaved on Reddit "
-                                       "(re-save failed — check the session cookie)")
+                    item["warning"] = (
+                        "restored locally, but still unsaved on Reddit "
+                        "(re-save failed — check the session cookie)"
+                    )
         return jsonify(item)
 
     @app.post("/items/<path:fullname>/suggest")
     def suggest(fullname):
         from content_hoarder.assist import llm
+
         if not llm.is_available():
             return jsonify({"error": "LLM not configured"}), 503
         with conn() as c:
@@ -363,14 +421,168 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "no suggestion"}), 502
         return jsonify(s)
 
+    @app.get("/tag-suggestions")
+    def list_tag_suggestions():
+        from content_hoarder import tag_suggest
+
+        status = request.args.get("status", "pending")
+        tag = request.args.get("tag")
+        source_type = request.args.get("source_type")
+        try:
+            limit = int(request.args["limit"]) if "limit" in request.args else None
+        except (ValueError, KeyError):
+            limit = None
+        with conn() as c:
+            suggestions = tag_suggest.list_suggestions(
+                c, status=status, tag=tag, source_type=source_type, limit=limit
+            )
+            counts = tag_suggest.suggestion_counts(c, status=status)
+        return jsonify(
+            {"suggestions": suggestions, "by_tag": counts, "total": len(suggestions)}
+        )
+
+    @app.post("/tag-suggestions/<int:suggestion_id>/accept")
+    def accept_tag_suggestion(suggestion_id):
+        from content_hoarder import tag_suggest
+
+        with conn() as c:
+            res = tag_suggest.accept_suggestion(c, suggestion_id)
+        if res is None:
+            return jsonify({"error": "not found or not pending"}), 404
+        return jsonify(res)
+
+    @app.post("/tag-suggestions/<int:suggestion_id>/reject")
+    def reject_tag_suggestion(suggestion_id):
+        from content_hoarder import tag_suggest
+
+        with conn() as c:
+            res = tag_suggest.reject_suggestion(c, suggestion_id)
+        if res is None:
+            return jsonify({"error": "not found or not pending"}), 404
+        return jsonify(res)
+
+    @app.post("/tag-suggestions/accept-all")
+    def accept_all_tag_suggestions():
+        from content_hoarder import tag_suggest
+
+        data = request.get_json(silent=True) or {}
+        with conn() as c:
+            n = tag_suggest.accept_all_suggestions(c, tag=data.get("tag"))
+        return jsonify({"accepted": n})
+
+    @app.post("/tag-suggestions/reject-all")
+    def reject_all_tag_suggestions():
+        from content_hoarder import tag_suggest
+
+        data = request.get_json(silent=True) or {}
+        with conn() as c:
+            n = tag_suggest.reject_all_suggestions(c, tag=data.get("tag"))
+        return jsonify({"rejected": n})
+
+    # ------------------------------------------------------------------
+    # Folder routes (Epic 26)
+    # ------------------------------------------------------------------
+
+    @app.get("/folders")
+    def list_folders():
+        from content_hoarder import db
+
+        with conn() as c:
+            folders = db.list_folders(c)
+            counts = db.folder_counts(c)
+        for f in folders:
+            f["count"] = counts.get(f["name"], 0)
+        return jsonify(folders)
+
+    @app.post("/folders")
+    def create_folder():
+        from content_hoarder import db
+
+        data = request.get_json(silent=True) or {}
+        name = data.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+        qd = data.get("query_def") or {}
+        desc = data.get("description", "")
+        with conn() as c:
+            try:
+                f = db.create_folder(c, name, qd, desc)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 409
+        return jsonify(f), 201
+
+    @app.patch("/folders/<int:folder_id>")
+    def update_folder(folder_id):
+        from content_hoarder import db
+
+        data = request.get_json(silent=True) or {}
+        with conn() as c:
+            if "name" in data:
+                try:
+                    f = db.rename_folder(c, folder_id, data["name"])
+                except ValueError as exc:
+                    return jsonify({"error": str(exc)}), 409
+                if f is None:
+                    return jsonify({"error": "not found"}), 404
+            else:
+                return jsonify({"error": "nothing to update"}), 400
+        return jsonify(f)
+
+    @app.delete("/folders/<int:folder_id>")
+    def delete_folder(folder_id):
+        from content_hoarder import db
+
+        with conn() as c:
+            if db.delete_folder(c, folder_id):
+                return jsonify({"deleted": folder_id})
+            return jsonify({"error": "not found"}), 404
+
+    @app.post("/folders/evaluate")
+    def evaluate_folders():
+        from content_hoarder import folders as fmod
+
+        data = request.get_json(silent=True) or {}
+        folder_id = data.get("folder_id")
+        with conn() as c:
+            if folder_id:
+                res = fmod.evaluate_folder(c, int(folder_id))
+                results = [res] if isinstance(res, dict) else res
+            else:
+                results = fmod.evaluate_all_folders(c)
+        return jsonify({"results": results})
+
+    @app.patch("/items/<path:fullname>/folder")
+    def set_item_folder(fullname):
+        from content_hoarder import db
+
+        data = request.get_json(silent=True) or {}
+        folder = data.get("folder")
+        with conn() as c:
+            if db.set_item_folder(c, fullname, folder):
+                return jsonify({"fullname": fullname, "folder": folder})
+            return jsonify({"error": "not found"}), 404
+
+    @app.get("/folders/stats")
+    def folder_stats():
+        from content_hoarder import db
+
+        with conn() as c:
+            counts = db.folder_counts(c)
+        return jsonify(counts)
+
     @app.post("/items/<path:fullname>/recover")
     def recover_item(fullname):
         from content_hoarder.archival import service as archival
         from content_hoarder.archival.providers import default_media_providers
+
         with conn() as c:
             res = archival.recover_one(
-                c, fullname,
-                media_providers=default_media_providers(archival.DEFAULT_USER_AGENT, throttle=False))
+                c,
+                fullname,
+                media_providers=default_media_providers(
+                    archival.DEFAULT_USER_AGENT, throttle=False
+                ),
+            )
         if res is None:
             return jsonify({"error": "not a recoverable reddit item"}), 400
         return jsonify(res)
@@ -388,6 +600,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/reddit/items/<path:fullname>/hydrate")
     def hydrate_item(fullname):
         from content_hoarder import reddit_hydrate
+
         with conn() as c:
             res = reddit_hydrate.hydrate_one(c, fullname)
         status = res.get("status")
@@ -406,6 +619,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/items/<path:fullname>/category")
     def set_category(fullname):
         from content_hoarder.categorize import VALID_CATEGORIES
+
         body = request.get_json(silent=True) or {}
         cat = (body.get("category") or "").strip().lower()
         if cat not in VALID_CATEGORIES:
@@ -450,6 +664,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/duplicates")
     def duplicates_route():
         from content_hoarder import dedup
+
         by = (request.args.get("by") or "url").strip().lower()
         status = (request.args.get("status") or "inbox").strip().lower()
         if by not in ("url", "title"):
@@ -463,6 +678,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/duplicates/resolve")
     def duplicates_resolve_route():
         from content_hoarder import dedup
+
         body = request.get_json(silent=True) or {}
         keep = str(body.get("keep") or "").strip()
         archive = body.get("archive") or []
@@ -474,6 +690,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/duplicates/undo")
     def duplicates_undo_route():
         from content_hoarder import dedup
+
         body = request.get_json(silent=True) or {}
         fullnames = body.get("fullnames") or []
         if not isinstance(fullnames, list) or not fullnames:
@@ -486,23 +703,29 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/reddit/unsave/status")
     def reddit_unsave_status():
         from content_hoarder import reddit_unsave as ru
+
         with conn() as c:
             auth = ru.get_auth(c)
-            return jsonify({
-                "configured": auth is not None,
-                "username": auth.get("username") if auth else None,
-                "enabled": db.get_setting(c, "reddit_unsave_on_done", "0") == "1",
-                "pending": ru.count_pending(c),
-                "failed": ru.count_failed(c),
-            })
+            return jsonify(
+                {
+                    "configured": auth is not None,
+                    "username": auth.get("username") if auth else None,
+                    "enabled": db.get_setting(c, "reddit_unsave_on_done", "0") == "1",
+                    "pending": ru.count_pending(c),
+                    "failed": ru.count_failed(c),
+                }
+            )
 
     @app.post("/reddit/unsave/auth")
     def reddit_unsave_auth():
         from content_hoarder import reddit_unsave as ru
+
         body = request.get_json(silent=True) or {}
         cookie = (body.get("cookie") or "").strip()
         if not cookie:
-            return jsonify({"ok": False, "error": "paste your reddit_session cookie"}), 400
+            return jsonify(
+                {"ok": False, "error": "paste your reddit_session cookie"}
+            ), 400
         try:
             with conn() as c:
                 username = ru.login(c, cookie)
@@ -521,6 +744,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/reddit/unsave/drain")
     def reddit_unsave_drain():
         from content_hoarder import reddit_unsave as ru
+
         body = request.get_json(silent=True) or {}
         # Cap per request (~50s at the 1 req/s throttle) — an unbounded drain of a big
         # queue is a 30+ minute HTTP request. The response's `remaining` lets the UI
@@ -535,6 +759,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/items/<path:fullname>/resave")
     def resave_item(fullname):
         from content_hoarder import reddit_unsave as ru
+
         with conn() as c:
             ok = ru.resave(c, fullname)
         return jsonify({"resaved": ok})
@@ -583,7 +808,9 @@ def create_app(db_path: str | None = None) -> Flask:
         is_saved = (
             parsed.is_saved
             if parsed.is_saved is not None
-            else _int(is_saved_param) if is_saved_param not in (None, "") else None
+            else _int(is_saved_param)
+            if is_saved_param not in (None, "")
+            else None
         )
 
         tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
@@ -594,10 +821,18 @@ def create_app(db_path: str | None = None) -> Flask:
                 c,
                 parsed.text,
                 source="reddit",  # route is reddit-scoped regardless of source: operator
-                kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
-                status=parsed.status if parsed.status is not None else (a.get("status") or None),
-                subreddit=parsed.subreddit if parsed.subreddit is not None else (a.get("subreddit") or None),
-                author=parsed.author if parsed.author is not None else (a.get("author") or None),
+                kind=parsed.kind
+                if parsed.kind is not None
+                else (a.get("kind") or None),
+                status=parsed.status
+                if parsed.status is not None
+                else (a.get("status") or None),
+                subreddit=parsed.subreddit
+                if parsed.subreddit is not None
+                else (a.get("subreddit") or None),
+                author=parsed.author
+                if parsed.author is not None
+                else (a.get("author") or None),
                 tags=tags,
                 tags_all=tags_all,
                 is_saved=is_saved,
@@ -625,7 +860,9 @@ def create_app(db_path: str | None = None) -> Flask:
                 offset=offset,
             )
         has_more = len(rows) > limit
-        return jsonify({"items": [_reddit_view(r) for r in rows[:limit]], "has_more": has_more})
+        return jsonify(
+            {"items": [_reddit_view(r) for r in rows[:limit]], "has_more": has_more}
+        )
 
     @app.get("/reddit/subreddits")
     def reddit_subreddits():
@@ -640,7 +877,8 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.get("/reddit/items/<path:fullname>/thread")
     def reddit_thread_route(fullname):
-        from content_hoarder import reddit_thread, reddit_hydrate
+        from content_hoarder import reddit_hydrate, reddit_thread
+
         sort = request.args.get("sort", "best")
         if sort not in ("best", "top", "new"):
             sort = "best"
@@ -653,12 +891,15 @@ def create_app(db_path: str | None = None) -> Flask:
             if res is None:
                 return jsonify({"error": "not found"}), 404
             if hres is not None:
-                res["hydrate_status"] = hres.get("status")  # hydrated|archived|cached|auth_*|...
+                res["hydrate_status"] = hres.get(
+                    "status"
+                )  # hydrated|archived|cached|auth_*|...
         return jsonify(res)
 
     @app.get("/hackernews/items/<path:fullname>/thread")
     def hn_thread_route(fullname):
         from content_hoarder import hn_thread
+
         sort = request.args.get("sort", "top")
         if sort not in ("top", "new", "default", "best"):
             sort = "top"
@@ -705,6 +946,7 @@ def create_app(db_path: str | None = None) -> Flask:
         # drained (actually unsaved on Reddit), do a live re-save. Otherwise just restore the
         # local flag. Returns {undone: bool} so the UI can report a genuine failure.
         from content_hoarder import reddit_unsave as ru
+
         with conn() as c:
             if db.get_item(c, fullname) is None:
                 return jsonify({"error": "not found"}), 404
@@ -724,12 +966,15 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/reddit/sync")
     def reddit_sync_route():
         from content_hoarder import reddit_sync
+
         body = request.get_json(silent=True) or {}
         full = bool(body.get("full"))
         max_pages = _int(body.get("max_pages"), 0)
         if max_pages <= 0:
             max_pages = 50 if full else 3
-        max_pages = min(max_pages, 200)  # hard ceiling — ~200 throttled reqs is already extreme
+        max_pages = min(
+            max_pages, 200
+        )  # hard ceiling — ~200 throttled reqs is already extreme
         with conn() as c:
             res = reddit_sync.sync_saved(c, max_pages=max_pages, stop_on_known=not full)
         return jsonify(res)
@@ -740,6 +985,7 @@ def create_app(db_path: str | None = None) -> Flask:
         auto_sync, and a NO-OP unless autosync is opted in — so the client can poll it freely. The
         background scheduler funnels into the same auto_sync path."""
         from content_hoarder import reddit_sync
+
         with conn() as c:
             if not reddit_sync.is_autosync_enabled(c):
                 return jsonify({"skipped": "disabled"})
@@ -754,10 +1000,13 @@ def create_app(db_path: str | None = None) -> Flask:
         from flask import send_file
 
         from content_hoarder import media_store
+
         p = media_store.path_for(blob)
         if not p:
             return jsonify({"error": "not found"}), 404
-        resp = send_file(str(p), mimetype=media_store.mime_for(p.name), conditional=True)
+        resp = send_file(
+            str(p), mimetype=media_store.mime_for(p.name), conditional=True
+        )
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return resp
 
@@ -770,12 +1019,14 @@ def create_app(db_path: str | None = None) -> Flask:
         out = []
         for r in rows:  # source_counts only returns sources actually present in the DB
             x = connectors.REGISTRY.get(r["source"])
-            out.append({
-                "id": r["source"],
-                "label": x.label if x else r["source"],
-                "badge_color": x.badge_color if x else "#888888",
-                "count": r["count"],
-            })
+            out.append(
+                {
+                    "id": r["source"],
+                    "label": x.label if x else r["source"],
+                    "badge_color": x.badge_color if x else "#888888",
+                    "count": r["count"],
+                }
+            )
         return jsonify({"sources": out})
 
     @app.get("/categories")
@@ -785,17 +1036,19 @@ def create_app(db_path: str | None = None) -> Flask:
         with conn() as c:
             rows = db.category_counts(c, source=source, status=status)
             total = db._count_items(c, source=source, status=status)
-        return jsonify({
-            "total": total,
-            "categories": [
-                {
-                    "id": r["category"],
-                    "label": str(r["category"]).capitalize(),
-                    "count": r["count"],
-                }
-                for r in rows
-            ],
-        })
+        return jsonify(
+            {
+                "total": total,
+                "categories": [
+                    {
+                        "id": r["category"],
+                        "label": str(r["category"]).capitalize(),
+                        "count": r["count"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
     @app.get("/tags")
     def tags():
@@ -803,13 +1056,20 @@ def create_app(db_path: str | None = None) -> Flask:
         # source/status. Kept off the hot /stats path (it's a json_each scan) so the
         # per-action status refresh stays cheap; the rail refetches this only on navigation.
         from content_hoarder import categorize
+
         source = request.args.get("source") or None
         status = request.args.get("status") or None
         with conn() as c:
             counts = db.tag_counts(c, source=source, status=status)
         # `groups` is the static parent→children rail grouping (Epic 26 P2); the rail nests the
         # curated `tags` counts under it. Tags stay flat — this is presentation only.
-        return jsonify({"tags": counts, "total": sum(counts.values()), "groups": categorize.tag_groups()})
+        return jsonify(
+            {
+                "tags": counts,
+                "total": sum(counts.values()),
+                "groups": categorize.tag_groups(),
+            }
+        )
 
     @app.get("/stats")
     def stats():
@@ -887,10 +1147,13 @@ def create_app(db_path: str | None = None) -> Flask:
                 res = pipeline.import_path(
                     c, tmp.name, source=request.form.get("source") or None
                 )
-            return jsonify({
-                "imported": res.imported, "skipped": res.skipped,
-                "errors": res.errors[:20],
-            })
+            return jsonify(
+                {
+                    "imported": res.imported,
+                    "skipped": res.skipped,
+                    "errors": res.errors[:20],
+                }
+            )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         finally:
@@ -927,8 +1190,10 @@ def create_app(db_path: str | None = None) -> Flask:
 
     def _count_existing(c, fullnames):
         existing = 0
-        for i in range(0, len(fullnames), 500):  # chunk to stay under SQLite's var limit
-            chunk = fullnames[i:i + 500]
+        for i in range(
+            0, len(fullnames), 500
+        ):  # chunk to stay under SQLite's var limit
+            chunk = fullnames[i : i + 500]
             qmarks = ",".join("?" * len(chunk))
             existing += c.execute(
                 f"SELECT COUNT(*) FROM items WHERE fullname IN ({qmarks})", chunk
@@ -944,7 +1209,9 @@ def create_app(db_path: str | None = None) -> Flask:
         try:
             proc = subprocess.run(
                 [exe, "--flat-playlist", "--dump-single-json", url],
-                capture_output=True, text=True, timeout=600,
+                capture_output=True,
+                text=True,
+                timeout=600,
             )
         except subprocess.TimeoutExpired:
             os.unlink(out.name)
@@ -976,7 +1243,11 @@ def create_app(db_path: str | None = None) -> Flask:
                 path = tmp.name
             elif url:
                 if not _YT_RE.match(url):
-                    return jsonify({"error": "Only YouTube playlist or video URLs are supported here."}), 400
+                    return jsonify(
+                        {
+                            "error": "Only YouTube playlist or video URLs are supported here."
+                        }
+                    ), 400
                 path = _ytdlp_to_temp(url)
                 forced = "youtube"
             else:
@@ -1002,30 +1273,57 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "No importable items found in that input."}), 400
 
         # de-dup within the file so "N items / X new" reflects distinct items, not raw rows
-        fullnames = list(dict.fromkeys(it["fullname"] for it in items if it.get("fullname")))
+        fullnames = list(
+            dict.fromkeys(it["fullname"] for it in items if it.get("fullname"))
+        )
         total = len(fullnames)
         with conn() as c:
             existing = _count_existing(c, fullnames)
         token = secrets.token_urlsafe(16)
-        _prepared[token] = {"path": path, "source": connector.id,
-                            "count": total, "ts": time.time()}
-        sample = [{"title": (it.get("title") or it.get("url") or it.get("fullname") or "")[:120],
-                "source": it.get("source")} for it in items[:5]]
-        return jsonify({"token": token, "count": total,
-                        "new": max(total - existing, 0),
-                        "source": connector.id, "label": connector.label, "sample": sample})
+        _prepared[token] = {
+            "path": path,
+            "source": connector.id,
+            "count": total,
+            "ts": time.time(),
+        }
+        sample = [
+            {
+                "title": (it.get("title") or it.get("url") or it.get("fullname") or "")[
+                    :120
+                ],
+                "source": it.get("source"),
+            }
+            for it in items[:5]
+        ]
+        return jsonify(
+            {
+                "token": token,
+                "count": total,
+                "new": max(total - existing, 0),
+                "source": connector.id,
+                "label": connector.label,
+                "sample": sample,
+            }
+        )
 
     @app.post("/import/commit")
     def import_commit():
         data = request.get_json(silent=True) or {}
         prep = _prepared.pop((data.get("token") or "").strip(), None)
         if not prep:
-            return jsonify({"error": "this import preview expired — please preview again"}), 400
+            return jsonify(
+                {"error": "this import preview expired — please preview again"}
+            ), 400
         try:
             with conn() as c:
                 res = pipeline.import_path(c, prep["path"], source=prep.get("source"))
-            return jsonify({"imported": res.imported, "skipped": res.skipped,
-                            "errors": res.errors[:20]})
+            return jsonify(
+                {
+                    "imported": res.imported,
+                    "skipped": res.skipped,
+                    "errors": res.errors[:20],
+                }
+            )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         finally:
