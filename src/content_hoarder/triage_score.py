@@ -113,6 +113,115 @@ def fit(conn, *, min_support: int = 20, alpha: float = 50.0) -> dict:
             "features": features}
 
 
+def _feature_rate(entry) -> float:
+    try:
+        return float(entry[2])
+    except (TypeError, ValueError, IndexError):
+        return 0.0
+
+
+def drift(prev_model: dict, curr_model: dict, *, top_n: int = 10) -> dict:
+    """Compare two fitted triage models and summarize feature/prior drift.
+
+    Pure computation: no DB access and no mutation of either model. ``features`` are
+    considered supported when they appear in the fitted model's feature table.
+    """
+    prev_features = prev_model.get("features") or {}
+    curr_features = curr_model.get("features") or {}
+    prev_keys = set(prev_features)
+    curr_keys = set(curr_features)
+    shared = sorted(prev_keys & curr_keys)
+
+    movers = []
+    deltas = []
+    for feature in shared:
+        old_rate = _feature_rate(prev_features.get(feature))
+        new_rate = _feature_rate(curr_features.get(feature))
+        delta = new_rate - old_rate
+        abs_delta = abs(delta)
+        deltas.append(abs_delta)
+        movers.append({
+            "feature": feature,
+            "old_rate": round(old_rate, 6),
+            "new_rate": round(new_rate, 6),
+            "delta": round(delta, 6),
+            "abs_delta": round(abs_delta, 6),
+        })
+    movers.sort(key=lambda m: (-m["abs_delta"], m["feature"]))
+
+    mean_delta = sum(deltas) / len(deltas) if deltas else 0.0
+    max_delta = max(deltas) if deltas else 0.0
+    old_prior = float(prev_model.get("prior") or 0.0)
+    new_prior = float(curr_model.get("prior") or 0.0)
+    prior_delta = new_prior - old_prior
+    return {
+        "features_added": sorted(curr_keys - prev_keys),
+        "features_dropped": sorted(prev_keys - curr_keys),
+        "rate_drift": {
+            "shared": len(shared),
+            "max_abs_delta": round(max_delta, 6),
+            "mean_abs_delta": round(mean_delta, 6),
+            "top_movers": movers[:top_n],
+        },
+        "prior_drift": {
+            "old": round(old_prior, 6),
+            "new": round(new_prior, 6),
+            "delta": round(prior_delta, 6),
+            "abs_delta": round(abs(prior_delta), 6),
+        },
+        "drift_score": round(mean_delta, 6),
+    }
+
+
+def new_decisions_since(conn, since_utc: int | None) -> int:
+    """Count post-fit human decisions, excluding machine-decayed/swept rows."""
+    if since_utc is None:
+        return 0
+    return conn.execute(
+        "SELECT COUNT(*) FROM items WHERE processed_utc IS NOT NULL "
+        "AND processed_utc > ? AND status IN (?, ?, ?) "
+        "AND json_extract(metadata, '$.decayed_at') IS NULL "
+        "AND json_extract(metadata, '$.decay_label') IS NULL",
+        (int(since_utc), *_PROCESSED),
+    ).fetchone()[0]
+
+
+def drift_report(conn, *, apply: bool = False, min_support: int = 20, alpha: float = 50.0,
+                 limit: int | None = None, samples: int = 10,
+                 since_processed: int | None = None) -> dict:
+    """Load the persisted model, fit current rows, and report drift.
+
+    Dry-run (default) writes nothing. With ``apply=True`` this delegates to
+    :func:`learn`, preserving the existing refit + rescore + persist behavior.
+    """
+    raw_prev = db.get_setting(conn, MODEL_SETTING_KEY)
+    prev_model = json.loads(raw_prev) if raw_prev else None
+    curr_model = fit(conn, min_support=min_support, alpha=alpha)
+    since_utc = since_processed
+    if since_utc is None and prev_model:
+        since_utc = int(prev_model.get("fitted_utc") or 0)
+
+    report = {
+        "applied": False,
+        "has_previous": prev_model is not None,
+        "previous_fitted_utc": prev_model.get("fitted_utc") if prev_model else None,
+        "current_fitted_utc": curr_model["fitted_utc"],
+        "new_decisions": new_decisions_since(conn, since_utc),
+        "current": {
+            "trained_on": curr_model["trained_on"],
+            "processed": curr_model["processed"],
+            "prior": curr_model["prior"],
+            "features_kept": len(curr_model["features"]),
+        },
+        "drift": drift(prev_model, curr_model) if prev_model else None,
+    }
+    if apply:
+        report["refit"] = learn(conn, apply=True, min_support=min_support, alpha=alpha,
+                                limit=limit, samples=samples)
+        report["applied"] = True
+    return report
+
+
 def score_item(model: dict, feats: list[str]) -> tuple[float, list[str]]:
     """Score = log-odds combination of the item's known features; why = the top
     contributors as compact 'feature ×lift' strings (lift = rate / prior)."""
