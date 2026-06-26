@@ -1539,13 +1539,12 @@ namespace) and builds on Epic 9 (tagging).*
   (volume-sorted) instead of the global vocabulary. Reuses the cross-filtered-counts pattern
   (`/sources?status=` style, Epic 5). Open question: how to treat shared/cross-source tags (always show vs.
   fold under an "all sources" group).
-- [ ] **P2 — Overall categories↔tags model reorg (decision gate first).** *(User direction 2026-06-17.)*
-  Decide + implement the unified taxonomy: whether the processing **categories** (listenable/watch/wotagei)
-  become a reserved **tag namespace** (one filter UI + one rail covers both — Epic 5 P2's idea), how
-  parent/child relationships are stored (a static parent→children map vs. a real hierarchy on `metadata`), and
-  how `categorize.py`'s buckets map onto the parents above. **Sketch the model before** refactoring
-  `categorize.py` + `search_items` + the rail. Large — sequence the two visual-grouping items above as the
-  near-term wins, this reorg as the structural follow-up.
+- [x] **P2 — Overall categories↔tags model reorg (decision gate first).** *(Done 2026-06-26.)* Decision (Q1,
+  resolved 2026-06-26): three-system model — categories stay first-class (`metadata.category`), tags remain
+  multi-label (`metadata.tags`), folders are a separate first-class field (`metadata.folder` + `folders`
+  registry). The category→tag dual-write in `db.set_category` is documented as the **intended bridge** (not a
+  legacy shim). Taxonomy reference doc: `docs/taxonomy.md`. Categories not collapsed — single-select invariant
+  in a multi-label array would be a standing bug magnet with zero UX gain.
 - [x] **P2 — Manual tagging + user-created tags.** *(User-requested 2026-06-19.)* Today tags are applied
   **only by the pipeline** (`categorize.py` heuristics + the optional LLM pass) from a **fixed curated
   vocabulary** (`REDDIT_TAGS`/`FILTER_TAGS`). Let the user **manually tag any item** from the UI **and create a
@@ -1567,21 +1566,17 @@ namespace) and builds on Epic 9 (tagging).*
   vanishes everywhere; a `user_tags` row carrying a stable id + display name lets one UPDATE rewrite
   `metadata.tags`/`tags_manual` in bulk). Also unlocks delete-from-vocab and per-tag colour/order. Decide
   table-vs-inline once, alongside folders, in the Epic 26 model reorg.
-- [ ] **P2 — Rule-based + AI-based tagging and new-tag suggestions.** *(User-requested 2026-06-19.)* Two
-  engines feeding the tag set, plus a **suggestion** surface. **Rule-based** largely exists — `categorize.py`'s
-  subreddit/host maps + word-bounded title keywords — so expose it as **user-editable rules** (add a
-  subreddit→tag / keyword→tag mapping from the UI, persisted like the gitignored `nsfw_rules.json` precedent)
-  rather than code-only seed maps. **AI-based** builds on the local-LLM classify path (Epic 1 / Epic 9(d)): run
-  it over the untagged tail to **propose** tags. Crucially, both should be able to **suggest *new* tags** (not
-  just pick from the fixed vocabulary) — the LLM/clustering proposes a candidate tag + items, and the user
-  **accepts/renames/rejects** it into the user-tag vocabulary (item above). Keep suggestions **non-destructive
-  + reviewable** (a queue/inbox of proposed tags, never auto-applied). Sequence after the manual-tagging
-  primitive; relates to Epic 9 (tagging) + Epic 1 (LLM classify).
-- [ ] **P2 — Create folders when saving posts.** *(User-requested 2026-06-19.)* Let the user **create a folder**
-  (and file the item into it) **at save time**, introducing a **folder** primitive alongside categories + tags.
-  **Decision gate (fold into the model reorg above):** are folders just a **reserved single-select tag
-  namespace** (one item lives in one folder, reuse the tag rail + filters) or a **separate first-class field** on
-  the item (`metadata.folder`)? Single-select + user-creatable distinguishes them from the multi-label tags.
-  Scope: a folder picker/creator in the save/import flow (and likely a move-to-folder action post-hoc), folders
-  in the left rail as a filter, persistence that survives re-import, and how folders coexist with the
-  parent/child tag grouping. Sketch the model with the taxonomy reorg before building.
+- [x] **P2 — Rule-based + AI-based tagging and new-tag suggestions.** *(Shipped 2026-06-26, commit 44570ce.)*
+  Tag suggestion queue (`tag_suggest.py`): three suggestion sources (rule-based, discovery of untagged
+  subreddits/domains, LLM), persistent `tag_suggestions` table, CLI (`categorize --suggest/--review/
+  --accept/--reject`), web API (`/tag-suggestions`), 28 tests. Suggestions stay non-destructive + reviewable
+  (pending queue, accepted on demand). User-editable rules and AI classify over the untagged tail remain as
+  future integration points (the suggestion queue is the infrastructure they feed into).
+- [x] **P2 — Folder primitive alongside categories + tags.** *(Shipped 2026-06-26, commit 44570ce.)* Decision
+  (Q1, resolved 2026-06-26): folders = first-class `metadata.folder` field + `folders` registry table, derived
+  from saved queries (not save-time filing — per B5/Epic 21 constraint). `folders.py` evaluation engine:
+  `evaluate_folder(id)` runs the saved query and assigns/clears `metadata.folder`. Query filters: source, kind,
+  status, tag, subreddit, author, has, q. CLI: `content_hoarder folder {list,create,rename,delete,evaluate,
+  assign,stats}`. Web API: `GET/POST /folders`, `PATCH/DELETE /folders/<id>`, `POST /folders/evaluate`.
+  Registry supports rename-in-place and empty folders (no P3 user_tags table needed for folder vocabs).
+  24 tests. Taxonomy model documented in `docs/taxonomy.md`.
