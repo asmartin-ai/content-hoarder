@@ -83,6 +83,29 @@ def _append_companion(yt_md: dict, comp: dict) -> bool:
     return True
 
 
+def _candidate_urls(url: str, md: dict) -> list[str]:
+    """URLs to inspect for a YouTube video, preserving primary-url precedence."""
+    out: list[str] = []
+    if url:
+        out.append(url)
+    links = md.get("outlinks") if isinstance(md, dict) else None
+    if isinstance(links, list):
+        out += [str(u).strip() for u in links if str(u).strip()]
+    elif isinstance(links, str) and links.strip():
+        out.append(links.strip())
+    seen: set[str] = set()
+    return [u for u in out if not (u in seen or seen.add(u))]
+
+
+def _youtube_match(url: str, md: dict) -> tuple[str, str]:
+    """Return ``(video_id, matched_url)`` from the primary URL or metadata.outlinks."""
+    for u in _candidate_urls(url, md):
+        vid = youtube_id(u)
+        if vid:
+            return vid, u
+    return "", ""
+
+
 def plan(conn) -> dict:
     """Classify non-youtube rows that link to YouTube videos (read-only, no writes)."""
     yt_ids = {r[0] for r in conn.execute("SELECT source_id FROM items WHERE source='youtube'")}
@@ -94,10 +117,10 @@ def plan(conn) -> dict:
         "SELECT fullname, source, kind, url, title, status, processed_utc, metadata FROM items "
         "WHERE source <> 'youtube' AND url <> '' ORDER BY fullname"
     ):
-        vid = youtube_id(url or "")
+        md = parse_metadata(metadata)
+        vid, matched_url = _youtube_match(url or "", md)
         if not vid:
             continue
-        md = parse_metadata(metadata)
         yt_fullname = f"youtube:{vid}"
         # Already folded into this exact target on a prior run — don't re-count.
         if md.get("consolidated_into") == yt_fullname:
@@ -112,6 +135,7 @@ def plan(conn) -> dict:
             "status": status if status in VALID_STATUSES else "inbox",
             "processed_utc": processed_utc,
             "vid": vid,
+            "matched_url": matched_url,
             "youtube_fullname": yt_fullname,
             "metadata": md,
         }

@@ -6,7 +6,7 @@
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { createLightbox, imageUrl, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
+import { createLightbox, imageUrl, imageUrls, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders, shareItem } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -341,6 +341,8 @@ function openMediaFor(item) {
     // sized variants load first (Epic 13 P2); prefer locally-archived copies when present (Epic 4 P1)
     return lightbox.openGallery(m.gallery.map((u) => localUrl(item, u)),
                                (m.gallery_preview || []).map((u) => localUrl(item, u)));
+  const imgs = imageUrls(item);
+  if (imgs.length > 1) return lightbox.openGallery(imgs, imgs);
   const vsrc = playableVideoSrc(item);   // shared playability test (same as the reader's inline player)
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
   const img = imageUrl(item);
