@@ -946,7 +946,9 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   extraction. Builds on the note-with-video reader above.
 - [ ] **P2 — Edit note bodies as raw markdown, in the reader.** *(User-requested 2026-06-19.)* Let the reader
   edit a note's body as **raw markdown** (a textarea + rendered live preview reusing the reader's markdown
-  renderer above) — **reuse the reader view**, not a separate editor surface. Backend: a `POST /items/<fn>/body`
+  renderer above) — **reuse the reader view**, not a separate editor surface. ✅ **Reader editor shipped
+  2026-06-25:** Keep/Obsidian items now open in the existing reader with an edit-body toggle, textarea, live
+  markdown preview, save/cancel controls, and an in-memory feed refresh after save. Backend: a `POST /items/<fn>/body`
   endpoint updating `body` + rebuilding `search_text`/FTS (precedented by `/recover` + `/category`), re-deriving
   Obsidian inline `#tags` + `[[wikilinks]]`. **Re-import durability (the crux — `merge_upsert` overlays the
   incoming body, db.py:417):** stamp `metadata.body_edited_at` and skip the body overlay for dirty rows so a

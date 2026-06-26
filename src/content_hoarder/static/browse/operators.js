@@ -201,6 +201,15 @@ export function initOperators(input, pop, opts = {}) {
       setSel((sel - 1 + rows.length) % rows.length);
     } else if ((e.key === "Enter" || e.key === "Tab") && sel >= 0) {
       e.preventDefault();
+      const tok = activeToken(input);
+      const chosen = rows[sel] && rows[sel].complete;
+      if (e.key === "Enter" && chosen && !chosen.endsWith(":") &&
+          chosen.toLowerCase() === tok.typed.toLowerCase()) {
+        onApply();
+        pop.classList.remove("show");
+        input.blur();
+        return;
+      }
       complete(sel);
     } else if (e.key === "Escape") {
       pop.classList.remove("show");

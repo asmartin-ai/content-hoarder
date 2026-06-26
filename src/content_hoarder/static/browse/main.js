@@ -230,6 +230,12 @@ function redo() {
 const readerUI = initReader({
   onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur,
   onImage: (url) => lightbox.openImage(url),   // inline comment/selftext image → lightbox
+  onBodySaved: (updated) => {
+    if (!updated || !updated.fullname) return;
+    const it = state.items.find((x) => x.fullname === updated.fullname);
+    if (it) Object.assign(it, updated);
+    render();
+  },
 });
 
 /* per-item manual tag editor (browse surface, Epic 5/26 P2) — opens from the ＋ trigger on
@@ -276,15 +282,20 @@ itemsEl.addEventListener("click", (e) => {
     openMediaFor(item);
     return;
   }
-  // Discussion-thread items: tapping the title link or body text opens the in-app reader.
-  // A title link's parent is an <h3> (every density); meta links (r/subreddit) sit
-  // in .meta, so they keep their external navigation.
+  // Discussion-thread + note items: tapping the title link or body text opens the in-app reader.
+  // A title link's parent is an <h3> (every density); meta/source links sit in .meta,
+  // so they keep their external navigation.
   const rItem = state.items.find((it) => it.fullname === fn);
-  if (rItem && (rItem.source === "reddit" || rItem.source === "hackernews")) {
+  if (rItem && (rItem.source === "reddit" || rItem.source === "hackernews" ||
+                rItem.source === "keep" || rItem.source === "obsidian")) {
     const a = e.target.closest("a");
     const onTitle = a && a.parentElement && a.parentElement.tagName === "H3";
     const onText = !a && e.target.closest(".title, .snippet, .pin h3");
-    if (onTitle || onText) { e.preventDefault(); readerUI.open(rItem); preloadNext(rItem); }
+    if (onTitle || onText) {
+      e.preventDefault();
+      readerUI.open(rItem);
+      if (rItem.source === "reddit" || rItem.source === "hackernews") preloadNext(rItem);
+    }
   }
 });
 
