@@ -65,7 +65,7 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `categorize [--source youtube\|reddit\|firefox\|hackernews] [--topics] [--dry-run] [--all] [--limit N]` | Tag items by heuristics. `--source youtube` → processing areas *listenable* / *watch* / *wotagei* on `metadata.category`; `--topics` (youtube) / `--source reddit\|firefox\|hackernews` → multi-label topic tags (gaming/defense/investing/…) on `metadata.tags` (host + title keywords; `--dry-run` previews accuracy without writing). |
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `scan-media [--status S] [--limit N] [--apply] [--recheck] [--workers N] [--batch N]` | Probe saved Reddit image/gallery items for deleted media and classify them on `metadata.media_status` (`gone` / `salvageable`, recording the salvageable preview URL for the `archive-media` pass). `--apply` writes (+ a `deleted` tag on gone items, surfaced by `is:deleted`); dry-run by default, crash-safe + resumable (skips already-classified unless `--recheck`). |
-| `archive-media [--salvageable] [--galleries] [--images] [--limit N] [--throttle S] [--apply]` | **Hoard the bytes:** download + store saved Reddit media locally (content-addressed under `data/media/`, served same-origin via `/media/<blob>` so the PWA survives remote deletion) so a reddit/imgur deletion can't take it. Scopes, cheap→bulk: `--salvageable` (rescue still-live previews of already-deleted posts — run first), `--galleries`, `--images` (the bulk `i.redd.it` set, ~15 GB+). Dry-run by default; resumable (skips already-archived); per-item commit. ⚠️ `data/media/` is gitignored and **not** in DB backups — back it up separately. |
+| `archive-media [--salvageable] [--galleries] [--images] [--twitter] [--limit N] [--throttle S] [--apply]` | **Hoard the bytes:** download + store saved Reddit and Twitter/X image media locally (content-addressed under `data/media/`, served same-origin via `/media/<blob>` so the PWA survives remote deletion). Scopes, cheap→bulk: `--salvageable` (rescue still-live previews of already-deleted posts — run first), `--galleries`, `--images` (the bulk `i.redd.it` set, ~15 GB+), `--twitter` (imported `pbs.twimg.com` bookmark images). Dry-run by default; resumable (skips already-archived); per-item commit. ⚠️ `data/media/` is gitignored and **not** in DB backups — back it up separately. |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `consolidate [--apply] [--undo]` | Fold a Reddit post / HN story / Firefox tab that links to a YouTube video into one canonical `youtube:<id>` item (companions linked). Re-runnable; dry-run by default; reversible. |
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
@@ -150,8 +150,10 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 - **Firefox tabs** are imported from the "Export Tabs URLs" extension's `.txt` (Rich format);
   YouTube tabs are promoted to canonical `youtube:<id>` rows.
 - **Twitter/X bookmarks** are imported from a browser-side JSON/CSV export, not the paid API;
-  rows are keyed as `twitter:<tweet_id>` and retain tweet text, author, permalink, and media URLs.
-  re-importing the overlapping daily exports de-dups by URL.
+  rows are keyed as `twitter:<tweet_id>` and retain tweet text, author, permalink, outbound links,
+  and media URLs. Re-importing overlapping daily exports de-dups by URL. Tweets that link to YouTube
+  videos can be folded into canonical `youtube:<id>` rows with `consolidate`; imported tweet images
+  can be cached locally with `python -m content_hoarder archive-media --twitter --apply`.
 
 ## Privacy & data safety
 The SQLite database (`data/app.db`), all exports, `.env`, and `nsfw_rules.json` are gitignored.

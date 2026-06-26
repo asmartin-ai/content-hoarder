@@ -28,11 +28,15 @@ from content_hoarder import media_store
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 DEFAULT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB/image cap — skip pathological originals
 _IMG_RE = re.compile(r"\.(png|jpe?g|gif|webp|bmp)(\?|#|$)", re.I)
-SCOPES = ("salvageable", "galleries", "images")
+SCOPES = ("salvageable", "galleries", "images", "twitter")
 
 
 def _is_img(u: str) -> bool:
     return bool(u) and (bool(_IMG_RE.search(u)) or "i.redd.it" in u)
+
+
+def _is_twitter_img(u: str) -> bool:
+    return bool(u) and "pbs.twimg.com/media/" in u and _is_img(u)
 
 
 def default_fetch(url: str, *, max_bytes: int = DEFAULT_MAX_BYTES) -> tuple[bytes | None, str]:
@@ -63,6 +67,8 @@ def _urls_for(md: dict, scope: str) -> list[str]:
         u = md.get("media_url") or ""
         if _is_img(u) and md.get("media_status") != "gone":
             out.append(u)
+    elif scope == "twitter":
+        out += [u for u in (md.get("media_urls") or []) if _is_twitter_img(u)]
     seen: set = set()
     return [u for u in out if not (u in seen or seen.add(u))]
 
@@ -73,6 +79,8 @@ def _candidates_sql(scope: str) -> str:
         return base + " AND json_extract(metadata, '$.media_salvage_url') IS NOT NULL"
     if scope == "galleries":
         return base + " AND json_extract(metadata, '$.gallery_preview') IS NOT NULL"
+    if scope == "twitter":
+        return "source='twitter' AND json_extract(metadata, '$.media_urls') IS NOT NULL"
     # images: an image-shaped media_url that isn't already known-gone
     return (base + " AND COALESCE(json_extract(metadata, '$.media_status'),'') <> 'gone'"
             " AND (json_extract(metadata, '$.media_url') LIKE '%i.redd.it%'"

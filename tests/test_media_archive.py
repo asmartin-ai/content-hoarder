@@ -10,6 +10,11 @@ def _seed(conn, sid, **md):
                                           title=sid, metadata=md))
 
 
+def _seed_source(conn, source, sid, **md):
+    db.merge_upsert(conn, models.new_item(source=source, source_id=sid, kind="post",
+                                          title=sid, metadata=md))
+
+
 def test_urls_for_scopes():
     assert media_archive._urls_for({"media_salvage_url": "u"}, "salvageable") == ["u"]
     assert media_archive._urls_for({"gallery_preview": ["a", "b"]}, "galleries") == ["a", "b"]
@@ -18,6 +23,14 @@ def test_urls_for_scopes():
     # a known-gone image is not re-fetched
     assert media_archive._urls_for(
         {"media_url": "https://i.redd.it/x.jpg", "media_status": "gone"}, "images") == []
+    assert media_archive._urls_for(
+        {"media_urls": [
+            "https://pbs.twimg.com/media/a.jpg?name=orig",
+            "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4",
+            "https://pbs.twimg.com/media/a.jpg?name=orig",
+        ]},
+        "twitter",
+    ) == ["https://pbs.twimg.com/media/a.jpg?name=orig"]
 
 
 def test_archive_salvageable_and_galleries(conn, tmp_path, monkeypatch):
@@ -72,3 +85,34 @@ def test_archive_item_limit(conn, tmp_path, monkeypatch):
     res = media_archive.archive(conn, scopes=["salvageable"], apply=True, limit=2, throttle=0,
                                 fetch=lambda u, *, max_bytes: (b"x", "image/jpeg"))
     assert res["items"] == 2 and res["archived"] == 2
+
+
+def test_archive_twitter_images(conn, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "db_path", lambda: str(tmp_path / "app.db"))
+    img = "https://pbs.twimg.com/media/abc123.jpg?name=orig"
+    _seed_source(conn, "twitter", "tw1", media_urls=[
+        img,
+        "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4",
+    ])
+    _seed(conn, "reddit", media_url="https://i.redd.it/x.jpg")
+    conn.commit()
+    calls = []
+
+    def fake(u, *, max_bytes):
+        calls.append(u)
+        return (b"TW-" + u.encode(), "image/jpeg")
+
+    plan = media_archive.archive(conn, scopes=["twitter"], apply=False, fetch=fake, throttle=0)
+    assert plan["items"] == 1 and plan["urls"] == 1 and plan["archived"] == 0
+    assert calls == []
+
+    res = media_archive.archive(conn, scopes=["twitter"], apply=True, fetch=fake, throttle=0)
+    assert res["items"] == 1 and res["archived"] == 1 and res["failed"] == 0
+    assert calls == [img]
+    md = json.loads(db.get_item(conn, "twitter:tw1")["metadata"])
+    blob = md["archived_media"][img]
+    assert blob.endswith(".jpg")
+    assert media_store.path_for(blob).read_bytes() == b"TW-" + img.encode()
+
+    again = media_archive.archive(conn, scopes=["twitter"], apply=True, fetch=fake, throttle=0)
+    assert again["urls"] == 0 and again["archived"] == 0

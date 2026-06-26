@@ -21,6 +21,7 @@ from content_hoarder.connectors.base import BaseConnector
 from content_hoarder.models import new_item
 
 _STATUS_RE = re.compile(r"https?://(?:www\.)?(?:x|twitter)\.com/([^/?#]+)/status/(\d+)", re.I)
+_URL_RE = re.compile(r"https?://[^\s<>)\"']+", re.I)
 _ID_RE = re.compile(r"^\d{5,}$")
 
 
@@ -134,6 +135,32 @@ def _media_urls(*values: Any) -> list[str]:
     return out
 
 
+def _link_url(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if not isinstance(value, dict):
+        return ""
+    return _first(
+        value.get("expanded_url"),
+        value.get("unwound_url"),
+        value.get("url"),
+    )
+
+
+def _link_urls(*values: Any, text: str = "") -> list[str]:
+    out: list[str] = []
+    for value in values:
+        for link in _as_list(value):
+            url = _link_url(link)
+            if url and url not in out:
+                out.append(url)
+    for url in _URL_RE.findall(text or ""):
+        url = url.rstrip(".,;:!?)]}")
+        if url and url not in out:
+            out.append(url)
+    return out
+
+
 def _orig_image(url: str) -> str:
     if "pbs.twimg.com/media/" not in url:
         return url
@@ -169,6 +196,13 @@ def _flat_item(row: dict[str, Any], *, index: int | None = None) -> dict | None:
         row.get("photos"),
         row.get("videos"),
     )]
+    outlinks = _link_urls(
+        row.get("outlinks"),
+        row.get("links"),
+        row.get("urls"),
+        row.get("expanded_urls"),
+        text=text,
+    )
     meta: dict[str, Any] = {
         "permalink": _permalink(tweet_id, handle, url),
         "author_handle": handle,
@@ -178,6 +212,8 @@ def _flat_item(row: dict[str, Any], *, index: int | None = None) -> dict | None:
         meta["media_urls"] = media
         meta["media_type"] = "video" if any("video.twimg.com/" in u for u in media) else "image"
         meta["thumbnail"] = media[0]
+    if outlinks:
+        meta["outlinks"] = outlinks
     if index is not None:
         meta["bookmark_index"] = index
     return new_item(
@@ -218,6 +254,7 @@ def _graphql_item(result: dict[str, Any], *, index: int | None = None) -> dict |
         "author_name": user_legacy.get("name"),
         "media": (legacy.get("extended_entities") or {}).get("media")
                  or (legacy.get("entities") or {}).get("media"),
+        "urls": (legacy.get("entities") or {}).get("urls"),
     }
     return _flat_item(row, index=index)
 

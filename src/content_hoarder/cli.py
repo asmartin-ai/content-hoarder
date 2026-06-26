@@ -481,11 +481,12 @@ def cmd_scan_media(args) -> int:
 def cmd_archive_media(args) -> int:
     """Download + store media bytes locally so deletions are survivable (Epic 4 P1, hoard the
     bytes). Dry-run by default; --apply fetches + writes content-addressed blobs under data/media/
-    and stamps metadata.archived_media. Scope with --salvageable/--galleries/--images (default:
-    salvageable + galleries). Resumable (skips already-archived URLs); per-item commit."""
+    and stamps metadata.archived_media. Scope with --salvageable/--galleries/--images/--twitter
+    (default: salvageable + galleries). Resumable (skips already-archived URLs); per-item commit."""
     from content_hoarder import media_archive
     scopes = [s for s, on in (("salvageable", args.salvageable), ("galleries", args.galleries),
-                              ("images", args.images)) if on] or ["salvageable", "galleries"]
+                              ("images", args.images), ("twitter", args.twitter)) if on] \
+        or ["salvageable", "galleries"]
     with _connect() as conn:
         res = media_archive.archive(conn, scopes=scopes, limit=args.limit, apply=args.apply,
                                     throttle=args.throttle,
@@ -1034,6 +1035,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Archive the sized gallery_preview variants (~1080px).")
     pam.add_argument("--images", action="store_true",
                      help="Archive direct reddit images (the large set — ~10GB).")
+    pam.add_argument("--twitter", action="store_true",
+                     help="Archive imported Twitter/X bookmark image media.")
     pam.add_argument("--limit", type=int, default=None,
                      help="Cap items with work this run (resumable).")
     pam.add_argument("--throttle", type=float, default=0.3,

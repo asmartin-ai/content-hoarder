@@ -34,6 +34,18 @@ def _reddit(fullname_id: str, url: str, *, permalink: str = "", **md):
     )
 
 
+def _twitter(tweet_id: str, *, outlinks: list[str], title: str = "Tweet"):
+    permalink = f"https://x.com/me/status/{tweet_id}"
+    return dict(
+        source="twitter",
+        source_id=tweet_id,
+        kind="tweet",
+        title=title,
+        url=permalink,
+        metadata={"permalink": permalink, "outlinks": outlinks},
+    )
+
+
 def test_reddit_link_to_existing_youtube_folds(tmp_db):
     vid = "Vfold000001"  # 11 chars
     conn = db.connect(tmp_db)
@@ -327,6 +339,51 @@ def test_search_items_hides_consolidated_companions(tmp_db):
 
     fns2 = {r["fullname"] for r in db.search_items(conn, include_consolidated=True)}
     assert "reddit:t3_s" in fns2
+
+
+def test_twitter_outlink_to_existing_youtube_folds_to_tweet_permalink(tmp_db):
+    vid = "TwFold0001x"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(
+        conn,
+        [
+            _youtube(vid),
+            _twitter("1777777777777777777",
+                     outlinks=[f"https://www.youtube.com/watch?v={vid}&t=30"]),
+        ],
+    )
+
+    res = consolidate.migrate(conn, apply=True)
+    assert res["foldable"] == 1 and res["promoted"] == 0
+
+    yt_md = json.loads(db.get_item(conn, f"youtube:{vid}")["metadata"])
+    assert yt_md["companions"] == [
+        {
+            "source": "twitter",
+            "kind": "tweet",
+            "permalink": "https://x.com/me/status/1777777777777777777",
+            "fullname": "twitter:1777777777777777777",
+        }
+    ]
+    tw_md = json.loads(db.get_item(conn, "twitter:1777777777777777777")["metadata"])
+    assert tw_md["consolidated_into"] == f"youtube:{vid}"
+    assert tw_md["outlinks"] == [f"https://www.youtube.com/watch?v={vid}&t=30"]
+
+
+def test_twitter_outlink_to_missing_youtube_promotes(tmp_db):
+    vid = "TwProm0001x"  # 11 chars
+    conn = db.connect(tmp_db)
+    _seed(conn, [_twitter("1888888888888888888", title="Great video",
+                          outlinks=[f"https://youtu.be/{vid}"])])
+
+    res = consolidate.migrate(conn, apply=True)
+    assert res["foldable"] == 0 and res["promoted"] == 1 and res["youtube_created"] == 1
+
+    yt = db.get_item(conn, f"youtube:{vid}")
+    assert yt["title"] == "Great video"
+    yt_md = json.loads(yt["metadata"])
+    assert yt_md["promoted_by"] == "consolidate"
+    assert yt_md["companions"][0]["permalink"] == "https://x.com/me/status/1888888888888888888"
 
 
 # --- undo -> re-migrate round-trips (delegation/08) ---------------------------

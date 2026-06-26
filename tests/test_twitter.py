@@ -56,6 +56,10 @@ def test_twitter_graphql_shape_and_dedup(tmp_path):
                     "legacy": {
                         "full_text": "Nested GraphQL tweet",
                         "created_at": "Wed Oct 10 20:19:24 +0000 2018",
+                        "entities": {"urls": [{
+                            "url": "https://t.co/short",
+                            "expanded_url": "https://www.youtube.com/watch?v=GraphVid001",
+                        }]},
                         "extended_entities": {"media": [{
                             "type": "photo",
                             "media_url_https": "https://pbs.twimg.com/media/nested.jpg?format=jpg&name=small",
@@ -79,6 +83,26 @@ def test_twitter_graphql_shape_and_dedup(tmp_path):
     assert it["author"] == "graph_user"
     assert it["created_utc"] == 1539202764
     assert md(it)["media_urls"] == ["https://pbs.twimg.com/media/nested.jpg?name=orig"]
+    assert md(it)["outlinks"] == ["https://www.youtube.com/watch?v=GraphVid001"]
+
+
+def test_twitter_outlinks_from_flat_rows_and_text(tmp_path):
+    p = tmp_path / "x.csv"
+    p.write_text(
+        "tweet_id,text,url,expanded_urls\n"
+        "1666666666666666666,"
+        "\"watch this https://youtu.be/TextVid001x\","
+        "https://x.com/me/status/1666666666666666666,"
+        "https://www.youtube.com/watch?v=CsvVid0001x\n",
+        encoding="utf-8",
+    )
+
+    its = list(TwitterConnector().import_file(p))
+    links = md(its[0])["outlinks"]
+    assert links == [
+        "https://www.youtube.com/watch?v=CsvVid0001x",
+        "https://youtu.be/TextVid001x",
+    ]
 
 
 def test_tweet_id_from_url():
