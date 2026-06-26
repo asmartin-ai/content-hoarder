@@ -1,0 +1,44 @@
+[
+  {
+    "fullname": "reddit:t3_synth001",
+    "title": "TIL that the octopus has three hearts and blue blood",
+    "thread": {
+      "id": "t3_synth001",
+      "title": "TIL that the octopus has three hearts and blue blood",
+      "permalink": "/r/todayilearned/comments/synth001/octopus_three_hearts/",
+      "subreddit": "todayilearned",
+      "author": "placeholder_user",
+      "score": 4200,
+      "num_comments": 3,
+      "created_utc": 1700000000,
+      "body": "",
+      "comments": [
+        {
+          "id": "t1_synth_c1",
+          "author": "commenter_alpha",
+          "score": 850,
+          "created_utc": 1700000500,
+          "body": "Two of the hearts pump blood through the gills, while the third pumps it through the rest of the body.",
+          "replies": [
+            {
+              "id": "t1_synth_c1r1",
+              "author": "commenter_beta",
+              "score": 220,
+              "created_utc": 1700000800,
+              "body": "And during swimming, the main heart stops beating, which is why octopuses prefer crawling over swimming.",
+              "replies": []
+            }
+          ]
+        },
+        {
+          "id": "t1_synth_c2",
+          "author": "commenter_gamma",
+          "score": 310,
+          "created_utc": 1700001000,
+          "body": "The blue blood is due to hemocyanin, which uses copper instead of iron to transport oxygen. More efficient in cold, low-oxygen environments.",
+          "replies": []
+        }
+      ]
+    }
+  }
+]
