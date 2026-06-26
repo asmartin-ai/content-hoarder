@@ -1170,19 +1170,89 @@ def dedupe_reddit_comment_twins(conn: sqlite3.Connection) -> dict:
     return {"removed": removed, "status_moved": status_moved, "requeued": requeued}
 
 
-def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> int:
+def preview_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> dict:
+    """Preview local unsave queueing for still-saved reddit items carrying *tag*.
+
+    No network calls and no writes. The skip buckets are mutually exclusive and ordered
+    so the ``eligible`` count is exactly the number a confirmed enqueue can add.
+    """
+    tag = str(tag or "").strip()
+    summary = {
+        "tag": tag,
+        "matched": 0,
+        "eligible": 0,
+        "enqueued": 0,
+        "skipped": {
+            "non_reddit": 0,
+            "already_unsaved": 0,
+            "invalid_id": 0,
+            "already_queued": 0,
+        },
+        "fullnames": [],
+    }
+    if not tag:
+        return summary
+
+    rows = conn.execute(
+        "SELECT i.fullname, i.source, i.source_id, i.is_saved, q.fullname AS queued "
+        "FROM items i "
+        "LEFT JOIN reddit_unsave q ON q.fullname = i.fullname "
+        "WHERE EXISTS (SELECT 1 FROM json_each(i.metadata, '$.tags') WHERE value = ?)",
+        (tag,),
+    ).fetchall()
+    summary["matched"] = len(rows)
+
+    fullnames: list[str] = []
+    skipped = summary["skipped"]
+    for row in rows:
+        if row["source"] != "reddit":
+            skipped["non_reddit"] += 1
+            continue
+        if int(row["is_saved"] or 0) != 1:
+            skipped["already_unsaved"] += 1
+            continue
+        sid = row["source_id"] or ""
+        if not sid.startswith(("t1_", "t3_")):
+            skipped["invalid_id"] += 1
+            continue
+        if row["queued"] is not None:
+            skipped["already_queued"] += 1
+            continue
+        fullnames.append(row["fullname"])
+
+    summary["eligible"] = len(fullnames)
+    summary["fullnames"] = fullnames[:200]
+    return summary
+
+
+def enqueue_unsave_by_tag(conn: sqlite3.Connection, tag: str, *, dry_run: bool = False) -> dict:
     """Queue every still-saved reddit item carrying *tag* for unsaving.
 
-    Finds items via search_items and reuses enqueue_unsave (idempotent).
-    Does NOT drain or make any network call.  Returns the number newly enqueued.
+    Idempotent and local-only: existing ``reddit_unsave`` rows are left untouched, and
+    Reddit is contacted only by the separate drain operation. Returns a preview/apply
+    summary with ``enqueued`` set to the number newly inserted.
     """
-    before = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
-    items = search_items(conn, "", source="reddit", is_saved=1, tags=[tag], limit=100_000)
-    for item in items:
-        enqueue_unsave(conn, item["fullname"])
+    summary = preview_unsave_by_tag(conn, tag)
+    summary["dry_run"] = bool(dry_run)
+    if dry_run or not summary["eligible"]:
+        return summary
+
+    now = int(time.time())
+    conn.execute(
+        "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) "
+        "SELECT i.fullname, i.source_id, 'pending', ? "
+        "FROM items i "
+        "WHERE i.source = 'reddit' "
+        "AND i.is_saved = 1 "
+        "AND EXISTS (SELECT 1 FROM json_each(i.metadata, '$.tags') WHERE value = ?) "
+        "AND (i.source_id LIKE 't3\\_%' ESCAPE '\\' OR i.source_id LIKE 't1\\_%' ESCAPE '\\') "
+        "AND NOT EXISTS (SELECT 1 FROM reddit_unsave q WHERE q.fullname = i.fullname) "
+        "ON CONFLICT(fullname) DO NOTHING",
+        (now, summary["tag"]),
+    )
+    summary["enqueued"] = conn.execute("SELECT changes()").fetchone()[0]
     conn.commit()
-    after = conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0]
-    return after - before
+    return summary
 
 
 def reconcile_reddit_saves(

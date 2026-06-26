@@ -29,6 +29,8 @@ import { esc } from "./core/util.js";
   const filterTag      = $('filter-tag');        // <details> wrapper
   const tagFilterList  = $('tag-filter-list');
   const tagSummary     = $('tag-summary');
+  const btnUnsaveTag   = $('btn-unsave-tag');
+  const unsaveTagStatus= $('unsave-tag-status');
   const filterSub      = $('filter-subreddit');
   const sortSelect     = $('sort-select');
   const itemsPanel     = $('items-panel');
@@ -288,6 +290,69 @@ import { esc } from "./core/util.js";
       });
   };
 
+  function selectedTagForUnsave() {
+    const tags = Array.from(selectedTags);
+    if (tags.length !== 1) {
+      if (unsaveTagStatus) {
+        unsaveTagStatus.textContent = tags.length
+          ? 'Select exactly one tag to queue unsaves.'
+          : 'Select one tag first. Local queue only; drain contacts Reddit.';
+      }
+      return null;
+    }
+    return tags[0];
+  }
+
+  function queueUnsaveBySelectedTag() {
+    const tag = selectedTagForUnsave();
+    if (!tag || !btnUnsaveTag) return;
+    btnUnsaveTag.disabled = true;
+    if (unsaveTagStatus) unsaveTagStatus.textContent = 'Previewing local queue...';
+    fetch('/reddit/unsave/enqueue-by-tag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, dry_run: true }),
+    })
+      .then(r => r.json())
+      .then(preview => {
+        if (preview.error) throw new Error(preview.error);
+        const skipped = preview.skipped || {};
+        const skipText = [
+          skipped.non_reddit ? `${skipped.non_reddit} non-Reddit` : '',
+          skipped.already_unsaved ? `${skipped.already_unsaved} already unsaved` : '',
+          skipped.invalid_id ? `${skipped.invalid_id} invalid IDs` : '',
+          skipped.already_queued ? `${skipped.already_queued} already queued` : '',
+        ].filter(Boolean).join(', ');
+        const note = 'This only queues local unsaves and does not contact Reddit. Use the existing drain action when you are ready to contact Reddit.';
+        const prompt = `Queue ${preview.eligible || 0} saved Reddit item(s) tagged "${tag}"?\n\n${note}`
+          + (skipText ? `\n\nSkipped: ${skipText}.` : '');
+        if (!preview.eligible || !window.confirm(prompt)) {
+          if (unsaveTagStatus) {
+            unsaveTagStatus.textContent = `Preview: ${preview.eligible || 0} eligible. Local queue only; drain contacts Reddit.`;
+          }
+          return null;
+        }
+        if (unsaveTagStatus) unsaveTagStatus.textContent = 'Queueing locally...';
+        return fetch('/reddit/unsave/enqueue-by-tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag, confirm: true }),
+        }).then(r => r.json());
+      })
+      .then(result => {
+        if (!result) return;
+        if (result.error) throw new Error(result.error);
+        if (unsaveTagStatus) {
+          unsaveTagStatus.textContent = `Queued ${result.enqueued || 0} local unsave(s). Drain contacts Reddit.`;
+        }
+        loadHeaderCounts();
+      })
+      .catch(err => {
+        if (unsaveTagStatus) unsaveTagStatus.textContent = 'Queue preview failed: ' + err.message;
+      })
+      .finally(() => { btnUnsaveTag.disabled = false; });
+  }
+
   // ── Thread view ────────────────────────────────────────────────────────────
   let threadSort = localStorage.getItem('ch-thread-sort') || 'best';
   const threadSortSelect = $('thread-sort');
@@ -463,6 +528,7 @@ import { esc } from "./core/util.js";
     updateTagSummary();
     loadItems();
   });
+  if (btnUnsaveTag) btnUnsaveTag.addEventListener('click', queueUnsaveBySelectedTag);
   filterSub.addEventListener('input', debounceLoad);
 
   // Click a tag chip on a row/card → add that tag to the active filter (check its box).

@@ -86,6 +86,57 @@ def test_media_url_video_still_wins_over_image_branch():
     assert out == "video"
 
 
+def test_gallery_metadata_classifies_as_gallery_before_image():
+    out = _node_eval(
+        "import { mediaType } from './core/media.js';"
+        "const byArray = { url: 'https://www.reddit.com/r/pics/comments/abc/t/',"
+        "  metadata: { gallery: ['https://i.redd.it/g1.jpg'], media_url: 'https://i.redd.it/g1.jpg' } };"
+        "const byType = { url: 'https://www.reddit.com/r/pics/comments/def/t/',"
+        "  metadata: { media_type: 'gallery', media_url: 'https://i.redd.it/g2.jpg' } };"
+        "console.log(JSON.stringify([mediaType(byArray).cls, mediaType(byType).cls]));"
+    )
+    assert json.loads(out) == ["gallery", "gallery"]
+
+
+def test_thumb_uses_gallery_preview_for_list_density():
+    out = _node_eval(
+        "import { thumb } from './core/media.js';"
+        "console.log(thumb({ source:'reddit', metadata:{"
+        "  gallery_preview:['https://preview.redd.it/p0.jpg?s=1'],"
+        "  gallery:['https://i.redd.it/f0.jpg']"
+        "} }, 'list'));"
+    )
+    assert out == "https://preview.redd.it/p0.jpg?s=1"
+
+
+def test_thumb_falls_back_to_gallery_when_thumbnail_is_invalid_or_sentinel():
+    out = _node_eval(
+        "import { thumb } from './core/media.js';"
+        "const bad = { source:'reddit', metadata:{ thumbnail:'javascript:alert(1)',"
+        "  gallery:['https://i.redd.it/f0.jpg'] } };"
+        "const sentinel = { source:'reddit', metadata:{ thumbnail:'self',"
+        "  gallery_preview:['https://preview.redd.it/p0.jpg?s=1'],"
+        "  gallery:['https://i.redd.it/f0.jpg'] } };"
+        "console.log(JSON.stringify([thumb(bad, 'list'), thumb(sentinel, 'list')]));"
+    )
+    assert json.loads(out) == [
+        "https://i.redd.it/f0.jpg",
+        "https://preview.redd.it/p0.jpg?s=1",
+    ]
+
+
+def test_gallery_thumb_prefers_local_archive_when_enabled():
+    out = _node_eval(
+        "import { setArchivePref, thumb } from './core/media.js';"
+        "const p = 'https://preview.redd.it/p0.jpg?s=1';"
+        "setArchivePref(true);"
+        "console.log(thumb({ source:'reddit', metadata:{"
+        "  thumbnail:'default', gallery_preview:[p], archived_media:{ [p]:'blob.jpg' }"
+        "} }, 'list'));"
+    )
+    assert out == "/media/blob.jpg"
+
+
 def test_twitter_media_urls_classify_and_resolve_images():
     out = _node_eval(
         "import { mediaType, imageUrl, imageUrls } from './core/media.js';"

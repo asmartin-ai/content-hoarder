@@ -25,6 +25,18 @@ export const localUrl = (item, url) => {
 /* ---- thumbnails ---- */
 /* density: "card" gets the crisp maxres variant (onerror-falls back to mqdefault
    via ytFallback); everything else gets the light bar-free mqdefault (~10KB). */
+const _galleryThumb = (m) => {
+  if (Array.isArray(m.gallery_preview) && m.gallery_preview.length && safeUrl(m.gallery_preview[0]))
+    return m.gallery_preview[0];
+  if (Array.isArray(m.gallery) && m.gallery.length && safeUrl(m.gallery[0]))
+    return m.gallery[0];
+  return "";
+};
+const _thumbSentinel = /^(self|default|nsfw|spoiler)$/i;
+const _usableThumb = (u) => {
+  const t = typeof u === "string" ? u.trim() : "";
+  return t && !_thumbSentinel.test(t) ? safeUrl(t) : "";
+};
 export const thumb = (item, density) => {
   const m = item.metadata || {};
   // Card density wants a crisp preview: a gallery's first full-size image beats the small
@@ -33,9 +45,10 @@ export const thumb = (item, density) => {
   if (density === "card" && Array.isArray(m.gallery) && m.gallery.length)
     // prefer the sized ~1080px variant over the 5000px original for the feed card (Epic 13 P2),
     // and the locally-archived copy over either when present (Epic 4 P1)
-    return localUrl(item, (Array.isArray(m.gallery_preview) && m.gallery_preview[0]) || m.gallery[0]);
-  let t = m.thumbnail || "";
+    return localUrl(item, _galleryThumb(m));
+  let t = _usableThumb(m.thumbnail);
   if (!t && item.source === "hackernews") t = m.og_image || "";  // article preview (Epic 15 P3)
+  if (!t) t = _galleryThumb(m);
   if (!t) {
     const url = item.url || "";
     if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
@@ -87,16 +100,19 @@ export const imageUrl = (item) => {
    native-embed pass: galleries/video from archived metadata, no reddit iframe). */
 export const mediaType = (item) => {
   if (item.kind === "comment") return { cls: "comment", icon: "💬", label: "Comment" };
+  const m = item.metadata || {};
   // Reddit-hosted video: item.url is the permalink (→ "text" below), so the v.redd.it
   // evidence lives in metadata.media_url. Trust it directly (the archive signal the
   // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
-  if (((item.metadata || {}).media_url || "").includes("v.redd.it"))
+  if ((m.media_url || "").includes("v.redd.it"))
     return { cls: "video", icon: "🎬", label: "Video" };
   if (videoUrls(item).length)
     return { cls: "video", icon: "▶", label: "Video" };
+  if ((Array.isArray(m.gallery) && m.gallery.length) || m.media_type === "gallery")
+    return { cls: "gallery", icon: "🖼️", label: "Gallery" };
   // Image evidence in metadata.media_url (harvested from feat/reddit-media-v13): the
   // ~25.8k reddit_media-catch-all posts whose item.url is the permalink, not the image.
-  if (_directImg((item.metadata || {}).media_url) || imageUrls(item).length)
+  if (_directImg(m.media_url) || imageUrls(item).length)
     return { cls: "image", icon: "🖼️", label: "Image" };
   const url = (item.url || "").toLowerCase();
   if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com"))

@@ -610,12 +610,22 @@ body.focus .batchstrip{display:flex}
   font-weight:var(--fw-semibold)}
 .set-note{font:var(--fw-regular) var(--fs-xs)/1.55 var(--font-sans);color:var(--text-dim);
   margin-top:var(--sp-2)}
+.set-card{margin-top:var(--sp-2);padding:12px 14px;border:1px solid var(--border-hairline);
+  border-radius:var(--r-sm);background:var(--surface-inset);font:var(--fw-regular) var(--fs-sm)/1.5 var(--font-sans);
+  color:var(--text)}
+.set-check{display:flex;align-items:flex-start;gap:10px;margin-top:var(--sp-3);color:var(--text-body);
+  font:var(--fw-regular) var(--fs-sm)/1.45 var(--font-sans)}
+.set-check input{margin-top:.2em;accent-color:var(--accent);flex:none}
+.setbtn.warn{margin-top:var(--sp-3);color:var(--status-done);border-color:var(--status-done);
+  background:var(--done-tint)}
+.setbtn.warn:hover{border-color:var(--status-done);background:color-mix(in srgb, var(--done-tint) 72%, transparent)}
+.setbtn:disabled{opacity:.55;cursor:default}
 
 /* settings: plain action button + the stats sheet (Epic 14) */
 .setbtn{display:block;width:100%;text-align:left;font:var(--fw-medium) var(--fs-sm)/1.4 var(--font-sans);
   color:var(--text);background:var(--surface-inset);border:1px solid var(--border-control);
   border-radius:var(--r-md);padding:11px 14px;cursor:pointer;min-height:40px}
-.setbtn:hover{border-color:var(--accent)}
+.setbtn:hover:not(:disabled){border-color:var(--accent)}
 .stats-list{font:var(--fw-regular) var(--fs-sm)/1.5 var(--font-sans);color:var(--text)}
 .stats-list .lab{font:var(--fw-bold) var(--fs-xs)/1 var(--font-mono);letter-spacing:.16em;
   color:var(--text-dim);margin:var(--sp-4) 0 var(--sp-2)}
@@ -930,6 +940,32 @@ html.reader-lock{overflow:hidden}
 }
 .rd-body p{margin:0 0 var(--sp-3)}
 .rd-body p:last-child{margin-bottom:0}
+.rd-details{display:flex;flex-wrap:wrap;gap:7px;margin-top:var(--sp-3)}
+.rd-detail{display:inline-flex;gap:5px;align-items:center;max-width:100%;
+  border:1px solid var(--border-hairline);border-radius:var(--r-pill);
+  padding:5px 9px;font:var(--fw-medium) var(--fs-xs)/1.25 var(--font-mono);
+  color:var(--text-muted);background:var(--surface-inset)}
+.rd-detail b{color:var(--text-dim);font-weight:var(--fw-semibold);text-transform:uppercase;
+  letter-spacing:.05em}
+.rd-youtube-desc{white-space:pre-wrap}
+.rd-companions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:var(--sp-3)}
+.rd-companions>span{font:var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
+  color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em}
+.rd-reply-context{margin-top:var(--sp-3);font:var(--fw-medium) var(--fs-xs)/1.35 var(--font-mono);
+  color:var(--text-dim)}
+.rd-tweet-quote{margin:var(--sp-3) 0 0;padding:var(--sp-3);
+  border:1px solid var(--border-hairline);border-left:3px solid var(--source-twitter);
+  border-radius:var(--r-sm);background:var(--surface-inset);color:var(--text-body)}
+.rd-tweet-quote-by{margin-bottom:6px;font:var(--fw-semibold) var(--fs-xs)/1 var(--font-mono);
+  color:var(--text-muted)}
+.rd-tweet-quote-text p{margin:0 0 var(--sp-2)}
+.rd-tweet-quote-text p:last-child{margin-bottom:0}
+.rd-tweet-quote a,.rd-outlinks a{color:var(--accent);overflow-wrap:anywhere}
+.rd-outlinks{display:flex;flex-direction:column;gap:5px;margin-top:var(--sp-3);
+  font:var(--fw-regular) var(--fs-sm)/1.45 var(--font-sans)}
+.rd-tweet-media{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:8px;margin-top:var(--sp-3)}
+.rd-tweet-media .md-img{margin:0;width:100%;height:100%;max-height:42vh;object-fit:contain}
 /* markdown subset rendered in the reader (post self-text + comment bodies, Epic 15) */
 .rd-body a,.rd-ctext a,.rd-body-preview a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
   overflow-wrap:anywhere}
@@ -984,6 +1020,7 @@ html.reader-lock{overflow:hidden}
 .rd-keep-checklist li{margin:0}
 .rd-keep-checklist label{display:flex;align-items:flex-start;gap:9px;color:var(--text-body)}
 .rd-keep-checklist input{margin-top:.22em;accent-color:var(--accent);flex:none}
+.rd-keep-checklist input:not(:disabled),.rd-keep-checklist input:not(:disabled)+span{cursor:pointer}
 .rd-keep-checklist input:checked + span{color:var(--text-muted);text-decoration:line-through}
 /* poster-less video/gallery in the reader — a centered play glyph IS the tap target */
 .rd-media.noimg{display:flex;align-items:center;justify-content:center;min-height:140px}

@@ -10,10 +10,16 @@ import { createLightbox, imageUrl, imageUrls, redditUrl, playableVideoSrc, local
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders, shareItem } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
-import { initReader } from "./reader.js";
+import { canOpenInReader, initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
 import { initOperators } from "./operators.js";
 import { initTagEditor } from "./tagedit.js";
+import {
+  PREFETCH_LIMITS,
+  buildFirstPageWarmParams,
+  createFirstPageCache,
+  createFirstPagePrefetcher,
+} from "./prefetch.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -57,6 +63,7 @@ function sortForTab(status) {
 setArchivePref(state.archiveMedia);  // tell core/media.js whether to prefer local /media copies
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
+const doneRetention = { loaded: false, loading: false, days: 30, preview: null };
 
 /* ---- mobile "Jump" drawer state (the phone expression of the .rail) ---- */
 const drawer = $("#navdrawer");
@@ -90,6 +97,40 @@ function params(extra) {
   return sp;
 }
 
+const itemFirstPageCache = createFirstPageCache();
+const itemFirstPagePrefetch = createFirstPagePrefetcher({
+  cache: itemFirstPageCache,
+  fetchJSON: (url, opts) => api.getJSON(url, opts),
+});
+const TOP_PREFETCH_SORTS = ["smart:desc", "first_seen_utc:desc", "created_utc:desc"];
+
+function topSourceIds() {
+  return facets.sources.map((s) => s && s.id).filter(Boolean);
+}
+
+function warmItemFirstPages() {
+  const warmParams = buildFirstPageWarmParams({
+    status: state.status,
+    source: state.source,
+    category: state.category,
+    tags: state.tags,
+    q: state.q,
+    exact: state.exact,
+    safe: state.safe,
+    focus: state.focus,
+    sort: state.sort,
+  }, topSourceIds(), TOP_PREFETCH_SORTS, PREFETCH_LIMITS);
+  if (!warmParams.length) {
+    itemFirstPagePrefetch.abort();
+    return;
+  }
+  itemFirstPagePrefetch.warm(warmParams);
+}
+
+function clearItemFirstPageCache() {
+  itemFirstPagePrefetch.clear();
+}
+
 let loadGen = 0;
 async function loadItems(reset) {
   // an append during a load is a duplicate; a RESET supersedes whatever is in
@@ -98,6 +139,7 @@ async function loadItems(reset) {
   if (!reset && state.loading) return;
   const gen = ++loadGen;
   state.loading = true;
+  if (reset) itemFirstPagePrefetch.abort();
   if (reset) {
     state.offset = 0;
     state.items = [];
@@ -112,13 +154,20 @@ async function loadItems(reset) {
   try {
     const limit = state.focus ? FOCUS_BATCH : 50;
     const offset = state.offset;
-    const r = await api.getJSON("/items?" + params({ limit, offset }));
+    const query = params({ limit, offset });
+    let r = itemFirstPageCache.get(query);
+    const fromCache = !!r;
+    if (!r) {
+      r = await api.getJSON("/items?" + query);
+    }
     if (gen !== loadGen) return;  // a newer load superseded this one
+    if (!fromCache) itemFirstPageCache.set(query, r);
     state.items = state.items.concat(r.items);
     state.hasMore = state.focus ? false : r.has_more;
     state.offset += r.items.length;
     if (reset && state.focus) state.batchTotal = r.items.length;
     render();
+    if (reset) warmItemFirstPages();
   } catch (e) {
     if (gen === loadGen) {
       itemsEl.classList.remove("loading");
@@ -191,6 +240,7 @@ async function act(fullname, status) {
   }
   try {
     await api.setStatus(fullname, status);
+    clearItemFirstPageCache();
   } catch (e) {
     if (row) row.classList.remove("leaving", "lv-" + status);
     toast("That didn't stick — try again.");
@@ -206,6 +256,7 @@ async function act(fullname, status) {
     if (window.chHaptic) window.chHaptic("undo");
     try {
       await api.undoItem(fullname);
+      clearItemFirstPageCache();
       bumpPulse(status === "inbox" ? 0 : -1);
       if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
       // restore the row in place — no full refetch/skeleton, keeps the scroll position
@@ -229,6 +280,7 @@ async function snooze(fullname) {
   let res;
   try {
     res = await api.snoozeItem(fullname, { window_days: 7 });
+    clearItemFirstPageCache();
   } catch (e) {
     if (row) row.classList.remove("leaving", "lv-snooze");
     toast("Snooze didn't stick - try again.");
@@ -247,6 +299,7 @@ async function snooze(fullname) {
         ? { snoozed_wave: res.snoozed_wave }
         : { decayed_at: res.decayed_at };
       await api.undoSnooze(undoBody);
+      clearItemFirstPageCache();
       if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
       if (escalated) bumpPulse(-1);
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
@@ -325,8 +378,7 @@ itemsEl.addEventListener("click", (e) => {
   // A title link's parent is an <h3> (every density); meta/source links sit in .meta,
   // so they keep their external navigation.
   const rItem = state.items.find((it) => it.fullname === fn);
-  if (rItem && (rItem.source === "reddit" || rItem.source === "hackernews" ||
-                rItem.source === "keep" || rItem.source === "obsidian")) {
+  if (canOpenInReader(rItem)) {
     const a = e.target.closest("a");
     const onTitle = a && a.parentElement && a.parentElement.tagName === "H3";
     const onText = !a && e.target.closest(".title, .snippet, .pin h3");
@@ -422,7 +474,7 @@ $$("#bulktray [data-bulk]").forEach((b) => b.addEventListener("click", async () 
   if (!fns.length) return;
   if (window.chHaptic) window.chHaptic(status);
   clearSelection();
-  try { await api.bulkStatus(fns, status); }
+  try { await api.bulkStatus(fns, status); clearItemFirstPageCache(); }
   catch (e) { toast("Bulk action failed."); return; }
   const bulkRemoved = fns.map((fn) => {
     const i = state.items.findIndex((it) => it.fullname === fn);
@@ -434,6 +486,7 @@ $$("#bulktray [data-bulk]").forEach((b) => b.addEventListener("click", async () 
   render();
   snackbar(fns.length + " — " + (COPY[status] || "logged.").toLowerCase(), async () => {
     const r = await api.bulkUndo(fns);
+    clearItemFirstPageCache();
     bumpPulse(status === "inbox" ? 0 : -r.ok);
     // restore the rows in place (ascending index) — no full refetch/skeleton
     bulkRemoved.sort((a, b) => a.i - b.i).forEach(({ i, item }) => {
@@ -580,8 +633,10 @@ ambient.addEventListener("click", async (e) => {
     ambient.hidden = true;
     try {
       const r = await api.postJSON("/resurface/letgo", { cluster });
+      clearItemFirstPageCache();
       snackbar(r.total + " saves let go — resting in the archive.", async () => {
         await api.postJSON("/resurface/letgo/undo", { cluster, decayed_at: r.decayed_at });
+        clearItemFirstPageCache();
         loadItems(true); refreshPulse();
       });
       loadItems(true); refreshPulse();
@@ -625,8 +680,7 @@ ambient.addEventListener("click", (e) => {
   const it = surpriseItem;
   surpriseItem = null;
   ambient.hidden = true;
-  if (it.source === "reddit" || it.source === "hackernews" ||
-      it.source === "keep" || it.source === "obsidian") {
+  if (canOpenInReader(it)) {
     readerUI.open(it);
     if (it.source === "reddit" || it.source === "hackernews") preloadNext(it);
   } else {
@@ -728,6 +782,7 @@ async function refreshRail() {
       railBtn(s.label, s.id, s.count, "source", s.badge_color)).join("");
     $("#rail-tags").innerHTML = railTagsHtml();
     renderDrawer();
+    if (!state.loading) warmItemFirstPages();
   } catch (e) { /* rail is navigation sugar */ }
 }
 document.addEventListener("click", (e) => {
@@ -859,6 +914,82 @@ function closeSheets() {
   scrim.classList.remove("show");
 }
 
+async function readError(err, fallback) {
+  if (!err || typeof err.json !== "function") return fallback;
+  try {
+    const body = await err.json();
+    return body && body.error ? body.error : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function formatCutoffDate(ts) {
+  return new Date(ts * 1000).toLocaleDateString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+  });
+}
+
+function paintDoneRetention() {
+  const current = $("#done-retention-current");
+  const preview = $("#done-retention-preview");
+  const confirm = $("#done-retention-confirm");
+  const purge = $("#done-retention-purge");
+  const feedback = $("#done-retention-feedback");
+  if (!current || !preview || !confirm || !purge || !feedback) return;
+
+  $$("#set-done-retention button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(parseInt(b.dataset.days, 10) === doneRetention.days)));
+
+  if (!doneRetention.loaded) {
+    current.textContent = "Loading current window...";
+    preview.textContent = "Checking what would be purged...";
+    confirm.checked = false;
+    purge.disabled = true;
+    feedback.innerHTML = 'The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.';
+    return;
+  }
+
+  current.textContent = "Current window: " + doneRetention.days + " day" +
+    (doneRetention.days === 1 ? "" : "s") + ".";
+
+  const plan = doneRetention.preview;
+  if (!plan) {
+    preview.textContent = "Could not load the current purge preview.";
+  } else if (!plan.total) {
+    preview.textContent = "Nothing is eligible right now. Done items older than " +
+      formatCutoffDate(plan.cutoff) + " would be purged.";
+  } else {
+    preview.innerHTML = '<b>' + plan.total.toLocaleString() + "</b> Done item" +
+      (plan.total === 1 ? "" : "s") + " older than <b>" + formatCutoffDate(plan.cutoff) +
+      "</b> would be permanently deleted.";
+  }
+  purge.disabled = doneRetention.loading || !plan || !plan.total || !confirm.checked;
+  feedback.innerHTML = doneRetention.loading
+    ? "Working..."
+    : 'The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.';
+}
+
+async function loadDoneRetention(force) {
+  if (doneRetention.loading || (doneRetention.loaded && !force)) {
+    paintDoneRetention();
+    return;
+  }
+  doneRetention.loading = true;
+  paintDoneRetention();
+  try {
+    const data = await api.getJSON("/settings/done-retention");
+    doneRetention.days = parseInt(data.retention_days, 10) || 30;
+    doneRetention.preview = data.preview || null;
+    doneRetention.loaded = true;
+  } catch (e) {
+    toast("Couldn't load Done retention.");
+  } finally {
+    doneRetention.loading = false;
+    paintDoneRetention();
+  }
+}
+
 /* ---- long-press / right-click row action menu (Tag · Share) — Epic 16 ---- */
 let rowMenuFn = null;
 const rowMenu = $("#rowmenu");
@@ -895,13 +1026,13 @@ function toggleKbd() {
   if (show) { k.classList.add("show"); scrim.classList.add("show"); }
 }
 scrim.addEventListener("click", closeSheets);
-$("#open-settings").addEventListener("click", () => openPanel("#settings"));
-$("#dock-settings").addEventListener("click", () => openPanel("#settings"));
+$("#open-settings").addEventListener("click", () => { openPanel("#settings"); loadDoneRetention(true); });
+$("#dock-settings").addEventListener("click", () => { openPanel("#settings"); loadDoneRetention(true); });
 
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v71";
+const APP_VERSION = "v73";
 (() => {
   const ver = $("#app-version"); if (ver) ver.textContent = APP_VERSION;
   const head = $(".console"); if (!head) return;
@@ -1241,8 +1372,10 @@ $("#dupesheet").addEventListener("click", async (e) => {
   btn.disabled = true;
   try {
     await api.resolveDuplicates(keep, archive);
+    clearItemFirstPageCache();
     snackbar("Archived " + archive.length + " duplicate" + (archive.length === 1 ? "." : "s."), async () => {
       await api.undoDuplicates(archive);
+      clearItemFirstPageCache();
       loadDupes(); loadItems(true); loadCounts(); refreshPulse();
     });
     loadDupes(); loadItems(true); loadCounts(); refreshPulse();
@@ -1287,6 +1420,60 @@ $$("#set-archive button").forEach((b) => b.addEventListener("click", () => {
   $$("#set-archive button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
   render();   // re-render with the new media-source preference
 }));
+$("#done-retention-confirm").addEventListener("change", paintDoneRetention);
+$$("#set-done-retention button").forEach((b) => b.addEventListener("click", async () => {
+  if (doneRetention.loading) return;
+  const days = parseInt(b.dataset.days, 10);
+  if (!days || days === doneRetention.days) return;
+  doneRetention.loading = true;
+  $("#done-retention-confirm").checked = false;
+  paintDoneRetention();
+  try {
+    const data = await api.postJSON("/settings/done-retention", { retention_days: days });
+    doneRetention.days = parseInt(data.retention_days, 10) || days;
+    doneRetention.preview = data.preview || null;
+    doneRetention.loaded = true;
+    toast("Done retention set to " + doneRetention.days + " days.");
+  } catch (err) {
+    toast(await readError(err, "Couldn't save Done retention."));
+  } finally {
+    doneRetention.loading = false;
+    paintDoneRetention();
+  }
+}));
+$("#done-retention-purge").addEventListener("click", async () => {
+  if (doneRetention.loading || !doneRetention.preview || !doneRetention.preview.total) return;
+  if (!$("#done-retention-confirm").checked) { paintDoneRetention(); return; }
+  doneRetention.loading = true;
+  paintDoneRetention();
+  try {
+    const data = await api.postJSON("/settings/done-retention/purge", {
+      expected_total: doneRetention.preview.total,
+      expected_cutoff: doneRetention.preview.cutoff,
+    });
+    doneRetention.preview = data.preview || null;
+    doneRetention.loaded = true;
+    $("#done-retention-confirm").checked = false;
+    toast("Purged " + (data.purged?.total || 0) + " Done item" +
+      ((data.purged?.total || 0) === 1 ? "." : "s."));
+    clearItemFirstPageCache();
+    loadItems(true); loadCounts(); refreshRail(); refreshPulse();
+  } catch (err) {
+    let body = null;
+    if (err && typeof err.json === "function") {
+      try { body = await err.json(); } catch (e) {}
+    }
+    if (body && body.preview) {
+      doneRetention.preview = body.preview;
+      doneRetention.loaded = true;
+      $("#done-retention-confirm").checked = false;
+    }
+    toast((body && body.error) || "Done purge failed.");
+  } finally {
+    doneRetention.loading = false;
+    paintDoneRetention();
+  }
+});
 
 /* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9) ---- */
 const syncBtn = $("#open-sync");
@@ -1301,6 +1488,7 @@ if (syncBtn) syncBtn.addEventListener("click", async () => {
     else if (data.error) toast("Sync error: " + data.error);
     else {
       toast("+" + data.new + " new (" + data.fetched + " fetched · " + data.stopped + ").");
+      clearItemFirstPageCache();
       loadItems(true); loadCounts(); refreshRail(); refreshPulse();
     }
   } catch (e) { toast("Sync failed — network error."); }
@@ -1322,6 +1510,7 @@ $$("#set-archive button").forEach((b) =>
 $$("#set-theme button").forEach((b) =>
   b.setAttribute("aria-pressed",
     String((document.documentElement.dataset.theme || "dark") === b.dataset.theme)));
+paintDoneRetention();
 
 /* ---- wheel from the side gutters scrolls the list (13:385) ---- */
 document.addEventListener("wheel", (e) => {
@@ -1401,6 +1590,7 @@ if ("serviceWorker" in navigator)
       if (!data || data.skipped) return;         // disabled / debounced -> nothing changed
       const r = data.result || {}, rec = r.reconcile || {};
       if ((r.new || 0) > 0 || (rec.unsaved || 0) > 0 || (rec.promoted_done || 0) > 0) {
+        clearItemFirstPageCache();
         loadItems(true); loadCounts(); refreshRail(); refreshPulse();
       }
     } catch (e) { /* offline / network — silent; retried on next focus */ }

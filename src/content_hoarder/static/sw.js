@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v71";  // v71: no reddit-iframe for empty-gallery items — placeholder + link only
+const CACHE = "ch-shell-v73";  // v73: bounded browse first-page prefetch + local unsave-by-tag queue preview
 const SHELL = [
   "/", "/triage",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
@@ -11,7 +11,7 @@ const SHELL = [
   "/static/core/media.js", "/static/core/swipe.js", "/static/core/render.js",
   "/static/core/icons.js", "/static/core/tags.js", "/static/core/overlaynav.js",
   "/static/browse/browse.css", "/static/browse/main.js", "/static/browse/render.js",
-  "/static/browse/reader.js", "/static/browse/tagedit.js",
+  "/static/browse/reader.js", "/static/browse/tagedit.js", "/static/browse/prefetch.js",
   "/static/browse/palette.js", "/static/browse/operators.js",
   // /triage now loads triage.js as an ES module (imports core/util, core/api, core/icons)
   "/static/app.css", "/static/triage.js",

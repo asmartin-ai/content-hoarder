@@ -70,15 +70,21 @@ python -m content_hoarder import wl2.json
 2. **One-time confirm** Harmonic favorites server-side: favorite one story, then open that favorites URL
    in a browser — it should appear there. (HN's API is read-only; favoriting works by driving the HN
    website, same as voting — so it must be confirmed once.)
-3. **Import** (manual, until the auto-scraper lands — see BACKLOG Epic 7 P2): save the favorites page as
-   HTML and import it — the HN connector already parses `item?id=`/`athing` out of HN HTML (and bare-id
-   `.txt`/`.json` lists):
+3. **Sync** the public favorites page directly:
+   ```bash
+   python -m content_hoarder hn-sync --user YOURNAME
+   python -m content_hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
+   ```
+   `hn-sync` follows HN's "More" pagination link and stops at a high-water mark, so routine runs are
+   incremental. It inserts bare saved-story rows and leaves title/score/author/preview hydration to the
+   existing `enrich` pass.
+
+Manual fallback: save the favorites page as HTML and import it — the HN connector already parses
+`item?id=`/`athing` out of HN HTML (and bare-id `.txt`/`.json` lists):
    ```bash
    python -m content_hoarder import "path/to/favorites.html" --source hackernews
    python -m content_hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
    ```
-   The planned **favorites-page scraper** (`favorites?id=<user>`, paginated `&p=N`) turns this into a
-   keyless, server-side, scheduled sync — the HN analogue of the Reddit auto-sync.
 
 ### Legacy — Materialistic app DB (reference only; being retired)
 Older saves came from the Materialistic Android app's local DB via `adb backup` (a non-rooted phone
@@ -151,8 +157,8 @@ python -m content_hoarder archive-media --twitter --apply
 
 ---
 
-## Google Keep  ⏳ (deferred — do later)
-When ready: <https://takeout.google.com> → deselect all → select **Keep** → export → unzip, then:
+## Google Keep
+Export from <https://takeout.google.com> → deselect all → select **Keep** → export → unzip, then:
 ```bash
 python -m content_hoarder import "path\to\Takeout\Keep"
 ```

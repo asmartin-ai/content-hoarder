@@ -68,5 +68,6 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
 - [09](09-devstral-batch.md) — Devstral batch of offline-backend backlog tasks. **Task A (HN
   comment-thread viewer backend) ✅ SHIPPED 2026-06-25** (`92c8877`: `hn_thread.py` + route +
   16 tests). **Task B (note→youtube promotion) ✅ SHIPPED 2026-06-25** (`49e9fc9`:
-  `migrate-note-youtube` CLI + `note_youtube.py` + 5 tests). Tasks C (note-body edit backend)
-  + D (HN favorites auto-sync) not started.
+  `migrate-note-youtube` CLI + `note_youtube.py` + 5 tests). **Tasks C (note-body edit
+  backend) + D (HN favorites auto-sync) ✅ SHIPPED 2026-06-25** and merged locally to
+  `main` (`b1a7694`: `db.set_body` + body route; `hn_sync.py` + `hn-sync` CLI + tests).
