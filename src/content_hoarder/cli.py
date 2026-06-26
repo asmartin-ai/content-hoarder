@@ -560,6 +560,27 @@ def cmd_reddit_sync(args) -> int:
     return 1 if (res.get("auth_error") or res.get("network_error")) else 0
 
 
+def cmd_hn_sync(args) -> int:
+    from content_hoarder import hn_sync
+    prog = lambda m: print(m, file=sys.stderr)
+    max_pages = args.max_pages if args.max_pages else (50 if args.full else 5)
+    with _connect() as conn:
+        try:
+            res = hn_sync.sync_saved(
+                conn,
+                user=args.user,
+                max_pages=max_pages,
+                stop_on_known=not args.full,
+                throttle=args.throttle,
+                progress=prog,
+            )
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+    print(json.dumps(res, indent=2))
+    return 1 if res.get("network_error") else 0
+
+
 def cmd_reddit_unsave(args) -> int:
     from content_hoarder import db, reddit_unsave as ru
     with _connect() as conn:
@@ -1061,6 +1082,19 @@ def build_parser() -> argparse.ArgumentParser:
     prs.add_argument("--disable-auto", action="store_true",
                      help="Disarm the automatic sync.")
     prs.set_defaults(func=cmd_reddit_sync)
+
+    phn = sub.add_parser(
+        "hn-sync",
+        help="Pull newest public Hacker News favorites for a user.",
+    )
+    phn.add_argument("--user", required=True, help="HN username whose favorites page to sync.")
+    phn.add_argument("--max-pages", type=int, default=None,
+                     help="Favorites pages to fetch (default 5; --full defaults to 50).")
+    phn.add_argument("--full", action="store_true",
+                     help="Deeper backfill; do not stop on the existing high-water mark.")
+    phn.add_argument("--throttle", type=float, default=1.0,
+                     help="Seconds between HN pages, jittered (default 1.0).")
+    phn.set_defaults(func=cmd_hn_sync)
 
     pu = sub.add_parser("reddit-unsave",
                         help="Unsave reddit items (queued when triaged 'Done') from your Reddit "
