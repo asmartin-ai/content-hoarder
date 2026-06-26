@@ -14,6 +14,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
 
   var EDGE_DEADZONE = 30;     // ignore pointerdown within 30px of a screen edge
   var COMMIT_PX = 80;         // horizontal distance to commit a swipe
+  var LONG_LEFT_PX = 170;     // long-left snoozes instead of marking done
   var BATCH = parseInt(localStorage.getItem("ch_batch"), 10) || 20;
 
   var stack = document.getElementById("card-stack");
@@ -475,6 +476,9 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
       '<span class="tcard-stamp stamp-arch">' + chIcon("archive") + ' Archive</span>' +
       '<span class="tcard-stamp stamp-done">Done ' + chIcon("done") + '</span>' +
+      '<span class="tcard-stamp stamp-snooze">Snooze</span>' +
+      '<span class="tcard-stamp stamp-open">Open</span>' +
+      '<span class="tcard-stamp stamp-skip">Skip</span>' +
       '<div class="tcard-head">' + badge(item) + "</div>" +
       mediaHtml(item) +
       '<h2 class="tcard-title">' + titleHtml + "</h2>" +
@@ -589,15 +593,49 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     setTimeout(function () { if (!queue.length) loadBatch(); else renderCurrent(); }, 180);
   }
 
+  function commitSnooze() {
+    if (!queue.length) return;
+    if (window.chHaptic) window.chHaptic("skip");
+    var item = queue[0];
+    animateSkipOut(stack.querySelector(".tcard"));
+    postJSON("/items/" + encodeURIComponent(item.fullname) + "/snooze", { window_days: 7 })
+      .then(function (res) {
+        var escalated = !!(res && res.decayed_at);
+        lastAction = { fullname: item.fullname, status: "snoozed", snooze: res, item: item, escalated: escalated };
+        if (escalated) { todayCleared++; updateProgress(); }
+        updateUndoBtn();
+        toast(escalated ? "Archived after repeat snoozes" : "Snoozed for 7 days", true);
+      }).catch(function () { toast("Failed - check connection", false); });
+    queue.shift();
+    reviewed++;
+    saveSession();
+    setTimeout(function () { if (!queue.length) loadBatch(); else renderCurrent(); }, 180);
+  }
+
+  function openCurrentInReader() {
+    if (!queue.length) return;
+    saveSession();
+    location.assign("/?open=" + encodeURIComponent(queue[0].fullname) + "&from=triage");
+  }
+
   function undo() {
     if (!lastAction) return;
     if (window.chHaptic) window.chHaptic("undo");
-    var fn = lastAction.fullname;
-    fetchJSON("/items/" + encodeURIComponent(fn) + "/undo", { method: "POST" })
+    var action = lastAction;
+    var fn = action.fullname;
+    var p;
+    if (action.status === "snoozed") {
+      var r = action.snooze || {};
+      var undoBody = r.snoozed_wave ? { snoozed_wave: r.snoozed_wave } : { decayed_at: r.decayed_at };
+      p = postJSON("/snooze/undo", undoBody).then(function () { return action.item; });
+    } else {
+      p = fetchJSON("/items/" + encodeURIComponent(fn) + "/undo", { method: "POST" });
+    }
+    p
       .then(function (item) {
         queue.unshift(item);
         reviewed = Math.max(0, reviewed - 1);
-        todayCleared = Math.max(0, todayCleared - 1);
+        if (action.status !== "snoozed" || action.escalated) todayCleared = Math.max(0, todayCleared - 1);
         lastAction = null;
         updateUndoBtn();
         renderCurrent();
@@ -642,13 +680,13 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   }
   function attachSwipe(card) {
     if (!card) return;
-    var startX = 0, startY = 0, dragging = false, decided = false, horizontal = false;
+    var startX = 0, startY = 0, dragging = false, decided = false, horizontal = false, vertical = false;
     card.addEventListener("pointerdown", function (e) {
       // Android back-gesture safety: ignore drags starting near a screen edge.
       if (e.clientX < EDGE_DEADZONE || e.clientX > window.innerWidth - EDGE_DEADZONE) return;
       // Links/buttons/gallery no longer block the swipe: we don't claim the gesture
       // until it's decided horizontal, so taps on them still fire (delegated on stack).
-      dragging = true; decided = false; horizontal = false;
+      dragging = true; decided = false; horizontal = false; vertical = false;
       startX = e.clientX; startY = e.clientY;
       card.style.transition = "none";
     });
@@ -659,28 +697,43 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         decided = true;
         horizontal = Math.abs(dx) > Math.abs(dy);
+        vertical = !horizontal;
         if (horizontal) { try { card.setPointerCapture(e.pointerId); } catch (_e) {} }
+      }
+      if (vertical) {
+        if (e.cancelable) e.preventDefault();
+        card.style.transform = "translateY(" + dy + "px) scale(.98)";
+        card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dy) / 360));
+        card.classList.toggle("swipe-open", dy < -40);
+        card.classList.toggle("swipe-skip", dy > 40);
+        return;
       }
       if (!horizontal) return;                 // not a horizontal swipe → leave the card be
       if (e.cancelable) e.preventDefault();    // claim the gesture: block link activation / native drag
       card.style.transform = "translateX(" + dx + "px) rotate(" + (dx * 0.04) + "deg)";
       card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 320));
       card.classList.toggle("swipe-arch", dx > 40);
-      card.classList.toggle("swipe-done", dx < -40);
+      card.classList.toggle("swipe-done", dx < -40 && dx > -LONG_LEFT_PX);
+      card.classList.toggle("swipe-snooze", dx <= -LONG_LEFT_PX);
     });
     function end(e) {
       if (!dragging) return;
       dragging = false;
-      if (horizontal) suppressNextClick();
-      if (!horizontal) return;                 // a tap or vertical move: let the click through
-      var dx = e.clientX - startX;
+      if (horizontal || vertical) suppressNextClick();
+      if (!horizontal && !vertical) return;                 // a tap: let the click through
+      var dx = e.clientX - startX, dy = e.clientY - startY;
       card.style.transition = "transform .2s ease-out, opacity .2s ease-out";
-      if (Math.abs(dx) >= COMMIT_PX) {
-        commit(dx > 0 ? "archived" : "done");
+      if (vertical && Math.abs(dy) >= COMMIT_PX) {
+        if (dy < 0) openCurrentInReader();
+        else skip();
+      } else if (horizontal && Math.abs(dx) >= COMMIT_PX) {
+        if (dx > 0) commit("archived");
+        else if (Math.abs(dx) >= LONG_LEFT_PX) commitSnooze();
+        else commit("done");
       } else {
         card.style.transform = "translateX(0) rotate(0)";
         card.style.opacity = "1";
-        card.classList.remove("swipe-arch", "swipe-done");
+        card.classList.remove("swipe-arch", "swipe-done", "swipe-snooze", "swipe-open", "swipe-skip");
       }
     }
     card.addEventListener("pointerup", end);

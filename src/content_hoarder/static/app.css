@@ -880,6 +880,11 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 .tcard.swipe-done {
     border-color: var(--done);
 }
+.tcard.swipe-snooze,
+.tcard.swipe-open,
+.tcard.swipe-skip {
+    border-color: var(--accent);
+}
 
 /* triage card: Tinder-style swipe stamps (parity with the list's reveal icons) */
 .tcard-stamp {
@@ -902,8 +907,14 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 }
 .stamp-arch { left: 1.1rem; color: var(--archive); border-color: var(--archive); transform: rotate(-10deg); }
 .stamp-done { right: 1.1rem; color: var(--done); border-color: var(--done); transform: rotate(10deg); }
+.stamp-snooze { right: 1.1rem; bottom: 1.1rem; top: auto; color: var(--accent); border-color: var(--accent); transform: rotate(8deg); }
+.stamp-open { left: 50%; transform: translateX(-50%); color: var(--accent); border-color: var(--accent); }
+.stamp-skip { left: 50%; bottom: 1.1rem; top: auto; transform: translateX(-50%); color: var(--muted); border-color: var(--muted); }
 .tcard.swipe-arch .stamp-arch { opacity: 1; }
 .tcard.swipe-done .stamp-done { opacity: 1; }
+.tcard.swipe-snooze .stamp-snooze { opacity: 1; }
+.tcard.swipe-open .stamp-open { opacity: 1; }
+.tcard.swipe-skip .stamp-skip { opacity: 1; }
 
 /* triage card: inline click-to-load Reddit embed */
 .tcard-embed {

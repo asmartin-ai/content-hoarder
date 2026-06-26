@@ -825,6 +825,7 @@ html.reader-lock{overflow:hidden}
   transform:translateX(100%);visibility:hidden;
   transition:transform var(--dur-slow) var(--ease),visibility 0s var(--dur-slow);
   will-change:transform}
+.reader.from-triage{transform:translateY(100%)}
 .reader.show{transform:none;visibility:visible;
   transition:transform var(--dur-slow) var(--ease)}
 
