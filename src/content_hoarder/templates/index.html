@@ -228,15 +228,15 @@
     </div>
   </aside>
 
-  <!-- inline thread reader — full-screen sheet (post + collapsible comment thread).
-       Opens on tapping a saved Reddit/HN discussion item; "open original" stays
-       as the escape hatch. Behaviour: browse/reader.js. -->
-  <section class="reader" id="reader" aria-label="Thread reader" aria-hidden="true">
+  <!-- inline item reader — full-screen sheet for Reddit/HN threads and editable notes.
+       Reddit/HN items render post + comments; Keep/Obsidian notes render the saved body
+       with a DB-backed editor. Behaviour: browse/reader.js. -->
+  <section class="reader" id="reader" aria-label="Item reader" aria-hidden="true">
     <header class="rd-head">
       <span class="led" aria-hidden="true"></span>
       <span class="rd-sub" id="reader-sub"></span>
       <a class="rd-oo" id="reader-open-original" href="#" target="_blank" rel="noopener"
-         aria-label="Open the original"><span class="rd-oo-txt">open original </span>&#8599;</a>
+         aria-label="Open the original item"><span class="rd-oo-txt">open original </span>&#8599;</a>
       <button type="button" class="rd-oo rd-share" id="reader-share" aria-label="Share">share</button>
       <button type="button" class="rd-x" id="reader-close" aria-label="Back to feed">&#10005;</button>
     </header>
