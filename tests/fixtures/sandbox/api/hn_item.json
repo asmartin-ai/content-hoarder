@@ -1,0 +1,11 @@
+{
+  "by": "placeholder_hn_user",
+  "descendants": 320,
+  "id": 1,
+  "kids": [2, 3, 4],
+  "score": 850,
+  "time": 1700004000,
+  "title": "Python 3.12 release notes",
+  "type": "story",
+  "url": "https://docs.python.org/3/whatsnew/3.12.html"
+}

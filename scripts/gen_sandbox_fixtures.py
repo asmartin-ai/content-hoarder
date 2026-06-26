@@ -6,6 +6,11 @@ Creates:
 - tests/fixtures/sandbox/reddit_threads.json — sample thread JSON
 
 Safe: read-only on the live DB, a few API requests. No writes.
+
+WARNING: The output contains REAL personal data from your live DB (usernames,
+titles, URLs, comment text). Do NOT commit the output to git. The committed
+fixtures under tests/fixtures/sandbox/ are hand-written synthetic examples —
+this script is for generating LOCAL test data only.
 """
 
 import json
