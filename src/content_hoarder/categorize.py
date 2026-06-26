@@ -1,10 +1,29 @@
-"""Heuristic content categorizer: tag items listenable / watch / wotagei / unknown.
+"""Heuristic content categorizer — three-system taxonomy model.
 
-No LLM (validate heuristic accuracy first). The category is stored on
-``metadata.category`` for compatibility and mirrored into ``metadata.tags`` for
-the browse filters. YouTube videos are the default target. An LLM auto-classifier
-is a separate backlog item.
+Three primitives, each with its own storage and cardinality, unified for
+filtering only in the browse tag rail:
+
+================  ==============  ===================  ==========================
+Primitive         Cardinality     Stored in            Populated how
+================  ==============  ===================  ==========================
+**Category**      single-select   ``metadata.category``  auto (heuristic: duration /
+                                                          channel / title)
+**Tags**          multi-label     ``metadata.tags``      auto (subreddit / keyword /
+                                   (+ tags_manual stamp)  channel / host) + manual
+**Folders**       single-select   ``metadata.folder``    derived from saved queries
+                                   (+ folders registry)  (Epic 26, not yet shipped)
+================  ==============  ===================  ==========================
+
+The dual-write between ``metadata.category`` and ``metadata.tags`` is the
+**intended bridge** that makes single-select categories filter through the
+multi-label tag rail — it's not a legacy shim. ``db.set_category`` mirrors
+category into ``tags`` so a ``tag:listenable`` rail filter finds both items
+whose category *is* listenable and items manually tagged "listenable".
+
+YouTube videos are the default target for category heuristics. LLM
+classifier lives in ``assist/llm.py``.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,7 +37,10 @@ from content_hoarder.models import parse_metadata
 
 # Title keywords that mark a wotagei (ヲタ芸) idol-event performance.
 # Includes romanized forms and compound dance terms.
-_WOTAGEI_RE = re.compile(r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b|\botagei\b|打ち師|サイリウムダンス|ペンライトダンス|\bcyalume\b", re.IGNORECASE)
+_WOTAGEI_RE = re.compile(
+    r"ヲタ芸|オタ芸|ﾜｵﾀ|wotagei|\bwota\b|\botagei\b|打ち師|サイリウムダンス|ペンライトダンス|\bcyalume\b",
+    re.IGNORECASE,
+)
 
 # Channels that are reliably "listenable" (audio-first: long-form talk, music, podcasts).
 # Word-boundaried so short tokens (e.g. "lofi") don't match unrelated names like
@@ -28,8 +50,8 @@ _LISTENABLE_CHANNEL_RE = re.compile(
     re.IGNORECASE,
 )
 
-LISTENABLE_MIN_SECONDS = 30 * 60   # >= 30 min  => likely listenable
-WATCH_MAX_SECONDS = 5 * 60         # <= 5 min   => short, watch
+LISTENABLE_MIN_SECONDS = 30 * 60  # >= 30 min  => likely listenable
+WATCH_MAX_SECONDS = 5 * 60  # <= 5 min   => short, watch
 
 VALID_CATEGORIES = ("listenable", "watch", "wotagei", "unknown")
 
@@ -59,13 +81,19 @@ def categorize_item(item: dict) -> str:
     return categorize(item.get("title", ""), md.get("channel", ""), md.get("duration"))
 
 
-def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool = False) -> dict:
+def categorize_source(
+    conn, source: str = "youtube", *, limit=None, retry: bool = False
+) -> dict:
     """Categorize a source's items, mirroring visible categories into tags."""
     where = ["source = ?"]
     params: list = [source]
     if not retry:
         where.append("json_extract(metadata, '$.category') IS NULL")
-    sql = "SELECT * FROM items WHERE " + " AND ".join(where) + " ORDER BY last_seen_utc DESC"
+    sql = (
+        "SELECT * FROM items WHERE "
+        + " AND ".join(where)
+        + " ORDER BY last_seen_utc DESC"
+    )
     if limit:
         sql += " LIMIT ?"
         params.append(int(limit))
@@ -89,16 +117,30 @@ def categorize_source(conn, source: str = "youtube", *, limit=None, retry: bool 
 # ---------------------------------------------------------------------------
 
 REDDIT_TAGS = (
-    "nsfw_erotic", "nsfw_talk", "nsfw_other", "vtubers", "coding", "japan",
-    "anime", "memes", "minecraft", "defense", "science", "tips",
-    "esports", "gaming", "investing", "ephemeral",
+    "nsfw_erotic",
+    "nsfw_talk",
+    "nsfw_other",
+    "vtubers",
+    "coding",
+    "japan",
+    "anime",
+    "memes",
+    "minecraft",
+    "defense",
+    "science",
+    "tips",
+    "esports",
+    "gaming",
+    "investing",
+    "ephemeral",
 )
 
 # The curated vocabulary the browse tag-rail filters on: the reddit topic/NSFW tags plus the
-# YouTube processing-area tags (mirrored from metadata.category by db.set_category). Anything
-# ELSE that lands in metadata.tags — notably YouTube per-video keywords from the enrich pass —
-# is deliberately NOT a filter facet, so the rail stays a small, meaningful set (~18 tags)
-# instead of the tens of thousands of raw keywords. db.tag_counts restricts to this set.
+# YouTube processing-area tags (from metadata.category via the intentional dual-write in
+# db.set_category). Anything ELSE that lands in metadata.tags — notably YouTube per-video
+# keywords from the enrich pass — is deliberately NOT a filter facet, so the rail stays a
+# small, meaningful set (~18 tags) instead of the tens of thousands of raw keywords.
+# db.tag_counts restricts to this set.
 FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 
 # Visual parent→children grouping for the browse tag rail (Epic 26 P2). Purely a RAIL-UX
@@ -123,6 +165,7 @@ def tag_groups() -> list[dict]:
     Children are guaranteed curated FILTER_TAGS covering the whole set (see test_tag_groups)."""
     return [{"label": label, "tags": list(tags)} for label, tags in TAG_GROUPS]
 
+
 # Resurfacing-card clusters (Epic 20; docs/resurfacing-card-design.md — DESIGN LOCKED
 # 2026-06-11). Knowledge buckets only: identity/meme content never resurfaces (CH3).
 # The subreddit clusters are deliberately untagged communities — they cluster by
@@ -130,7 +173,12 @@ def tag_groups() -> list[dict]:
 # decision: a cluster can't be both "ask me later" and "let it go silently").
 RESURFACE_TAGS = ("tips", "coding", "science", "japan")
 RESURFACE_SUBREDDITS = (
-    "adhd", "adhdwomen", "askhistorians", "personalfinance", "philosophy", "history",
+    "adhd",
+    "adhdwomen",
+    "askhistorians",
+    "personalfinance",
+    "philosophy",
+    "history",
 )
 
 # subreddit (lowercased) -> tags. Seeded from the corpus's top subreddits + well-known
@@ -138,72 +186,148 @@ RESURFACE_SUBREDDITS = (
 # (e.g. feedthememes = minecraft + memes; programmerhumor = coding + memes).
 _SUBREDDIT_TAGS = {
     # vtubers
-    "hololive": ["vtubers"], "okbuddyhololive": ["vtubers", "memes"],
-    "nijisanji": ["vtubers"], "virtualyoutubers": ["vtubers"], "vtubers": ["vtubers"],
+    "hololive": ["vtubers"],
+    "okbuddyhololive": ["vtubers", "memes"],
+    "nijisanji": ["vtubers"],
+    "virtualyoutubers": ["vtubers"],
+    "vtubers": ["vtubers"],
     # anime
-    "anime": ["anime"], "animemes": ["anime", "memes"], "anime_irl": ["anime", "memes"],
-    "wholesomeanimemes": ["anime", "memes"], "goodanimemes": ["anime", "memes"],
-    "manga": ["anime"], "awwnime": ["anime"], "okbuddybaka": ["anime", "memes"],
-    "oregairusnafu": ["anime"], "characterarcs": ["anime", "memes"], "animewallpaper": ["anime"],
+    "anime": ["anime"],
+    "animemes": ["anime", "memes"],
+    "anime_irl": ["anime", "memes"],
+    "wholesomeanimemes": ["anime", "memes"],
+    "goodanimemes": ["anime", "memes"],
+    "manga": ["anime"],
+    "awwnime": ["anime"],
+    "okbuddybaka": ["anime", "memes"],
+    "oregairusnafu": ["anime"],
+    "characterarcs": ["anime", "memes"],
+    "animewallpaper": ["anime"],
     # minecraft
-    "minecraft": ["minecraft"], "feedthebeast": ["minecraft"], "feedthememes": ["minecraft", "memes"],
-    "technicalminecraft": ["minecraft"], "mcpe": ["minecraft"], "admincraft": ["minecraft"],
+    "minecraft": ["minecraft"],
+    "feedthebeast": ["minecraft"],
+    "feedthememes": ["minecraft", "memes"],
+    "technicalminecraft": ["minecraft"],
+    "mcpe": ["minecraft"],
+    "admincraft": ["minecraft"],
     # coding
-    "programming": ["coding"], "learnprogramming": ["coding"], "programmerhumor": ["coding", "memes"],
-    "webdev": ["coding"], "javascript": ["coding"], "python": ["coding"], "rust": ["coding"],
-    "cpp": ["coding"], "golang": ["coding"], "compsci": ["coding"], "cscareerquestions": ["coding"],
-    "experienceddevs": ["coding"], "engineeringstudents": ["coding"],
+    "programming": ["coding"],
+    "learnprogramming": ["coding"],
+    "programmerhumor": ["coding", "memes"],
+    "webdev": ["coding"],
+    "javascript": ["coding"],
+    "python": ["coding"],
+    "rust": ["coding"],
+    "cpp": ["coding"],
+    "golang": ["coding"],
+    "compsci": ["coding"],
+    "cscareerquestions": ["coding"],
+    "experienceddevs": ["coding"],
+    "engineeringstudents": ["coding"],
     # defense / military
-    "noncredibledefense": ["defense", "memes"], "noncrediblediplomacy": ["defense", "memes"],
-    "lesscredibledefence": ["defense"], "credibledefense": ["defense"], "warcollege": ["defense"],
-    "combatfootage": ["defense"], "militaryporn": ["defense"], "tankporn": ["defense"],
-    "aviation": ["defense"], "warthunder": ["defense"],
+    "noncredibledefense": ["defense", "memes"],
+    "noncrediblediplomacy": ["defense", "memes"],
+    "lesscredibledefence": ["defense"],
+    "credibledefense": ["defense"],
+    "warcollege": ["defense"],
+    "combatfootage": ["defense"],
+    "militaryporn": ["defense"],
+    "tankporn": ["defense"],
+    "aviation": ["defense"],
+    "warthunder": ["defense"],
     # japan
-    "japan": ["japan"], "japanlife": ["japan"], "japantravel": ["japan"],
-    "learnjapanese": ["japan"], "japanpics": ["japan"],
+    "japan": ["japan"],
+    "japanlife": ["japan"],
+    "japantravel": ["japan"],
+    "learnjapanese": ["japan"],
+    "japanpics": ["japan"],
     # science & space
-    "space": ["science"], "spaceporn": ["science"], "askscience": ["science"], "science": ["science"],
-    "nasa": ["science"], "astrophotography": ["science"], "physics": ["science"], "futurology": ["science"],
+    "space": ["science"],
+    "spaceporn": ["science"],
+    "askscience": ["science"],
+    "science": ["science"],
+    "nasa": ["science"],
+    "astrophotography": ["science"],
+    "physics": ["science"],
+    "futurology": ["science"],
     # tips & guides
-    "lifeprotips": ["tips"], "youshouldknow": ["tips"], "coolguides": ["tips"],
-    "explainlikeimfive": ["tips"], "todayilearned": ["tips"], "diy": ["tips"],
-    "howto": ["tips"], "internetisbeautiful": ["tips"], "dataisbeautiful": ["tips"],
+    "lifeprotips": ["tips"],
+    "youshouldknow": ["tips"],
+    "coolguides": ["tips"],
+    "explainlikeimfive": ["tips"],
+    "todayilearned": ["tips"],
+    "diy": ["tips"],
+    "howto": ["tips"],
+    "internetisbeautiful": ["tips"],
+    "dataisbeautiful": ["tips"],
     # generic memes
-    "memes": ["memes"], "dankmemes": ["memes"], "greentext": ["memes"], "meirl": ["memes"],
-    "me_irl": ["memes"], "wholesomememes": ["memes"], "wholesomegreentext": ["memes"],
-    "4chan": ["memes"], "tumblr": ["memes"], "adviceanimals": ["memes"],
-    "comedyheaven": ["memes"], "terriblefacebookmemes": ["memes"], "adhdmeme": ["memes"],
+    "memes": ["memes"],
+    "dankmemes": ["memes"],
+    "greentext": ["memes"],
+    "meirl": ["memes"],
+    "me_irl": ["memes"],
+    "wholesomememes": ["memes"],
+    "wholesomegreentext": ["memes"],
+    "4chan": ["memes"],
+    "tumblr": ["memes"],
+    "adviceanimals": ["memes"],
+    "comedyheaven": ["memes"],
+    "terriblefacebookmemes": ["memes"],
+    "adhdmeme": ["memes"],
 }
 
 # Coverage expansion (top-150 subreddit scan). Conservative: only confident mappings into the
 # existing buckets; gaming/general/discussion subs are intentionally left untagged.
-_SUBREDDIT_TAGS.update({
-    # anime (series / fandom / weeb podcasts)
-    "trashtaste": ["anime"], "bocchitherock": ["anime"], "sonobisquedoll": ["anime"],
-    "shingekinokyojin": ["anime"], "killlakill": ["anime"],
-    "evangelionmemes": ["anime", "memes"], "okbuddyumamusume": ["anime", "memes"],
-    "okbuddytracen": ["anime", "memes"],
-    # vtubers
-    "vtubercirclejerk": ["vtubers", "memes"],
-    # coding / maker
-    "raspberry_pi": ["coding"], "arduino": ["coding"],
-    # defense / military / war
-    "warplaneporn": ["defense"], "acecombat": ["defense"], "ukraine": ["defense"],
-    "ukrainewarvideoreport": ["defense"], "ukrainianconflict": ["defense"],
-    # science & tech
-    "technology": ["science"],
-    # tips & guides
-    "lifehacks": ["tips"], "socialskills": ["tips"], "outoftheloop": ["tips"],
-    # japan
-    "japanesepeopletwitter": ["japan", "memes"],
-    # generic memes / humor
-    "historymemes": ["memes"], "polandball": ["memes"], "2meirl4meirl": ["memes"],
-    "starterpacks": ["memes"], "shitposting": ["memes"], "holup": ["memes"],
-    "bikinibottomtwitter": ["memes"], "whitepeopletwitter": ["memes"],
-    "blackpeopletwitter": ["memes"], "curatedtumblr": ["memes"], "worldjerking": ["memes"],
-    "dankmemesfromsite19": ["memes"], "funny": ["memes"], "okbuddyphd": ["memes"],
-    "196": ["memes"], "okbuddyvicodin": ["memes"], "bookscirclejerk": ["memes"],
-})
+_SUBREDDIT_TAGS.update(
+    {
+        # anime (series / fandom / weeb podcasts)
+        "trashtaste": ["anime"],
+        "bocchitherock": ["anime"],
+        "sonobisquedoll": ["anime"],
+        "shingekinokyojin": ["anime"],
+        "killlakill": ["anime"],
+        "evangelionmemes": ["anime", "memes"],
+        "okbuddyumamusume": ["anime", "memes"],
+        "okbuddytracen": ["anime", "memes"],
+        # vtubers
+        "vtubercirclejerk": ["vtubers", "memes"],
+        # coding / maker
+        "raspberry_pi": ["coding"],
+        "arduino": ["coding"],
+        # defense / military / war
+        "warplaneporn": ["defense"],
+        "acecombat": ["defense"],
+        "ukraine": ["defense"],
+        "ukrainewarvideoreport": ["defense"],
+        "ukrainianconflict": ["defense"],
+        # science & tech
+        "technology": ["science"],
+        # tips & guides
+        "lifehacks": ["tips"],
+        "socialskills": ["tips"],
+        "outoftheloop": ["tips"],
+        # japan
+        "japanesepeopletwitter": ["japan", "memes"],
+        # generic memes / humor
+        "historymemes": ["memes"],
+        "polandball": ["memes"],
+        "2meirl4meirl": ["memes"],
+        "starterpacks": ["memes"],
+        "shitposting": ["memes"],
+        "holup": ["memes"],
+        "bikinibottomtwitter": ["memes"],
+        "whitepeopletwitter": ["memes"],
+        "blackpeopletwitter": ["memes"],
+        "curatedtumblr": ["memes"],
+        "worldjerking": ["memes"],
+        "dankmemesfromsite19": ["memes"],
+        "funny": ["memes"],
+        "okbuddyphd": ["memes"],
+        "196": ["memes"],
+        "okbuddyvicodin": ["memes"],
+        "bookscirclejerk": ["memes"],
+    }
+)
 
 # Epic 21 (2026-06-10): gaming/esports/ephemeral buckets for the decay backfill.
 # Subdivision per user spec: esports titles separate from casual/general gaming; modded-MC
@@ -211,70 +335,130 @@ _SUBREDDIT_TAGS.update({
 # corpus-confirmed against the live inbox (read-only inventory, 2026-06-10).
 # NOTE: deal subs are ephemeral-ONLY (no gaming co-tag) — the ephemeral decay wave is
 # age-gated so still-live promos survive; a gaming co-tag would sweep them ungated.
-_SUBREDDIT_TAGS.update({
-    # esports titles (LoL / OW / CS / R6 / Valorant)
-    "leagueoflegends": ["esports"], "leagueofmemes": ["esports", "memes"],
-    "summonerschool": ["esports"], "valorant": ["esports"],
-    "globaloffensive": ["esports"], "csgo": ["esports"],
-    "overwatch": ["esports"], "competitiveoverwatch": ["esports"],
-    "overwatchuniversity": ["esports"], "overwatch_memes": ["esports", "memes"],
-    "rainbow6": ["esports"], "shittyrainbow6": ["esports", "memes"],
-    "r6proleague": ["esports"], "esports": ["esports"],
-    # casual / general gaming
-    "gaming": ["gaming"], "games": ["gaming"], "truegaming": ["gaming"],
-    "pcgaming": ["gaming"], "pcmasterrace": ["gaming"], "patientgamers": ["gaming"],
-    "steam": ["gaming"], "gamingcirclejerk": ["gaming", "memes"], "girlgamers": ["gaming"],
-    "projectzomboid": ["gaming"], "stellaris": ["gaming"], "hoi4": ["gaming"],
-    "kaiserreich": ["gaming"], "civ": ["gaming"], "rimworld": ["gaming"],
-    "aoe2": ["gaming"], "battlefield_one": ["gaming"], "cyberpunkgame": ["gaming"],
-    "darkestdungeon": ["gaming"], "hadesthegame": ["gaming"], "satisfactorygame": ["gaming"],
-    "osugame": ["gaming"], "ddlc": ["gaming"], "katawashoujo": ["gaming"],
-    "coffinofandyandleyley": ["gaming"], "girlsfrontline": ["gaming"], "azurelane": ["gaming"],
-    # modded-MC joiners (user decision: modded goes with feedthebeast = minecraft)
-    "createmod": ["minecraft"], "minecraftmemes": ["minecraft", "memes"],
-    "minecraftbuilds": ["minecraft"],
-    # game development is coding, not gaming
-    "gamedev": ["coding"],
-    # ephemeral: deal/promo subs — time-limited by nature ("likely easy to let go")
-    "gamedeals": ["ephemeral"], "buildapcsales": ["ephemeral"],
-    "freegamefindings": ["ephemeral"], "frugalmalefashion": ["ephemeral"],
-    "freebies": ["ephemeral"],
-})
+_SUBREDDIT_TAGS.update(
+    {
+        # esports titles (LoL / OW / CS / R6 / Valorant)
+        "leagueoflegends": ["esports"],
+        "leagueofmemes": ["esports", "memes"],
+        "summonerschool": ["esports"],
+        "valorant": ["esports"],
+        "globaloffensive": ["esports"],
+        "csgo": ["esports"],
+        "overwatch": ["esports"],
+        "competitiveoverwatch": ["esports"],
+        "overwatchuniversity": ["esports"],
+        "overwatch_memes": ["esports", "memes"],
+        "rainbow6": ["esports"],
+        "shittyrainbow6": ["esports", "memes"],
+        "r6proleague": ["esports"],
+        "esports": ["esports"],
+        # casual / general gaming
+        "gaming": ["gaming"],
+        "games": ["gaming"],
+        "truegaming": ["gaming"],
+        "pcgaming": ["gaming"],
+        "pcmasterrace": ["gaming"],
+        "patientgamers": ["gaming"],
+        "steam": ["gaming"],
+        "gamingcirclejerk": ["gaming", "memes"],
+        "girlgamers": ["gaming"],
+        "projectzomboid": ["gaming"],
+        "stellaris": ["gaming"],
+        "hoi4": ["gaming"],
+        "kaiserreich": ["gaming"],
+        "civ": ["gaming"],
+        "rimworld": ["gaming"],
+        "aoe2": ["gaming"],
+        "battlefield_one": ["gaming"],
+        "cyberpunkgame": ["gaming"],
+        "darkestdungeon": ["gaming"],
+        "hadesthegame": ["gaming"],
+        "satisfactorygame": ["gaming"],
+        "osugame": ["gaming"],
+        "ddlc": ["gaming"],
+        "katawashoujo": ["gaming"],
+        "coffinofandyandleyley": ["gaming"],
+        "girlsfrontline": ["gaming"],
+        "azurelane": ["gaming"],
+        # modded-MC joiners (user decision: modded goes with feedthebeast = minecraft)
+        "createmod": ["minecraft"],
+        "minecraftmemes": ["minecraft", "memes"],
+        "minecraftbuilds": ["minecraft"],
+        # game development is coding, not gaming
+        "gamedev": ["coding"],
+        # ephemeral: deal/promo subs — time-limited by nature ("likely easy to let go")
+        "gamedeals": ["ephemeral"],
+        "buildapcsales": ["ephemeral"],
+        "freegamefindings": ["ephemeral"],
+        "frugalmalefashion": ["ephemeral"],
+        "freebies": ["ephemeral"],
+    }
+)
 
 # Untagged-tail coverage expansion (Epic 21 rehearsal, 2026-06-10): conservative mappings
 # into EXISTING buckets only, from the post-retag top-200 untagged inbox inventory. Skipped
 # on purpose: discussion subs (askreddit, bestof, iama, ...), fiction (scp, writingprompts,
 # humansarespaceorcs), streaming (livestreamfail, offlinetv — no bucket), knowledge/identity
 # (adhd, adhdwomen — future resurfacing material, never decay), personal (iastate).
-_SUBREDDIT_TAGS.update({
-    # anime (series / fandom / gif subs)
-    "animegifs": ["anime"], "animenocontext": ["anime", "memes"],
-    "animememes": ["anime", "memes"], "historyanimemes": ["anime", "memes"],
-    "spyxfamily": ["anime"], "kiminonawa": ["anime"], "evangelion": ["anime"],
-    "domesticgirlfriend": ["anime"], "kanojookarishimasu": ["anime"],
-    "wholesomeyuri": ["anime"], "nagatoro": ["anime"], "seishunbutayarou": ["anime"],
-    # memes / humor (screenshot-humor subs; r/tinder + r/comics deliberately NOT mapped —
-    # user decision 2026-06-10: they don't belong in the memes decay bucket)
-    "whenthe": ["memes"], "bi_irl": ["memes"], "newgreentexts": ["memes"],
-    "anarchychess": ["memes"], "cursedcomments": ["memes"], "unexpected": ["memes"],
-    "brandnewsentence": ["memes"], "murderedbywords": ["memes"],
-    "nonpoliticaltwitter": ["memes"], "blursedimages": ["memes"], "tihi": ["memes"],
-    "suspiciouslyspecific": ["memes"], "hopeposting": ["memes"], "discord_irl": ["memes"],
-    "youtubehaiku": ["memes"], "perfectlycutscreams": ["memes"],
-    "maybemaybemaybe": ["memes"], "hmmm": ["memes"], "meme": ["memes"],
-    "chadtopia": ["memes"], "extrafabulouscomics": ["memes"],
-    "politicalcompassmemes": ["memes"], "politicalhumor": ["memes"],
-    "dndmemes": ["memes"], "roughromanmemes": ["memes"], "oddlyspecific": ["memes"],
-    "physicsmemes": ["science", "memes"], "mathmemes": ["science", "memes"],
-    "shermanposting": ["defense", "memes"],
-    # defense / military
-    "military": ["defense"],
-    # science / engineering
-    "spacex": ["science"], "engineeringporn": ["science"],
-    # coding / computing
-    "learnpython": ["coding"], "learnmachinelearning": ["coding"],
-    "linux": ["coding"], "hacking": ["coding"], "howtohack": ["coding"],
-})
+_SUBREDDIT_TAGS.update(
+    {
+        # anime (series / fandom / gif subs)
+        "animegifs": ["anime"],
+        "animenocontext": ["anime", "memes"],
+        "animememes": ["anime", "memes"],
+        "historyanimemes": ["anime", "memes"],
+        "spyxfamily": ["anime"],
+        "kiminonawa": ["anime"],
+        "evangelion": ["anime"],
+        "domesticgirlfriend": ["anime"],
+        "kanojookarishimasu": ["anime"],
+        "wholesomeyuri": ["anime"],
+        "nagatoro": ["anime"],
+        "seishunbutayarou": ["anime"],
+        # memes / humor (screenshot-humor subs; r/tinder + r/comics deliberately NOT mapped —
+        # user decision 2026-06-10: they don't belong in the memes decay bucket)
+        "whenthe": ["memes"],
+        "bi_irl": ["memes"],
+        "newgreentexts": ["memes"],
+        "anarchychess": ["memes"],
+        "cursedcomments": ["memes"],
+        "unexpected": ["memes"],
+        "brandnewsentence": ["memes"],
+        "murderedbywords": ["memes"],
+        "nonpoliticaltwitter": ["memes"],
+        "blursedimages": ["memes"],
+        "tihi": ["memes"],
+        "suspiciouslyspecific": ["memes"],
+        "hopeposting": ["memes"],
+        "discord_irl": ["memes"],
+        "youtubehaiku": ["memes"],
+        "perfectlycutscreams": ["memes"],
+        "maybemaybemaybe": ["memes"],
+        "hmmm": ["memes"],
+        "meme": ["memes"],
+        "chadtopia": ["memes"],
+        "extrafabulouscomics": ["memes"],
+        "politicalcompassmemes": ["memes"],
+        "politicalhumor": ["memes"],
+        "dndmemes": ["memes"],
+        "roughromanmemes": ["memes"],
+        "oddlyspecific": ["memes"],
+        "physicsmemes": ["science", "memes"],
+        "mathmemes": ["science", "memes"],
+        "shermanposting": ["defense", "memes"],
+        # defense / military
+        "military": ["defense"],
+        # science / engineering
+        "spacex": ["science"],
+        "engineeringporn": ["science"],
+        # coding / computing
+        "learnpython": ["coding"],
+        "learnmachinelearning": ["coding"],
+        "linux": ["coding"],
+        "hacking": ["coding"],
+        "howtohack": ["coding"],
+    }
+)
 
 # Keyword fallback for items whose subreddit isn't mapped — applied to the subreddit name +
 # title ONLY (never body: incidental body mentions, e.g. an AskReddit answer that says "Japan",
@@ -289,12 +473,17 @@ _KEYWORD_TAGS = [
     # "free"/"sale"/"deal"/"event": false-positive magnets). The decay wave for this tag is
     # age-gated, so a rare false positive is recoverable and a true-but-recent promo survives.
     # (?<!dead ) guards the idiom "a dead giveaway" — a real corpus false positive.
-    ("ephemeral", re.compile(
-        r"\b(?<!dead )giveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
-        r"|\blimited[- ]time\b|\bfree\s+until\b|\bfree\s+weekend\b|\bfree\s+to\s+keep\b"
-        r"|\bhumble\s+bundle\b|\bpromo\s+code\b|\bcoupon\b|\bexpires\b|\bflash\s+sale\b",
-        re.IGNORECASE)),
+    (
+        "ephemeral",
+        re.compile(
+            r"\b(?<!dead )giveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
+            r"|\blimited[- ]time\b|\bfree\s+until\b|\bfree\s+weekend\b|\bfree\s+to\s+keep\b"
+            r"|\bhumble\s+bundle\b|\bpromo\s+code\b|\bcoupon\b|\bexpires\b|\bflash\s+sale\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
+
 
 # NSFW classification is subreddit-driven (the over_18 flag is too sparse to rely on). The rule
 # lists are intentionally NOT in source — they load from a gitignored JSON
@@ -363,8 +552,9 @@ def reddit_tags(item: dict) -> list[str]:
     return tags
 
 
-def tag_reddit_source(conn, *, limit=None, retry: bool = False,
-                      dry_run: bool = False, samples: int = 6) -> dict:
+def tag_reddit_source(
+    conn, *, limit=None, retry: bool = False, dry_run: bool = False, samples: int = 6
+) -> dict:
     """Multi-label tag reddit items into ``metadata.tags``.
 
     ``dry_run`` previews without writing, returning per-tag counts + sample subreddits/titles
@@ -374,8 +564,11 @@ def tag_reddit_source(conn, *, limit=None, retry: bool = False,
     where = ["source = 'reddit'"]
     if not retry and not dry_run:
         where.append("json_extract(metadata, '$.tags') IS NULL")
-    sql = ("SELECT fullname, title, metadata FROM items WHERE "
-           + " AND ".join(where) + " ORDER BY last_seen_utc DESC")
+    sql = (
+        "SELECT fullname, title, metadata FROM items WHERE "
+        + " AND ".join(where)
+        + " ORDER BY last_seen_utc DESC"
+    )
     params: list = []
     if limit:
         sql += " LIMIT ?"
@@ -398,8 +591,14 @@ def tag_reddit_source(conn, *, limit=None, retry: bool = False,
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                db.merge_upsert(conn, {"fullname": r["fullname"],
-                                       "metadata": {"tags": tags}, "last_seen_utc": now})
+                db.merge_upsert(
+                    conn,
+                    {
+                        "fullname": r["fullname"],
+                        "metadata": {"tags": tags},
+                        "last_seen_utc": now,
+                    },
+                )
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
@@ -416,6 +615,7 @@ def tag_reddit_source(conn, *, limit=None, retry: bool = False,
         "samples": {t: s for t, s in sample.items() if s},
         "untagged_sample": untagged_sample,
     }
+
 
 # channel-name substring (lowercase) -> tags. Checked with `key in channel.lower()`.
 _YOUTUBE_CHANNEL_TAGS = {
@@ -443,7 +643,12 @@ _YOUTUBE_KEYWORD_TAGS = [
     ("anime", re.compile(r"\banime\b|\bmanga\b", re.IGNORECASE)),
     ("vtubers", re.compile(r"\bvtuber\b|hololive|nijisanji", re.IGNORECASE)),
     ("japan", re.compile(r"\bjapan(ese)?\b", re.IGNORECASE)),
-    ("coding", re.compile(r"\bpython\b|\bjavascript\b|\brust\b|\bprogramming\b", re.IGNORECASE)),
+    (
+        "coding",
+        re.compile(
+            r"\bpython\b|\bjavascript\b|\brust\b|\bprogramming\b", re.IGNORECASE
+        ),
+    ),
 ]
 
 
@@ -477,10 +682,12 @@ def youtube_tags(item) -> list[str]:
 # Mirrors youtube_tags structure: host-map pass, then keyword fallback.
 # ---------------------------------------------------------------------------
 
+
 def _extract_host(url: str) -> str:
     """Extract lowercased hostname from a URL (empty string on failure)."""
     m = re.match(r"https?://([^/]+)", url or "", re.I)
     return m.group(1).lower() if m else ""
+
 
 # Domain substring (lowercase) -> tags. Checked with `key in domain`.
 _BROWSER_HOST_TAGS = {
@@ -498,9 +705,13 @@ _BROWSER_HOST_TAGS = {
 _BROWSER_KEYWORD_TAGS = [
     ("gaming", re.compile(r"\bsteam\b|\bvideo\s+game\b", re.IGNORECASE)),
     ("defense", re.compile(r"\bmilitary\b", re.IGNORECASE)),
-    ("investing", re.compile(
-        r"\bstocks?\b|\bearnings\b|\binvest(?:ing|or|ors)?\b|\bstock\s+markets?\b",
-        re.IGNORECASE)),
+    (
+        "investing",
+        re.compile(
+            r"\bstocks?\b|\bearnings\b|\binvest(?:ing|or|ors)?\b|\bstock\s+markets?\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 
@@ -534,11 +745,20 @@ def firefox_tags(item: dict) -> list[str]:
 
 def hackernews_tags(item: dict) -> list[str]:
     """Return ordered de-duped topic tags for a Hacker News item (F14)."""
-    return _browser_bucket_tags(_extract_host(item.get("url") or ""), item.get("title") or "")
+    return _browser_bucket_tags(
+        _extract_host(item.get("url") or ""), item.get("title") or ""
+    )
 
 
-def tag_browser_source(conn, source: str, *, limit=None, retry: bool = False,
-                       dry_run: bool = False, samples: int = 6) -> dict:
+def tag_browser_source(
+    conn,
+    source: str,
+    *,
+    limit=None,
+    retry: bool = False,
+    dry_run: bool = False,
+    samples: int = 6,
+) -> dict:
     """Multi-label tag Firefox-tab / Hacker-News items into ``metadata.tags`` (F14).
 
     Mirrors :func:`tag_reddit_source`: ``dry_run`` previews without writing (returning
@@ -554,8 +774,11 @@ def tag_browser_source(conn, source: str, *, limit=None, retry: bool = False,
     params: list = [source]
     if not retry and not dry_run:
         where.append("json_extract(metadata, '$.tags') IS NULL")
-    sql = ("SELECT fullname, title, url, metadata FROM items WHERE "
-           + " AND ".join(where) + " ORDER BY last_seen_utc DESC")
+    sql = (
+        "SELECT fullname, title, url, metadata FROM items WHERE "
+        + " AND ".join(where)
+        + " ORDER BY last_seen_utc DESC"
+    )
     if limit:
         sql += " LIMIT ?"
         params.append(int(limit))
@@ -578,8 +801,14 @@ def tag_browser_source(conn, source: str, *, limit=None, retry: bool = False,
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                db.merge_upsert(conn, {"fullname": r["fullname"],
-                                       "metadata": {"tags": tags}, "last_seen_utc": now})
+                db.merge_upsert(
+                    conn,
+                    {
+                        "fullname": r["fullname"],
+                        "metadata": {"tags": tags},
+                        "last_seen_utc": now,
+                    },
+                )
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
@@ -599,12 +828,16 @@ def tag_browser_source(conn, source: str, *, limit=None, retry: bool = False,
     }
 
 
-def tag_youtube_source(conn, *, limit=None, retry: bool = False,
-                       dry_run: bool = False, samples: int = 6) -> dict:
+def tag_youtube_source(
+    conn, *, limit=None, retry: bool = False, dry_run: bool = False, samples: int = 6
+) -> dict:
     """Multi-label tag YouTube items into metadata.tags. dry_run previews without writing."""
     where = ["source = 'youtube'"]
-    sql = ("SELECT fullname, title, metadata FROM items WHERE "
-           + " AND ".join(where) + " ORDER BY last_seen_utc DESC")
+    sql = (
+        "SELECT fullname, title, metadata FROM items WHERE "
+        + " AND ".join(where)
+        + " ORDER BY last_seen_utc DESC"
+    )
     params: list = []
     if limit:
         sql += " LIMIT ?"
@@ -637,15 +870,23 @@ def tag_youtube_source(conn, *, limit=None, retry: bool = False,
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                final_tags = [t for t in existing_tags if t in db.PROCESSING_TAGS] + topic_tags
+                final_tags = [
+                    t for t in existing_tags if t in db.PROCESSING_TAGS
+                ] + topic_tags
                 seen = set()
                 deduped: list[str] = []
                 for t in final_tags:
                     if t not in seen:
                         seen.add(t)
                         deduped.append(t)
-                db.merge_upsert(conn, {"fullname": r["fullname"],
-                                       "metadata": {"tags": deduped}, "last_seen_utc": now})
+                db.merge_upsert(
+                    conn,
+                    {
+                        "fullname": r["fullname"],
+                        "metadata": {"tags": deduped},
+                        "last_seen_utc": now,
+                    },
+                )
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
@@ -654,8 +895,10 @@ def tag_youtube_source(conn, *, limit=None, retry: bool = False,
         conn.commit()
 
     return {
-        "selected": processed, "dry_run": dry_run,
-        "tagged": processed - untagged, "untagged": untagged,
+        "selected": processed,
+        "dry_run": dry_run,
+        "tagged": processed - untagged,
+        "untagged": untagged,
         "by_tag": {t: c for t, c in by_tag.items() if c},
         "samples": {t: s for t, s in sample.items() if s},
         "untagged_sample": untagged_sample,
