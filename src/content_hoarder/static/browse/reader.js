@@ -108,6 +108,49 @@ const absReddit = (p) => {
 };
 export const canEditNoteBody = (it) => !!(it && (it.source === "keep" || it.source === "obsidian"));
 
+const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const YT_TRAIL_RE = /(?:&(?:quot|#39|gt|lt);|[)\]}>}."';,:!?])+$/;
+const YT_NON_IDS = new Set(["videoseries", "live_stream", "playlist"]);
+const youtubeHost = (host) => {
+  const h = String(host || "").toLowerCase();
+  return h === "youtube.com" || h.endsWith(".youtube.com") ||
+    h === "youtu.be" || h.endsWith(".youtu.be");
+};
+function cleanCandidateUrl(raw) {
+  let u = String(raw || "").trim();
+  while (u && YT_TRAIL_RE.test(u)) u = u.replace(YT_TRAIL_RE, "");
+  return u;
+}
+function youtubeIdFromUrl(raw) {
+  const u = cleanCandidateUrl(raw);
+  let url;
+  try { url = new URL(u); } catch (e) { return ""; }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+  if (!youtubeHost(url.hostname)) return "";
+  const parts = url.pathname.split("/").filter(Boolean);
+  let vid = "";
+  if (url.hostname.toLowerCase().endsWith("youtu.be")) {
+    vid = parts[0] || "";
+  } else if (parts[0] === "shorts" || parts[0] === "embed") {
+    vid = parts[1] || "";
+  } else {
+    vid = url.searchParams.get("v") || "";
+  }
+  vid = String(vid || "").trim();
+  return YT_ID_RE.test(vid) && !YT_NON_IDS.has(vid) ? vid : "";
+}
+export function extractYoutubeIds(text) {
+  const out = [];
+  const seen = new Set();
+  const add = (raw) => {
+    const vid = youtubeIdFromUrl(raw);
+    if (vid && !seen.has(vid)) { seen.add(vid); out.push(vid); }
+  };
+  const src = String(text == null ? "" : text);
+  src.replace(/https?:\/\/\S+/gi, (raw) => { add(raw); return raw; });
+  return out;
+}
+
 const decodeEntity = (ent) => {
   const e = String(ent || "");
   if (e[0] === "#") {
@@ -147,6 +190,41 @@ export function hnHtmlToMarkdown(src) {
 
 export function renderHnHtml(src) {
   return renderMarkdown(hnHtmlToMarkdown(src), {});
+}
+
+function stripOuterParagraph(html) {
+  const s = String(html || "");
+  const m = /^<p>([\s\S]*)<\/p>$/.exec(s);
+  return m ? m[1] : s;
+}
+function renderKeepBody(src) {
+  const text = String(src == null ? "" : src).replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  const out = [];
+  let buf = [];
+  const flushText = () => {
+    const html = renderMarkdown(buf.join("\n"), {});
+    if (html) out.push(html);
+    buf = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*\[([ xX])\]\s+(.*)$/.exec(lines[i]);
+    if (!m) { buf.push(lines[i]); continue; }
+    flushText();
+    const items = [];
+    while (i < lines.length) {
+      const cm = /^\s*\[([ xX])\]\s+(.*)$/.exec(lines[i]);
+      if (!cm) { i--; break; }
+      const checked = cm[1].toLowerCase() === "x";
+      const label = stripOuterParagraph(renderMarkdown(cm[2], {})) || esc(cm[2]);
+      items.push('<li><label><input type="checkbox" disabled' +
+        (checked ? " checked" : "") + "><span>" + label + "</span></label></li>");
+      i++;
+    }
+    out.push('<ul class="rd-keep-checklist">' + items.join("") + "</ul>");
+  }
+  flushText();
+  return out.join("");
 }
 
 export function normalizeThreadComments(raw, source) {
@@ -204,6 +282,26 @@ const SOURCE_META = {
     },
     scoreText: (n) => fmtScore(n) + " pts",
     bodyHtml: (body) => renderHnHtml(body),
+  },
+  keep: {
+    label: "Keep",
+    led: "var(--source-keep)",
+    threadPath: null,
+    hydratePath: null,
+    originalHref: (it) => itemUrl(it) || it.url || "",
+    author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
+    scoreText: (n) => fmtScore(n),
+    bodyHtml: (body) => renderKeepBody(body),
+  },
+  obsidian: {
+    label: "Obsidian",
+    led: "var(--source-obsidian)",
+    threadPath: null,
+    hydratePath: null,
+    originalHref: (it) => itemUrl(it) || it.url || "",
+    author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
+    scoreText: (n) => fmtScore(n),
+    bodyHtml: (body) => renderMarkdown(body, {}),
   },
 };
 const sourceMeta = (it) => SOURCE_META[it && it.source] || SOURCE_META.reddit;
@@ -395,7 +493,8 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
      for direct/native-HLS playback (mountVideo returns destroy:null there), so the
-     pause+reset below is what actually silences those. */
+     pause+reset below is what actually silences those. Also removes note-mode
+     YouTube iframes so playback stops on every reader close path. */
   function stopInlineVideo() {
     if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
     if (videoEl) {
@@ -406,10 +505,41 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
       } catch (e) { /* no-op */ }
       videoEl = null;
     }
+    postEl.querySelectorAll(".rd-note-video-wrap iframe").forEach((frame) => {
+      try { frame.removeAttribute("src"); } catch (e) { /* no-op */ }
+      const wrap = frame.closest(".rd-note-video-wrap") || frame;
+      wrap.remove();
+    });
   }
 
   /* ---- render ---- */
-  function mediaTileHtml() {
+  function noteYoutubeIds(body) {
+    return canEditNoteBody(item) ? extractYoutubeIds(body) : [];
+  }
+  function noteVideoEmbedHtml(id) {
+    const src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
+    return '<div class="rd-note-video-wrap">' +
+      '<iframe src="' + esc(src) + '" title="YouTube video" loading="lazy" ' +
+      'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>';
+  }
+  function noteVideoIdForBody(body) {
+    const ids = noteYoutubeIds(body);
+    if (ids.length === 1) return ids[0];
+    // Multi-video notes are a separate reader shape; keep the existing note reader path.
+    return "";
+  }
+  function isNoteVideoMode(body) {
+    return !!noteVideoIdForBody(body);
+  }
+  function renderNoteBodyRegion(body, post) {
+    if (!isNoteVideoMode(body)) return;
+    cmtsEl.innerHTML = bodyEditing
+      ? ""
+      : '<div class="rd-note-body-region">' + bodyHtml(body, post) + "</div>";
+  }
+  function mediaTileHtml(body) {
+    const noteVid = noteVideoIdForBody(body);
+    if (noteVid) return noteVideoEmbedHtml(noteVid);
     const mt = mediaType(item);
     if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
@@ -448,9 +578,9 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
     if (scoreRaw != null) h += '<span class="rd-pscore">' + sm.scoreText(scoreRaw) + "</span>";
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
-    h += mediaTileHtml();
+    h += mediaTileHtml(body);
     h += bodyControlsHtml();
-    h += bodyHtml(body, post);
+    if (!isNoteVideoMode(body) || bodyEditing) h += bodyHtml(body, post);
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
@@ -467,6 +597,10 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
         const inp = ui.querySelector(".rd-tag-add-input");
         if (inp) { inp.value = keep; refreshAddSuggestions(inp); inp.focus(); }
       }
+    }
+    if (canEditNoteBody(item)) {
+      if (isNoteVideoMode(body)) renderNoteBodyRegion(body, post);
+      else cmtsEl.innerHTML = "";
     }
   }
   function setChip(kind) {
@@ -562,6 +696,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
     // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
     pushOverlay(() => closeReader(true));
     if (it.source === "reddit") load();
+    else if (isNoteVideoMode(currentBody(null))) renderNoteBodyRegion(currentBody(null), null);
     else cmtsEl.innerHTML = "";
     // Lazy-load the tag vocabulary once so the "＋ tag" add-UI can suggest known tags.
     if (!knownTags.length && !knownTagsLoading) {
