@@ -20,6 +20,9 @@ export const undoItem = (fullname) =>
 export const recoverItem = (fullname) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/recover");
 
+export const setBody = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/body", { body });
+
 export const bulkStatus = (fullnames, status) =>
   postJSON("/bulk/status", { fullnames, status });
 

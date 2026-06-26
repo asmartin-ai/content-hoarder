@@ -106,6 +106,7 @@ const absReddit = (p) => {
   if (/^https?:\/\//i.test(p)) return p;
   return p.startsWith("/") ? "https://www.reddit.com" + p : p;
 };
+export const canEditNoteBody = (it) => !!(it && (it.source === "keep" || it.source === "obsidian"));
 
 const decodeEntity = (ent) => {
   const e = String(ent || "");
@@ -235,7 +236,7 @@ function tagEditorHtml(it) {
 let knownTags = [];        // the user's tag vocabulary, cached from /tags on first open
 let knownTagsLoading = false;
 
-export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } = {}) {
+export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, onBodySaved } = {}) {
   const $ = (s) => document.querySelector(s);
   const reader = $("#reader");
   if (!reader) return { open() {} };
@@ -249,6 +250,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   let item = null, fullname = null, ooHref = "";
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
+  let postData = null, bodyEditing = false, bodyDraft = "", bodySaving = false;
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
   let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
@@ -321,6 +323,75 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     }
     if (item === it) refreshReaderTagRow();
   }
+  function currentBody(post) {
+    return String(((post && post.selftext) || item.body || ""));
+  }
+  function bodyControlsHtml() {
+    if (!canEditNoteBody(item)) return "";
+    const edited = item.metadata && item.metadata.body_edited_at;
+    return '<div class="rd-body-tools">' +
+      '<button type="button" class="rd-oo rd-edit-body" data-rd-body-edit="1">' +
+        (bodyEditing ? "close editor" : "edit body") + "</button>" +
+      (edited ? '<span class="rd-edit-stamp">edited</span>' : "") +
+    "</div>";
+  }
+  function bodyHtml(body, post) {
+    if (!bodyEditing) {
+      return String(body).trim()
+        ? '<div class="rd-body" data-rd-body-view="1">' + sourceMeta(item).bodyHtml(body, post && post.media) + "</div>"
+        : (canEditNoteBody(item) ? '<div class="rd-body rd-empty" data-rd-body-view="1">No body yet.</div>' : "");
+    }
+    const preview = renderMarkdown(bodyDraft, { media: post && post.media }) ||
+      '<p class="rd-preview-empty">Nothing in the preview yet.</p>';
+    return '<div class="rd-body-edit" data-rd-body-panel="1">' +
+      '<textarea class="rd-body-input" data-rd-body-input="1" spellcheck="true" ' +
+        'aria-label="Edit note body">' + esc(bodyDraft) + "</textarea>" +
+      '<div class="rd-body-preview" data-rd-body-preview="1" aria-label="Preview">' + preview + "</div>" +
+      '<div class="rd-body-actions">' +
+        '<button type="button" class="rd-save-body" data-rd-body-save="1"' +
+          (bodySaving ? " disabled" : "") + ">" + (bodySaving ? "Saving..." : "Save") + "</button>" +
+        '<button type="button" class="rd-cancel-body" data-rd-body-cancel="1"' +
+          (bodySaving ? " disabled" : "") + ">Cancel</button>" +
+      "</div></div>";
+  }
+  function refreshBodyPreview() {
+    const box = postEl.querySelector("[data-rd-body-preview]");
+    if (!box) return;
+    box.innerHTML = renderMarkdown(bodyDraft, { media: postData && postData.media }) ||
+      '<p class="rd-preview-empty">Nothing in the preview yet.</p>';
+  }
+  function openBodyEditor() {
+    if (!canEditNoteBody(item) || bodySaving) return;
+    bodyEditing = !bodyEditing;
+    bodyDraft = bodyEditing ? currentBody(postData) : "";
+    renderPost(postData);
+    const inp = postEl.querySelector("[data-rd-body-input]");
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
+  function cancelBodyEditor() {
+    if (bodySaving) return;
+    bodyEditing = false; bodyDraft = "";
+    renderPost(postData);
+  }
+  async function saveBodyEditor() {
+    if (!item || !canEditNoteBody(item) || bodySaving) return;
+    const it = item, fn = fullname, next = bodyDraft;
+    bodySaving = true; renderPost(postData);
+    try {
+      const updated = await api.setBody(fn, next);
+      if (item === it && updated) {
+        Object.assign(it, updated);
+        bodyEditing = false; bodyDraft = "";
+        toast("Body saved.");
+        if (typeof onBodySaved === "function") onBodySaved(updated);
+        renderPost(postData);
+      }
+    } catch (e) {
+      if (item === it) toast("Couldn't save body — check connection");
+    } finally {
+      if (item === it) { bodySaving = false; renderPost(postData); }
+    }
+  }
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
      for direct/native-HLS playback (mountVideo returns destroy:null there), so the
@@ -363,6 +434,7 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   function renderPost(post) {
     const m = item.metadata || {};
     const sm = sourceMeta(item);
+    postData = post || null;
     subEl.textContent = item.source === "reddit" && m.subreddit ? "r/" + m.subreddit : sm.label;
     const author = (post && post.author) || m.author || item.author || "";
     const scoreRaw = (post && Number.isFinite(post.score)) ? post.score
@@ -377,7 +449,8 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
     h += mediaTileHtml();
-    if (String(body).trim()) h += '<div class="rd-body">' + sm.bodyHtml(body, post && post.media) + "</div>";
+    h += bodyControlsHtml();
+    h += bodyHtml(body, post);
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
@@ -466,13 +539,15 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
     item = it; fullname = it.fullname;
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
+    postData = null; bodyEditing = false; bodyDraft = ""; bodySaving = false;
     const sm = sourceMeta(it);
     reader.dataset.source = it.source || "";
     reader.setAttribute("aria-label", sm.label + " thread reader");
     if (ledEl) ledEl.style.setProperty("--reader-led", sm.led);
     if (ooEl) ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
     ooHref = sm.originalHref(it);
-    if (ooEl) ooEl.href = ooHref || "#";
+    if (ooEl) { ooEl.href = ooHref || "#"; ooEl.hidden = !ooHref; }
+    reader.classList.toggle("no-original", !ooHref);
     renderPost(null);                                 // instant, from the list item
     reader.style.transition = ""; reader.style.transform = "";
     reader.classList.add("show");
@@ -486,7 +561,8 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     // Register with the shared overlay coordinator: OS-back closes the reader (or, if a lightbox is
     // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
     pushOverlay(() => closeReader(true));
-    load();
+    if (it.source === "reddit") load();
+    else cmtsEl.innerHTML = "";
     // Lazy-load the tag vocabulary once so the "＋ tag" add-UI can suggest known tags.
     if (!knownTags.length && !knownTagsLoading) {
       knownTagsLoading = true;
@@ -542,8 +618,19 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
   postEl.addEventListener("input", (e) => {
     const inp = e.target.closest(".rd-tag-add-input");
     if (inp) refreshAddSuggestions(inp);
+    const bodyInp = e.target.closest("[data-rd-body-input]");
+    if (bodyInp) { bodyDraft = bodyInp.value; refreshBodyPreview(); }
   });
   postEl.addEventListener("keydown", (e) => {
+    const bodyInp = e.target.closest("[data-rd-body-input]");
+    if (bodyInp) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault(); e.stopPropagation(); saveBodyEditor();
+      } else if (e.key === "Escape") {
+        e.preventDefault(); e.stopPropagation(); cancelBodyEditor();
+      }
+      return;
+    }
     const inp = e.target.closest(".rd-tag-add-input");
     if (!inp) return;
     if (e.key === "Enter") {
@@ -585,6 +672,10 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose } 
     if (sugg) { e.preventDefault(); readerAddTag(sugg.getAttribute("data-rd-addtag")); collapseReaderTagAdd(); return; }
     const addBtn = e.target.closest("[data-rd-tagadd]");
     if (addBtn) { openReaderTagAdd(); return; }
+    const editBody = e.target.closest("[data-rd-body-edit]");
+    if (editBody) { openBodyEditor(); return; }
+    if (e.target.closest("[data-rd-body-save]")) { saveBodyEditor(); return; }
+    if (e.target.closest("[data-rd-body-cancel]")) { cancelBodyEditor(); return; }
     // ---- inline markdown image (comment / selftext) → open it in the lightbox ----
     const mdImg = e.target.closest(".md-img[data-img]");
     if (mdImg) {

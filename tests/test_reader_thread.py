@@ -38,6 +38,20 @@ def _eval(script):
     return r.stdout.strip()
 
 
+def _call_item(fn, item):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        f"import {{ {fn} }} from './browse/reader.js';"
+        f"console.log(JSON.stringify({fn}({json.dumps(item)})));"
+    )
+    r = subprocess.run([node, "--input-type=module", "-e", script],
+                       capture_output=True, text=True, cwd=STATIC)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip())
+
+
 def c(author, body, depth):
     return {"author": author, "body": body, "depth": depth}
 
@@ -47,6 +61,13 @@ def test_is_deleted_comment_variants():
     assert _call("isDeletedComment", c("x", "[removed]", 0)) is True
     assert _call("isDeletedComment", c("[deleted]", "anything", 0)) is True
     assert _call("isDeletedComment", c("real", "a normal reply", 0)) is False
+
+
+def test_note_body_edit_gate_is_limited_to_note_sources():
+    assert _call_item("canEditNoteBody", {"source": "keep"}) is True
+    assert _call_item("canEditNoteBody", {"source": "obsidian"}) is True
+    assert _call_item("canEditNoteBody", {"source": "reddit"}) is False
+    assert _call_item("canEditNoteBody", {"source": "youtube"}) is False
 
 
 def test_dead_subtree_collapses_the_root():
