@@ -1334,6 +1334,13 @@ the word "bankruptcy" stays CLI-only, never UI copy.*
   ephemeral precision samples, exact live command block incl. `--backup-live`). ✓ live block
   executed; `is:swept` pulls the pass; the freebies round-trip recipe is clean. Note: "age"
   = `created_utc` (content age) — Reddit exposes no save timestamps.
+- [ ] **P2 — Defense bucket: review time-sensitive vs evergreen before sweeping.** *(Deferred from
+  WP1 P13, 2026-06-26.)* Breakdown: 5,825 defense-tagged items — 75% defense memes (keep),
+  16% evergreen defense tech (keep), 9% Ukraine-war subs (sweep candidates). Review the 4
+  Ukraine-war subs before running: `ukraine` (171), `CombatFootage` (162),
+  `UkraineWarVideoReport` (111), `UkrainianConflict` (88). Dry-run: `content_hoarder decay
+  --tag defense --subreddit ukraine,CombatFootage,UkraineWarVideoReport,UkrainianConflict
+  --before 90d --dry-run`.
 - [ ] **P2 — Future decay waves for the remaining entertainment buckets.** `anime` (5.9k),
   `vtubers` (2.8k), `minecraft` (2.2k), `defense` (5.8k — includes aviation + Ukraine-war
   subs; review before sweeping) stay tagged in the inbox. Each is one command when ready:
