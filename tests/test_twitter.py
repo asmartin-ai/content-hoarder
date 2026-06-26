@@ -86,6 +86,63 @@ def test_twitter_graphql_shape_and_dedup(tmp_path):
     assert md(it)["outlinks"] == ["https://www.youtube.com/watch?v=GraphVid001"]
 
 
+def test_twitter_graphql_quote_reply_and_video_context(tmp_path):
+    p = tmp_path / "x-video.json"
+    p.write_text(json.dumps({
+        "tweet_results": {"result": {
+            "rest_id": "1666666666666666666",
+            "core": {"user_results": {"result": {"legacy": {
+                "screen_name": "clipper",
+                "name": "Clipper",
+            }}}},
+            "legacy": {
+                "full_text": "replying with a clip",
+                "created_at": "Wed Oct 10 20:19:24 +0000 2018",
+                "conversation_id_str": "1111111111111111111",
+                "in_reply_to_status_id_str": "1222222222222222222",
+                "in_reply_to_screen_name": "parent",
+                "extended_entities": {"media": [{
+                    "type": "video",
+                    "media_url_https": "https://pbs.twimg.com/media/poster.jpg?format=jpg&name=small",
+                    "video_info": {"variants": [
+                        {"content_type": "application/x-mpegURL",
+                         "url": "https://video.twimg.com/ext_tw_video/1/pu/pl/x.m3u8"},
+                        {"content_type": "video/mp4", "bitrate": 832000,
+                         "url": "https://video.twimg.com/ext_tw_video/1/pu/vid/480x480/lo.mp4"},
+                        {"content_type": "video/mp4", "bitrate": 2176000,
+                         "url": "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/hi.mp4"},
+                    ]},
+                }]},
+            },
+            "quoted_status_result": {"result": {
+                "rest_id": "1555555555555555555",
+                "core": {"user_results": {"result": {"legacy": {
+                    "screen_name": "quoted",
+                    "name": "Quoted User",
+                }}}},
+                "legacy": {"full_text": "quoted text"},
+            }},
+        }}
+    }), encoding="utf-8")
+
+    its = list(TwitterConnector().import_file(p))
+    assert len(its) == 1
+    meta = md(its[0])
+    assert meta["media_urls"] == ["https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/hi.mp4"]
+    assert meta["media_type"] == "video"
+    assert meta["thumbnail"] == "https://pbs.twimg.com/media/poster.jpg?name=orig"
+    assert meta["conversation_id"] == "1111111111111111111"
+    assert meta["in_reply_to_status_id"] == "1222222222222222222"
+    assert meta["in_reply_to_screen_name"] == "parent"
+    assert meta["quote_tweet"] == {
+        "tweet_id": "1555555555555555555",
+        "permalink": "https://x.com/quoted/status/1555555555555555555",
+        "text": "quoted text",
+        "author_handle": "quoted",
+        "author_name": "Quoted User",
+    }
+
+
 def test_twitter_outlinks_from_flat_rows_and_text(tmp_path):
     p = tmp_path / "x.csv"
     p.write_text(

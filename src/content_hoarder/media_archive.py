@@ -26,8 +26,9 @@ from typing import Callable
 from content_hoarder import media_store
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-DEFAULT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB/image cap — skip pathological originals
+DEFAULT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB/media cap — skip pathological originals
 _IMG_RE = re.compile(r"\.(png|jpe?g|gif|webp|bmp)(\?|#|$)", re.I)
+_VIDEO_RE = re.compile(r"\.(mp4|webm|mov)(\?|#|$)", re.I)
 SCOPES = ("salvageable", "galleries", "images", "twitter")
 
 
@@ -37,6 +38,10 @@ def _is_img(u: str) -> bool:
 
 def _is_twitter_img(u: str) -> bool:
     return bool(u) and "pbs.twimg.com/media/" in u and _is_img(u)
+
+
+def _is_twitter_media(u: str) -> bool:
+    return _is_twitter_img(u) or (bool(u) and "video.twimg.com/" in u and bool(_VIDEO_RE.search(u)))
 
 
 def default_fetch(url: str, *, max_bytes: int = DEFAULT_MAX_BYTES) -> tuple[bytes | None, str]:
@@ -68,7 +73,7 @@ def _urls_for(md: dict, scope: str) -> list[str]:
         if _is_img(u) and md.get("media_status") != "gone":
             out.append(u)
     elif scope == "twitter":
-        out += [u for u in (md.get("media_urls") or []) if _is_twitter_img(u)]
+        out += [u for u in (md.get("media_urls") or []) if _is_twitter_media(u)]
     seen: set = set()
     return [u for u in out if not (u in seen or seen.add(u))]
 
