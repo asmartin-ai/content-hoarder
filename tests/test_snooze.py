@@ -1,6 +1,6 @@
 import json
 
-from content_hoarder import db, models, resurface, search_query
+from content_hoarder import db, models, resurface, search_query, web
 
 
 def _seed(conn, sid, *, source="reddit", status=None, metadata=None, title="t"):
@@ -145,3 +145,48 @@ def test_is_snoozed_matches_only_current_snoozes(conn, monkeypatch):
     db.snooze(conn, fullnames=[expired], until_utc=999, apply=True)
     assert search_query.parse("is:snoozed").snoozed is True
     assert {r["fullname"] for r in db.search_items(conn, "", snoozed=True)} == {active}
+
+
+def test_snooze_routes_hide_inbox_and_undo(tmp_db, monkeypatch):
+    monkeypatch.setattr(db.time, "time", lambda: 1_000)
+    monkeypatch.setattr(web.time, "time", lambda: 1_000)
+    with db.connect(tmp_db) as conn:
+        fn = _seed(conn, "t3_route", title="route snooze")
+        visible = _seed(conn, "t3_visible", title="visible")
+
+    cl = web.create_app(tmp_db).test_client()
+    detail = cl.get("/items/" + fn).get_json()
+    assert detail["fullname"] == fn
+
+    res = cl.post("/items/" + fn + "/snooze", json={"window_days": 7}).get_json()
+    assert res["snoozed"] == [fn]
+    wave = res["snoozed_wave"]
+
+    inbox = cl.get("/items?status=inbox").get_json()["items"]
+    assert {it["fullname"] for it in inbox} == {visible}
+    snoozed = cl.get("/items?status=inbox&q=is:snoozed").get_json()["items"]
+    assert {it["fullname"] for it in snoozed} == {fn}
+
+    undo = cl.post("/snooze/undo", json={"snoozed_wave": wave}).get_json()
+    assert undo["total"] == 1
+    inbox2 = cl.get("/items?status=inbox").get_json()["items"]
+    assert {it["fullname"] for it in inbox2} == {fn, visible}
+
+
+def test_snooze_route_escalation_undoes_decay(tmp_db, monkeypatch):
+    monkeypatch.setattr(db.time, "time", lambda: 1_000)
+    monkeypatch.setattr(web.time, "time", lambda: 1_000)
+    with db.connect(tmp_db) as conn:
+        fn = _seed(conn, "t3_escalate", metadata={"snooze_count": 2})
+
+    cl = web.create_app(tmp_db).test_client()
+    res = cl.post(
+        "/items/" + fn + "/snooze",
+        json={"window_days": 7, "escalate_after": 3},
+    ).get_json()
+    assert res["escalated"] == [fn]
+    assert res["decayed_at"]
+
+    undo = cl.post("/snooze/undo", json={"decayed_at": res["decayed_at"]}).get_json()
+    assert undo["total"] == 1
+    assert cl.get("/items/" + fn).get_json()["status"] == "inbox"

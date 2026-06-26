@@ -712,6 +712,7 @@ def search_items(
     decayed: bool = False,
     swept: bool = False,
     snoozed: bool = False,
+    hide_snoozed: bool = False,
     deleted: bool = False,
     has_media: str | list[str] | None = None,
     before: int | None = None,
@@ -821,6 +822,12 @@ def search_items(
         if snoozed:
             # snoozed (is:snoozed): currently hidden from triage until a future UTC.
             filters.append(f"json_extract({a}metadata, '$.snoozed_until') > ?")
+            params.append(int(time.time()))
+        if hide_snoozed and not snoozed:
+            filters.append(
+                f"(json_extract({a}metadata, '$.snoozed_until') IS NULL "
+                f"OR json_extract({a}metadata, '$.snoozed_until') <= ?)"
+            )
             params.append(int(time.time()))
         if deleted:
             # deleted (is:deleted): media probed gone (scan-deleted-media). media_status is the

@@ -203,6 +203,7 @@ def create_app(db_path: str | None = None) -> Flask:
 
         tags = parsed.tags if parsed.tags else (a.getlist("tag") or None)
         tags_all = parsed.tags_all if parsed.tags else False
+        status_filter = parsed.status if parsed.status is not None else (a.get("status") or None)
 
         with conn() as c:
             rows = db.search_items(
@@ -210,7 +211,7 @@ def create_app(db_path: str | None = None) -> Flask:
                 parsed.text,
                 source=parsed.source if parsed.source is not None else (a.get("source") or None),
                 kind=parsed.kind if parsed.kind is not None else (a.get("kind") or None),
-                status=parsed.status if parsed.status is not None else (a.get("status") or None),
+                status=status_filter,
                 category=a.get("category") or None,
                 tags=tags,
                 tags_all=tags_all,
@@ -220,6 +221,8 @@ def create_app(db_path: str | None = None) -> Flask:
                 nsfw=parsed.nsfw,
                 decayed=parsed.decayed,
                 swept=parsed.swept,
+                snoozed=parsed.snoozed,
+                hide_snoozed=not parsed.snoozed and status_filter == "inbox",
                 deleted=parsed.deleted,
                 has_media=parsed.has,
                 before=parsed.before,
@@ -241,6 +244,14 @@ def create_app(db_path: str | None = None) -> Flask:
             )
             has_more = len(rows) > limit
             return jsonify({"items": rows[:limit], "has_more": has_more})
+
+    @app.get("/items/<path:fullname>")
+    def item_detail(fullname):
+        with conn() as c:
+            item = db._public_by_fullname(c, fullname)
+        if item is None:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(item)
 
     @app.get("/random")
     def random_batch():
@@ -273,6 +284,47 @@ def create_app(db_path: str | None = None) -> Flask:
         if arm_trickle:                       # (re)arm the idle debounce; returns immediately
             _trickle.note_enqueue()
         return jsonify(item)
+
+    @app.post("/items/<path:fullname>/snooze")
+    def snooze_item(fullname):
+        body = request.get_json(silent=True) or {}
+        now = int(time.time())
+        window_days = _int(body.get("window_days"), 7) or 7
+        until_utc = _int(body.get("until_utc"), 0) or now + window_days * 86400
+        escalate_after = _int(body.get("escalate_after"), 3) or 3
+        try:
+            with conn() as c:
+                res = db.snooze(
+                    c,
+                    fullnames=[fullname],
+                    until_utc=until_utc,
+                    window_days=window_days,
+                    escalate_after=escalate_after,
+                    apply=True,
+                )
+        except ValueError as exc:
+            msg = str(exc)
+            return jsonify({"error": msg}), 404 if msg.startswith("unknown item") else 400
+        return jsonify(res)
+
+    @app.post("/snooze/undo")
+    def snooze_undo():
+        body = request.get_json(silent=True) or {}
+        try:
+            with conn() as c:
+                if isinstance(body.get("snoozed_wave"), int):
+                    return jsonify(db.unsnooze(c, snoozed_wave=body["snoozed_wave"], apply=True))
+                if isinstance(body.get("decayed_at"), int):
+                    wave = int(body["decayed_at"])
+                    return jsonify(db.undecay(
+                        c,
+                        decayed_after=wave,
+                        decayed_before=wave + 1,
+                        apply=True,
+                    ))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"error": "snoozed_wave or decayed_at required"}), 400
 
     @app.post("/items/<path:fullname>/undo")
     def undo(fullname):

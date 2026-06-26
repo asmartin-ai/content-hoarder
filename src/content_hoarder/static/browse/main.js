@@ -218,6 +218,45 @@ async function act(fullname, status) {
   });
 }
 
+async function snooze(fullname) {
+  lastUndone = null;
+  if (window.chHaptic) window.chHaptic("skip");
+  const row = rowEl(fullname);
+  if (row && !row.classList.contains("leaving")) {
+    row.classList.add("leaving", "lv-snooze");
+    await new Promise((r) => setTimeout(r, 180));
+  }
+  let res;
+  try {
+    res = await api.snoozeItem(fullname, { window_days: 7 });
+  } catch (e) {
+    if (row) row.classList.remove("leaving", "lv-snooze");
+    toast("Snooze didn't stick - try again.");
+    return;
+  }
+  const undoIdx = state.items.findIndex((it) => it.fullname === fullname);
+  const undoItem = undoIdx >= 0 ? state.items[undoIdx] : null;
+  state.items = state.items.filter((it) => it.fullname !== fullname);
+  const escalated = !!(res && res.decayed_at);
+  if (state.focus) state.batchCleared += 1;
+  if (escalated) bumpPulse(1);
+  render();
+  snackbar(escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.", async () => {
+    try {
+      const undoBody = res && res.snoozed_wave
+        ? { snoozed_wave: res.snoozed_wave }
+        : { decayed_at: res.decayed_at };
+      await api.undoSnooze(undoBody);
+      if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
+      if (escalated) bumpPulse(-1);
+      if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
+        state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
+      }
+      render();
+    } catch (e) { toast("Undo failed."); }
+  });
+}
+
 /* Redo: replay the last undone single-item action (re-applies the status + shows a
    fresh undo snackbar). act() resets lastUndone, so it's a clean one-step toggle. */
 function redo() {
@@ -228,7 +267,7 @@ function redo() {
 /* the in-app thread reader — replaces external handoff for Reddit/HN discussion
    threads. act/openMediaFor/closeSheets are hoisted function declarations. */
 const readerUI = initReader({
-  onTriage: act, onMedia: openMediaFor, closeSheets, onClose: reblur,
+  onTriage: act, onSnooze: snooze, onMedia: openMediaFor, closeSheets, onClose: reblur,
   onImage: (url) => lightbox.openImage(url),   // inline comment/selftext image → lightbox
   onBodySaved: (updated) => {
     if (!updated || !updated.fullname) return;
@@ -815,6 +854,7 @@ rowMenu.addEventListener("click", (e) => {
   closeSheets();
   if (!fn) return;
   if (action === "tag") tagEditor.open(fn, rowEl(fn));
+  else if (action === "snooze") snooze(fn);
   else if (action === "share") shareItem(state.items.find((i) => i.fullname === fn));
 });
 // desktop has no long-press → right-click a row opens the same menu

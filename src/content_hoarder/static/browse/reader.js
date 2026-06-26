@@ -334,7 +334,7 @@ function tagEditorHtml(it) {
 let knownTags = [];        // the user's tag vocabulary, cached from /tags on first open
 let knownTagsLoading = false;
 
-export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, onBodySaved } = {}) {
+export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, onClose, onBodySaved } = {}) {
   const $ = (s) => document.querySelector(s);
   const reader = $("#reader");
   if (!reader) return { open() {} };
@@ -846,15 +846,16 @@ export function initReader({ onTriage, onMedia, onImage, closeSheets, onClose, o
   });
   const foot = reader.querySelector(".rd-foot");
   if (foot) {
-    foot.querySelectorAll(".rd-act").forEach((b) => {        // the app's own icons.js glyphs
+    foot.querySelectorAll(".rd-act[data-act]").forEach((b) => {        // the app's own icons.js glyphs
       const a = b.dataset.act;
       b.insertAdjacentHTML("afterbegin", chIcon(a === "archived" ? "archive" : a));
     });
     foot.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-act]"); if (!b) return;
+      const b = e.target.closest("[data-act], [data-snooze]"); if (!b) return;
       const fn = fullname, status = b.dataset.act;
       closeReader(false);
-      if (typeof onTriage === "function") onTriage(fn, status);
+      if (status && typeof onTriage === "function") onTriage(fn, status);
+      else if (b.dataset.snooze && typeof onSnooze === "function") onSnooze(fn);
     });
   }
 
