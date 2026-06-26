@@ -25,13 +25,14 @@ if APPLY:
     shutil.copy2(DB, bak)
     print(f"Backup: {bak}")
     conn = sqlite3.connect(str(DB))
+    conn.row_factory = sqlite3.Row
 else:
     conn = sqlite3.connect(f"file:{DB.resolve().as_posix()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
 
 rows = conn.execute(
-    "SELECT fullname, json_extract(metadata, '$.media_url') AS mu "
-    "FROM items WHERE json_extract(metadata, '$.media_url') LIKE '%gfycat.com%'"
+    "SELECT fullname FROM items "
+    "WHERE json_extract(metadata, '$.media_url') LIKE '%gfycat.com%'"
 ).fetchall()
 
 count = len(rows)
