@@ -8,13 +8,13 @@ Agent profile: has a sandboxed checkout of the code, can run offline tests with 
 | 2 | 26 P2 | Folders at save time — folder primitive alongside categories + tags | ~~Q1 (reserved namespace vs `metadata.folder`)~~ **DONE**: `metadata.folder` field + `folders` registry table + derived-rule evaluation engine (`folders.py`) + CLI (`folder list/create/rename/delete/evaluate/assign/stats`) + 6 web routes + 24 tests. Derived from saved queries (not save-time picker), per B5/Epic 21 constraint. Docs updated in `docs/taxonomy.md`. |
 | 3 | 26 P2 | Rule-based + AI-based tagging + new-tag suggestions (reviewable queue) | ~~Q1 (model shape)~~ `tag_suggest.py` done; rule-suggest, discovery, LLM-suggest, queue API + CLI + web routes + 28 tests. Model shape still pending for task 1–2. |
 | 4 | 26 P3 | User-tag table — pre-create empty tags, rename-in-vocabulary, delete-from-vocab | Q1 resolved: inline via `tags_manual` stamp (shipped 2026-06-22). Table still needed for pre-create + rename (P3 backlog). |
-| 5 | 12 P3 | OCR enrich pass (`enrich --ocr`) + fold `metadata.ocr_text` into `items_fts` | Q3 (engine), `has:ocr`/`has:text` operator |
+| 5 | 12 P3 | OCR enrich pass (`enrich --ocr`) + fold `metadata.ocr_text` into `items_fts` | Q3 (engine), `has:ocr`/`has:text` operator. `has:media`/`has:video` shipped in patch (reader helpers). |
 | 6 | 5 P2 | Rework keyboard controls — new ergonomic one-hand scheme | Q2 |
 | 7 | 5 P3 | Drag-and-drop to buckets (SortableJS ~20KB vs html5sortable ~4KB) | — |
-| 8 | 8 P2 | Predictive prefetch cache — per-source × per-sort warm | Design: cache location / invalidation / memory bound |
+| 8 | 8 P2 | Predictive prefetch cache — per-source × per-sort warm | ~~Design: cache location / invalidation / memory bound~~ **DONE** (shipped in patch: `prefetch.js` + `test_browse_prefetch.py` — ServiceWorker-cached browse pages, per-source × per-sort warm, TTL-based invalidation). |
 | 9 | 8 P2 | Redesign app icon (backwards-E forming H, teal on `#0f1115`) | Q6 |
 | 10 | 8 P3 | 60fps UI audit — layout thrash, transforms, `will-change` (Pixel-6 target) | — |
-| 11 | 15 P2 | Video plays inline in the reader media tile (no lightbox) | — |
+| 11 | 15 P2 | Video plays inline in the reader media tile (no lightbox) | — (shipped in patch: inline video in reader) |
 | 12 | 15 P3 | Inline comment video (`v.redd.it`/gfycat/redgifs/streamable) in reader threads | RES screenshots from user |
 | 13 | 15 P2 | Obsidian write-back — persist absolute vault root, write edits to `.md` on disk | Q7 |
 | 14 | 16 P2 | Long-press → group-select (mobile) | — |
@@ -23,13 +23,13 @@ Agent profile: has a sandboxed checkout of the code, can run offline tests with 
 | 17 | 17 P2 | Unify Reddit (`/reddit`) + Inbox/Triage into one surface | Large; sequence after settings/mobile |
 | 18 | 18 P3 | Custom YouTube view (duration, channel grouping, playlist order, processing-areas) | — |
 | 19 | 20 P2 | Triage visual rework (design bakeoff, GLM arm) + 4-directional gesture visual hints | — |
-| 20 | 21 P2 | `purge-done` settings UI (retention-window control) + scheduled-sweep entrypoint | Design: retention-window control, sweep trigger |
+| 20 | 21 P2 | `purge-done` settings UI (retention-window control) + scheduled-sweep entrypoint | ~~Design: retention-window control, sweep trigger~~ **DONE** (shipped in patch: `/settings/done-retention` web endpoints + purge confirmation with backup + audit, UI in browse settings). |
 | 21 | 22 P3 | Triage-as-separate-app architecture + card-source interface `{id, source_app, render(), actions[], on_action()}` | Q4 |
 | 22 | 22 P3 | Anki interleave prototype (AnkiConnect JSON-RPC localhost:8765) | Q4 + port collision with PKMS (8765) |
 | 23 | 24 icebox | Comments table normalization design (blob → normalized `comments` table) | Reactivation: want sort-in-SQL / single-comment writes |
 | 24 | 25 P3 | Human-mimic jitter (log-normal / two-state Markov / empirical sampling) | — (user's own learning project) |
 | 25 | 4 P2 | RedGifs resolver implementation (connector + metadata rewrite) | WP1#3 (API validated first) |
-| 26 | 7 P2 | Twitter/X bookmarks connector (`twitter:<tweet_id>`) | Q9 + browser-export format research |
+| 26 | 7 P2 | Twitter/X bookmarks connector (`twitter:<tweet_id>`) | Q9 + browser-export format research. Handoff doc shipped in patch (`twitter-x-bookmarks-handoff.md`). Connector implementation pending Q9. |
 | 27 | 7 P3 | Live Firefox tab integration (WebExtension / sessionstore / bookmarklet) | Shape choice (a/b/c) |
 | 28 | 21 P3 | LLM identity-vs-actionable classifier (resurfacing candidate quality) | Local-LLM/GPU availability |
 | 29 | 20 P3 | Unused `app.css` selectors audit (per-selector usage checks before deletion) | — |
