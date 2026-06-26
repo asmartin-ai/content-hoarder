@@ -70,6 +70,51 @@ def test_note_body_edit_gate_is_limited_to_note_sources():
     assert _call_item("canEditNoteBody", {"source": "youtube"}) is False
 
 
+def _extract_youtube_ids(text):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+    script = (
+        "import { extractYoutubeIds } from './browse/reader.js';"
+        f"console.log(JSON.stringify(extractYoutubeIds({json.dumps(text)})));"
+    )
+    r = subprocess.run([node, "--input-type=module", "-e", script],
+                       capture_output=True, text=True, cwd=STATIC)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip())
+
+
+def test_extract_youtube_ids_host_forms_and_markdown():
+    text = "\n".join([
+        "bare https://youtu.be/dQw4w9WgXcQ",
+        "watch [video](https://www.youtube.com/watch?v=aaaaaaaaaaa&t=30)",
+        "embed ![](https://www.youtube.com/embed/bbbbbbbbbbb)",
+        "short https://youtube.com/shorts/ccccccccccc?feature=share",
+    ])
+    assert _extract_youtube_ids(text) == [
+        "dQw4w9WgXcQ",
+        "aaaaaaaaaaa",
+        "bbbbbbbbbbb",
+        "ccccccccccc",
+    ]
+
+
+def test_extract_youtube_ids_dedupes_and_preserves_order():
+    text = (
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ "
+        "https://youtu.be/aaaaaaaaaaa "
+        "https://youtube.com/embed/dQw4w9WgXcQ"
+    )
+    assert _extract_youtube_ids(text) == ["dQw4w9WgXcQ", "aaaaaaaaaaa"]
+
+
+def test_extract_youtube_ids_multiple_zero_and_rejects():
+    assert _extract_youtube_ids("no links here") == []
+    assert _extract_youtube_ids("https://example.com/watch?v=dQw4w9WgXcQ") == []
+    assert _extract_youtube_ids("https://www.youtube.com/embed/videoseries?list=PLx") == []
+    assert _extract_youtube_ids("https://youtube.com/watch?v=shortid") == []
+
+
 def test_dead_subtree_collapses_the_root():
     # deleted parent + deleted child -> the whole dead thread collapses at the root (index 0)
     comments = [c("[deleted]", "[deleted]", 0), c("[deleted]", "[removed]", 1)]
