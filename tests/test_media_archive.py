@@ -30,7 +30,10 @@ def test_urls_for_scopes():
             "https://pbs.twimg.com/media/a.jpg?name=orig",
         ]},
         "twitter",
-    ) == ["https://pbs.twimg.com/media/a.jpg?name=orig"]
+    ) == [
+        "https://pbs.twimg.com/media/a.jpg?name=orig",
+        "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4",
+    ]
 
 
 def test_archive_salvageable_and_galleries(conn, tmp_path, monkeypatch):
@@ -90,9 +93,10 @@ def test_archive_item_limit(conn, tmp_path, monkeypatch):
 def test_archive_twitter_images(conn, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "db_path", lambda: str(tmp_path / "app.db"))
     img = "https://pbs.twimg.com/media/abc123.jpg?name=orig"
+    vid = "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4"
     _seed_source(conn, "twitter", "tw1", media_urls=[
         img,
-        "https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4",
+        vid,
     ])
     _seed(conn, "reddit", media_url="https://i.redd.it/x.jpg")
     conn.commit()
@@ -100,19 +104,23 @@ def test_archive_twitter_images(conn, tmp_path, monkeypatch):
 
     def fake(u, *, max_bytes):
         calls.append(u)
-        return (b"TW-" + u.encode(), "image/jpeg")
+        mime = "video/mp4" if u.endswith(".mp4") else "image/jpeg"
+        return (b"TW-" + u.encode(), mime)
 
     plan = media_archive.archive(conn, scopes=["twitter"], apply=False, fetch=fake, throttle=0)
-    assert plan["items"] == 1 and plan["urls"] == 1 and plan["archived"] == 0
+    assert plan["items"] == 1 and plan["urls"] == 2 and plan["archived"] == 0
     assert calls == []
 
     res = media_archive.archive(conn, scopes=["twitter"], apply=True, fetch=fake, throttle=0)
-    assert res["items"] == 1 and res["archived"] == 1 and res["failed"] == 0
-    assert calls == [img]
+    assert res["items"] == 1 and res["archived"] == 2 and res["failed"] == 0
+    assert calls == [img, vid]
     md = json.loads(db.get_item(conn, "twitter:tw1")["metadata"])
     blob = md["archived_media"][img]
     assert blob.endswith(".jpg")
     assert media_store.path_for(blob).read_bytes() == b"TW-" + img.encode()
+    vblob = md["archived_media"][vid]
+    assert vblob.endswith(".mp4")
+    assert media_store.path_for(vblob).read_bytes() == b"TW-" + vid.encode()
 
     again = media_archive.archive(conn, scopes=["twitter"], apply=True, fetch=fake, throttle=0)
     assert again["urls"] == 0 and again["archived"] == 0

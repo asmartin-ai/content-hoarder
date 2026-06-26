@@ -1036,7 +1036,7 @@ def build_parser() -> argparse.ArgumentParser:
     pam.add_argument("--images", action="store_true",
                      help="Archive direct reddit images (the large set — ~10GB).")
     pam.add_argument("--twitter", action="store_true",
-                     help="Archive imported Twitter/X bookmark image media.")
+                     help="Archive imported Twitter/X bookmark image/video media.")
     pam.add_argument("--limit", type=int, default=None,
                      help="Cap items with work this run (resumable).")
     pam.add_argument("--throttle", type=float, default=0.3,
