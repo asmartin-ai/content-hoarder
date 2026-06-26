@@ -58,7 +58,6 @@ else:
     print("Dry-run — use --apply to write")
     counts = {}
     for r in rows:
-        mu = r["mu"] or ""
         status = conn.execute(
             "SELECT json_extract(metadata, '$.media_status') FROM items WHERE fullname=?",
             (r["fullname"],),

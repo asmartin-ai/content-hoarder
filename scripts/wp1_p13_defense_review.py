@@ -98,19 +98,15 @@ print()
 
 # --- 3. Recommended commands ---
 ts_subs = [sub for sub, _, k in subs if k == "time-sensitive"]
-ts_sub_list = ",".join(ts_subs)
+ts_sub_flags = " ".join(f"--subreddit {s}" for s in ts_subs)
 print(f"=== Recommended decay commands ===")
 print(f"Time-sensitive subs ({len(ts_subs)}): {', '.join(ts_subs)}")
 print()
 print("# Dry-run preview:")
-print(
-    f"content_hoarder decay --tag defense --subreddit {ts_sub_list} --before 90d --dry-run"
-)
+print(f"content_hoarder decay {ts_sub_flags} --before 90d --dry-run")
 print()
 print("# Apply (REVIEW first):")
-print(
-    f"content_hoarder decay --tag defense --subreddit {ts_sub_list} --before 90d --label swept --apply"
-)
+print(f"content_hoarder decay {ts_sub_flags} --before 90d --label swept --apply")
 print()
 
 ro.close()
