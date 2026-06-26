@@ -14,8 +14,17 @@ export const postJSON = (url, body) =>
 export const setStatus = (fullname, status) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/status", { status });
 
+export const fetchItem = (fullname) =>
+  getJSON("/items/" + encodeURIComponent(fullname));
+
 export const undoItem = (fullname) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/undo");
+
+export const snoozeItem = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/snooze", body || { window_days: 7 });
+
+export const undoSnooze = (body) =>
+  postJSON("/snooze/undo", body);
 
 export const recoverItem = (fullname) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/recover");

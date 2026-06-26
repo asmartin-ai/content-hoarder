@@ -262,6 +262,7 @@ body.focus .batchstrip{display:flex}
 .row.leaving.lv-archived .item-fg{transform:translateX(48px);background:var(--archive-tint)}
 .row.leaving.lv-done .item-fg{transform:translateX(-48px);background:var(--done-tint)}
 .row.leaving.lv-inbox .item-fg{transform:translateX(-48px);background:var(--accent-tint)}
+.row.leaving.lv-snooze .item-fg{transform:translateY(12px);background:var(--accent-tint)}
 
 /* swipe underlay (touch): archive | keep (stage 2) | done */
 .item-bg{position:absolute;inset:0;display:none;align-items:center;
@@ -1023,6 +1024,7 @@ a.rd-au:hover{color:var(--accent);text-decoration:underline;text-underline-offse
 .rd-act svg{width:18px;height:18px}
 .rd-act.a{color:var(--archive);border-color:var(--archive);background:var(--archive-tint)}
 .rd-act.d{color:var(--done);border-color:var(--done);background:var(--done-tint)}
+.rd-act.s{color:var(--accent);border-color:var(--accent);background:var(--accent-tint)}
 .rd-act.k{color:var(--keep);border-color:var(--keep)}   /* no fill — Keep stays deliberate */
 .rd-act:active{transform:scale(.98)}
 .rd-act:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
