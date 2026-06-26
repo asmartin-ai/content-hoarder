@@ -6,7 +6,7 @@
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { createLightbox, imageUrl, imageUrls, redditUrl, playableVideoSrc, localUrl, setArchivePref } from "../core/media.js";
+import { createLightbox, imageUrl, imageUrls, redditUrl, playableVideoSrc, localUrl, setArchivePref, thumb } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import { wireTagExpanders, shareItem } from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -549,6 +549,7 @@ function cardHtml(c) {
     '<button type="button" class="ambbtn letgo" data-amb="letgo">Let it go</button></div>';
 }
 let ambientCard = null;
+let surpriseItem = null;
 async function loadAmbient() {
   try {
     const r = await fetch("/resurface");
@@ -593,21 +594,45 @@ async function surprise() {
     const it = (r.items || [])[0];
     if (!it) { toast("Nothing to deal — the shelves are empty."); return; }
     const m = it.metadata || {};
+    const t = thumb(it, "list") || imageUrl(it) || "";
+    const media = t ? '<div class="amb-thumb"><img src="' + esc(t) + '" alt="" loading="lazy"></div>' : "";
+    surpriseItem = it;
     ambient.innerHTML = '<div class="amb-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
       "<h3>“" + esc(it.title || "(untitled)") + "”</h3>" +
-      '<div class="amb-body"><div class="amb-meta">' +
+      '<div class="amb-body">' + media + '<div class="amb-meta">' +
       (m.subreddit ? "<b>r/" + esc(m.subreddit) + "</b> · " : "") +
       (it.created_utc ? "from " + new Date(it.created_utc * 1000).getFullYear() : "") +
       "</div></div>" +
       '<div class="amb-acts">' +
-      '<a class="ambbtn primary" href="' + esc(it.url || "#") + '" target="_blank" rel="noopener">Open it</a>' +
-      '<button type="button" class="ambbtn" data-amb="open">Not today</button></div>';
+      '<button type="button" class="ambbtn primary" data-surprise="open">Open</button>' +
+      '<button type="button" class="ambbtn" data-surprise="dismiss">Not today</button></div>';
     ambientCard = null;
     ambient.hidden = false;
     ambient.scrollIntoView({ block: "nearest", behavior: "smooth" });
   } catch (e) { toast("The dice jammed — try again."); }
 }
 $("#dice").addEventListener("click", surprise);
+ambient.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-surprise]");
+  if (!b) return;
+  const action = b.dataset.surprise;
+  if (action === "dismiss") {
+    surpriseItem = null;
+    ambient.hidden = true;
+    return;
+  }
+  if (action !== "open" || !surpriseItem) return;
+  const it = surpriseItem;
+  surpriseItem = null;
+  ambient.hidden = true;
+  if (it.source === "reddit" || it.source === "hackernews" ||
+      it.source === "keep" || it.source === "obsidian") {
+    readerUI.open(it);
+    if (it.source === "reddit" || it.source === "hackernews") preloadNext(it);
+  } else {
+    openMediaFor(it);
+  }
+});
 
 /* ---- tabs / rail / chips (locked #2/#7) ---- */
 function paintTabs() {
