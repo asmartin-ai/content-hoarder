@@ -731,19 +731,25 @@ def create_app(db_path: str | None = None) -> Flask:
                 retention_days = 30
                 db.set_setting(c, "done_retention_days", "30")
             preview = db.purge_done(c, now=now, apply=False)
-        return jsonify({"retention_days": retention_days, "preview": preview, "now": now})
+        return jsonify(
+            {"retention_days": retention_days, "preview": preview, "now": now}
+        )
 
     @app.post("/settings/done-retention")
     def done_retention_set():
         body = request.get_json(silent=True) or {}
         retention_days = _parse_retention_days(body.get("retention_days"))
         if retention_days is None:
-            return jsonify({"error": "retention_days must be an integer between 1 and 3650"}), 400
+            return jsonify(
+                {"error": "retention_days must be an integer between 1 and 3650"}
+            ), 400
         now = int(time.time())
         with conn() as c:
             db.set_setting(c, "done_retention_days", str(retention_days))
             preview = db.purge_done(c, now=now, apply=False)
-        return jsonify({"retention_days": retention_days, "preview": preview, "now": now})
+        return jsonify(
+            {"retention_days": retention_days, "preview": preview, "now": now}
+        )
 
     @app.post("/settings/done-retention/purge")
     def done_retention_purge():
@@ -754,21 +760,27 @@ def create_app(db_path: str | None = None) -> Flask:
             expected_total = int(expected_total)
             expected_cutoff = int(expected_cutoff)
         except (TypeError, ValueError):
-            return jsonify({"error": "expected_total and expected_cutoff are required"}), 400
+            return jsonify(
+                {"error": "expected_total and expected_cutoff are required"}
+            ), 400
 
         now = int(time.time())
         with conn() as c:
             plan = db.purge_done(c, now=now, apply=False)
             if plan["total"] != expected_total or plan["cutoff"] != expected_cutoff:
-                return jsonify({
-                    "error": "purge preview changed; review the updated count before deleting",
-                    "preview": plan,
-                }), 409
+                return jsonify(
+                    {
+                        "error": "purge preview changed; review the updated count before deleting",
+                        "preview": plan,
+                    }
+                ), 409
             if plan["total"] == 0:
-                return jsonify({
-                    "error": "no Done items currently qualify for purge",
-                    "preview": plan,
-                }), 409
+                return jsonify(
+                    {
+                        "error": "no Done items currently qualify for purge",
+                        "preview": plan,
+                    }
+                ), 409
 
             victims = [
                 {"fullname": r[0], "source": r[1], "title": (r[2] or "")[:80]}
@@ -1036,7 +1048,9 @@ def create_app(db_path: str | None = None) -> Flask:
         tag = str(body.get("tag", "") or "").strip()
         if not tag:
             return jsonify({"error": "tag required"}), 400
-        apply = bool(body.get("confirm") or body.get("apply") or body.get("dry_run") is False)
+        apply = bool(
+            body.get("confirm") or body.get("apply") or body.get("dry_run") is False
+        )
         with conn() as c:
             res = db.enqueue_unsave_by_tag(c, tag, dry_run=not apply)
         res["confirmed"] = apply
