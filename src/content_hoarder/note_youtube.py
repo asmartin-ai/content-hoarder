@@ -116,7 +116,7 @@ def plan(conn) -> dict:
         row = dict(r)
         md = parse_metadata(row.get("metadata"))
         vids = _note_yt_ids({"body": row.get("body"), "url": row.get("url"), "metadata": md})
-        if not vids:
+        if len(vids) != 1:
             continue
         for vid in vids:
             yt_fn = f"youtube:{vid}"

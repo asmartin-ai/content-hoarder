@@ -948,6 +948,14 @@ html.reader-lock{overflow:hidden}
   max-height:52vh;margin:var(--sp-3) auto 0;border:1px solid var(--border-hairline);
   border-radius:var(--r-md);overflow:hidden;background:var(--surface-inset)}
 .rd-note-video-wrap iframe{display:block;width:100%;height:100%;border:0;background:var(--surface-inset)}
+.rd-note-video-multi{margin-top:var(--sp-3)}
+.rd-note-video-multi .rd-note-video-wrap{margin-top:0}
+.rd-note-video-tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.rd-note-video-tab{min-height:32px;border:1px solid var(--border-control);border-radius:var(--r-pill);
+  background:transparent;color:var(--text-muted);padding:0 11px;cursor:pointer;
+  font:var(--fw-semibold) var(--fs-xs)/1 var(--font-mono)}
+.rd-note-video-tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent-tint);
+  color:var(--accent-strong)}
 .rd-note-body-region{padding:var(--sp-3) var(--sp-4) var(--sp-5)}
 .rd-note-body-region .rd-body{margin-top:0}
 .rd-keep-checklist{list-style:none;margin:0 0 var(--sp-3);padding:0;display:flex;
