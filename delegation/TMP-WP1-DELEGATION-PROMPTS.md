@@ -5,7 +5,7 @@ Agent profile: can query the live database at `K:\Projects\content-hoarder\data\
 ## Project context every prompt assumes
 
 - DB path: `K:\Projects\content-hoarder\data\app.db` (SQLite, WAL). **Always back up before any write**: `copy data\app.db data\app.backup-<YYYYMMDD-HHMM>.db`.
-- Schema: one generic `items` table. PK `fullname = "<source>:<source_id>"`. Columns: `source, source_id, kind, title, body, url, author, created_utc, saved_utc, is_saved, first_seen_utc, last_seen_utc, hydrated_at, status, processed_utc, status_prev, search_text, metadata (JSON), raw_json`. Side tables: `settings`, `reddit_threads`, `reddit_unsave` (queue), `media_blobs`.
+- Schema: one generic `items` table. PK `fullname = "<source>:<source_id>"`. Columns: `source, source_id, kind, title, body, url, author, created_utc, saved_utc, is_saved, first_seen_utc, last_seen_utc, hydrated_at, status, processed_utc, status_prev, search_text, metadata (JSON), raw_json`. Side tables: `settings`, `reddit_threads`, `reddit_unsave` (queue), `media_blobs`, `tag_suggestions` (reviewable tag proposals), `folders` (derived-rule folder registry).
 - **GOTCHA (critical):** when reading `items.metadata`, `SELECT` the FULL column and `json.loads()` it in Python — never `substr(metadata,1,N)`. JSON keys sort alphabetically, so truncation hides late keys (`gallery`, `media_type`, `media_url` sit after `author`/`body`) and makes a populated row look empty.
 - Triage state: `status ∈ {inbox, keep, archived, done}`; `processed_utc` set on leaving inbox; `status_prev` enables one-step undo.
 - `merge_upsert` is non-destructive (overlay non-empty incoming fields only; never overwrite user/triage state).
