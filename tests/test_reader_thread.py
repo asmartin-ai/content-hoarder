@@ -28,6 +28,16 @@ def _call(fn, comments):
     return json.loads(r.stdout.strip())
 
 
+def _eval(script):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+    r = subprocess.run([node, "--input-type=module", "-e", script],
+                       capture_output=True, text=True, cwd=STATIC)
+    assert r.returncode == 0, r.stderr
+    return r.stdout.strip()
+
+
 def c(author, body, depth):
     return {"author": author, "body": body, "depth": depth}
 
@@ -61,3 +71,31 @@ def test_live_parent_not_collapsed_but_nested_dead_thread_is():
         c("[deleted]", "[deleted]", 2),     # dead leaf -> not its own collapse
     ]
     assert set(_call("deadThreadCollapseSet", comments)) == {1}
+
+
+def test_hn_nested_comments_normalize_to_flat_reddit_shape():
+    comments = [{
+        "author": "pg", "text": "<p>root</p>", "points": 5, "depth": 1,
+        "children": [{"author": "dang", "text": "child", "points": 2, "depth": 2}],
+    }]
+    out = _eval(
+        "import { normalizeThreadComments } from './browse/reader.js';"
+        f"console.log(JSON.stringify(normalizeThreadComments({json.dumps(comments)}, 'hackernews')));"
+    )
+    flat = json.loads(out)
+    assert [(c["author"], c["body"], c["score"], c["depth"]) for c in flat] == [
+        ("pg", "<p>root</p>", 5, 0),
+        ("dang", "child", 2, 1),
+    ]
+
+
+def test_hn_html_to_markdown_preserves_links_and_strips_scripts():
+    out = _eval(
+        "import { hnHtmlToMarkdown, renderHnHtml } from './browse/reader.js';"
+        "const src = '<p>Hello &amp; <a href=\"item?id=42\">thread</a></p><script>x()</script>';"
+        "console.log(JSON.stringify([hnHtmlToMarkdown(src), renderHnHtml(src)]));"
+    )
+    md, html = json.loads(out)
+    assert md == "Hello & [thread](https://news.ycombinator.com/item?id=42)"
+    assert 'href="https://news.ycombinator.com/item?id=42"' in html
+    assert "script" not in html.lower()
