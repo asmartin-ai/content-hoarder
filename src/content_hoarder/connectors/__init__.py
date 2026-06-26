@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from content_hoarder.connectors.base import BaseConnector, ImportResult
+from content_hoarder.connectors.twitter import TwitterConnector
 from content_hoarder.connectors.reddit import RedditConnector
 from content_hoarder.connectors.youtube import YouTubeConnector
 from content_hoarder.connectors.hackernews import HNConnector
@@ -17,9 +18,12 @@ from content_hoarder.connectors.obsidian import ObsidianConnector
 from content_hoarder.connectors.keep import KeepConnector
 from content_hoarder.connectors.firefox import FirefoxConnector
 
-# Order matters for dispatch: more specific sniffs first. Obsidian (requires a .md)
-# is checked before Keep (any dir with .json) so a vault never matches Keep.
+# Order matters for dispatch: more specific sniffs first. Twitter is checked
+# before Reddit because reddit accepts several broad JSON export shapes; Obsidian
+# (requires a .md) is checked before Keep (any dir with .json) so a vault never
+# matches Keep.
 _CONNECTORS = (
+    TwitterConnector(),
     RedditConnector(),
     YouTubeConnector(),
     HNConnector(),
