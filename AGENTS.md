@@ -24,6 +24,9 @@ Offline PWA (service worker + manifest) ships.
   against the app served in-process off a **copy** of the live DB with autosync OFF (no live mutation,
   no scheduler). Excluded from the default run (`addopts -m "not ui"`). **Verify any mobile/PWA UI
   change here** — it catches what unit tests + the preview tool miss. Add a regression test per UI bug.
+  If `playwright install chromium` is blocked by local TLS/corporate certs, system Chrome can run the
+  suite with `pytest -m ui --browser-channel chrome`. If `data/app.db` is absent in a sandbox, point
+  `CONTENT_HOARDER_DB` at a temporary synthetic DB with enough rows for the smoke tests; never commit it.
 
 ## Layout
 ```

@@ -80,6 +80,7 @@ def test_thread_parse_and_route(tmp_db):
 def test_reddit_page_renders(tmp_db):
     r = _client(tmp_db).get("/reddit")
     assert r.status_code == 200 and b"/static/reddit.js" in r.data
+    assert b"Local queue only; drain contacts Reddit." in r.data
 
 
 def test_unsave_enqueues(tmp_db):
@@ -92,6 +93,45 @@ def test_unsave_enqueues(tmp_db):
     c.close()
     assert n == 1
     assert saved == 0  # optimistically flipped so the UI toggles to its Undo state
+
+
+def test_unsave_by_tag_route_previews_then_confirms(tmp_db):
+    tag = "nsfw_erotic"
+    _seed(tmp_db)
+    c = db.connect(tmp_db)
+    db.merge_upsert(c, models.new_item(
+        source="reddit", source_id="t3_tagged", kind="post",
+        title="Tagged", url="http://r/tagged",
+        metadata={"tags": [tag]},
+    ))
+    c.commit()
+    c.close()
+
+    cl = create_app(tmp_db).test_client()
+    preview = cl.post("/reddit/unsave/enqueue-by-tag", json={"tag": tag}).get_json()
+    assert preview["dry_run"] is True
+    assert preview["confirmed"] is False
+    assert preview["eligible"] == 1
+    assert preview["enqueued"] == 0
+    assert "only queues local unsaves" in preview["message"]
+
+    c = db.connect(tmp_db)
+    assert c.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] == 0
+    c.close()
+
+    applied = cl.post(
+        "/reddit/unsave/enqueue-by-tag",
+        json={"tag": tag, "confirm": True},
+    ).get_json()
+    assert applied["confirmed"] is True
+    assert applied["enqueued"] == 1
+
+    again = cl.post(
+        "/reddit/unsave/enqueue-by-tag",
+        json={"tag": tag, "confirm": True},
+    ).get_json()
+    assert again["enqueued"] == 0
+    assert again["skipped"]["already_queued"] == 1
 
 
 def test_undo_cancels_pending_unsave(tmp_db):

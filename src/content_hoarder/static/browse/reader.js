@@ -20,9 +20,9 @@ import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
-import { imageUrl, mediaType, mountVideo, playableVideoSrc } from "../core/media.js";
+import { imageUrl, imageUrls, mediaType, mountVideo, playableVideoSrc, videoUrls } from "../core/media.js";
 import { isNsfw } from "./render.js";
-import { hnUserUrl, itemUrl, shareItem } from "../core/render.js";
+import { COMP_LABEL, companionHref, hnUserUrl, itemUrl, shareItem } from "../core/render.js";
 import { toast } from "../core/toast.js";
 import { pushOverlay, settleTop } from "../core/overlaynav.js";
 
@@ -107,6 +107,8 @@ const absReddit = (p) => {
   return p.startsWith("/") ? "https://www.reddit.com" + p : p;
 };
 export const canEditNoteBody = (it) => !!(it && (it.source === "keep" || it.source === "obsidian"));
+export const READER_SOURCE_IDS = ["reddit", "hackernews", "keep", "obsidian", "youtube", "twitter"];
+export const canOpenInReader = (it) => !!(it && READER_SOURCE_IDS.includes(it.source));
 
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const YT_TRAIL_RE = /(?:&(?:quot|#39|gt|lt);|[)\]}>}."';,:!?])+$/;
@@ -138,6 +140,12 @@ function youtubeIdFromUrl(raw) {
   }
   vid = String(vid || "").trim();
   return YT_ID_RE.test(vid) && !YT_NON_IDS.has(vid) ? vid : "";
+}
+export function youtubeIdForItem(it) {
+  if (!it) return "";
+  const sid = String(it.source_id || "").trim();
+  if (it.source === "youtube" && YT_ID_RE.test(sid) && !YT_NON_IDS.has(sid)) return sid;
+  return youtubeIdFromUrl(it.url || "");
 }
 export function extractYoutubeIds(text) {
   const out = [];
@@ -197,7 +205,20 @@ function stripOuterParagraph(html) {
   const m = /^<p>([\s\S]*)<\/p>$/.exec(s);
   return m ? m[1] : s;
 }
-function renderKeepBody(src) {
+const CHECK_RE = /^(\s*(?:[-*]\s+)?)\[([ xX])\](\s+)(.*)$/;
+function checklistMatch(line) {
+  return CHECK_RE.exec(String(line == null ? "" : line));
+}
+export function toggleChecklistLine(body, lineIndex) {
+  const lines = String(body == null ? "" : body).replace(/\r\n?/g, "\n").split("\n");
+  if (lineIndex < 0 || lineIndex >= lines.length) return String(body == null ? "" : body);
+  const m = checklistMatch(lines[lineIndex]);
+  if (!m) return String(body == null ? "" : body);
+  const nextMark = m[2].toLowerCase() === "x" ? " " : "x";
+  lines[lineIndex] = m[1] + "[" + nextMark + "]" + m[3] + m[4];
+  return lines.join("\n");
+}
+function renderChecklistBody(src) {
   const text = String(src == null ? "" : src).replace(/\r\n?/g, "\n");
   const lines = text.split("\n");
   const out = [];
@@ -208,17 +229,17 @@ function renderKeepBody(src) {
     buf = [];
   };
   for (let i = 0; i < lines.length; i++) {
-    const m = /^\s*\[([ xX])\]\s+(.*)$/.exec(lines[i]);
+    const m = checklistMatch(lines[i]);
     if (!m) { buf.push(lines[i]); continue; }
     flushText();
     const items = [];
     while (i < lines.length) {
-      const cm = /^\s*\[([ xX])\]\s+(.*)$/.exec(lines[i]);
+      const cm = checklistMatch(lines[i]);
       if (!cm) { i--; break; }
-      const checked = cm[1].toLowerCase() === "x";
-      const label = stripOuterParagraph(renderMarkdown(cm[2], {})) || esc(cm[2]);
-      items.push('<li><label><input type="checkbox" disabled' +
-        (checked ? " checked" : "") + "><span>" + label + "</span></label></li>");
+      const checked = cm[2].toLowerCase() === "x";
+      const label = stripOuterParagraph(renderMarkdown(cm[4], {})) || esc(cm[4]);
+      items.push('<li><label><input type="checkbox" class="rd-check-toggle" data-rd-check-line="' +
+        i + '"' + (checked ? " checked" : "") + '><span>' + label + "</span></label></li>");
       i++;
     }
     out.push('<ul class="rd-keep-checklist">' + items.join("") + "</ul>");
@@ -291,7 +312,7 @@ const SOURCE_META = {
     originalHref: (it) => itemUrl(it) || it.url || "",
     author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
     scoreText: (n) => fmtScore(n),
-    bodyHtml: (body) => renderKeepBody(body),
+    bodyHtml: (body) => renderChecklistBody(body),
   },
   obsidian: {
     label: "Obsidian",
@@ -301,10 +322,157 @@ const SOURCE_META = {
     originalHref: (it) => itemUrl(it) || it.url || "",
     author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
     scoreText: (n) => fmtScore(n),
+    bodyHtml: (body) => renderChecklistBody(body),
+  },
+  youtube: {
+    label: "YouTube",
+    led: "var(--source-youtube)",
+    threadPath: null,
+    hydratePath: null,
+    originalHref: (it) => itemUrl(it) || it.url || "",
+    author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
+    scoreText: (n) => fmtScore(n),
+    bodyHtml: (body) => renderMarkdown(body, {}),
+  },
+  twitter: {
+    label: "X/Twitter",
+    led: "var(--source-twitter)",
+    threadPath: null,
+    hydratePath: null,
+    originalHref: (it) => itemUrl(it) || it.url || "",
+    author: (author) => {
+      const handle = String(author || "").replace(/^@+/, "");
+      return handle
+        ? '<a class="rd-au" href="https://x.com/' + esc(encodeURIComponent(handle)) +
+          '" target="_blank" rel="noopener noreferrer nofollow">@' + esc(handle) + "</a>"
+        : '<span class="rd-au"></span>';
+    },
+    scoreText: (n) => fmtScore(n),
     bodyHtml: (body) => renderMarkdown(body, {}),
   },
 };
-const sourceMeta = (it) => SOURCE_META[it && it.source] || SOURCE_META.reddit;
+const sourceMeta = (it) => SOURCE_META[it && it.source] || {
+  label: (it && it.source) || "Item",
+  led: "var(--accent)",
+  threadPath: null,
+  hydratePath: null,
+  originalHref: (x) => itemUrl(x) || x.url || "",
+  author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
+  scoreText: (n) => fmtScore(n),
+  bodyHtml: (body) => renderMarkdown(body, {}),
+};
+
+const fmtDur = (secs) => {
+  const s = Math.round(+secs || 0);
+  if (s <= 0) return "";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h ? h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0")
+           : m + ":" + String(r).padStart(2, "0");
+};
+const fmtCount = (n) => {
+  const v = +n;
+  if (!Number.isFinite(v) || v <= 0) return "";
+  if (v < 1000) return String(Math.round(v));
+  if (v < 1000000) return (v / 1000).toFixed(v < 10000 ? 1 : 0).replace(/\.0$/, "") + "k";
+  return (v / 1000000).toFixed(v < 10000000 ? 1 : 0).replace(/\.0$/, "") + "M";
+};
+function detailPills(pairs) {
+  const chips = (pairs || []).filter((p) => p && p[1] !== "" && p[1] != null && !(Array.isArray(p[1]) && !p[1].length))
+    .map(([k, v]) => '<span class="rd-detail"><b>' + esc(k) + '</b> ' +
+      esc(Array.isArray(v) ? v.join(", ") : v) + "</span>");
+  return chips.length ? '<div class="rd-details">' + chips.join("") + "</div>" : "";
+}
+function youtubeEmbedHtml(id) {
+  if (!id) return "";
+  const src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
+  return '<div class="rd-note-video-wrap rd-youtube-video">' +
+    '<iframe src="' + esc(src) + '" title="YouTube video" loading="lazy" ' +
+    'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>';
+}
+function renderCompanions(item) {
+  const list = (item.metadata || {}).companions;
+  if (!Array.isArray(list) || !list.length) return "";
+  const links = list.map((c) => {
+    if (!c || typeof c !== "object") return "";
+    const label = COMP_LABEL[c.source] || c.source || "source";
+    const fn = String(c.fullname || "").trim();
+    if (fn) {
+      return '<a class="comp-link" href="/?open=' + esc(encodeURIComponent(fn)) + '">' +
+        esc(label) + "</a>";
+    }
+    const href = companionHref(c);
+    return href ? '<a class="comp-link" href="' + esc(href) +
+      '" target="_blank" rel="noopener">' + esc(label) + " - source</a>" : "";
+  }).filter(Boolean).join("");
+  return links ? '<div class="rd-companions"><span>Companions</span>' + links + "</div>" : "";
+}
+function renderYoutubeReader(it, body) {
+  const m = it.metadata || {};
+  const cats = Array.isArray(m.yt_categories) ? m.yt_categories : (Array.isArray(m.categories) ? m.categories : []);
+  const desc = String(m.description || body || "").trim();
+  return youtubeEmbedHtml(youtubeIdForItem(it)) +
+    detailPills([
+      ["Channel", m.channel || it.author || ""],
+      ["Duration", fmtDur(m.duration)],
+      ["Playlist", m.playlist || ""],
+      ["Availability", m.availability || ""],
+      ["Views", fmtCount(m.view_count)],
+      ["Categories", cats],
+    ]) +
+    (desc ? '<div class="rd-body rd-youtube-desc">' + renderMarkdown(desc, {}) + "</div>" : "") +
+    renderCompanions(it);
+}
+function tweetPermalink(id, handle) {
+  const sid = String(id || "").trim();
+  if (!sid) return "";
+  const h = String(handle || "").replace(/^@+/, "") || "i";
+  return "https://x.com/" + encodeURIComponent(h) + "/status/" + encodeURIComponent(sid);
+}
+export function renderTweetQuote(q) {
+  if (!q || typeof q !== "object") return "";
+  const text = String(q.text || q.title || q.body || "").trim();
+  const handle = String(q.author_handle || q.handle || "").replace(/^@+/, "");
+  const name = String(q.author_name || q.name || "").trim();
+  const href = safeUrl(q.permalink || tweetPermalink(q.id || q.tweet_id || q.source_id, handle));
+  const by = (name || handle) ? '<div class="rd-tweet-quote-by">' +
+    esc(name || ("@" + handle)) + (handle && name ? " @" + esc(handle) : "") + "</div>" : "";
+  const inner = by + (text ? '<div class="rd-tweet-quote-text">' + renderMarkdown(text, {}) + "</div>" : "");
+  if (!inner) return "";
+  return '<blockquote class="rd-tweet-quote">' + inner +
+    (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener nofollow">Open quote</a>' : "") +
+    "</blockquote>";
+}
+export function renderTweetOutlinks(links) {
+  const safe = (Array.isArray(links) ? links : []).map((u) => safeUrl(String(u || "").trim())).filter(Boolean);
+  if (!safe.length) return "";
+  return '<div class="rd-outlinks">' + safe.map((u) =>
+    '<a href="' + esc(u) + '" target="_blank" rel="noopener nofollow">' + esc(u) + "</a>").join("") + "</div>";
+}
+function renderTweetMedia(it, mediaHtml) {
+  const imgs = imageUrls(it);
+  const vids = videoUrls(it);
+  let h = "";
+  if (imgs.length) {
+    h += '<div class="rd-tweet-media">' + imgs.map((u) =>
+      '<img class="md-img rd-tweet-img" src="' + esc(u) + '" data-img="' + esc(u) +
+      '" alt="" loading="lazy">').join("") + "</div>";
+  }
+  if (vids.length && typeof mediaHtml === "function") h += mediaHtml("");
+  return h;
+}
+function renderTwitterReader(it, body, mediaHtml) {
+  const m = it.metadata || {};
+  const text = String(body || it.title || "").trim();
+  const reply = m.in_reply_to_status_id || m.in_reply_to_screen_name
+    ? '<div class="rd-reply-context">Replying to ' +
+      (m.in_reply_to_screen_name ? "@" + esc(m.in_reply_to_screen_name) : esc(m.in_reply_to_status_id)) +
+      "</div>" : "";
+  return reply +
+    (text ? '<div class="rd-body rd-tweet-text">' + renderMarkdown(text, {}) + "</div>" : "") +
+    renderTweetQuote(m.quote_tweet) +
+    renderTweetOutlinks(m.outlinks) +
+    renderTweetMedia(it, mediaHtml);
+}
 
 /* ---- manual tag editor (reader header/meta area) ----
    Mirror of the triage card editor: existing tags as removable chips + a "＋ tag"
@@ -492,6 +660,29 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       if (item === it) { bodySaving = false; renderPost(postData); }
     }
   }
+  async function toggleChecklistInput(inp) {
+    if (!item || !canEditNoteBody(item) || bodySaving || !inp) return;
+    const it = item, fn = fullname;
+    const prev = currentBody(postData);
+    const next = toggleChecklistLine(prev, parseInt(inp.getAttribute("data-rd-check-line"), 10));
+    if (next === prev) { renderPost(postData); return; }
+    item.body = next;
+    renderPost(postData);
+    try {
+      const updated = await api.setBody(fn, next);
+      if (item === it && updated) {
+        Object.assign(it, updated);
+        if (typeof onBodySaved === "function") onBodySaved(updated);
+        renderPost(postData);
+      }
+    } catch (e) {
+      if (item === it) {
+        item.body = prev;
+        toast("Couldn't update checklist - check connection");
+        renderPost(postData);
+      }
+    }
+  }
   /* Stop and discard any inline video: tear down HLS, pause the element, drop its
      src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
      for direct/native-HLS playback (mountVideo returns destroy:null there), so the
@@ -594,9 +785,15 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     if (scoreRaw != null) h += '<span class="rd-pscore">' + sm.scoreText(scoreRaw) + "</span>";
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
-    h += mediaTileHtml(body);
-    h += bodyControlsHtml();
-    if (!isNoteVideoMode(body) || bodyEditing) h += bodyHtml(body, post);
+    if (item.source === "youtube") {
+      h += renderYoutubeReader(item, body);
+    } else if (item.source === "twitter") {
+      h += renderTwitterReader(item, body, mediaTileHtml);
+    } else {
+      h += mediaTileHtml(body);
+      h += bodyControlsHtml();
+      if (!isNoteVideoMode(body) || bodyEditing) h += bodyHtml(body, post);
+    }
     h += tagEditorHtml(item);   // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
@@ -769,6 +966,10 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     threadSort = sel.value;
     localStorage.setItem("ch_reader_sort", threadSort);
     load();
+  });
+  reader.addEventListener("change", (e) => {
+    const inp = e.target.closest("[data-rd-check-line]");
+    if (inp) toggleChecklistInput(inp);
   });
 
   /* ---- manual tag editor: live suggestions + Enter/Esc on the free input ---- */

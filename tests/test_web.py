@@ -1,8 +1,11 @@
 import io
 import json
+from pathlib import Path
 
 from content_hoarder import db, models
 from content_hoarder.web import create_app
+
+NOW = 2_000_000_000
 
 
 def _seed(dbp):
@@ -18,6 +21,41 @@ def _seed(dbp):
 def _client(tmp_db):
     _seed(tmp_db)
     return create_app(tmp_db).test_client()
+
+
+def _seed_done_retention(dbp):
+    conn = db.connect(dbp)
+    try:
+        db.merge_upsert(conn, models.new_item(
+            source="reddit", source_id="old_done", kind="post", title="Old done",
+            url="https://example.com/old", now=NOW - 5000,
+        ))
+        db.merge_upsert(conn, models.new_item(
+            source="reddit", source_id="recent_done", kind="post", title="Recent done",
+            url="https://example.com/recent", now=NOW - 4000,
+        ))
+        db.merge_upsert(conn, models.new_item(
+            source="reddit", source_id="keep_me", kind="post", title="Keep me",
+            url="https://example.com/keep", now=NOW - 3000,
+        ))
+        conn.execute(
+            "UPDATE items SET status='done', processed_utc=?, status_prev='inbox' "
+            "WHERE fullname='reddit:old_done'",
+            (NOW - 31 * 86400,),
+        )
+        conn.execute(
+            "UPDATE items SET status='done', processed_utc=?, status_prev='inbox' "
+            "WHERE fullname='reddit:recent_done'",
+            (NOW - 3 * 86400,),
+        )
+        conn.execute(
+            "UPDATE items SET status='keep', processed_utc=?, status_prev='inbox' "
+            "WHERE fullname='reddit:keep_me'",
+            (NOW - 40 * 86400,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def test_items_search(tmp_db):
@@ -72,6 +110,76 @@ def test_sources_and_stats(tmp_db):
     ids = {s["id"] for s in cl.get("/sources").get_json()["sources"]}
     assert {"reddit", "youtube"} <= ids
     assert cl.get("/stats").get_json()["total"] == 2
+
+
+def test_done_retention_settings_get_and_persist(tmp_db, monkeypatch):
+    monkeypatch.setattr("content_hoarder.web.time.time", lambda: NOW)
+    cl = _client(tmp_db)
+    _seed_done_retention(tmp_db)
+
+    res = cl.get("/settings/done-retention")
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["retention_days"] == 30
+    assert body["preview"]["total"] == 1
+    assert body["preview"]["cutoff"] == NOW - 30 * 86400
+
+    saved = cl.post("/settings/done-retention", json={"retention_days": 90})
+    assert saved.status_code == 200
+    body = saved.get_json()
+    assert body["retention_days"] == 90
+    assert body["preview"]["total"] == 0
+
+    with db.connect(tmp_db) as conn:
+        assert db.get_setting(conn, "done_retention_days") == "90"
+
+
+def test_done_retention_settings_reject_invalid_days(tmp_db):
+    cl = _client(tmp_db)
+    for payload in ({}, {"retention_days": "abc"}, {"retention_days": 0}, {"retention_days": -7}):
+        res = cl.post("/settings/done-retention", json=payload)
+        assert res.status_code == 400
+        assert "retention_days" in res.get_json()["error"]
+
+
+def test_done_retention_purge_applies_backup_audit_and_keeps_non_done_rows(tmp_db, monkeypatch):
+    monkeypatch.setattr("content_hoarder.web.time.time", lambda: NOW)
+    cl = _client(tmp_db)
+    _seed_done_retention(tmp_db)
+
+    preview = cl.get("/settings/done-retention").get_json()["preview"]
+    res = cl.post("/settings/done-retention/purge", json={
+        "expected_total": preview["total"],
+        "expected_cutoff": preview["cutoff"],
+    })
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["purged"]["total"] == 1
+    assert body["purged"]["applied"] is True
+    assert body["preview"]["total"] == 0
+
+    tmp_dir = Path(tmp_db).parent
+    backups = list(tmp_dir.glob("app.backup-pre-purge-done-*.db"))
+    assert len(backups) == 1
+    assert body["purged"]["backup"] == str(backups[0])
+
+    audit_path = tmp_dir / "delete-audit.jsonl"
+    assert audit_path.exists()
+    audit = json.loads(audit_path.read_text(encoding="utf-8").strip().splitlines()[-1])
+    assert audit["op"] == "purge_done"
+    assert audit["total"] == 1
+    assert audit["backup"] == str(backups[0])
+    assert audit["victims"][0]["fullname"] == "reddit:old_done"
+
+    with db.connect(tmp_db) as conn:
+        rows = {
+            row["fullname"]: row["status"]
+            for row in conn.execute("SELECT fullname, status FROM items").fetchall()
+        }
+    assert "reddit:old_done" not in rows
+    assert rows["reddit:recent_done"] == "done"
+    assert rows["reddit:keep_me"] == "keep"
+    assert rows["reddit:t3_a"] == "inbox"
 
 
 def test_status_undo_bulk(tmp_db):
