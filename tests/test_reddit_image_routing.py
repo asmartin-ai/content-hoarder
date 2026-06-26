@@ -84,3 +84,30 @@ def test_media_url_video_still_wins_over_image_branch():
         "  metadata: { media_url: 'https://v.redd.it/xyz' } }).cls);"
     )
     assert out == "video"
+
+
+def test_twitter_media_urls_classify_and_resolve_images():
+    out = _node_eval(
+        "import { mediaType, imageUrl, imageUrls } from './core/media.js';"
+        "const it = { source: 'twitter', url: 'https://x.com/me/status/1', metadata: {"
+        "  media_urls: ['https://pbs.twimg.com/media/a.jpg?name=orig',"
+        "               'https://video.twimg.com/ext_tw_video/1/pu/vid/720x720/v.mp4']"
+        "} };"
+        "console.log(JSON.stringify([mediaType(it).cls, imageUrl(it), imageUrls(it)]));"
+    )
+    assert json.loads(out) == [
+        "image",
+        "https://pbs.twimg.com/media/a.jpg?name=orig",
+        ["https://pbs.twimg.com/media/a.jpg?name=orig"],
+    ]
+
+
+def test_twitter_media_urls_prefer_local_archive_when_enabled():
+    out = _node_eval(
+        "import { setArchivePref, imageUrl } from './core/media.js';"
+        "const u = 'https://pbs.twimg.com/media/a.jpg?name=orig';"
+        "setArchivePref(true);"
+        "console.log(imageUrl({ source: 'twitter', url: 'https://x.com/me/status/1',"
+        "  metadata: { media_urls: [u], archived_media: { [u]: 'abc.jpg' } } }));"
+    )
+    assert out == "/media/abc.jpg"

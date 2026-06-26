@@ -57,6 +57,12 @@ export const ytFallback = (t) => /i\.ytimg\.com\/vi\/[^/]+\/maxresdefault\.jpg/.
 /* Full image URL to open in a lightbox (direct images / i.redd.it), else "". */
 export const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i;
 const _directImg = (u) => IMG_EXT.test(u || "") || /i\.redd\.it\//i.test(u || "");
+export const imageUrls = (item) => {
+  const m = item.metadata || {};
+  if (Array.isArray(m.media_urls))
+    return m.media_urls.filter(_directImg).map((u) => localUrl(item, u));
+  return [];
+};
 export const imageUrl = (item) => {
   const m = item.metadata || {};
   // each return prefers the locally-archived copy when present (Epic 4 P1, localUrl)
@@ -65,6 +71,8 @@ export const imageUrl = (item) => {
   // SHAPE, not the media_type label — unlocks ~25.8k i.redd.it posts stuck in the
   // reddit_media catch-all with item.url = permalink.
   if (_directImg(m.media_url)) return localUrl(item, m.media_url);
+  const imgs = imageUrls(item);
+  if (imgs.length) return imgs[0];
   return m.media_type === "image" ? localUrl(item, m.media_url || "") : "";
 };
 
@@ -79,7 +87,7 @@ export const mediaType = (item) => {
     return { cls: "video", icon: "🎬", label: "Video" };
   // Image evidence in metadata.media_url (harvested from feat/reddit-media-v13): the
   // ~25.8k reddit_media-catch-all posts whose item.url is the permalink, not the image.
-  if (_directImg((item.metadata || {}).media_url))
+  if (_directImg((item.metadata || {}).media_url) || imageUrls(item).length)
     return { cls: "image", icon: "🖼️", label: "Image" };
   const url = (item.url || "").toLowerCase();
   if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/.test(url) || url.includes("i.redd.it") || url.includes("i.imgur.com"))
