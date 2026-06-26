@@ -138,6 +138,44 @@ def test_status_and_undo(conn):
     assert it["status"] == "inbox" and it["processed_utc"] is None
 
 
+def test_set_body_updates_metadata_and_search(conn):
+    db.merge_upsert(conn, mk(source="keep", source_id="1", title="Note", body="old"))
+    updated = db.set_body(conn, "keep:1", "new body words")
+    assert updated["body"] == "new body words"
+    assert updated["metadata"]["body_edited_at"]
+    assert db.search_items(conn, "new body words")[0]["fullname"] == "keep:1"
+    assert db.search_items(conn, "old") == []
+
+
+def test_set_body_missing_returns_none(conn):
+    assert db.set_body(conn, "keep:nope", "x") is None
+
+
+def test_set_body_refreshes_obsidian_body_metadata(conn):
+    db.merge_upsert(conn, mk(
+        source="obsidian", source_id="n.md", title="Note", body="#old [[Old]]",
+        metadata={"tags": ["old"], "wikilinks": ["Old"], "tags_manual": ["manual"]},
+    ))
+    updated = db.set_body(conn, "obsidian:n.md", "Body #new [[Target|label]] [[Page#Head]]")
+    md = updated["metadata"]
+    assert md["tags"] == ["new", "manual"]
+    assert md["tags_manual"] == ["manual"]
+    assert md["wikilinks"] == ["Target", "Page"]
+
+
+def test_merge_upsert_preserves_edited_body(conn):
+    db.merge_upsert(conn, mk(source="keep", source_id="1", title="Note", body="original"))
+    db.set_body(conn, "keep:1", "my edit")
+    db.merge_upsert(conn, mk(source="keep", source_id="1", title="Note", body="original re-import"))
+    row = db.get_item(conn, "keep:1")
+    assert row["body"] == "my edit"
+    assert json.loads(row["metadata"])["body_edited_at"]
+
+    db.merge_upsert(conn, mk(source="keep", source_id="2", title="Note", body="original"))
+    db.merge_upsert(conn, mk(source="keep", source_id="2", title="Note", body="original re-import"))
+    assert db.get_item(conn, "keep:2")["body"] == "original re-import"
+
+
 def test_triage_state_preserved_on_reimport(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     db.set_status(conn, "r:1", "done")

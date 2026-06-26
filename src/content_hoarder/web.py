@@ -323,6 +323,16 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify({"error": "not a recoverable reddit item"}), 400
         return jsonify(res)
 
+    @app.post("/items/<path:fullname>/body")
+    def set_body_route(fullname):
+        data = request.get_json(silent=True) or {}
+        with conn() as c:
+            updated = db.set_body(c, fullname, str(data.get("body") or ""))
+            if updated is None:
+                return jsonify({"error": "not found"}), 404
+            c.commit()
+        return jsonify(updated)
+
     @app.post("/reddit/items/<path:fullname>/hydrate")
     def hydrate_item(fullname):
         from content_hoarder import reddit_hydrate
@@ -942,4 +952,3 @@ def create_app(db_path: str | None = None) -> Flask:
     app._prepared = _prepared
     app._cleanup_all_prepared = _cleanup_all_prepared
     return app
-
