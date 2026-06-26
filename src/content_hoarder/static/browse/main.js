@@ -1264,6 +1264,18 @@ function restoreView() {
 restoreView();
 state.sort = sortForTab(state.status); sortSel.value = state.sort;   // apply the tab's sort once the view restores
 
+async function openDeepLinkedReader() {
+  const qs = new URLSearchParams(location.search);
+  const fn = qs.get("open");
+  if (!fn) return;
+  try {
+    const item = await api.fetchItem(fn);
+    readerUI.open(item, { from: qs.get("from") === "triage" ? "triage" : "" });
+  } catch (e) {
+    toast("Couldn't open that item.");
+  }
+}
+
 /* ---- boot ---- */
 paintTabs();
 paintChips();
@@ -1273,6 +1285,7 @@ loadCounts();
 refreshPulse();
 loadAmbient();
 loadItems(true);
+openDeepLinkedReader();
 
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.register("/static/sw.js").catch((err) => {

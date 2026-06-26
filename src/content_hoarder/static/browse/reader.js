@@ -348,6 +348,7 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   let item = null, fullname = null, ooHref = "";
   let comments = [], collapsed = new Set(), opAuthor = "";
   let revealed = false, isOpen = false;
+  let returnTo = "";
   let postData = null, bodyEditing = false, bodyDraft = "", bodySaving = false;
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
@@ -668,14 +669,17 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   }
 
   /* ---- open / close (+ history so the system back-gesture returns to feed) ---- */
-  function openReader(it) {
+  function openReader(it, opts) {
+    opts = opts || {};
     if (typeof closeSheets === "function") closeSheets();
     stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
     item = it; fullname = it.fullname;
+    returnTo = opts.from === "triage" ? "/triage" : "";
     comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
     postData = null; bodyEditing = false; bodyDraft = ""; bodySaving = false;
     const sm = sourceMeta(it);
     reader.dataset.source = it.source || "";
+    reader.classList.toggle("from-triage", !!returnTo);
     reader.setAttribute("aria-label", sm.label + " thread reader");
     if (ledEl) ledEl.style.setProperty("--reader-led", sm.led);
     if (ooEl) ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
@@ -709,8 +713,10 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   function closeReader(fromPop) {
     if (!isOpen) return;
     isOpen = false;
+    const dest = returnTo;
+    returnTo = "";
     stopInlineVideo();           // pause+reset+remove the <video> so audio doesn't bleed after close
-    reader.classList.remove("show");
+    reader.classList.remove("show", "from-triage");
     reader.setAttribute("aria-hidden", "true");
     reader.style.transition = ""; reader.style.transform = "";
     document.documentElement.classList.remove("reader-lock");
@@ -720,7 +726,8 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     if (typeof onClose === "function") onClose(fullname);  // re-blur the feed thumbnail (Epic 13 P2)
     // A manual close (button/Esc/swipe/F-A-D keys) unwinds the history entry we pushed; an OS-back
     // (fromPop) already popped it, so the coordinator handled the history side for us.
-    if (!fromPop) settleTop();
+    if (dest) location.replace(dest);
+    else if (!fromPop) settleTop();
   }
   document.addEventListener("keydown", (e) => {
     if (!isOpen) return;
@@ -861,13 +868,13 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
 
   /* ---- swipe-right → return to feed (Relay-style). Left-edge is left to the
          OS back-gesture, which also closes the reader via popstate. ---- */
-  let sx = 0, sy = 0, dragging = false, decided = false, horizontal = false;
+  let sx = 0, sy = 0, dragging = false, decided = false, horizontal = false, verticalClose = false;
   reader.addEventListener("touchstart", (e) => {
     if (!isOpen || e.touches.length !== 1) { dragging = false; return; }
     const x = e.touches[0].clientX;
     if (x < 24) { dragging = false; return; }         // OS back-gesture zone
     sx = x; sy = e.touches[0].clientY;
-    dragging = true; decided = false; horizontal = false;
+    dragging = true; decided = false; horizontal = false; verticalClose = false;
     reader.style.transition = "none";
   }, { passive: true });
   reader.addEventListener("touchmove", (e) => {
@@ -876,6 +883,12 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     if (!decided) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       decided = true; horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
+      verticalClose = !horizontal && !!returnTo && dy > 0 && scrollEl && scrollEl.scrollTop <= 0;
+    }
+    if (verticalClose) {
+      e.preventDefault();
+      reader.style.transform = "translateY(" + Math.max(0, dy) + "px)";
+      return;
     }
     if (!horizontal) { dragging = false; return; }     // vertical → let it scroll
     if (dx > 0) { e.preventDefault(); reader.style.transform = "translateX(" + dx + "px)"; }
@@ -886,11 +899,15 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     reader.style.transition = "";
     const t = (e.changedTouches && e.changedTouches[0]) || null;
     const dx = t ? t.clientX - sx : 0;
+    const dy = t ? t.clientY - sy : 0;
     if (horizontal && dx > 90) closeReader(false);
+    else if (verticalClose && dy > 90) closeReader(false);
     else reader.style.transform = "";
   }
   reader.addEventListener("touchend", endSwipe);
-  reader.addEventListener("touchcancel", () => { dragging = false; reader.style.transition = ""; reader.style.transform = ""; });
+  reader.addEventListener("touchcancel", () => {
+    dragging = false; verticalClose = false; reader.style.transition = ""; reader.style.transform = "";
+  });
 
   return { open: openReader };
 }
