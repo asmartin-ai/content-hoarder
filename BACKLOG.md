@@ -181,18 +181,13 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
   source permalink (reddit/HN/youtube/firefox URL) vs. a deep-link back into content-hoarder. Lean
   Web-Share-with-clipboard-fallback so it works on the Pixel-6 target.
-- [ ] **P2 — Defer/Skip as a first-class triage action.** ⏳ **Skip half ✅ SHIPPED** (triage-skip: a no-decision "pass / show next" via button + Space, on main); the **timed Defer/Snooze** half (`metadata.snoozed_until`) is still pending. *(User-requested 2026-06-19.)* A "decide later"
-  action available everywhere triage happens (triage card + browse row + reader), not just a swipe gesture —
-  surfaced as a button + keyboard key alongside Keep/Archive/Done, and reversible like the other actions.
-  **Two distinct behaviors to decide between (or ship both):** (a) **Skip** = a no-decision "pass, show me the
-  next" that just advances within the current batch without changing status or persisting anything; (b)
-  **Defer/Snooze** = a *timed* deferral that hides the item from triage batches for a window
-  (`metadata.snoozed_until`) then quietly resurfaces it. Honors the project guardrails: friction-asymmetry
-  (defer is priced above Done/Archive, never the cheapest gesture), no guilt mechanics (no "snoozed 3×!"
-  badges), and after N defers an item flows into the Epic 21 guilt-free decay path. **Unify with — don't
-  duplicate —** the Epic 20 P2 "4-way swipe: Snooze on the unassigned long-left" item (that's the *gesture*
-  binding of this same action) and the Epic 21 snooze-decay escalation. Relates to Epic 5 keyboard rework +
-  Epic 10 (a skipped/deferred item is a weak training signal — decide whether it counts).
+- [x] ~~**P2 — Defer/Skip as a first-class triage action.**~~ ✅ **Snooze backend SHIPPED 2026-06-26:** `db.snooze`
+  (`metadata.snoozed_until` monotonic wave), `is:snoozed` operator, escalation after N snoozes → decay.
+  **Frontend SHIPPED 2026-06-26:** snooze button on triage card + browse row, `POST /items/<fn>/snooze` +
+  `POST /items/<fn>/unsnooze` routes, triage-batch exclusion. **Skip SHIPPED** (triage-skip: a no-decision "pass,
+  show me the next" via button + Space, on main). Honors the project guardrails: friction-asymmetry, no guilt
+  mechanics, escalation flows into the Epic 21 decay path. Relates to Epic 10 (a skipped/deferred item is a weak
+  training signal — decide whether it counts).
 
 ## Epic 6 — Duplicates v2  (`enhancement`, `area:ui`)
 *The first cut was removed: the "duplicate group" naming confused, and placeholder titles created
@@ -202,9 +197,9 @@ false positives.*
   resolve via CLI `dedup [--by url|title] [--resolve] [--clear]`. **Excludes placeholder titles**
   (`[removed]`/`[deleted]`/`[Private video]`/`[Deleted video]`); URL grouping **keeps the query string**
   (a real-data scan caught the old code collapsing every `youtube.com/watch?v=…` into one group).
-- [ ] **P3 — Duplicates review UI.** A clear "possible duplicates" surface (group cards → keep one,
-  archive the rest) built on `dedup.find_groups`. The prior modal was removed for confusing UX —
-  rebuild minimally; the CLI already does the work non-destructively.
+- [x] ~~**P3 — Duplicates review UI.**~~ ✅ SHIPPED 2026-06-26: a `#dupesheet` panel under Settings → Duplicates,
+  `/duplicates` + `/duplicates/resolve` + `/duplicates/undo` routes, deduped item cards with "Archive others"
+  per group, undo snackbar. Built on `dedup.find_groups` with By URL / By Title toggle.
 
 ## Epic 7 — More sources & live sync  (`enhancement`, `area:connectors`)
 - [ ] **P2 — Import WL3 + Watch Later.** WL3 via the same `yt-dlp --flat-playlist` flow; main Watch
@@ -469,9 +464,11 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
 - [~] **P2 — "Smart triage" mode (recency + likely-done interleave)** — same status:
   built (`get_random_batch(mode="smart")` + `/random?mode=smart`), parked on
   `feat/triage-score`. The triage-card UI toggle is an Epic 20 Stage-C item.
-- [ ] **P3 — Feedback loop.** Re-fit the score periodically (or after every N triage actions) so it
-  tracks drift in what I care about; optionally fold in the local-LLM keep/skip suggestion
-  (`assist/llm.py`) and the heuristic category (`categorize.py`) as additional features.
+- [x] ~~**P3 — Feedback loop.**~~ ✅ SHIPPED 2026-06-26: `triage_score.drift()` compares two fitted models
+  (features added/dropped, rate drift with top movers, prior drift, `drift_score`); `triage-drift` CLI reports
+  drift vs the persisted model; `--apply` refits, rescors inbox items, and persists. **Still open:** optionally
+  fold in the local-LLM keep/skip suggestion (`assist/llm.py`) and the heuristic category (`categorize.py`)
+  as additional features.
 - [ ] **P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.** Where the learned
   skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
   (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
@@ -518,24 +515,15 @@ to its companion discussion threads.*
 - [x] ~~**Precedence + matching.**~~ Honored: match key = canonical YouTube video id (`firefox.youtube_id`)
   from any source's link; YouTube is always the survivor. Firefox-tab→YouTube is still promoted at import
   (`firefox_youtube.py`); Reddit link-post→YouTube and HN story→YouTube fold here.
-- [ ] **P2 — Promote standalone YouTube-link notes (Keep + Obsidian) → YouTube items.** *(User-requested
-  2026-06-19.)* Extend the link→video promotion to **Keep notes** and **Obsidian markdown files** whose body
-  **is essentially just a YouTube link** (no real surrounding prose). Treat them like the Firefox-tab
-  promotion: fold into a canonical `youtube:<id>` item (create a keyless one if none exists, `promoted_by`),
-  keeping the note as a reversible companion. **Decisions (user 2026-06-19):** standalone → promote; runs
-  **both at import** (like `firefox_youtube.py`) **and** re-runnably via the reversible `consolidate` pass
-  (dry-run + `--undo`). **Connector prerequisites (URL extraction):**
-  - **Obsidian** scans **nothing** in the body today — `url` comes only from frontmatter (`obsidian.py:116`);
-    add body-URL extraction.
-  - **Keep** captures only the **first** URL (`keep.py:90`); capture all, so a non-first YouTube link is seen.
-  - Handle markdown link forms (`[text](url)`, `![](url)` embeds) + bare URLs; normalize via
-    `connectors.firefox.youtube_id` (`youtu.be`/`shorts`/`watch?v=`).
-  - **Standalone-vs-document heuristic** (shared with the Epic 15 note-reader items): after stripping the
-    YouTube URL(s) + the title, is there meaningful remaining body text? Below a threshold → standalone
-    (promote); otherwise it's a **document** → hand off to the note-with-video reader (Epic 15), do NOT
-    convert (the note text is the irreplaceable thing). **Open: the exact threshold** — pick after sampling
-    real notes. A note with **multiple** YouTube links is never "standalone" (→ Epic 15 multi-video reader).
-  Relates to Epic 7 (connectors) + Epic 15 (note reader).
+- [x] ~~**P2 — Promote standalone YouTube-link notes (Keep + Obsidian) → YouTube items.**~~ ✅ SHIPPED
+  2026-06-25 (`49e9fc9`): `note_youtube.py` + `migrate-note-youtube` CLI (dry-run default, `--apply`).
+  Extracts YouTube ids from note bodies (bare URL, `[text](url)`, `![](url)` embed, all host forms), promotes
+  standalone links (no meaningful surrounding prose) to canonical `youtube:<id>` items via the `consolidate`
+  pass, reversible. **Multi-video notes excluded** — they are the domain of the multi-video note reader
+  (Epic 15 P3, shipped 2026-06-26). **Standalone-vs-document heuristic:** after stripping the YouTube URL(s)
+  + title, remaining body text below a threshold → standalone; otherwise a **document** → hand off to the
+  note-with-video reader (Epic 15 P2, shipped 2026-06-26). **Open: the exact threshold** — pick after sampling
+  real notes. Relates to Epic 7 (connectors) + Epic 15 (note reader).
 
 ## Epic 12 — Search operators in the search bar  (`enhancement`, `area:search`)
 *Mimic Gmail / Discord / Google search-operator syntax in the main search bar so power queries don't
@@ -928,22 +916,18 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P3 — Reader triage buttons show their hotkey shortcuts.**~~ ✅ Shipped (`4ff7126`): Keep/Archive/Done
   buttons display their keys and the reader-scoped F/A/D keys are wired (capture-phase, triages the reader's own
   item). *(User-requested 2026-06-17.)* Relates to the Epic 5 keyboard rework.
-- [ ] **P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.** *(User-requested
-  2026-06-19.)* When a note has **real content AND a single YouTube link**, do NOT promote/convert it (Epic 11
-  leaves these alone) — the note text is the irreplaceable thing. Instead keep it as a `keep:`/`obsidian:`
-  item and open it in the inline reader **exactly like the Reddit comment reader**: the **YouTube video plays
-  at the top** (where the post media sits) and **the note's own content renders below, where the comment thread
-  would be**. Needs: (a) the video id(s) extracted onto the note (`metadata.youtube_ids`, the same extraction
-  the Epic 11 heuristic uses); (b) a note mode in `reader.js` — embed the YouTube player (iframe) up top, render
-  the note body below (**Obsidian** = markdown, reuse the reader-markdown renderer above; **Keep** = text +
-  checklist); (c) Epic 15 tap-routing so a note-with-video opens this reader. Builds on the inline reader +
-  `core/media.js`. Relates to Epic 11 (id extraction) + the reader-markdown item above.
-- [ ] **P3 — Multi-video note reader: embed several YouTube videos from one note.** *(User idea 2026-06-19.)*
-  A note containing **multiple YouTube links** is a collection, not a single video — never promote it to one
-  video item. Build a reader view that **embeds all of the note's YouTube videos** (a playlist/grid of players)
-  alongside the note content. **Open scope:** layout (stacked players vs. a list with one active player),
-  lazy-load the iframes (don't auto-load a wall of embeds), and reuse the Epic 11 `metadata.youtube_ids`
-  extraction. Builds on the note-with-video reader above.
+- [x] ~~**P2 — Note-with-video reader (Keep/Obsidian): play the video where the comments go.**~~ ✅ SHIPPED
+  2026-06-26: single-video notes render a YouTube iframe (`youtube-nocookie.com/embed/<id>`) in the reader's
+  media tile with the note body below (**Obsidian** = markdown via `core/markdown.js`; **Keep** = plain text +
+  checklist with line-through). Keep invocation of the Epic 11 standalone heuristic — notes with real content
+  stay as `keep:`/`obsidian:` items, NOT promoted. Iframe tears down on every close path (button/Esc/popstate/
+  swipe/F-A-D). Multi-video notes fall back gracefully (the multi-video reader handles them). Node-tested
+  `extractYoutubeIds()` + Playwright UI test. *(User-requested 2026-06-19.)*
+- [x] ~~**P3 — Multi-video note reader: embed several YouTube videos from one note.**~~ ✅ SHIPPED 2026-06-26:
+  tabbed video switcher — one active iframe at a time with "Video 1" / "Video 2" / … tab bar below.
+  `note_youtube.py` now skips multi-video notes in the promote pass (`len(vids) != 1`) — they're exclusively
+  this reader's domain. Note body renders below the video tab bar. Playwright UI test covers tab switching +
+  body rendering. *(User idea 2026-06-19.)*
 - [ ] **P2 — Edit note bodies as raw markdown, in the reader.** *(User-requested 2026-06-19.)* Let the reader
   edit a note's body as **raw markdown** (a textarea + rendered live preview reusing the reader's markdown
   renderer above) — **reuse the reader view**, not a separate editor surface. ✅ **Reader editor shipped
@@ -992,15 +976,16 @@ Absorbs "make the Reddit view more mobile-friendly".*
   sheet pinned at `bottom:0` clipping into the bottom bar. Fix = one rule `.tagpop[hidden]{display:none}`
   (higher specificity). Verified: hidden→`display:none` in every state (incl. `.sheet` still applied — the
   exact tap-away-after-use case), shown→`flex`.
-- [~] **P2 — Back on the reader/triage view should return to the inbox, not exit the app.** *(User-
-  reported 2026-06-22.)* ✅ **Reader + overlays SHIPPED** 2026-06-22 via the shared `core/overlaynav.js`
-  back-button coordinator (one history entry + one `popstate` over a stack; OS-back closes only the top
-  overlay — verified live: reader closes + stays on app, lightbox-over-reader nesting closes LIFO).
-  ⏳ **STILL OPEN — the triage PAGE-as-entry case:** when `/triage` is the *first* PWA history entry
-  (launched/refreshed directly onto it), back exits because there's nothing below it. Normal nav
-  (inbox → TRIAGE link) already returns to the inbox. Needs a page-level guard: if `/triage` is the
-  entry (no same-origin referrer / `history.length<=1`), push a sentinel so back routes to `/` instead
-  of exiting — coordinated with the overlay coordinator (overlay-back takes precedence). Verify on Pixel-6/Chrome.
+- [x] ~~**P2 — Back on the reader/triage view should return to the inbox, not exit the app.**~~ ✅ **Reader +
+  overlays SHIPPED** 2026-06-22 via the shared `core/overlaynav.js` back-button coordinator (one history
+  entry + one `popstate` over a stack; OS-back closes only the top overlay — verified live: reader closes +
+  stays on app, lightbox-over-reader nesting closes LIFO).
+  ✅ **Triage entry guard SHIPPED 2026-06-26:** `installTriageEntryBackGuard()` in `triage.js` — detects
+  direct `/triage` entry (no same-origin referrer, navigation type `navigate`) and pushes a sentinel history
+  entry so OS-back lands on `/` instead of exiting the app. Coordinates with `overlaynav.js` (open overlays
+  close before the page guard fires). State change: `history.replaceState({chTriageInboxGuard})` + `pushState`.
+  Playwright-tested: direct entry, browse→triage nav, overlay precedence, reload stacking. *(User-reported
+  2026-06-22.)*
 - [x] ~~**P2 — Back from the lightbox/gallery should return to the inbox, not exit the app.**~~ ✅ SHIPPED
   2026-06-22 (`core/overlaynav.js` + `core/media.js` createLightbox + triage.js inline lightbox, sw.js
   v55→v56). *(User-reported 2026-06-22.)* Both lightboxes register with the shared coordinator on open;
@@ -1242,31 +1227,19 @@ build-tracking now, not open design questions:*
   color+icon swap at the second threshold + a haptic pulse (`navigator.vibrate`); long-press
   stays = select. **Design locked 2026-06-11** (06-adhd-round.html, thresholds ≈90px/≈170px,
   demoed working); build in Stage C.
-- [ ] **P2 — 4-way swipe: Snooze on the unassigned long-left (+ snooze-decay).** *(User idea
-  2026-06-12.)* The locked two-stage map leaves long-← unassigned — claim it for **Snooze**:
-  "I don't want to decide right now" as a first-class gesture, killing decision fatigue without
-  the guilt of skipping. Sketch (design rides the Stage C gate): snooze hides the item from
-  triage batches for a window (e.g. `metadata.snoozed_until`, ~7d); **repeated snoozes are
-  themselves a decision** — after N snoozes (~3) the item flows into the Epic 21 guilt-free
-  decay path (auto-archive + stamp, reversible, no badge/no "snoozed 3 times!" guilt copy).
-  Friction-asymmetry note: snooze *defers* rather than preserves — price it above
-  Done/Archive but below Keep; never the cheapest gesture in reach. Open questions: window
-  length/escalation curve, quiet resurface marker vs silent return, overlap with the deferred
-  ☾ resting-soon markers (both want the same server-side flag).
-- [ ] **P2 — 4-DIRECTIONAL triage: add the vertical axis (↑ = thread, ↓ = skip-for-later).** *(User
-  idea 2026-06-22.)* The two-stage map above claims the horizontal axis (←/→ = Done/Archive/Keep, long-←
-  = Snooze); add the **vertical** axis so triage is genuinely 4-directional:
-  - **Swipe ↑ → open the comments thread** (the inline reader/thread view). First open lazy-hydrates via
-    `reddit_hydrate.hydrate_if_missing` (Epic 24) — ties straight into the hydration work. Read-without-
-    deciding: the card stays in the deck after closing the reader.
-  - **Swipe ↓ → skip the item for later** (no-decision pass / show next). This is the *gesture binding* of
-    the already-shipped **Skip** (triage-skip, on main) — wire the existing action, do NOT add a new one.
-    Decide vs the Epic 16 P2 timed Defer/Snooze and the long-← Snooze above: ↓ maps to the cheap
-    no-decision Skip, NOT the timed snooze, to keep the two gestures distinct.
-  Touches `core/swipe.js` (today `touchAction="pan-y"`, horizontal-only — needs a vertical axis +
-  thresholds that don't fight list scroll, and a direction-lock so a diagonal drag resolves to one axis)
-  + `triage.js`. **Unify with — don't duplicate —** the long-← Snooze item and the Epic 16 Skip/Defer
-  item; this is the gesture layer over those existing actions.
+- [x] ~~**P2 — 4-way swipe: Snooze on the unassigned long-left (+ snooze-decay).**~~ ✅ SHIPPED 2026-06-26:
+  **Backend:** `db.snooze` stamps `metadata.snoozed_until` (monotonic wave, direct UPDATE — never
+  `bulk_set_status`, so no unsave enqueue) + increments `metadata.snooze_count`; triage batches exclude
+  snoozed items via `get_random_batch` filter; `is:snoozed` search operator. **Escalation:** after N snoozes
+  (~3) the item routes through decay (`decay_label='snooze-escalated'`, reversible, no guilt copy).
+  **Frontend:** long-← swipe claims Snooze; `POST /items/<fn>/snooze` + `POST /items/<fn>/unsnooze` routes;
+  hardened `snooze` CLI (dry-run default, `--apply --yes` gate, auto-backup, `snooze-audit.jsonl`).
+  Friction-asymmetry: snooze is priced above Done/Archive but below Keep. *(User idea 2026-06-12.)*
+- [x] ~~**P2 — 4-DIRECTIONAL triage: add the vertical axis (↑ = thread, ↓ = skip-for-later).**~~ ✅ SHIPPED
+  2026-06-26: ↑ opens the reader/thread (via `triage.js` swipe-up → `readerUI.open` + `preloadNext`),
+  ↓ calls the existing Skip (no-decision pass). Direction lock resolves diagonal drags to one axis.
+  Works alongside the existing 2-stage horizontal swipe (←/→ = Done/Archive/Keep, long-← = Snooze).
+  Reader close returns to the triage deck (card stays undecided). *(User idea 2026-06-22.)*
 - [ ] **P2 — Triage visual rework (design bakeoff, probably GLM).** *(User idea 2026-06-22.)* A fresh
   visual pass on the triage card/deck — hand it to a design bakeoff arm (GLM, per the Epic 20 P3 GLM-5.2
   design-arm trial). Pair with the 4-directional gesture item above: the new ↑/↓ affordances need visual
@@ -1308,11 +1281,10 @@ Stage C design gate:*
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
   **Design locked 2026-06-11** (06: same ambient slot, never both cards, + ⚄ dice for
   user-pulled); build in Stage C.
-- [ ] **P3 — "Surprise me" card: render media + open → reader.** *(User-requested 2026-06-17.)* The
-  surprise-me ambient card needs better rendering: when the dealt item **has an image**, render the image on
-  the card (not just title/meta); and its **"Open" action should route into `section#reader`** (the same
-  in-app reader a normal post open uses), not an external tab or bare lightbox. Builds on `surprise()`
-  (`browse/main.js:358`) + the Epic 15 reader routing.
+- [x] ~~**P3 — "Surprise me" card: render media + open → reader.**~~ ✅ SHIPPED 2026-06-26: `surprise()`
+  (`browse/main.js:358`) now renders the item's thumbnail (`thumb(it, "list")`) on the card, and the "Open"
+  button routes into `section#reader` for note/discussion items (`reddit`/`hackernews`/`keep`/`obsidian`)
+  or falls through to the media lightbox for media-only items. *(User-requested 2026-06-17.)*
 
 *Code-quality / dead-code cleanup migrated 2026-06-20 from the retired
 `docs/IMPLEMENTATION-HANDOFF-2026-06-17.md` work queue (I1–I4). The v3 `static/core/` layer was created to
