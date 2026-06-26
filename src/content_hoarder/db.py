@@ -461,6 +461,54 @@ def normalize_processing_tags(conn: sqlite3.Connection) -> int:
 
 _OVERLAY_FIELDS = ("title", "body", "url", "author")
 _TIME_FIELDS = ("created_utc", "saved_utc")
+_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+_INLINE_TAG_RE = re.compile(r"(?<![:/\w])#([\w\-/]+)")
+
+
+def _obsidian_body_metadata(body: str) -> dict:
+    """Metadata derived from an Obsidian note body."""
+    wikilinks = []
+    for raw in _WIKILINK_RE.findall(body or ""):
+        target = raw.split("#")[0].split("|")[0].strip()
+        if target and target not in wikilinks:
+            wikilinks.append(target)
+    tags = list(dict.fromkeys(_INLINE_TAG_RE.findall(body or "")))
+    return {"tags": tags, "wikilinks": wikilinks}
+
+
+def set_body(conn: sqlite3.Connection, fullname: str, body: str) -> dict | None:
+    """Set an item's body, update search text, and mark it as user-edited.
+
+    Direct UPDATE mirrors the user-state helpers: callers commit, and the existing
+    items_au trigger keeps FTS in sync.
+    """
+    row = get_item(conn, fullname)
+    if row is None:
+        return None
+    text = str(body or "")
+    item = dict(row)
+    item["body"] = text
+    md = parse_metadata(row.get("metadata"))
+    md["body_edited_at"] = int(time.time())
+    if row.get("source") == "obsidian":
+        derived = _obsidian_body_metadata(text)
+        manual = _tag_list(md.get("tags_manual"))
+        tags = _tag_list(derived["tags"])
+        for t in manual:
+            if t not in tags:
+                tags.append(t)
+        md["tags"] = tags
+        md["wikilinks"] = derived["wikilinks"]
+    conn.execute(
+        "UPDATE items SET body=?, metadata=?, search_text=? WHERE fullname=?",
+        (
+            text,
+            json.dumps(md, ensure_ascii=False),
+            build_search_text(item, md),
+            fullname,
+        ),
+    )
+    return _public_by_fullname(conn, fullname)
 
 
 def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
@@ -484,7 +532,10 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
         return "inserted"
 
     merged = dict(existing)
+    emd = parse_metadata(existing.get("metadata"))
     for f in _OVERLAY_FIELDS:
+        if f == "body" and emd.get("body_edited_at"):
+            continue
         if item.get(f):
             merged[f] = item[f]
     for f in _TIME_FIELDS:
@@ -500,7 +551,6 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
     # wholesale — re-tag passes recompute from scratch and rely on this. A future
     # partial-tags caller would clobber e.g. NSFW tags: change deliberately (with tests)
     # or send category alongside. Pinned by test_merge_upsert_tags_semantics.
-    emd = parse_metadata(existing.get("metadata"))
     for k, v in incoming_md.items():
         if k == "tags" and incoming_category:
             tags = _tag_list(emd.get("tags"))

@@ -295,6 +295,20 @@ def test_recover_route_non_reddit_400(tmp_db):
     assert _client(tmp_db).post("/items/youtube:v1/recover").status_code == 400
 
 
+def test_set_body_route(tmp_db):
+    cl = _client(tmp_db)
+    r = cl.post("/items/reddit:t3_a/body", json={"body": "fresh hedgehog notes"})
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["body"] == "fresh hedgehog notes"
+    assert data["metadata"]["body_edited_at"]
+    assert cl.get("/items?q=fresh hedgehog notes").get_json()["items"][0]["fullname"] == "reddit:t3_a"
+
+
+def test_set_body_route_unknown_item(tmp_db):
+    assert _client(tmp_db).post("/items/reddit:t3_nope/body", json={"body": "x"}).status_code == 404
+
+
 def test_reddit_unsave_status_and_enable(tmp_db):
     cl = _client(tmp_db)
     s = cl.get("/reddit/unsave/status").get_json()
