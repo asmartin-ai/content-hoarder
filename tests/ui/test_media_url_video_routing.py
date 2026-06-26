@@ -1,8 +1,8 @@
-"""UI regression: RedGifs-resolved .mp4 in metadata.media_url must classify as video.
+"""UI regression: a direct video file in metadata.media_url must classify as video.
 
 Finding #5 from the 2026-06-26 code review: mediaType() checked metadata.media_url
 for v.redd.it and image extensions but NOT for direct video files (.mp4/.webm/.mov).
-A permalink-type item (item.url = reddit permalink) with a RedGifs-resolved .mp4 in
+A permalink-type item (item.url = reddit permalink) with a resolved .mp4 in
 metadata.media_url fell through to 'text' — the resolved video was invisible in the
 browse/reader UI. playableVideoSrc() also returned "" because it gates on
 mediaType().cls === 'video'.
@@ -24,12 +24,12 @@ def test_media_url_mp4_classified_as_video(pixel6_page):
         const mod = await import('/static/core/media.js');
         return mod.mediaType({
             kind: 'post',
-            url: '/r/test/comments/synth/redgifs_resolved/',
+            url: '/r/test/comments/synth/video_resolved/',
             metadata: {
-                media_url: 'https://media.redgifs.com/SynthClip.mp4',
-                media_type: 'redgifs_video',
+                media_url: 'https://example.com/video.mp4',
+                media_type: 'resolved_video',
                 subreddit: 'test',
-                permalink: '/r/test/comments/synth/redgifs_resolved/'
+                permalink: '/r/test/comments/synth/video_resolved/'
             }
         });
     }""")
@@ -42,10 +42,10 @@ def test_media_url_mp4_playable(pixel6_page):
         const mod = await import('/static/core/media.js');
         return mod.playableVideoSrc({
             kind: 'post',
-            url: '/r/test/comments/synth/redgifs_resolved/',
+            url: '/r/test/comments/synth/video_resolved/',
             metadata: {
-                media_url: 'https://media.redgifs.com/SynthClip.mp4',
-                media_type: 'redgifs_video',
+                media_url: 'https://example.com/video.mp4',
+                media_type: 'resolved_video',
                 subreddit: 'test'
             }
         });
@@ -53,16 +53,16 @@ def test_media_url_mp4_playable(pixel6_page):
     assert src != "", "playableVideoSrc should return a non-empty URL for resolved .mp4"
 
 
-def test_unresolved_gfycat_permalink_stays_text(pixel6_page):
-    """An unresolved gfycat permalink (no .mp4 in media_url) stays 'text' —
-    the fix only triggers on a resolved direct-video URL, not the original gfycat page."""
+def test_permalink_without_direct_video_stays_text(pixel6_page):
+    """A permalink item whose media_url is NOT a direct video file stays 'text' —
+    the fix only triggers on a resolved direct-video URL, not a non-video page URL."""
     result = pixel6_page.evaluate("""async () => {
         const mod = await import('/static/core/media.js');
         return mod.mediaType({
             kind: 'post',
-            url: '/r/test/comments/synth/unresolved/',
+            url: '/r/test/comments/synth/no_video/',
             metadata: {
-                media_url: 'https://gfycat.com/synthclip',
+                media_url: 'https://example.com/page.html',
                 subreddit: 'test'
             }
         });

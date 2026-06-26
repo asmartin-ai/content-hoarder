@@ -117,9 +117,9 @@ export const mediaType = (item) => {
   // url-heuristic can't see) so the row routes to openVideo (HLS) not the iframe.
   if ((m.media_url || "").includes("v.redd.it"))
     return { cls: "video", icon: "🎬", label: "Video" };
-  // Direct video file in metadata.media_url (e.g. a RedGifs-resolved .mp4 for a
-  // dead-Gfycat permalink item): item.url is the permalink, so the url-heuristic
-  // below can't see it. Trust the archive signal like the v.redd.it check above.
+  // Direct video file in metadata.media_url (a resolved .mp4/.webm for a
+  // permalink-type item whose item.url is the reddit permalink): the
+  // url-heuristic below can't see it. Trust the archive signal like v.redd.it.
   if (VIDEO_EXT.test(m.media_url || ""))
     return { cls: "video", icon: "🎬", label: "Video" };
   if (videoUrls(item).length)
