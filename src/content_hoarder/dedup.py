@@ -134,6 +134,26 @@ def resolve_group(conn, keep_fullname: str, archive_fullnames: list[str]) -> dic
     return {"kept": keep_fullname, "archived": archived}
 
 
+def undo_resolve(conn, fullnames: list[str]) -> dict:
+    """Undo a duplicate resolve for explicit archived rows and clear dedup_of."""
+    seen: set[str] = set()
+    fns = []
+    for fn in fullnames or []:
+        s = str(fn or "").strip()
+        if s and s not in seen:
+            seen.add(s)
+            fns.append(s)
+    restored = 0
+    for fn in fns:
+        before = db.get_item(conn, fn)
+        item = db.undo_status(conn, fn)
+        if before and item and before.get("status") != item.get("status"):
+            restored += 1
+        _set_meta(conn, fn, lambda md: md.pop("dedup_of", None))
+    conn.commit()
+    return {"restored": restored, "fullnames": fns}
+
+
 def auto_resolve(conn, by: str = "url") -> dict:
     """Keep the richest item per group, archive the rest. Reversible."""
     archived = 0
