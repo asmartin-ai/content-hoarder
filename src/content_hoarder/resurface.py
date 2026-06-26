@@ -174,3 +174,58 @@ def undo_letgo(conn: sqlite3.Connection, cluster: str, decayed_at: int) -> dict:
         state[cluster].pop("dismissed_until", None)
         _save_state(conn, state)
     return {"cluster": cluster, "total": res["total"]}
+
+
+def escalate_snoozed(
+    conn: sqlite3.Connection,
+    *,
+    escalate_after: int = 3,
+    now: int | None = None,
+    apply: bool = False,
+    limit: int | None = None,
+) -> dict:
+    """Bulk sweep for the repeat-snooze rule.
+
+    Items whose cumulative ``metadata.snooze_count`` has reached the threshold silently
+    enter the same reversible decay path as ``letgo``/``db.decay``, stamped with
+    ``decay_label='snooze-escalated'``. The active snooze marks are cleared by the decay
+    update; ``snooze_count`` remains as historical signal.
+    """
+    if escalate_after < 1:
+        raise ValueError("escalate_after must be >= 1")
+    now = int(now or time.time())
+    where = (
+        "status='inbox' "
+        "AND CAST(COALESCE(json_extract(metadata, '$.snooze_count'), 0) AS INTEGER) >= ?"
+    )
+    params: list = [int(escalate_after)]
+    limit_sql = ""
+    if limit is not None:
+        limit_sql = " LIMIT ?"
+        params.append(int(limit))
+    rows = conn.execute(
+        "SELECT fullname, title FROM items WHERE "
+        f"{where} ORDER BY first_seen_utc ASC, fullname ASC{limit_sql}",
+        params,
+    ).fetchall()
+    fullnames = [r["fullname"] for r in rows]
+    res = {
+        "total": len(fullnames),
+        "applied": False,
+        "decayed_at": None,
+        "label": "snooze-escalated",
+        "escalate_after": int(escalate_after),
+        "now": now,
+        "sample": [f"{r['fullname']}: {(r['title'] or '')[:60]}" for r in rows[:5]],
+    }
+    if apply and fullnames:
+        decayed = db.decay_fullnames(
+            conn,
+            fullnames=fullnames,
+            label="snooze-escalated",
+            apply=True,
+        )
+        res.update(total=decayed["total"], applied=True, decayed_at=decayed["decayed_at"])
+    elif apply:
+        res["applied"] = True
+    return res

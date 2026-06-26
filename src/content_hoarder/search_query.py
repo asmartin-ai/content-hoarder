@@ -38,6 +38,7 @@ class ParsedQuery:
     nsfw: bool = False
     decayed: bool = False  # is:decayed — carries a decay-wave stamp (db.decay)
     swept: bool = False    # is:swept — decayed in the labeled initial backfill pass
+    snoozed: bool = False  # is:snoozed — currently hidden by metadata.snoozed_until
     open_in_firefox: bool = False  # is:firefox-tab — metadata.open_in_firefox (incl. promoted YT tabs)
     deleted: bool = False  # is:deleted — metadata.media_status='gone' (durable SSOT; the `deleted` tag is fragile)
     has: str | list[str] | None = None  # has:video|image|gallery — metadata.media_type facet
@@ -159,7 +160,7 @@ def parse(q: str) -> ParsedQuery:
     tags_groups: list[list[str]] = []  # each token's group; later collapsed to tags/tags_all
     is_saved: int | None = None
     nsfw = False
-    decayed = swept = False
+    decayed = swept = snoozed = False
     open_in_firefox = False
     deleted = False
     has_groups: list[list[str]] = []
@@ -249,6 +250,9 @@ def parse(q: str) -> ParsedQuery:
                 continue
             if v == "swept":
                 swept = True
+                continue
+            if v == "snoozed":
+                snoozed = True
                 continue
             if v in ("firefox-tab", "firefoxtab"):
                 open_in_firefox = True
@@ -345,6 +349,7 @@ def parse(q: str) -> ParsedQuery:
         nsfw=nsfw,
         decayed=decayed,
         swept=swept,
+        snoozed=snoozed,
         open_in_firefox=open_in_firefox,
         deleted=deleted,
         has=has,
