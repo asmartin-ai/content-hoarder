@@ -294,9 +294,40 @@ function reblur(fn) {
    undoable, so only one is redoable). Any new act() clears it. */
 let lastUndone = null;
 
-async function act(fullname, status) {
+async function act(fullname, status, opts = {}) {
   lastUndone = null; // a fresh action invalidates the redo buffer
   if (window.chHaptic) window.chHaptic(status); // tactile confirm on the decision (covers swipe + buttons)
+
+  /* SPEC A2: reader triage skips leave-anim, cache clear, item removal, and render().
+     The item stays in state.items with its status updated lazily; undo just reverts
+     the in-memory status. No redo tracking for the reader path. */
+  if (opts.fromReader) {
+    try {
+      await api.setStatus(fullname, status);
+    } catch (e) {
+      toast("That didn't stick — try again.");
+      return;
+    }
+    const item = state.items.find((it) => it.fullname === fullname);
+    const prevStatus = item ? item.status : null;
+    if (item) item.status = status;
+    if (state.focus) state.batchCleared += 1;
+    bumpPulse(status === "inbox" ? 0 : 1);
+    snackbar(COPY[status] || "Logged.", async () => {
+      if (window.chHaptic) window.chHaptic("undo");
+      try {
+        await api.undoItem(fullname);
+        bumpPulse(status === "inbox" ? 0 : -1);
+        if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
+        if (item) item.status = prevStatus;
+      } catch (e) {
+        toast("Undo failed.");
+      }
+    });
+    return;
+  }
+
+  // Inline row path: leave-anim, cache clear, item removal, render (existing behavior)
   const row = rowEl(fullname);
   if (row && !row.classList.contains("leaving")) {
     row.classList.add("leaving", "lv-" + status);
@@ -335,9 +366,48 @@ async function act(fullname, status) {
   });
 }
 
-async function snooze(fullname) {
+async function snooze(fullname, opts = {}) {
   lastUndone = null;
   if (window.chHaptic) window.chHaptic("skip");
+
+  /* SPEC A2: reader snooze skips leave-anim, cache clear, item removal, and render().
+     The item stays in state.items with its status updated lazily; undo reverts status. */
+  if (opts.fromReader) {
+    let res;
+    try {
+      res = await api.snoozeItem(fullname, { window_days: 7 });
+    } catch (e) {
+      toast("Snooze didn't stick - try again.");
+      return;
+    }
+    const item = state.items.find((it) => it.fullname === fullname);
+    const prevStatus = item ? item.status : null;
+    const escalated = !!(res && res.decayed_at);
+    if (item && escalated) item.status = "archived";
+    if (state.focus) state.batchCleared += 1;
+    if (escalated) bumpPulse(1);
+    snackbar(
+      escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.",
+      async () => {
+        try {
+          const undoBody =
+            res && res.snoozed_wave
+              ? { snoozed_wave: res.snoozed_wave }
+              : { decayed_at: res.decayed_at };
+          await api.undoSnooze(undoBody);
+          if (state.focus)
+            state.batchCleared = Math.max(0, state.batchCleared - 1);
+          if (escalated) bumpPulse(-1);
+          if (item) item.status = prevStatus;
+        } catch (e) {
+          toast("Undo failed.");
+        }
+      },
+    );
+    return;
+  }
+
+  // Inline row path: existing behavior
   const row = rowEl(fullname);
   if (row && !row.classList.contains("leaving")) {
     row.classList.add("leaving", "lv-snooze");
@@ -400,8 +470,8 @@ function redo() {
 /* the in-app thread reader — replaces external handoff for Reddit/HN discussion
    threads. act/openMediaFor/closeSheets are hoisted function declarations. */
 const readerUI = initReader({
-  onTriage: act,
-  onSnooze: snooze,
+  onTriage: (fn, status) => act(fn, status, { fromReader: true }),
+  onSnooze: (fn) => snooze(fn, { fromReader: true }),
   onMedia: openMediaFor,
   closeSheets,
   onClose: reblur,
