@@ -2653,6 +2653,10 @@ kbd {
     transition: transform 120ms var(--ease);
     touch-action: pan-y pinch-zoom;
 } /* placeholder + tap=full-res */
+#media-body .media-img.zoomed,
+#media-body .gallery-img.zoomed { touch-action: none; cursor: grab; }
+#media-body .media-img.zoomed:active,
+#media-body .gallery-img.zoomed:active { cursor: grabbing; }
 #media-body .media-fallback {
     display: inline-block;
     margin-top: 10px;
