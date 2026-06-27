@@ -1776,13 +1776,15 @@ body.focus .batchstrip {
     opacity: 1;
 }
 .relay-btn {
-    flex: none;
+    flex: 1 1 0;
+    min-width: 56px;
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: var(--touch-min);
-    height: var(--touch-min);
-    padding: 0;
+    gap: 5px;
+    min-height: 60px;
+    padding: 8px 4px;
     border: 1px solid var(--border-control);
     border-radius: var(--r-md);
     background: var(--surface-app);
@@ -1795,9 +1797,17 @@ body.focus .batchstrip {
         background var(--dur) var(--ease);
 }
 .relay-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     flex: none;
+}
+.relay-lbl {
+    font: var(--fw-medium) var(--fs-xs)/1 var(--font-sans);
+    letter-spacing: 0.01em;
+    max-width: 12ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .relay-btn:hover,
 .relay-btn:active {
