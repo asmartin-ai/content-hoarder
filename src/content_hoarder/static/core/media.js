@@ -439,6 +439,19 @@ export function createLightbox(opts) {
     { passive: true },
   );
 
+  // B4: window-level release listener for peek mode (auto-closes on pointerup/pointercancel).
+  let _peekRelease = null;
+  const _attachPeekRelease = () => {
+    const release = () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      _peekRelease = null;
+      close();
+    };
+    _peekRelease = release;
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+  };
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
   const closeVisual = () => {
     if (modal.hidden) return;
@@ -459,6 +472,11 @@ export function createLightbox(opts) {
   };
   // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
   const close = () => {
+    if (_peekRelease) {
+      window.removeEventListener("pointerup", _peekRelease);
+      window.removeEventListener("pointercancel", _peekRelease);
+      _peekRelease = null;
+    }
     if (modal.hidden) return;
     closeVisual();
     settleTop();
@@ -487,11 +505,12 @@ export function createLightbox(opts) {
     close,
     /* Open arbitrary HTML in the lightbox (for caller-constructed content like a gallery
        placeholder). Registers with the overlay coordinator so OS-back closes it. */
-    openHtml(html) {
+    openHtml(html, opts_) {
       open(html);
+      if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Reddit permalink → redditmedia iframe (online-only; permalink is the fallback). */
-    openMedia(permalink) {
+    openMedia(permalink, opts_) {
       const url = redditUrl(permalink);
       if (!safeUrl(url)) return;
       open(
@@ -502,9 +521,10 @@ export function createLightbox(opts) {
           esc(url) +
           '" target="_blank" rel="noopener">Open on Reddit ↗</a>',
       );
+      if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Direct image → simple lightbox (reliable; no Reddit dependency). */
-    openImage(url) {
+    openImage(url, opts_) {
       if (!safeUrl(url)) return;
       open(
         '<img class="media-img" src="' +
@@ -514,13 +534,14 @@ export function createLightbox(opts) {
           esc(url) +
           '" target="_blank" rel="noopener">Open original ↗</a>',
       );
+      if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Gallery → plain STACKED lightbox (restored 2026-06-22 per user pref — reverts the
        IntersectionObserver + min-height:50vh placeholder version, which felt jumpy/popped-in).
        To keep the "album extremely slow" fix (Epic 13 P2) we still stack the SIZED previews
        (~1080px), NOT the multi-MB 5000px originals, with native loading=lazy; tapping an image
        swaps it up to the full original. */
-    openGallery(urls, previews) {
+    openGallery(urls, previews, opts_) {
       const full = (urls || []).filter(safeUrl);
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
@@ -551,17 +572,19 @@ export function createLightbox(opts) {
           }
         });
       });
+      if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored url
        has no audio, so we play the HLS manifest (audio+video) via hls.js (preferred) or
        native HLS (iOS-Safari fallback); a non-v.redd.it direct file keeps the plain
        <video src>. See mountVideo for why hls.js wins over a canPlayType check. */
-    openVideo(srcUrl, posterUrl) {
+    openVideo(srcUrl, posterUrl, opts_) {
       if (!safeUrl(srcUrl)) return;
       open(""); // clear first and show (open() sets modal.hidden = false)
       const { video, destroy } = mountVideo(body, srcUrl, posterUrl);
       if (!video) return;
       videoTeardown = destroy;
+      if (opts_ && opts_.peek) _attachPeekRelease();
     },
   };
 }

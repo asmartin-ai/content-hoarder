@@ -492,6 +492,87 @@ itemsEl.addEventListener("click", (e) => {
   }
 });
 
+/* ---- hold-to-preview (B4: Relay-style press-and-hold lightbox peek) ----
+   A press-and-hold on a media thumbnail (~250ms) opens the lightbox temporarily;
+   release closes it. A quick tap opens persistently (existing behavior).
+   The release listener is on `window` in createLightbox (core/media.js) so release
+   fires even if the finger drifts onto the lightbox content. */
+let holdTimer = null;
+let peeking = false;
+let peekPointerId = null;
+let peekStartX = 0;
+let peekStartY = 0;
+const HOLD_DELAY = 250;
+const HOLD_SLOP = 10;
+
+// Suppress the click that follows a peek-opening pointerup (otherwise the [data-media]
+// click handler would open the lightbox again, persistently, right after the peek closed).
+let _suppressNextClick = false;
+
+itemsEl.addEventListener("pointerdown", (e) => {
+  const media = e.target.closest("[data-media]");
+  if (!media) return;
+  const fn = media.closest("[data-fullname]")?.dataset.fullname;
+  if (!fn) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  peekStartX = e.clientX;
+  peekStartY = e.clientY;
+  peekPointerId = e.pointerId;
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    peeking = true;
+    const item = state.items.find((it) => it.fullname === fn);
+    if (item) openMediaFor(item, { peek: true });
+  }, HOLD_DELAY);
+});
+
+itemsEl.addEventListener("pointermove", (e) => {
+  if (holdTimer === null || e.pointerId !== peekPointerId) return;
+  if (Math.hypot(e.clientX - peekStartX, e.clientY - peekStartY) > HOLD_SLOP) {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+});
+
+itemsEl.addEventListener("pointerup", (e) => {
+  if (holdTimer !== null) {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    // tap (< 250ms, no movement) -> let the existing click handler open persistently
+    return;
+  }
+  if (peeking) {
+    peeking = false;
+    // schedule suppression of the trailing click (it arrives after pointerup)
+    _suppressNextClick = true;
+    // the lightbox-side window listener (in media.js) handles close on pointerup
+  }
+});
+
+itemsEl.addEventListener("pointercancel", (e) => {
+  if (holdTimer !== null) {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+  if (peeking) {
+    peeking = false;
+  }
+});
+
+// Capture-phase click suppressor: catches the synthetic click that follows a
+// peek-opening pointerup and stops it from re-opening the lightbox persistently.
+itemsEl.addEventListener(
+  "click",
+  (e) => {
+    if (_suppressNextClick) {
+      _suppressNextClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  },
+  true,
+);
+
 /* ---- predictive preload: on reader-open, warm the NEXT discussion thread + its media (Epic 8 P2) ----
    Sequential reading is the common path, so when an item opens we pre-hydrate the next Reddit/HN
    comment thread (a GET lazily hydrates it server-side → the next open is instant) and prime its media
@@ -546,7 +627,7 @@ const lightbox = createLightbox({
   lockScrollEl: itemsEl,
   onClose: () => reblur(lastMediaFn),
 });
-function openMediaFor(item) {
+function openMediaFor(item, opts) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
   if (Array.isArray(m.gallery) && m.gallery.length)
@@ -554,13 +635,14 @@ function openMediaFor(item) {
     return lightbox.openGallery(
       m.gallery.map((u) => localUrl(item, u)),
       (m.gallery_preview || []).map((u) => localUrl(item, u)),
+      opts,
     );
   const imgs = imageUrls(item);
-  if (imgs.length > 1) return lightbox.openGallery(imgs, imgs);
+  if (imgs.length > 1) return lightbox.openGallery(imgs, imgs, opts);
   const vsrc = playableVideoSrc(item); // shared playability test (same as the reader's inline player)
-  if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail);
+  if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
   const img = imageUrl(item);
-  if (img) return lightbox.openImage(img);
+  if (img) return lightbox.openImage(img, opts);
   /* Gallery without captured image URLs — show a clean placeholder, not a reddit iframe
      (the 33 empty-gallery items have no local images to stack; the iframe was a bad
      fallback — user preference 2026-06-22). */
@@ -573,12 +655,13 @@ function openMediaFor(item) {
             esc(url) +
             '" target="_blank" rel="noopener">Open on Reddit ↗</a>'
         : '<p class="media-fallback">Gallery images unavailable.</p>',
+      opts,
     );
   }
   /* Permalink-only item (no lightboxable media) — reddit text/post thread.
      Open the reader instead of the reddit iframe (user preference 2026-06-26). */
   if (m.permalink && item.source === "reddit") return readerUI.open(item);
-  if (m.permalink) return lightbox.openMedia(m.permalink);
+  if (m.permalink) return lightbox.openMedia(m.permalink, opts);
   const url = item.url;
   if (url) window.open(url, "_blank", "noopener");
 }
