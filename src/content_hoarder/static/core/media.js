@@ -355,6 +355,8 @@ export function createLightbox(opts) {
     typeof opts.body === "string"
       ? document.querySelector(opts.body)
       : opts.body;
+  const lockEl = opts.lockScrollEl || null; // scroll-lock target (e.g. #items); save/restore scrollY
+  let lockSaved = 0;
 
   let videoTeardown = null; // teardown function for the open video's hls.js instance
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
@@ -366,6 +368,12 @@ export function createLightbox(opts) {
     } // stop HLS buffering
     body.innerHTML = ""; // stop playback
     modal.hidden = true;
+    // restore scroll on the locked element (Epic 16: lightbox scroll-lock)
+    if (lockEl) {
+      lockEl.style.overflow = "";
+      if (lockSaved) lockEl.scrollTop = lockSaved;
+      lockSaved = 0;
+    }
     if (typeof opts.onClose === "function") opts.onClose(); // e.g. re-blur the source thumbnail (Epic 13 P2)
   };
   // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
@@ -387,6 +395,11 @@ export function createLightbox(opts) {
     body.innerHTML = html;
     modal.hidden = false;
     pushOverlay(closeVisual);
+    // lock the scroll container so the browse list doesn't scroll behind the lightbox
+    if (lockEl) {
+      lockSaved = lockEl.scrollTop;
+      lockEl.style.overflow = "hidden";
+    }
   };
 
   return {

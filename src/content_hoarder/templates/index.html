@@ -1,313 +1,804 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101216">
-  <title>content-hoarder</title>
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/core/tokens.css">
-  <link rel="stylesheet" href="/static/browse/browse.css">
-  <script src="/static/theme.js"></script>
-</head>
-<body data-page="browse">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        <meta name="theme-color" content="#101216" />
+        <title>content-hoarder</title>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="/static/core/tokens.css" />
+        <link rel="stylesheet" href="/static/browse/browse.css" />
+        <script src="/static/theme.js"></script>
+    </head>
+    <body data-page="browse">
+        <header class="console">
+            <div class="con-row">
+                <button
+                    type="button"
+                    class="icon-btn nav-burger"
+                    id="open-nav"
+                    aria-controls="navdrawer"
+                    aria-label="Jump to a source, category, or tag"
+                >
+                    &#9776;
+                </button>
+                <h1 class="brand">
+                    <span class="led"></span>content&#8209;hoarder
+                </h1>
+                <div class="cmd">
+                    <span class="prompt">/</span>
+                    <input
+                        id="q"
+                        type="search"
+                        placeholder="search &middot; fuzzy by default &middot; &gt; commands"
+                        autocomplete="off"
+                        aria-label="Search"
+                    />
+                    <kbd>/</kbd>
+                    <div class="oppop" id="oppop">
+                        <!-- operators.js fills .ops with applied-operator chips + live suggestions -->
+                        <div
+                            class="ops"
+                            role="listbox"
+                            aria-label="Search operator suggestions"
+                        ></div>
+                        <div class="hint">
+                            <span
+                                ><b>Fuzzy by default</b> &mdash; close-enough
+                                spelling still hits. Quotes lock a phrase.</span
+                            >
+                            <label
+                                ><input type="checkbox" id="exact" /> exact
+                                only</label
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div
+                    class="wins"
+                    id="wins"
+                    title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over."
+                >
+                    <span class="wlab">TODAY</span
+                    ><span class="dots" id="windots"></span
+                    ><span class="wnum" id="winnum"></span>
+                </div>
+                <button
+                    type="button"
+                    class="icon-btn"
+                    id="dice"
+                    title="Surprise me — one old save, no strings"
+                    aria-label="Surprise me"
+                >
+                    &#9860;
+                </button>
+                <span
+                    class="app-ver"
+                    id="app-version"
+                    title="Loaded shell version — confirms what your phone has cached"
+                ></span>
+                <button
+                    type="button"
+                    class="icon-btn"
+                    id="open-settings"
+                    title="Settings"
+                    aria-label="Settings"
+                >
+                    &#9881;
+                </button>
+                <a class="btn-triage" href="/triage">TRIAGE &rarr;</a>
+            </div>
+        </header>
 
-  <header class="console">
-    <div class="con-row">
-      <button type="button" class="icon-btn nav-burger" id="open-nav"
-              aria-controls="navdrawer" aria-label="Jump to a source, category, or tag">&#9776;</button>
-      <h1 class="brand"><span class="led"></span>content&#8209;hoarder</h1>
-      <div class="cmd">
-        <span class="prompt">/</span>
-        <input id="q" type="search" placeholder="search &middot; fuzzy by default &middot; &gt; commands" autocomplete="off"
-               aria-label="Search">
-        <kbd>/</kbd>
-        <div class="oppop" id="oppop">
-          <!-- operators.js fills .ops with applied-operator chips + live suggestions -->
-          <div class="ops" role="listbox" aria-label="Search operator suggestions"></div>
-          <div class="hint">
-            <span><b>Fuzzy by default</b> &mdash; close-enough spelling still hits. Quotes lock a phrase.</span>
-            <label><input type="checkbox" id="exact"> exact only</label>
-          </div>
+        <nav class="folders" role="tablist" aria-label="Status">
+            <span class="leadgap"></span>
+            <button
+                class="folder"
+                role="tab"
+                data-status="inbox"
+                aria-selected="true"
+            >
+                Inbox <span class="n new" id="inbox-new"></span>
+            </button>
+            <button
+                class="folder"
+                role="tab"
+                data-status="keep"
+                aria-selected="false"
+            >
+                Keep <span class="n" data-count="keep"></span>
+            </button>
+            <button
+                class="folder"
+                role="tab"
+                data-status="archived"
+                aria-selected="false"
+            >
+                Archived
+            </button>
+            <button
+                class="folder"
+                role="tab"
+                data-status="done"
+                aria-selected="false"
+            >
+                Done <span class="n" data-count="done"></span>
+            </button>
+            <button
+                class="folder"
+                role="tab"
+                data-status=""
+                aria-selected="false"
+            >
+                All
+            </button>
+        </nav>
+        <nav class="statuspills" role="tablist" aria-label="Status">
+            <button
+                class="spill"
+                role="tab"
+                data-status="inbox"
+                aria-selected="true"
+            >
+                Inbox <span class="n new" id="inbox-new-m"></span>
+            </button>
+            <button
+                class="spill"
+                role="tab"
+                data-status="keep"
+                aria-selected="false"
+            >
+                Keep <span class="n" data-count="keep"></span>
+            </button>
+            <button
+                class="spill"
+                role="tab"
+                data-status="archived"
+                aria-selected="false"
+            >
+                Archived
+            </button>
+            <button
+                class="spill"
+                role="tab"
+                data-status="done"
+                aria-selected="false"
+            >
+                Done <span class="n" data-count="done"></span>
+            </button>
+            <button
+                class="spill"
+                role="tab"
+                data-status=""
+                aria-selected="false"
+            >
+                All
+            </button>
+        </nav>
+
+        <main class="desk">
+            <nav class="rail" aria-label="Filters">
+                <div class="lab">SOURCES</div>
+                <div id="rail-sources"></div>
+                <div class="lab">TAGS</div>
+                <div id="rail-tags"></div>
+            </nav>
+            <div class="sheet">
+                <div class="shelf">
+                    <span class="dateline" id="dateline"></span>
+                    <div class="right">
+                        <div class="fchips" id="fchips"></div>
+                        <select id="sort" title="Sort" aria-label="Sort">
+                            <option value="first_seen_utc:desc">
+                                SORT: NEWEST
+                            </option>
+                            <option value="created_utc:asc">
+                                SORT: OLDEST POST
+                            </option>
+                            <option value="created_utc:desc">
+                                SORT: NEWEST POST
+                            </option>
+                            <option value="title:asc">
+                                SORT: TITLE A&ndash;Z
+                            </option>
+                            <option value="duration:asc">SORT: SHORTEST</option>
+                            <option value="duration:desc">SORT: LONGEST</option>
+                            <option value="last_seen_utc:desc">
+                                SORT: LAST TOUCHED
+                            </option>
+                            <option value="shuffle:desc">
+                                SORT: SHUFFLE &middot; MIX
+                            </option>
+                            <option value="smart:desc">
+                                SORT: SMART &middot; LIKELY
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="swipehint">
+                    <span style="color: var(--status-archive)"
+                        >swipe &rarr; archive</span
+                    >
+                    <span style="color: var(--status-keep)"
+                        >&rarr;&rarr; keep</span
+                    >
+                    <span style="color: var(--status-done)">&larr; done</span>
+                    <span>hold to select</span>
+                </div>
+
+                <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->
+                <div class="ambient" id="ambient" hidden></div>
+
+                <div class="batchstrip" id="batchstrip">
+                    <span>FOCUS BATCH</span>
+                    <div class="segs" id="segs"></div>
+                    <span id="batchn"></span>
+                </div>
+
+                <div class="items density-comfortable" id="items"></div>
+                <div id="sentinel" aria-hidden="true"></div>
+
+                <div class="decayline" id="decayline" hidden>
+                    &#9790; <span id="decay-n"></span> older saves rested
+                    quietly last month &mdash; nothing needed from you.
+                    <button type="button" class="linkbtn" id="peekswept">
+                        have a look
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <div class="opsbar" id="bulktray">
+            <span class="cnt" id="bulkcnt">00</span>
+            <button type="button" class="opbtn k" data-bulk="keep">
+                <kbd>F</kbd> KEEP
+            </button>
+            <button type="button" class="opbtn a" data-bulk="archived">
+                <kbd>A</kbd> ARCHIVE
+            </button>
+            <button type="button" class="opbtn d" data-bulk="done">
+                <kbd>D</kbd> DONE
+            </button>
+            <button type="button" class="opbtn ghost" data-bulk="inbox">
+                <kbd>X</kbd> &rarr; INBOX
+            </button>
+            <button
+                type="button"
+                class="opbtn ghost"
+                id="bulkclear"
+                aria-label="Clear selection"
+            >
+                &#10005;
+            </button>
         </div>
-      </div>
-      <div class="wins" id="wins"
-           title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over.">
-        <span class="wlab">TODAY</span><span class="dots" id="windots"></span><span class="wnum" id="winnum"></span>
-      </div>
-      <button type="button" class="icon-btn" id="dice" title="Surprise me — one old save, no strings"
-              aria-label="Surprise me">&#9860;</button>
-      <span class="app-ver" id="app-version" title="Loaded shell version — confirms what your phone has cached"></span>
-      <button type="button" class="icon-btn" id="open-settings" title="Settings" aria-label="Settings">&#9881;</button>
-      <a class="btn-triage" href="/triage">TRIAGE &rarr;</a>
-    </div>
-  </header>
 
-  <nav class="folders" role="tablist" aria-label="Status">
-    <span class="leadgap"></span>
-    <button class="folder" role="tab" data-status="inbox" aria-selected="true">Inbox
-      <span class="n new" id="inbox-new"></span></button>
-    <button class="folder" role="tab" data-status="keep" aria-selected="false">Keep
-      <span class="n" data-count="keep"></span></button>
-    <button class="folder" role="tab" data-status="archived" aria-selected="false">Archived</button>
-    <button class="folder" role="tab" data-status="done" aria-selected="false">Done
-      <span class="n" data-count="done"></span></button>
-    <button class="folder" role="tab" data-status="" aria-selected="false">All</button>
-  </nav>
-  <nav class="statuspills" role="tablist" aria-label="Status">
-    <button class="spill" role="tab" data-status="inbox" aria-selected="true">Inbox
-      <span class="n new" id="inbox-new-m"></span></button>
-    <button class="spill" role="tab" data-status="keep" aria-selected="false">Keep
-      <span class="n" data-count="keep"></span></button>
-    <button class="spill" role="tab" data-status="archived" aria-selected="false">Archived</button>
-    <button class="spill" role="tab" data-status="done" aria-selected="false">Done
-      <span class="n" data-count="done"></span></button>
-    <button class="spill" role="tab" data-status="" aria-selected="false">All</button>
-  </nav>
+        <nav class="dock" aria-label="Navigation">
+            <button type="button" aria-pressed="true">
+                <span class="g">&#9636;</span>INBOX
+            </button>
+            <button type="button" aria-pressed="false" id="dock-focus">
+                <span class="g">&#9678;</span>FOCUS
+            </button>
+            <a class="fab" href="/triage">TRIAGE &rarr;</a>
+            <button type="button" aria-pressed="false" id="dock-search">
+                <span class="g">&#8981;</span>SEARCH
+            </button>
+            <button type="button" aria-pressed="false" id="dock-settings">
+                <span class="g">&#9881;</span>MORE
+            </button>
+        </nav>
 
-  <main class="desk">
-    <nav class="rail" aria-label="Filters">
-      <div class="lab">SOURCES</div>
-      <div id="rail-sources"></div>
-      <div class="lab">TAGS</div>
-      <div id="rail-tags"></div>
-    </nav>
-    <div class="sheet">
-      <div class="shelf">
-        <span class="dateline" id="dateline"></span>
-        <div class="right">
-          <div class="fchips" id="fchips"></div>
-          <select id="sort" title="Sort" aria-label="Sort">
-            <option value="first_seen_utc:desc">SORT: NEWEST</option>
-            <option value="created_utc:asc">SORT: OLDEST POST</option>
-            <option value="created_utc:desc">SORT: NEWEST POST</option>
-            <option value="title:asc">SORT: TITLE A&ndash;Z</option>
-            <option value="duration:asc">SORT: SHORTEST</option>
-            <option value="duration:desc">SORT: LONGEST</option>
-            <option value="last_seen_utc:desc">SORT: LAST TOUCHED</option>
-            <option value="shuffle:desc">SORT: SHUFFLE &middot; MIX</option>
-            <option value="smart:desc">SORT: SMART &middot; LIKELY</option>
-          </select>
+        <button
+            type="button"
+            class="gotop"
+            id="gotop"
+            aria-label="Scroll to top"
+        >
+            &#8593;
+        </button>
+
+        <div id="toast" hidden aria-live="polite"></div>
+
+        <div class="stampwrap" id="stamp">
+            <div class="stamp">PAGE CLEARED<small id="stampsub"></small></div>
+            <div class="stamp-acts">
+                <button type="button" class="ambbtn primary" id="drawagain">
+                    Draw another batch
+                </button>
+                <button type="button" class="ambbtn" id="enough">
+                    That's enough for today
+                </button>
+            </div>
         </div>
-      </div>
-      <div class="swipehint">
-        <span style="color:var(--status-archive)">swipe &rarr; archive</span>
-        <span style="color:var(--status-keep)">&rarr;&rarr; keep</span>
-        <span style="color:var(--status-done)">&larr; done</span>
-        <span>hold to select</span>
-      </div>
 
-      <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->
-      <div class="ambient" id="ambient" hidden></div>
+        <div class="scrim" id="scrim"></div>
 
-      <div class="batchstrip" id="batchstrip">
-        <span>FOCUS BATCH</span>
-        <div class="segs" id="segs"></div>
-        <span id="batchn"></span>
-      </div>
+        <aside class="sheetpanel" id="settings" aria-label="Settings">
+            <h2>Settings</h2>
+            <div class="set-group">
+                <div class="lab">THEME</div>
+                <div class="seg" id="set-theme">
+                    <button
+                        type="button"
+                        data-theme="light"
+                        aria-pressed="false"
+                    >
+                        Day log
+                    </button>
+                    <button type="button" data-theme="dark" aria-pressed="true">
+                        Night ops
+                    </button>
+                </div>
+            </div>
+            <div class="set-group">
+                <div class="lab">DENSITY</div>
+                <div class="seg" id="set-density">
+                    <button type="button" data-d="compact" aria-pressed="false">
+                        Ledger
+                    </button>
+                    <button
+                        type="button"
+                        data-d="comfortable"
+                        aria-pressed="true"
+                    >
+                        Log
+                    </button>
+                    <button type="button" data-d="card" aria-pressed="false">
+                        Pinboard
+                    </button>
+                </div>
+            </div>
+            <div class="set-group">
+                <div class="lab">LOADING</div>
+                <div class="seg" id="set-loading">
+                    <button type="button" data-focus="0" aria-pressed="true">
+                        Infinite scroll
+                    </button>
+                    <button type="button" data-focus="1" aria-pressed="false">
+                        Focus batches
+                    </button>
+                </div>
+                <p class="set-note">
+                    Focus deals you 25 at a time &mdash; clear the page, take
+                    the stamp, draw again.
+                </p>
+            </div>
+            <div class="set-group">
+                <div class="lab">DAILY GOAL</div>
+                <div class="seg" id="set-goal">
+                    <button type="button" data-g="4" aria-pressed="false">
+                        4
+                    </button>
+                    <button type="button" data-g="8" aria-pressed="true">
+                        8
+                    </button>
+                    <button type="button" data-g="12" aria-pressed="false">
+                        12
+                    </button>
+                    <button type="button" data-g="0" aria-pressed="false">
+                        no goal
+                    </button>
+                </div>
+                <p class="set-note">
+                    Pebbles in the top bar. Resets quietly each day &mdash;
+                    nothing carries over, nothing is owed.
+                </p>
+            </div>
+            <div class="set-group">
+                <div class="lab">CONTENT</div>
+                <div class="seg" id="set-nsfw">
+                    <button type="button" data-nsfw="hide" aria-pressed="true">
+                        Hide NSFW
+                    </button>
+                    <button type="button" data-nsfw="show" aria-pressed="false">
+                        Show all
+                    </button>
+                </div>
+                <p class="set-note">
+                    Keeps NSFW-tagged items (and over-18 residual) out of the
+                    log. Your choice sticks.
+                </p>
+            </div>
+            <div class="set-group">
+                <div class="lab">ARCHIVED MEDIA</div>
+                <div class="seg" id="set-archive">
+                    <button
+                        type="button"
+                        data-archive="off"
+                        aria-pressed="true"
+                    >
+                        Off
+                    </button>
+                    <button
+                        type="button"
+                        data-archive="on"
+                        aria-pressed="false"
+                    >
+                        Prefer local
+                    </button>
+                </div>
+                <p class="set-note">
+                    When on, images load from your locally-archived copies (the
+                    <code>archive-media</code> pass) instead of Reddit &mdash;
+                    survives deletion, works offline. Off by default.
+                </p>
+            </div>
+            <div class="set-group" id="done-retention-group">
+                <div class="lab">DONE RETENTION</div>
+                <div class="seg" id="set-done-retention">
+                    <button type="button" data-days="7" aria-pressed="false">
+                        7 days
+                    </button>
+                    <button type="button" data-days="30" aria-pressed="true">
+                        30 days
+                    </button>
+                    <button type="button" data-days="90" aria-pressed="false">
+                        90 days
+                    </button>
+                    <button type="button" data-days="180" aria-pressed="false">
+                        180 days
+                    </button>
+                    <button type="button" data-days="365" aria-pressed="false">
+                        365 days
+                    </button>
+                </div>
+                <p class="set-note" id="done-retention-current">
+                    Loading current window&hellip;
+                </p>
+                <div
+                    class="set-card"
+                    id="done-retention-preview"
+                    aria-live="polite"
+                >
+                    Checking what would be purged&hellip;
+                </div>
+                <label class="set-check" for="done-retention-confirm">
+                    <input type="checkbox" id="done-retention-confirm" />
+                    <span
+                        >I understand this permanently deletes Done items older
+                        than the current window.</span
+                    >
+                </label>
+                <button
+                    type="button"
+                    class="setbtn warn"
+                    id="done-retention-purge"
+                    disabled
+                >
+                    Purge eligible Done items
+                </button>
+                <p class="set-note" id="done-retention-feedback">
+                    The purge writes a timestamped DB backup and appends
+                    <code>delete-audit.jsonl</code>.
+                </p>
+            </div>
+            <div class="set-group">
+                <div class="lab">COLLECTION</div>
+                <button type="button" class="setbtn" id="open-stats">
+                    Stats &mdash; the shape of the collection
+                </button>
+                <button type="button" class="setbtn" id="open-dupes">
+                    Duplicates &mdash; review matching saves
+                </button>
+                <button type="button" class="setbtn" id="open-sync">
+                    Sync newest &mdash; pull saved items from Reddit
+                </button>
+            </div>
+            <p class="set-note">
+                The panel stays put while you fiddle. Esc closes.
+            </p>
+        </aside>
 
-      <div class="items density-comfortable" id="items"></div>
-      <div id="sentinel" aria-hidden="true"></div>
+        <aside class="sheetpanel" id="statsheet" aria-label="Stats">
+            <h2>Stats</h2>
+            <div class="stats-list" id="stats-list">Loading&hellip;</div>
+        </aside>
 
-      <div class="decayline" id="decayline" hidden>
-        &#9790; <span id="decay-n"></span> older saves rested quietly last month &mdash;
-        nothing needed from you.
-        <button type="button" class="linkbtn" id="peekswept">have a look</button>
-      </div>
-    </div>
-  </main>
+        <aside class="sheetpanel" id="dupesheet" aria-label="Duplicate review">
+            <h2>Duplicates</h2>
+            <div class="dup-tools">
+                <button
+                    type="button"
+                    class="minibtn"
+                    data-dupe-by="url"
+                    aria-pressed="true"
+                >
+                    By URL
+                </button>
+                <button
+                    type="button"
+                    class="minibtn"
+                    data-dupe-by="title"
+                    aria-pressed="false"
+                >
+                    By title
+                </button>
+            </div>
+            <div class="dup-list" id="dup-list">Loading&hellip;</div>
+        </aside>
 
-  <div class="opsbar" id="bulktray">
-    <span class="cnt" id="bulkcnt">00</span>
-    <button type="button" class="opbtn k" data-bulk="keep"><kbd>F</kbd> KEEP</button>
-    <button type="button" class="opbtn a" data-bulk="archived"><kbd>A</kbd> ARCHIVE</button>
-    <button type="button" class="opbtn d" data-bulk="done"><kbd>D</kbd> DONE</button>
-    <button type="button" class="opbtn ghost" data-bulk="inbox"><kbd>X</kbd> &rarr; INBOX</button>
-    <button type="button" class="opbtn ghost" id="bulkclear" aria-label="Clear selection">&#10005;</button>
-  </div>
-
-  <nav class="dock" aria-label="Navigation">
-    <button type="button" aria-pressed="true"><span class="g">&#9636;</span>INBOX</button>
-    <button type="button" aria-pressed="false" id="dock-focus"><span class="g">&#9678;</span>FOCUS</button>
-    <a class="fab" href="/triage">TRIAGE &rarr;</a>
-    <button type="button" aria-pressed="false" id="dock-search"><span class="g">&#8981;</span>SEARCH</button>
-    <button type="button" aria-pressed="false" id="dock-settings"><span class="g">&#9881;</span>MORE</button>
-  </nav>
-
-  <button type="button" class="gotop" id="gotop" aria-label="Scroll to top">&#8593;</button>
-
-  <div id="toast" hidden aria-live="polite"></div>
-
-  <div class="stampwrap" id="stamp">
-    <div class="stamp">PAGE CLEARED<small id="stampsub"></small></div>
-    <div class="stamp-acts">
-      <button type="button" class="ambbtn primary" id="drawagain">Draw another batch</button>
-      <button type="button" class="ambbtn" id="enough">That's enough for today</button>
-    </div>
-  </div>
-
-  <div class="scrim" id="scrim"></div>
-
-  <aside class="sheetpanel" id="settings" aria-label="Settings">
-    <h2>Settings</h2>
-    <div class="set-group"><div class="lab">THEME</div>
-      <div class="seg" id="set-theme">
-        <button type="button" data-theme="light" aria-pressed="false">Day log</button>
-        <button type="button" data-theme="dark" aria-pressed="true">Night ops</button>
-      </div>
-    </div>
-    <div class="set-group"><div class="lab">DENSITY</div>
-      <div class="seg" id="set-density">
-        <button type="button" data-d="compact" aria-pressed="false">Ledger</button>
-        <button type="button" data-d="comfortable" aria-pressed="true">Log</button>
-        <button type="button" data-d="card" aria-pressed="false">Pinboard</button>
-      </div>
-    </div>
-    <div class="set-group"><div class="lab">LOADING</div>
-      <div class="seg" id="set-loading">
-        <button type="button" data-focus="0" aria-pressed="true">Infinite scroll</button>
-        <button type="button" data-focus="1" aria-pressed="false">Focus batches</button>
-      </div>
-      <p class="set-note">Focus deals you 25 at a time &mdash; clear the page, take the stamp, draw again.</p>
-    </div>
-    <div class="set-group"><div class="lab">DAILY GOAL</div>
-      <div class="seg" id="set-goal">
-        <button type="button" data-g="4" aria-pressed="false">4</button>
-        <button type="button" data-g="8" aria-pressed="true">8</button>
-        <button type="button" data-g="12" aria-pressed="false">12</button>
-        <button type="button" data-g="0" aria-pressed="false">no goal</button>
-      </div>
-      <p class="set-note">Pebbles in the top bar. Resets quietly each day &mdash; nothing carries over,
-        nothing is owed.</p>
-    </div>
-    <div class="set-group"><div class="lab">CONTENT</div>
-      <div class="seg" id="set-nsfw">
-        <button type="button" data-nsfw="hide" aria-pressed="true">Hide NSFW</button>
-        <button type="button" data-nsfw="show" aria-pressed="false">Show all</button>
-      </div>
-      <p class="set-note">Keeps NSFW-tagged items (and over-18 residual) out of the log. Your choice sticks.</p>
-    </div>
-    <div class="set-group"><div class="lab">ARCHIVED MEDIA</div>
-      <div class="seg" id="set-archive">
-        <button type="button" data-archive="off" aria-pressed="true">Off</button>
-        <button type="button" data-archive="on" aria-pressed="false">Prefer local</button>
-      </div>
-      <p class="set-note">When on, images load from your locally-archived copies (the <code>archive-media</code> pass) instead of Reddit &mdash; survives deletion, works offline. Off by default.</p>
-    </div>
-    <div class="set-group" id="done-retention-group"><div class="lab">DONE RETENTION</div>
-      <div class="seg" id="set-done-retention">
-        <button type="button" data-days="7" aria-pressed="false">7 days</button>
-        <button type="button" data-days="30" aria-pressed="true">30 days</button>
-        <button type="button" data-days="90" aria-pressed="false">90 days</button>
-        <button type="button" data-days="180" aria-pressed="false">180 days</button>
-        <button type="button" data-days="365" aria-pressed="false">365 days</button>
-      </div>
-      <p class="set-note" id="done-retention-current">Loading current window&hellip;</p>
-      <div class="set-card" id="done-retention-preview" aria-live="polite">Checking what would be purged&hellip;</div>
-      <label class="set-check" for="done-retention-confirm">
-        <input type="checkbox" id="done-retention-confirm">
-        <span>I understand this permanently deletes Done items older than the current window.</span>
-      </label>
-      <button type="button" class="setbtn warn" id="done-retention-purge" disabled>Purge eligible Done items</button>
-      <p class="set-note" id="done-retention-feedback">The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.</p>
-    </div>
-    <div class="set-group"><div class="lab">COLLECTION</div>
-      <button type="button" class="setbtn" id="open-stats">Stats &mdash; the shape of the collection</button>
-      <button type="button" class="setbtn" id="open-dupes">Duplicates &mdash; review matching saves</button>
-      <button type="button" class="setbtn" id="open-sync">Sync newest &mdash; pull saved items from Reddit</button>
-    </div>
-    <p class="set-note">The panel stays put while you fiddle. Esc closes.</p>
-  </aside>
-
-  <aside class="sheetpanel" id="statsheet" aria-label="Stats">
-    <h2>Stats</h2>
-    <div class="stats-list" id="stats-list">Loading&hellip;</div>
-  </aside>
-
-  <aside class="sheetpanel" id="dupesheet" aria-label="Duplicate review">
-    <h2>Duplicates</h2>
-    <div class="dup-tools">
-      <button type="button" class="minibtn" data-dupe-by="url" aria-pressed="true">By URL</button>
-      <button type="button" class="minibtn" data-dupe-by="title" aria-pressed="false">By title</button>
-    </div>
-    <div class="dup-list" id="dup-list">Loading&hellip;</div>
-  </aside>
-
-  <!-- mobile "Jump" drawer — the phone expression of the desktop .rail.
+        <!-- mobile "Jump" drawer — the phone expression of the desktop .rail.
        Reuses the shared #scrim overlay; slides from the left. Sources/categories/
        tags render from the same data that fills the rail (main.js refreshRail). -->
-  <aside class="navdrawer" id="navdrawer" aria-label="Jump to a source, category, or tag" aria-hidden="true">
-    <div class="nd-head">
-      <span class="led" aria-hidden="true"></span>
-      <h2>Jump to&hellip;</h2>
-      <button type="button" class="nd-x" id="nav-close" aria-label="Close">&#10005;</button>
-    </div>
-    <div class="nd-search">
-      <span class="prompt" aria-hidden="true">/</span>
-      <input type="search" id="nav-filter" placeholder="filter sources &amp; tags&hellip;"
-             autocomplete="off" aria-label="Filter sources and tags">
-    </div>
-    <div class="nd-list" id="nav-list"><!-- groups rendered by main.js --></div>
-    <div class="nd-foot">
-      <button type="button" class="nd-manage" id="nav-manage" aria-pressed="false"
-              aria-label="Show or hide sections">&#9881; sections</button>
-    </div>
-  </aside>
+        <aside
+            class="navdrawer"
+            id="navdrawer"
+            aria-label="Jump to a source, category, or tag"
+            aria-hidden="true"
+        >
+            <div class="nd-head">
+                <span class="led" aria-hidden="true"></span>
+                <h2>Jump to&hellip;</h2>
+                <button
+                    type="button"
+                    class="nd-x"
+                    id="nav-close"
+                    aria-label="Close"
+                >
+                    &#10005;
+                </button>
+            </div>
+            <div class="nd-search">
+                <span class="prompt" aria-hidden="true">/</span>
+                <input
+                    type="search"
+                    id="nav-filter"
+                    placeholder="filter sources &amp; tags&hellip;"
+                    autocomplete="off"
+                    aria-label="Filter sources and tags"
+                />
+            </div>
+            <div class="nd-list" id="nav-list">
+                <!-- groups rendered by main.js -->
+            </div>
+            <div class="nd-foot">
+                <button
+                    type="button"
+                    class="nd-manage"
+                    id="nav-manage"
+                    aria-pressed="false"
+                    aria-label="Show or hide sections"
+                >
+                    &#9881; sections
+                </button>
+            </div>
+        </aside>
 
-  <!-- inline item reader — full-screen sheet for Reddit/HN threads and editable notes.
+        <!-- inline item reader — full-screen sheet for Reddit/HN threads and editable notes.
        Reddit/HN items render post + comments; Keep/Obsidian notes render the saved body
        with a DB-backed editor. Behaviour: browse/reader.js. -->
-  <section class="reader" id="reader" aria-label="Item reader" aria-hidden="true">
-    <header class="rd-head">
-      <span class="led" aria-hidden="true"></span>
-      <span class="rd-sub" id="reader-sub"></span>
-      <a class="rd-oo" id="reader-open-original" href="#" target="_blank" rel="noopener"
-         aria-label="Open the original item"><span class="rd-oo-txt">open original </span>&#8599;</a>
-      <button type="button" class="rd-oo rd-share" id="reader-share" aria-label="Share">share</button>
-      <button type="button" class="rd-x" id="reader-close" aria-label="Back to feed">&#10005;</button>
-    </header>
-    <div class="rd-scroll">
-      <article class="rd-post" id="reader-post"><!-- rendered by reader.js --></article>
-      <div class="rd-comments" id="reader-comments"><!-- rendered by reader.js --></div>
-    </div>
-    <div class="rd-foot">
-      <button type="button" class="rd-act a" data-act="archived">Archive<kbd class="rd-key">A</kbd></button>
-      <button type="button" class="rd-act d" data-act="done">Done<kbd class="rd-key">D</kbd></button>
-      <button type="button" class="rd-act s" data-snooze="7">Snooze</button>
-      <button type="button" class="rd-act k" data-act="keep">Keep<kbd class="rd-key">F</kbd></button>
-    </div>
-  </section>
+        <section
+            class="reader"
+            id="reader"
+            aria-label="Item reader"
+            aria-hidden="true"
+        >
+            <header class="rd-head">
+                <span class="led" aria-hidden="true"></span>
+                <span class="rd-sub" id="reader-sub"></span>
+                <a
+                    class="rd-oo"
+                    id="reader-open-original"
+                    href="#"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="Open the original item"
+                    ><span class="rd-oo-txt">open original </span>&#8599;</a
+                >
+                <button
+                    type="button"
+                    class="rd-oo rd-share"
+                    id="reader-share"
+                    aria-label="Share"
+                >
+                    share
+                </button>
+                <button
+                    type="button"
+                    class="rd-x"
+                    id="reader-close"
+                    aria-label="Back to feed"
+                >
+                    &#10005;
+                </button>
+            </header>
+            <div class="rd-scroll">
+                <article class="rd-post" id="reader-post">
+                    <!-- rendered by reader.js -->
+                </article>
+                <div class="rd-comments" id="reader-comments">
+                    <!-- rendered by reader.js -->
+                </div>
+            </div>
+            <div class="rd-foot" data-dock="closed">
+                <!-- collapsed pill: tap to fan the dock open -->
+                <button
+                    type="button"
+                    class="rd-dock-tab"
+                    data-dock-toggle="1"
+                    aria-label="Open action dock"
+                    aria-expanded="false"
+                >
+                    <span class="rd-dock-tab-label">Actions</span>
+                    <svg
+                        class="rd-dock-chev"
+                        viewBox="0 0 16 16"
+                        width="14"
+                        height="14"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M3 6l5 5 5-5"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </button>
+                <!-- the fan: 5 buttons laid out as a center-anchored semi-circle.
+                     Top arc: Archive (left), Snooze (right).
+                     Bottom arc: Keep (left-center), Tag (center), Done (right-center). -->
+                <div class="rd-dock" role="toolbar" aria-label="Triage actions">
+                    <button
+                        type="button"
+                        class="rd-act a"
+                        data-act="archived"
+                        data-slot="1"
+                    >
+                        Archive<kbd class="rd-key">A</kbd>
+                    </button>
+                    <button
+                        type="button"
+                        class="rd-act s"
+                        data-snooze="7"
+                        data-slot="2"
+                    >
+                        Snooze<kbd class="rd-key">S</kbd>
+                    </button>
+                    <button
+                        type="button"
+                        class="rd-act k"
+                        data-act="keep"
+                        data-slot="3"
+                    >
+                        Keep<kbd class="rd-key">F</kbd>
+                    </button>
+                    <button
+                        type="button"
+                        class="rd-act t"
+                        data-act="tag"
+                        data-slot="4"
+                    >
+                        Tag<kbd class="rd-key">T</kbd>
+                    </button>
+                    <button
+                        type="button"
+                        class="rd-act d"
+                        data-act="done"
+                        data-slot="5"
+                    >
+                        Done<kbd class="rd-key">D</kbd>
+                    </button>
+                </div>
+                <!-- tap here (the foot's own backdrop) to collapse an open dock without
+                     closing the reader -->
+                <div
+                    class="rd-dock-scrim"
+                    data-dock-toggle="1"
+                    aria-hidden="true"
+                ></div>
+            </div>
+        </section>
 
-  <div class="kbd-sheet" id="kbd" role="dialog" aria-label="Keyboard shortcuts">
-    <h2>One hand on the keys</h2>
-    <p class="sub">Left-hand cluster &mdash; coffee stays in the right.</p>
-    <div class="kgrid">
-      <span><kbd>W</kbd> <kbd>S</kbd></span><span class="what"><b>Move</b> up / down the log</span>
-      <span><kbd>F</kbd></span><span class="what"><b>Keep</b> &mdash; worth revisiting</span>
-      <span><kbd>A</kbd></span><span class="what"><b>Archive</b> &mdash; set aside, out of the way</span>
-      <span><kbd>D</kbd></span><span class="what"><b>Done</b> &mdash; finished with it</span>
-      <span><kbd>E</kbd></span><span class="what"><b>Open</b> the item</span>
-      <span><kbd>T</kbd></span><span class="what"><b>Tag</b> &mdash; add / remove tags</span>
-      <span><kbd>Q</kbd></span><span class="what"><b>Select</b> for a bulk entry</span>
-      <span><kbd>Z</kbd></span><span class="what"><b>Undo</b> &mdash; every entry is erasable</span>
-      <span><kbd>X</kbd></span><span class="what"><b>Back to Inbox</b></span>
-      <span><kbd>Space</kbd></span><span class="what"><b>Preview</b> media</span>
-      <span><kbd>/</kbd></span><span class="what"><b>Search</b></span>
-    </div>
-  </div>
+        <div
+            class="kbd-sheet"
+            id="kbd"
+            role="dialog"
+            aria-label="Keyboard shortcuts"
+        >
+            <h2>One hand on the keys</h2>
+            <p class="sub">
+                Left-hand cluster &mdash; coffee stays in the right.
+            </p>
+            <div class="kgrid">
+                <span><kbd>W</kbd> <kbd>S</kbd></span
+                ><span class="what"><b>Move</b> up / down the log</span>
+                <span><kbd>F</kbd></span
+                ><span class="what"><b>Keep</b> &mdash; worth revisiting</span>
+                <span><kbd>A</kbd></span
+                ><span class="what"
+                    ><b>Archive</b> &mdash; set aside, out of the way</span
+                >
+                <span><kbd>D</kbd></span
+                ><span class="what"><b>Done</b> &mdash; finished with it</span>
+                <span><kbd>E</kbd></span
+                ><span class="what"><b>Open</b> the item</span>
+                <span><kbd>T</kbd></span
+                ><span class="what"><b>Tag</b> &mdash; add / remove tags</span>
+                <span><kbd>Q</kbd></span
+                ><span class="what"><b>Select</b> for a bulk entry</span>
+                <span><kbd>Z</kbd></span
+                ><span class="what"
+                    ><b>Undo</b> &mdash; every entry is erasable</span
+                >
+                <span><kbd>X</kbd></span
+                ><span class="what"><b>Back to Inbox</b></span>
+                <span><kbd>Space</kbd></span
+                ><span class="what"><b>Preview</b> media</span>
+                <span><kbd>/</kbd></span
+                ><span class="what"><b>Search</b></span>
+            </div>
+        </div>
 
-  <div id="media-modal" hidden><div id="media-body"></div></div>
+        <div id="media-modal" hidden><div id="media-body"></div></div>
 
-  <!-- long-press action menu (Epic 16) — opened by holding a row; uses #scrim like the other sheets -->
-  <div class="rowmenu" id="rowmenu" role="menu" aria-label="Item actions">
-    <div class="rowmenu-title" id="rowmenu-title"></div>
-    <button type="button" class="rowmenu-item" data-rowmenu="tag" role="menuitem">＋ Tag</button>
-    <button type="button" class="rowmenu-item" data-rowmenu="snooze" role="menuitem">Snooze 7 days</button>
-    <button type="button" class="rowmenu-item" data-rowmenu="share" role="menuitem">↗ Share</button>
-  </div>
+        <!-- Relay-style inline long-press strip — injected into the row on long-press /
+             right-click (Epic 16 B3). The row translates aside and this horizontal action
+             row appears where the row was, in the same thumb zone. -->
+        <div class="relay-scrim" id="relay-scrim" aria-hidden="true"></div>
 
-  <script src="/static/haptics.js"></script>
-  <script type="module" src="/static/browse/main.js"></script>
-</body>
+        <template id="relay-strip-tpl">
+            <!-- a horizontal action strip. Each button carries data-relay="source|author|tag|share|snooze" -->
+            <div class="relay-strip" role="menu" aria-label="Item actions">
+                <button
+                    type="button"
+                    class="relay-btn"
+                    data-relay="source"
+                    role="menuitem"
+                >
+                    <span class="relay-ico" aria-hidden="true">←</span>
+                    <span class="relay-lbl" data-relay-label="source"
+                        >source</span
+                    >
+                </button>
+                <button
+                    type="button"
+                    class="relay-btn"
+                    data-relay="author"
+                    role="menuitem"
+                >
+                    <span class="relay-ico" aria-hidden="true">●</span>
+                    <span class="relay-lbl" data-relay-label="author"
+                        >author</span
+                    >
+                </button>
+                <button
+                    type="button"
+                    class="relay-btn"
+                    data-relay="tag"
+                    role="menuitem"
+                >
+                    <span class="relay-ico" aria-hidden="true">＋</span>
+                    <span class="relay-lbl">Tag</span>
+                </button>
+                <button
+                    type="button"
+                    class="relay-btn"
+                    data-relay="share"
+                    role="menuitem"
+                >
+                    <span class="relay-ico" aria-hidden="true">↗</span>
+                    <span class="relay-lbl">Share</span>
+                </button>
+                <button
+                    type="button"
+                    class="relay-btn"
+                    data-relay="snooze"
+                    role="menuitem"
+                >
+                    <span class="relay-ico" aria-hidden="true">⏸</span>
+                    <span class="relay-lbl">Snooze</span>
+                </button>
+            </div>
+        </template>
+
+        <script src="/static/haptics.js"></script>
+        <script type="module" src="/static/browse/main.js"></script>
+    </body>
 </html>

@@ -6,11 +6,18 @@
 import { esc, ago } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import {
-  CH_SOURCES, srcAccent, itemUrl, metaAnchor, ageMeta, consumeMeta, tagChips, articleChip,
+  CH_SOURCES,
+  srcAccent,
+  itemUrl,
+  metaAnchor,
+  ageMeta,
+  consumeMeta,
+  tagChips,
+  articleChip,
 } from "../core/render.js";
 import { thumb, ytFallback, mediaType } from "../core/media.js";
 
-export const isNsfw = (item) => !!((item.metadata || {}).over_18);
+export const isNsfw = (item) => !!(item.metadata || {}).over_18;
 
 const glyph = (item) => {
   const m = CH_SOURCES[item.source];
@@ -25,9 +32,15 @@ const glyph = (item) => {
    hidden on touch via @media(hover:none), so mobile uses long-press → row menu for share too. */
 const actsHtml = (status) =>
   '<div class="acts">' +
-  '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' + chIcon("keep") + "</button>" +
-  '<button type="button" class="act a" data-act="archived" title="Archive — A" aria-label="Archive">' + chIcon("archive") + "</button>" +
-  '<button type="button" class="act d" data-act="done" title="Done — D" aria-label="Done">' + chIcon("done") + "</button>" +
+  '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' +
+  chIcon("keep") +
+  "</button>" +
+  '<button type="button" class="act a" data-act="archived" title="Archive — A" aria-label="Archive">' +
+  chIcon("archive") +
+  "</button>" +
+  '<button type="button" class="act d" data-act="done" title="Done — D" aria-label="Done">' +
+  chIcon("done") +
+  "</button>" +
   (status && status !== "inbox"
     ? '<button type="button" class="act x" data-act="inbox" title="Back to Inbox — X" aria-label="Back to Inbox">IN</button>'
     : "") +
@@ -35,7 +48,7 @@ const actsHtml = (status) =>
 
 const underlay =
   '<div class="item-bg r"><span class="u1">&#9635; ARCHIVE</span><span class="u2">&#9193; KEEP — kept on purpose</span></div>' +
-  '<div class="item-bg l">&#10005; DONE</div>';
+  '<div class="item-bg l"><span class="u1">&#10005; DONE</span><span class="u2">&#9208; SNOOZE — decide later</span></div>';
 
 const titleLine = (item) => {
   const url = itemUrl(item);
@@ -49,19 +62,29 @@ const metaHtml = (item) => {
   const m = item.metadata || {};
   const bits = [];
   if (isNsfw(item)) bits.push('<span class="nsfw-tag">NSFW</span>');
-  if (m.subreddit) bits.push(metaAnchor("https://www.reddit.com/r/" + encodeURIComponent(m.subreddit), "r/" + m.subreddit));
+  if (m.subreddit)
+    bits.push(
+      metaAnchor(
+        "https://www.reddit.com/r/" + encodeURIComponent(m.subreddit),
+        "r/" + m.subreddit,
+      ),
+    );
   else if (m.channel) bits.push("<b>" + esc(m.channel) + "</b>");
   else if (item.source === "hackernews") bits.push("<b>HN</b>");
   if (Number.isFinite(m.score)) bits.push(Math.round(m.score) + " pts");
   bits.push(ageMeta(item));
   const consume = consumeMeta(item);
   const chip = articleChip(item);
-  return bits.join(" · ") + (consume ? " " + consume : "") + (chip ? " " + chip : "");
+  return (
+    bits.join(" · ") + (consume ? " " + consume : "") + (chip ? " " + chip : "")
+  );
 };
 
 const snippet = (item) => {
   const body = (item.body || "").trim().replace(/\s+/g, " ");
-  return body ? '<div class="snippet">' + esc(body.slice(0, 140)) + "</div>" : "";
+  return body
+    ? '<div class="snippet">' + esc(body.slice(0, 140)) + "</div>"
+    : "";
 };
 
 /* Extract and format the URL domain for display (Relay-style: i.redd.it, youtube.com, etc.) */
@@ -92,26 +115,54 @@ const monitorHtml = (item, nsfwRevealed) => {
     // playable media with no stored preview (many v.redd.it videos have no thumbnail)
     // still needs a tap target — a glyph-only play tile instead of a dead empty box.
     if (mt.cls === "video" || mt.cls === "gallery")
-      return '<button type="button" class="monitor noimg" data-media="1" aria-label="' +
-        esc(mt.label) + '"><span class="mglyph" aria-hidden="true">' + mt.icon + "</span></button>";
+      return (
+        '<button type="button" class="monitor noimg" data-media="1" aria-label="' +
+        esc(mt.label) +
+        '"><span class="mglyph" aria-hidden="true">' +
+        mt.icon +
+        "</span></button>"
+      );
     return '<div class="monitor empty" aria-hidden="true"></div>';
   }
   const m = item.metadata || {};
   const blur = isNsfw(item) && !nsfwRevealed;
-  const dur = item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
-    ? '<span class="dur">' + fmtDur(m.duration) + "</span>" : "";
-  const badge = mt.cls === "gallery" || mt.cls === "video"
-    ? '<span class="mglyph" aria-hidden="true">' + mt.icon + "</span>" : "";
-  return '<button type="button" class="monitor' + (blur ? " nsfw" : "") +
-    '" data-media="1" aria-label="' + esc(mt.label) + '">' +
-    '<img src="' + esc(t) + '" alt="" loading="lazy"' + ytFallback(t) + ">" +
-    dur + badge + (blur ? '<span class="veil">NSFW</span>' : "") + "</button>";
+  const dur =
+    item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
+      ? '<span class="dur">' + fmtDur(m.duration) + "</span>"
+      : "";
+  const badge =
+    mt.cls === "gallery" || mt.cls === "video"
+      ? '<span class="mglyph" aria-hidden="true">' + mt.icon + "</span>"
+      : "";
+  return (
+    '<button type="button" class="monitor' +
+    (blur ? " nsfw" : "") +
+    '" data-media="1" aria-label="' +
+    esc(mt.label) +
+    '">' +
+    '<img src="' +
+    esc(t) +
+    '" alt="" loading="lazy"' +
+    ytFallback(t) +
+    ">" +
+    dur +
+    badge +
+    (blur ? '<span class="veil">NSFW</span>' : "") +
+    "</button>"
+  );
 };
 
 const fmtDur = (secs) => {
-  const s = Math.round(secs), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h ? h + ":" + String(m).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0")
-           : m + ":" + String(s % 60).padStart(2, "0");
+  const s = Math.round(secs),
+    h = Math.floor(s / 3600),
+    m = Math.floor((s % 3600) / 60);
+  return h
+    ? h +
+        ":" +
+        String(m).padStart(2, "0") +
+        ":" +
+        String(s % 60).padStart(2, "0")
+    : m + ":" + String(s % 60).padStart(2, "0");
 };
 
 /* ---- per-density builders ---- */
@@ -133,41 +184,79 @@ const rowTags = (item, o) => {
 export const logRow = (item, opts) => {
   const o = opts || {};
   const domainHtml = urlDomainHtml(item);
-  return '<div class="row' + (item.status !== "inbox" && o.view === "" ? " seen" : "") +
-    '" data-fullname="' + esc(item.fullname) + '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
+  return (
+    '<div class="row' +
+    (item.status !== "inbox" && o.view === "" ? " seen" : "") +
+    '" data-fullname="' +
+    esc(item.fullname) +
+    '" style="--src:' +
+    srcAccent(item.source) +
+    '" tabindex="0">' +
     underlay +
     '<div class="item-fg">' +
     '<span class="idx"></span>' +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
+    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' +
+    glyph(item) +
+    "</span></button>" +
     '<div class="t">' +
-    '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
+    '<h3 class="title">' +
+    titleLine(item) +
+    "</h3>" +
+    '<div class="meta">' +
+    metaHtml(item) +
+    "</div>" +
+    rowTags(item, o) +
     domainHtml +
     snippet(item) +
     "</div>" +
-    '<div class="trail">' + monitorHtml(item, o.nsfwRevealed) + actsHtml(o.view) + "</div>" +
-    "</div></div>";
+    '<div class="trail">' +
+    monitorHtml(item, o.nsfwRevealed) +
+    actsHtml(o.view) +
+    "</div>" +
+    "</div></div>"
+  );
 };
 
 export const ledgerRow = (item, n, opts) => {
   const o = opts || {};
   const mt = mediaType(item);
-  const play = (mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery")
-    ? '<button type="button" class="playpill" data-media="1">' + mt.icon + " view</button>" : "";
+  const play =
+    mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery"
+      ? '<button type="button" class="playpill" data-media="1">' +
+        mt.icon +
+        " view</button>"
+      : "";
   const domainHtml = urlDomainHtml(item);
-  return '<div class="row" data-fullname="' + esc(item.fullname) +
-    '" style="--src:' + srcAccent(item.source) + '" tabindex="0">' +
+  return (
+    '<div class="row" data-fullname="' +
+    esc(item.fullname) +
+    '" style="--src:' +
+    srcAccent(item.source) +
+    '" tabindex="0">' +
     underlay +
     '<div class="item-fg">' +
-    '<span class="idx">' + String(n).padStart(2, "0") + "</span>" +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
+    '<span class="idx">' +
+    String(n).padStart(2, "0") +
+    "</span>" +
+    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' +
+    glyph(item) +
+    "</span></button>" +
     '<div class="t">' +
-    '<h3 class="title">' + titleLine(item) + "</h3>" +
-    '<div class="meta">' + metaHtml(item) + "</div>" + rowTags(item, o) +
+    '<h3 class="title">' +
+    titleLine(item) +
+    "</h3>" +
+    '<div class="meta">' +
+    metaHtml(item) +
+    "</div>" +
+    rowTags(item, o) +
     domainHtml +
     "</div>" +
-    '<div class="trail">' + play + actsHtml(o.view) + "</div>" +
-    "</div></div>";
+    '<div class="trail">' +
+    play +
+    actsHtml(o.view) +
+    "</div>" +
+    "</div></div>"
+  );
 };
 
 export const pinCard = (item, opts) => {
@@ -178,32 +267,68 @@ export const pinCard = (item, opts) => {
   const blur = isNsfw(item) && !o.nsfwRevealed;
   const domainHtml = urlDomainHtml(item);
   const screen = t
-    ? '<button type="button" class="screen' + (blur ? " nsfw" : "") + '" data-media="1">' +
-      (item.source === "youtube" ? '<div class="bloom" style="background-image:url(\'' + esc(t) + '\')"></div>' : "") +
-      '<img src="' + esc(t) + '" alt="" loading="lazy"' + ytFallback(t) + ">" +
+    ? '<button type="button" class="screen' +
+      (blur ? " nsfw" : "") +
+      '" data-media="1">' +
+      (item.source === "youtube"
+        ? '<div class="bloom" style="background-image:url(\'' +
+          esc(t) +
+          "')\"></div>"
+        : "") +
+      '<img src="' +
+      esc(t) +
+      '" alt="" loading="lazy"' +
+      ytFallback(t) +
+      ">" +
       (Array.isArray(m.gallery) && m.gallery.length > 1
-        ? '<span class="badge gallery">🖼 ' + m.gallery.length + "</span>" : "") +
-      (item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
-        ? '<span class="badge dur">' + fmtDur(m.duration) + "</span>" : "") +
+        ? '<span class="badge gallery">🖼 ' + m.gallery.length + "</span>"
+        : "") +
+      (item.source === "youtube" &&
+      Number.isFinite(m.duration) &&
+      m.duration > 0
+        ? '<span class="badge dur">' + fmtDur(m.duration) + "</span>"
+        : "") +
       (blur ? '<span class="veil">NSFW · REVEAL</span>' : "") +
       "</button>"
-    // poster-less video/gallery (e.g. thumbnail-less v.redd.it) still gets a glyph-only
-    // play tile so it's tappable — matching the list (monitorHtml) + reader (Epic 13 P2)
-    : (mt.cls === "video" || mt.cls === "gallery")
-      ? '<button type="button" class="screen noimg" data-media="1" aria-label="' + esc(mt.label) +
-        '"><span class="mglyph" aria-hidden="true">' + mt.icon + "</span></button>"
+    : // poster-less video/gallery (e.g. thumbnail-less v.redd.it) still gets a glyph-only
+      // play tile so it's tappable — matching the list (monitorHtml) + reader (Epic 13 P2)
+      mt.cls === "video" || mt.cls === "gallery"
+      ? '<button type="button" class="screen noimg" data-media="1" aria-label="' +
+        esc(mt.label) +
+        '"><span class="mglyph" aria-hidden="true">' +
+        mt.icon +
+        "</span></button>"
       : "";
-  return '<article class="pin" data-fullname="' + esc(item.fullname) + '">' + screen +
+  return (
+    '<article class="pin" data-fullname="' +
+    esc(item.fullname) +
+    '">' +
+    screen +
     '<div class="body">' +
     '<div class="head">' +
-    '<button type="button" class="avatar" data-select="1" style="--src:' + srcAccent(item.source) +
-    '" aria-label="Select"><span class="g">' + glyph(item) + "</span></button>" +
-    '<span class="meta">' + metaHtml(item) + "</span></div>" +
-    "<h3>" + titleLine(item) + "</h3>" +
+    '<button type="button" class="avatar" data-select="1" style="--src:' +
+    srcAccent(item.source) +
+    '" aria-label="Select"><span class="g">' +
+    glyph(item) +
+    "</span></button>" +
+    '<span class="meta">' +
+    metaHtml(item) +
+    "</span></div>" +
+    "<h3>" +
+    titleLine(item) +
+    "</h3>" +
     domainHtml +
-    snippet(item).replace('class="snippet"', 'class="snippet" style="display:block"') +
-    '<div class="tagrow">' + tagChips(item, { curated: o.curated, max: 3 }) + tagEditBtn + actsHtml(o.view) + "</div>" +
-    "</div></article>";
+    snippet(item).replace(
+      'class="snippet"',
+      'class="snippet" style="display:block"',
+    ) +
+    '<div class="tagrow">' +
+    tagChips(item, { curated: o.curated, max: 3 }) +
+    tagEditBtn +
+    actsHtml(o.view) +
+    "</div>" +
+    "</div></article>"
+  );
 };
 
 /* ---- list assembly with recency group headers (log/ledger only) ---- */
@@ -226,14 +351,20 @@ export function listHtml(items, state, opts) {
     return items.map((it) => pinCard(it, o)).join("");
   }
   const grouped = state.sort === "first_seen_utc:desc" && !state.focus;
-  let html = "", last = null, n = 0;
+  let html = "",
+    last = null,
+    n = 0;
   for (const it of items) {
     n += 1;
     if (grouped) {
       const g = groupLabel(it, now);
-      if (g !== last) { html += '<div class="grouphead">' + g + "</div>"; last = g; }
+      if (g !== last) {
+        html += '<div class="grouphead">' + g + "</div>";
+        last = g;
+      }
     }
-    html += state.density === "comfortable" ? logRow(it, o) : ledgerRow(it, n, o);
+    html +=
+      state.density === "comfortable" ? logRow(it, o) : ledgerRow(it, n, o);
   }
   if (state.focus && items.length) {
     html = '<div class="grouphead">FOCUS BATCH — JUST THESE</div>' + html;
@@ -247,6 +378,7 @@ export const emptyHtml = (focus) =>
   "<h3>The page is clear.</h3><p>Nothing here is waiting on you.</p>" +
   '<div class="amb-acts">' +
   '<button type="button" class="ambbtn primary" id="empty-draw">' +
-  (focus ? "Draw another batch" : "Draw a Focus batch") + "</button>" +
+  (focus ? "Draw another batch" : "Draw a Focus batch") +
+  "</button>" +
   '<button type="button" class="ambbtn" id="empty-surprise">⚄ Surprise me</button>' +
   "</div></div>";
