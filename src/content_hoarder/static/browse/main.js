@@ -1634,7 +1634,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v73";
+const APP_VERSION = "v74";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
