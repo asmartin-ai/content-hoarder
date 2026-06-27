@@ -359,9 +359,90 @@ export function createLightbox(opts) {
   let lockSaved = 0;
 
   let videoTeardown = null; // teardown function for the open video's hls.js instance
+
+  /* ---- pinch/mouse-wheel zoom (C2) ---- */
+  let zoomScale = 1;
+  let zoomImg = null; // the <img> currently being zoomed (or null)
+  let pinchStartDist = 0;
+  let pinchStartScale = 1;
+
+  const setZoom = (img, s) => {
+    zoomScale = Math.max(1, Math.min(4, s));
+    img.style.transform = `scale(${zoomScale})`;
+    img.classList.toggle("zoomed", zoomScale > 1.001);
+  };
+  const resetZoom = () => {
+    if (zoomImg) {
+      setZoom(zoomImg, 1);
+      zoomImg = null;
+    }
+  };
+
+  // wheel — desktop. Attach on body; match .media-img or .gallery-img.
+  body.addEventListener(
+    "wheel",
+    (e) => {
+      const img = e.target.closest(".media-img, .gallery-img");
+      if (!img) return;
+      e.preventDefault();
+      zoomImg = img;
+      const cur = zoomImg.style.transform ? zoomScale : 1;
+      setZoom(img, cur * Math.exp(-e.deltaY * 0.0015));
+    },
+    { passive: false },
+  );
+
+  // dblclick resets to 1×
+  body.addEventListener("dblclick", (e) => {
+    const img = e.target.closest(".media-img, .gallery-img");
+    if (!img) return;
+    setZoom(img, 1);
+  });
+
+  // pinch — touch. Two-finger only.
+  body.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 2) return;
+      const img = e.target.closest(".media-img, .gallery-img");
+      if (!img) return;
+      zoomImg = img;
+      pinchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+      pinchStartScale = zoomScale;
+      img.classList.add("zooming"); // disable transition during pinch
+    },
+    { passive: true },
+  );
+  body.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.touches.length !== 2 || !zoomImg) return;
+      e.preventDefault();
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+      setZoom(zoomImg, pinchStartScale * (d / (pinchStartDist || 1)));
+    },
+    { passive: false },
+  );
+  body.addEventListener(
+    "touchend",
+    (e) => {
+      if (e.touches.length >= 2 || !zoomImg) return;
+      zoomImg.classList.remove("zooming");
+      if (zoomScale < 1.05) setZoom(zoomImg, 1);
+    },
+    { passive: true },
+  );
+
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
   const closeVisual = () => {
     if (modal.hidden) return;
+    resetZoom();
     if (videoTeardown) {
       videoTeardown();
       videoTeardown = null;
@@ -464,8 +545,10 @@ export function createLightbox(opts) {
       // tap an image → swap the sized preview up to the full original
       [...body.querySelectorAll(".gallery-img")].forEach((im) => {
         im.addEventListener("click", () => {
-          if (im.dataset.full && im.src !== im.dataset.full)
+          if (im.dataset.full && im.src !== im.dataset.full) {
+            setZoom(im, 1); // reset zoom before swapping src
             im.src = im.dataset.full;
+          }
         });
       });
     },

@@ -2612,6 +2612,9 @@ kbd {
     max-width: 100%;
     max-height: 82vh;
     border-radius: var(--r-sm);
+    transform-origin: center center;
+    transition: transform 120ms var(--ease);
+    touch-action: pan-y pinch-zoom;
 }
 #media-body .media-video {
     max-width: 100%;
@@ -2632,12 +2635,25 @@ kbd {
 #media-body .gallery-img {
     background: var(--surface-inset);
     cursor: zoom-in;
+    transform-origin: center center;
+    transition: transform 120ms var(--ease);
+    touch-action: pan-y pinch-zoom;
 } /* placeholder + tap=full-res */
 #media-body .media-fallback {
     display: inline-block;
     margin-top: 10px;
     color: var(--accent);
     font: var(--fw-semibold) var(--fs-xs)/1 var(--font-sans);
+}
+#media-body .media-img.zooming,
+#media-body .gallery-img.zooming {
+    transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    #media-body .media-img,
+    #media-body .gallery-img {
+        transition: none;
+    }
 }
 
 /* ===================== mobile "Jump" drawer ===================== */
