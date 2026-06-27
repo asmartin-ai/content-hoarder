@@ -28,6 +28,7 @@ export function attachSwipe(el, opts) {
     decided = false,
     horizontal = false;
   let stage2 = false,
+    stage2left = false,
     armed = false,
     lpTimer = null;
 
@@ -36,8 +37,14 @@ export function attachSwipe(el, opts) {
   function reset() {
     fg.style.transition = "transform .25s cubic-bezier(.25,.9,.35,1.15)"; // soft spring settle
     fg.style.transform = "";
-    el.classList.remove("swipe-arch", "swipe-done", "swipe-keep");
+    el.classList.remove(
+      "swipe-arch",
+      "swipe-done",
+      "swipe-keep",
+      "swipe-snooze",
+    );
     stage2 = false;
+    stage2left = false;
     armed = false;
   }
 
@@ -108,11 +115,17 @@ export function attachSwipe(el, opts) {
       armed = a;
       if (a && navigator.vibrate) navigator.vibrate(12); // done/archive "armed" detent (firm tick)
     }
-    const s2 = dx > COMMIT2 || (opts.onLeftLong && dx < -COMMIT2);
+    const s2 = dx > COMMIT2;
+    const s2left = opts.onLeftLong && dx < -COMMIT2;
     if (s2 !== stage2) {
       stage2 = s2;
       el.classList.toggle("swipe-keep", s2);
-      if (s2 && navigator.vibrate) navigator.vibrate(15); // Keep stage detent — firmer (more travel/commitment)
+      if (s2 && navigator.vibrate) navigator.vibrate(15); // Keep stage detent
+    }
+    // separate detent for the long-left (Snooze) stage
+    if (s2left !== stage2left) {
+      stage2left = s2left;
+      if (s2left && navigator.vibrate) navigator.vibrate(15); // Snooze stage detent
     }
   });
 
