@@ -540,7 +540,7 @@ function preloadNext(opened) {
 /* ---- media lightbox ---- */
 let lastMediaFn = null; // item whose media is open in the lightbox → re-blurred on close
 const lightbox = createLightbox({
-  modal: "#mediabox",
+  modal: "#media-modal",
   body: "#media-body",
   lockScrollEl: itemsEl,
   onClose: () => reblur(lastMediaFn),
