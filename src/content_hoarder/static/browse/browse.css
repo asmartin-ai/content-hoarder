@@ -1778,21 +1778,25 @@ body.focus .batchstrip {
     flex: none;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    justify-content: center;
+    width: var(--touch-min);
     height: var(--touch-min);
-    padding: 0 14px;
+    padding: 0;
     border: 1px solid var(--border-control);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-md);
     background: var(--surface-app);
     color: var(--text-muted);
-    font: var(--fw-medium) var(--fs-sm)/1 var(--font-sans);
     text-decoration: none;
     cursor: pointer;
-    white-space: nowrap;
     transition:
         color var(--dur) var(--ease),
         border-color var(--dur) var(--ease),
         background var(--dur) var(--ease);
+}
+.relay-btn svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
 }
 .relay-btn:hover,
 .relay-btn:active {
@@ -1803,16 +1807,6 @@ body.focus .batchstrip {
 .relay-btn:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
-}
-.relay-ico {
-    font-size: var(--fs-md);
-    line-height: 1;
-    opacity: 0.9;
-}
-.relay-lbl {
-    max-width: 18ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 @media (prefers-reduced-motion: reduce) {
