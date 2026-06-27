@@ -941,6 +941,11 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   should close to the exact scroll position. Pairs with the dock (above) — dock is the surface; this is what
   happens after. **Design decision:** (a) `closeReader(false)` + `onTriage` must not trigger list refetch; (b)
   preserve scroll across reader open/close unconditionally (`feedScrollY` already handles the close side).
+  **Status 2026-06-27:** spec written (`delegation/SPEC-a2-no-feed-refresh-on-triage.md`) but **not attempted**
+  in the T2 batch — no worktree, no branch, no diff. Stays on T1. The spec is current; the implementation sketch
+  (an `{fromReader:true}` option on `act()` that skips `clearItemFirstPageCache` + `render()`, keeping the item in
+  `state.items` with its status updated in memory for lazy removal on next load) is ready to execute. `snooze()`
+  needs the same treatment (it shares `act()`'s `clearItemFirstPageCache`+`render()` shape).
 
 ### Icebox — true WYSIWYG markdown editing *(Epic 15)*
 - [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
@@ -1012,19 +1017,32 @@ Absorbs "make the Reddit view more mobile-friendly".*
   Design decision B3: Copy Relay — horizontal row with icon-over-label, shows where the item was. Swipe-back
   (`onRelayClose`) collapses the strip; swipe + relay states are mutually exclusive (`relayCloseMode` in
   `core/swipe.js`). A transparent `.relay-scrim` captures outside taps / Escape.
-- [ ] **P3 — Relay strip visual polish (icon-only, no text labels).** *(User-requested 2026-06-27.)* The current
-  relay strip has icon + text label (e.g. "Source", "Author", …) — user wants icon-only per
-  `relay-observations.md`. Also: make the buttons larger, ensure 5 evenly-spaced well-sized icons, and fix
-  text overlap on narrow screens. The `flex-direction: column` layout already puts text under icons — this
-  pass removes the text entirely and sizes the touch targets up. No long-press when touching `[data-media]`
-  (already guarded in `swipe.js:90`). Swipe + relay states are already mutually exclusive (`relayCloseMode`).
-- [ ] **P2 — Hold-to-preview media (Relay-style press-and-hold lightbox).** *(User-reported 2026-06-26.)* Pressing
-  and **holding** a media thumbnail should open the lightbox **temporarily** — it stays open while the finger is
-  down and closes on release (a quick peek, Relay-style). Today `press-and-hold` isn't wired for media (only the
-  row long-press → menu). Add a pointer/pointerup listener on `[data-media]` that opens the lightbox on hold-start
-  (with a ~250ms hold delay to distinguish from a tap) and closes it on pointerup/pointercancel. Must not conflict
-  with: tap (opens lightbox persistently), the row long-press (opens the menu), or the swipe gesture. The hold
-  lightbox registers with the overlay coordinator (`pushOverlay`) but with an auto-close on release.
+- [x] ~~**P3 — Relay strip visual polish (icon-only, no text labels).**~~ ✅ Shipped 2026-06-27
+  (T2 delegation, `delegate/p3-relay-icon-only` → staging `mobile-polish-t2`): the `.relay-lbl` spans
+  are now visually hidden (sr-only pattern: `position:absolute;width:1px;height:1px;clip:rect(0,0,0,0)`)
+  — screen readers still announce each button via its `aria-label`. Buttons enlarged 56×60 → 64×72,
+  icons 24 → 32px. `@media (max-width:360px)` shrinks to 56×64 / 28px icons so 5 across never overflows
+  on the narrowest phones. `title` attributes added on each `<button relay-btn>` for desktop hover
+  tooltips. Template + click handler unchanged — pure CSS + 5 `title` attrs. SW v77 → v83 (combined
+  with C2+B4 on staging). *(User-requested 2026-06-27.)* Orig: The current relay strip has icon +
+  text label (e.g. "Source", "Author", …) — user wants icon-only per `relay-observations.md`. Also:
+  make the buttons larger, ensure 5 evenly-spaced well-sized icons, and fix text overlap on narrow
+  screens.
+- [x] ~~**P2 — Hold-to-preview media (Relay-style press-and-hold lightbox).**~~ ✅ Shipped 2026-06-27
+  (T2 delegation, `delegate/b4-hold-to-preview` → staging `mobile-polish-t2`): `pointerdown` on
+  `[data-media]` starts a 250ms hold timer (10px slop cancels → swipe/scroll wins); when it fires,
+  `openMediaFor(item, {peek:true})` opens the lightbox and `_attachPeekRelease()` in `createLightbox`
+  registers a `window`-level `pointerup`/`pointercancel` listener that calls `close()` on release
+  (window-level so release fires even if the finger drifts onto the lightbox content). A quick tap
+  (<250ms, no movement) cancels the timer and the existing `[data-media]` click handler opens the
+  lightbox persistently — a capture-phase click suppressor (`_suppressNextClick`) prevents the trailing
+  click from re-opening after a peek. All `openMediaFor` branches thread `{peek}` through
+  (`openImage`/`openGallery`/`openVideo`/`openMedia`/`openHtml` all gained an `opts_` arg). `close()`
+  cleans up the release listener. `swipe.js`'s `[data-media]` long-press guard (450ms) already prevents
+  the relay strip opening on a media hold, so the 250ms peek wins the race cleanly. SW v77 → v83.
+  *(User-reported 2026-06-26.)* Orig: Pressing and **holding** a media thumbnail should open the
+  lightbox **temporarily** — it stays open while the finger is down and closes on release (a quick peek,
+  Relay-style).
 - [ ] **P3 — Scroll-deceleration physics feel (rapid scroll to top).** *(User-reported 2026-06-26.)* Rapidly fling-scrolling
   to the top of the browse list has weird deceleration physics (overshoots or stops abruptly). Likely the
   `scrollTo({behavior:smooth})` path or the native fling interacting with the infinite-scroll loadMore trigger.
@@ -1045,17 +1063,21 @@ Absorbs "make the Reddit view more mobile-friendly".*
 - [x] ~~**P2 — Scroll-lock the browse list while the lightbox is open.**~~ ✅ Shipped 2026-06-27:
   `createLightbox` accepts a `lockScrollEl` option; `openMediaFor` passes `#items` — scroll is saved, the
   element gets `overflow:hidden`, and restored on close (`core/media.js:349-373`).
-- [ ] **P2 — Pinch-zoom + mouse-wheel zoom in the lightbox.** *(User-reported 2026-06-26.)* Inside the lightbox, a
-  pinch gesture (touch) or mouse-wheel should **zoom the image** instead of scrolling the page. Today the image
-  renders at a fixed size with no zoom. Add a transform-scale driven by `wheel` (desktop) + touch `touchmove`
-  (two-finger pinch, mobile). Reset zoom on close + on image swap. Relates to the Epic 5 P3 zoom item (which
-  predates the v3 lightbox — fold them).
-- [ ] **P2 — Swipe-to-pan + swipe-far-to-close in the lightbox (Relay-style).** *(User-reported 2026-06-26.)* When
-  zoomed in, swiping up/down should **pan** the image (not close the lightbox). When zoomed out (or panned to the
-  edge), a large up/down swipe should **close** the lightbox (Relay's dismiss-on-pan-beyond-edge behavior).
-  Two-finger pinch + one-finger pan when zoomed; one-finger swipe = close when at scale 1. Must coordinate with
-  `overlaynav.js` (the close registers with the history stack) — the swipe-close should call the lightbox's
-  `close()`, not a raw `history.back()`.
+- [x] ~~**P2 — Pinch-zoom + mouse-wheel zoom in the lightbox.**~~ ✅ Shipped 2026-06-27
+  (T2 delegation, `delegate/c2-lightbox-zoom` → staging `mobile-polish-t2`): `createLightbox` gained
+  zoom state (`zoomScale`, `zoomImg`) + `setZoom`/`resetZoom` helpers. `wheel` on the body drives
+  `transform:scale` via `Math.exp(-e.deltaY * 0.0015)` (exponential per-notch), clamped 1×–4×;
+  `dblclick` resets. Two-finger `touchstart`/`touchmove`/`touchend` drives pinch zoom (ratio of
+  finger-distance to the start distance); a `.zooming` class on the image disables the 120ms
+  transition during the pinch so it tracks the fingers, removed on release; a settled scale <1.05
+  snaps back to 1×. `closeVisual` calls `resetZoom()`; gallery image-swap (tap to upgrade preview →
+  full-res) calls `setZoom(im, 1)` before swapping `src`. CSS: `transform-origin:center`,
+  `transition:transform 120ms`, `touch-action:pan-y pinch-zoom` on `.media-img`/`.gallery-img`;
+  `prefers-reduced-motion:reduce` kills the transition. Video path untouched (the `closest()`
+  matches return null on `<video>`). SW v77 → v83. *(User-reported 2026-06-26.)* Orig: Inside the
+  lightbox, a pinch gesture (touch) or mouse-wheel should **zoom the image** instead of scrolling
+  the page.
+- [ ] **P2 — Swipe-to-pan + swipe-far-to-close in the lightbox (Relay-style).** *(User-reported 2026-06-26.)* **Unblocked 2026-06-27** — depends on C2 (pinch-zoom, shipped to staging `mobile-polish-t2`); the spec `delegation/SPEC-c3-lightbox-pan-close.md` is ready. When zoomed in, swiping up/down should **pan** the image (not close the lightbox). When zoomed out (or panned to the edge), a large up/down swipe should **close** the lightbox (Relay's dismiss-on-pan-beyond-edge behavior). Two-finger pinch + one-finger pan when zoomed; one-finger swipe = close when at scale 1. Must coordinate with `overlaynav.js` (the close registers with the history stack) — the swipe-close should call the lightbox's `close()`, not a raw `history.back()`.
 
 ### Mobile tagging UX *(Epic 16)*
 
