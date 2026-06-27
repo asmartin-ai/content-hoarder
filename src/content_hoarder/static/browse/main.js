@@ -1548,8 +1548,9 @@ function openRowMenu(fn) {
     return a;
   };
   const srcBtn = frag.querySelector('[data-relay="source"]');
-  srcBtn.querySelector('[data-relay-label="source"]').textContent =
-    relaySourceLabel(it);
+  const srcLabel = relaySourceLabel(it);
+  srcBtn.setAttribute("aria-label", srcLabel);
+  srcBtn.setAttribute("data-relay-label", srcLabel);
   const srcHref = relaySourceHref(it);
   if (srcHref) toLink(srcBtn, srcHref);
   else srcBtn.hidden = true;
@@ -1557,7 +1558,8 @@ function openRowMenu(fn) {
   const auLabel = relayAuthorLabel(it);
   const auHref = relayAuthorHref(it);
   if (auHref && auLabel) {
-    auBtn.querySelector('[data-relay-label="author"]').textContent = auLabel;
+    auBtn.setAttribute("aria-label", auLabel);
+    auBtn.setAttribute("data-relay-label", auLabel);
     toLink(auBtn, auHref);
   } else {
     auBtn.hidden = true;

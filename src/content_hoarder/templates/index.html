@@ -744,56 +744,117 @@
         <div class="relay-scrim" id="relay-scrim" aria-hidden="true"></div>
 
         <template id="relay-strip-tpl">
-            <!-- a horizontal action strip. Each button carries data-relay="source|author|tag|share|snooze" -->
+            <!-- a horizontal action strip of icon-only buttons.
+                 data-relay="source|author|tag|share|snooze";
+                 visible text is replaced by aria-label for accessibility + JS sets it per-item. -->
             <div class="relay-strip" role="menu" aria-label="Item actions">
                 <button
                     type="button"
                     class="relay-btn"
                     data-relay="source"
+                    data-relay-label="source"
                     role="menuitem"
+                    aria-label="Open source"
                 >
-                    <span class="relay-ico" aria-hidden="true">←</span>
-                    <span class="relay-lbl" data-relay-label="source"
-                        >source</span
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
                     >
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+                    </svg>
                 </button>
                 <button
                     type="button"
                     class="relay-btn"
                     data-relay="author"
+                    data-relay-label="author"
                     role="menuitem"
+                    aria-label="Open author"
                 >
-                    <span class="relay-ico" aria-hidden="true">●</span>
-                    <span class="relay-lbl" data-relay-label="author"
-                        >author</span
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
                     >
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                    </svg>
                 </button>
                 <button
                     type="button"
                     class="relay-btn"
                     data-relay="tag"
                     role="menuitem"
+                    aria-label="Tag"
                 >
-                    <span class="relay-ico" aria-hidden="true">＋</span>
-                    <span class="relay-lbl">Tag</span>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M5 9h14" />
+                        <path d="M9 5l-2 14" />
+                        <path d="M15 5l-2 14" />
+                    </svg>
                 </button>
                 <button
                     type="button"
                     class="relay-btn"
                     data-relay="share"
                     role="menuitem"
+                    aria-label="Share"
                 >
-                    <span class="relay-ico" aria-hidden="true">↗</span>
-                    <span class="relay-lbl">Share</span>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"
+                        />
+                        <path d="M11 13l9 -9" />
+                        <path d="M15 4l5 0l0 5" />
+                    </svg>
                 </button>
                 <button
                     type="button"
                     class="relay-btn"
                     data-relay="snooze"
                     role="menuitem"
+                    aria-label="Snooze"
                 >
-                    <span class="relay-ico" aria-hidden="true">⏸</span>
-                    <span class="relay-lbl">Snooze</span>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                    </svg>
                 </button>
             </div>
         </template>
