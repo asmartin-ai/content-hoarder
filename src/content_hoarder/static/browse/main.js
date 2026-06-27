@@ -17,7 +17,14 @@ import {
   thumb,
 } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
-import { wireTagExpanders, shareItem } from "../core/render.js";
+import {
+  wireTagExpanders,
+  shareItem,
+  itemUrl,
+  metaLine,
+  CH_SOURCES,
+  srcAccent,
+} from "../core/render.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
 import { canOpenInReader, initReader } from "./reader.js";
 import { initPalette } from "./palette.js";
@@ -251,6 +258,7 @@ function render() {
         onRight: () => act(fn, "archived"),
         onRightLong: () => act(fn, "keep"),
         onLeft: () => act(fn, "done"),
+        onLeftLong: () => snooze(fn),
         onLongPress: () => openRowMenu(fn),
       });
     }
@@ -427,6 +435,9 @@ const tagEditor = initTagEditor({
 
 /* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
+  // Relay-style long-press strip buttons are handled by a dedicated listener;
+  // bail here so the row's title/media logic doesn't double-process them.
+  if (e.target.closest(".relay-strip")) return;
   const actBtn = e.target.closest(".act");
   const card = e.target.closest("[data-fullname]");
   if (!card) return;
@@ -529,8 +540,9 @@ function preloadNext(opened) {
 /* ---- media lightbox ---- */
 let lastMediaFn = null; // item whose media is open in the lightbox → re-blurred on close
 const lightbox = createLightbox({
-  modal: "#media-modal",
+  modal: "#mediabox",
   body: "#media-body",
+  lockScrollEl: itemsEl,
   onClose: () => reblur(lastMediaFn),
 });
 function openMediaFor(item) {
@@ -562,6 +574,9 @@ function openMediaFor(item) {
         : '<p class="media-fallback">Gallery images unavailable.</p>',
     );
   }
+  /* Permalink-only item (no lightboxable media) — reddit text/post thread.
+     Open the reader instead of the reddit iframe (user preference 2026-06-26). */
+  if (m.permalink && item.source === "reddit") return readerUI.open(item);
   if (m.permalink) return lightbox.openMedia(m.permalink);
   const url = item.url;
   if (url) window.open(url, "_blank", "noopener");
@@ -875,29 +890,45 @@ async function surprise() {
       return;
     }
     const m = it.metadata || {};
-    const t = thumb(it, "list") || imageUrl(it) || "";
-    const media = t
-      ? '<div class="amb-thumb"><img src="' +
+    // hero: prefer the crisp card-sized thumbnail (gallery aware), fall back to any image
+    const t = thumb(it, "card") || imageUrl(it) || "";
+    const hero = t
+      ? '<button type="button" class="surp-hero" data-surprise="open" aria-label="Open in reader">' +
+        '<img src="' +
         esc(t) +
-        '" alt="" loading="lazy"></div>'
+        '" alt="" loading="lazy"></button>'
       : "";
+    const src = CH_SOURCES[it.source] || {};
+    const badge =
+      '<span class="surp-badge" style="--src:' +
+      (src.token ? "var(" + src.token + ")" : "var(--accent)") +
+      '">' +
+      (src.glyph ? esc(src.glyph) : esc(it.source || "•")) +
+      "</span>";
     surpriseItem = it;
     ambient.innerHTML =
-      '<div class="amb-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
-      "<h3>“" +
+      '<article class="surp-card" data-fullname="' +
+      esc(it.fullname) +
+      '">' +
+      '<button type="button" class="surp-x" data-surprise="dismiss" aria-label="Not today">✕</button>' +
+      hero +
+      '<div class="surp-body">' +
+      '<div class="surp-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
+      "<h3>" +
       esc(it.title || "(untitled)") +
-      "”</h3>" +
-      '<div class="amb-body">' +
-      media +
-      '<div class="amb-meta">' +
-      (m.subreddit ? "<b>r/" + esc(m.subreddit) + "</b> · " : "") +
-      (it.created_utc
-        ? "from " + new Date(it.created_utc * 1000).getFullYear()
-        : "") +
-      "</div></div>" +
-      '<div class="amb-acts">' +
-      '<button type="button" class="ambbtn primary" data-surprise="open">Open</button>' +
-      '<button type="button" class="ambbtn" data-surprise="dismiss">Not today</button></div>';
+      "</h3>" +
+      '<div class="surp-meta">' +
+      badge +
+      '<span class="surp-metabits">' +
+      metaLine(it) +
+      "</span></div>" +
+      '<div class="surp-acts">' +
+      '<button type="button" class="surp-act k" data-surprise="keep">Keep</button>' +
+      '<button type="button" class="surp-act a" data-surprise="archived">Archive</button>' +
+      '<button type="button" class="surp-act d" data-surprise="done">Done</button>' +
+      '<button type="button" class="surp-act s" data-surprise="snooze">Snooze</button>' +
+      '<button type="button" class="surp-act surp-open" data-surprise="open">Open reader</button>' +
+      "</div></div></article>";
     ambientCard = null;
     ambient.hidden = false;
     ambient.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -910,13 +941,43 @@ ambient.addEventListener("click", (e) => {
   const b = e.target.closest("[data-surprise]");
   if (!b) return;
   const action = b.dataset.surprise;
+  const it = surpriseItem;
   if (action === "dismiss") {
     surpriseItem = null;
     ambient.hidden = true;
     return;
   }
-  if (action !== "open" || !surpriseItem) return;
-  const it = surpriseItem;
+  if (!it) return;
+  const fn = it.fullname;
+  // triage actions: animate the card out, then commit via the same paths as inbox rows
+  if (action === "keep" || action === "archived" || action === "done") {
+    const card = ambient.querySelector(".surp-card");
+    if (card && !card.classList.contains("leaving")) {
+      card.classList.add("leaving", "lv-" + action);
+    }
+    surpriseItem = null;
+    // wait for the leave animation, then clear the slot and commit
+    setTimeout(() => {
+      ambient.hidden = true;
+      ambient.innerHTML = "";
+    }, 200);
+    act(fn, action);
+    return;
+  }
+  if (action === "snooze") {
+    const card = ambient.querySelector(".surp-card");
+    if (card && !card.classList.contains("leaving")) {
+      card.classList.add("leaving", "lv-snooze");
+    }
+    surpriseItem = null;
+    setTimeout(() => {
+      ambient.hidden = true;
+      ambient.innerHTML = "";
+    }, 200);
+    snooze(fn);
+    return;
+  }
+  if (action !== "open") return;
   surpriseItem = null;
   ambient.hidden = true;
   if (canOpenInReader(it)) {
@@ -1263,22 +1324,38 @@ document.addEventListener("keydown", (e) => {
 
 /* ---- sheets / settings panel ---- */
 const scrim = $("#scrim");
+let _browseLock = 0;
+let _browseLockSaved = 0;
+function lockBrowseScroll() {
+  if (_browseLock === 0) _browseLockSaved = itemsEl.scrollTop;
+  _browseLock++;
+  itemsEl.style.overflow = "hidden";
+}
+function unlockBrowseScroll() {
+  if (_browseLock <= 0) return;
+  _browseLock = Math.max(0, _browseLock - 1);
+  if (_browseLock === 0) {
+    itemsEl.style.overflow = "";
+    if (_browseLockSaved) itemsEl.scrollTop = _browseLockSaved;
+    _browseLockSaved = 0;
+  }
+}
 function openPanel(id) {
   closeSheets();
   $(id).classList.add("show");
   scrim.classList.add("show");
+  lockBrowseScroll();
 }
 function closeSheets() {
-  [
-    "#settings",
-    "#navdrawer",
-    "#kbd",
-    "#statsheet",
-    "#dupesheet",
-    "#rowmenu",
-  ].forEach((s) => $(s).classList.remove("show"));
+  ["#settings", "#navdrawer", "#kbd", "#statsheet", "#dupesheet"].forEach((s) =>
+    $(s).classList.remove("show"),
+  );
   if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
+  // also collapse any open Relay-style inline strip (Epic 16 B3)
+  if (typeof closeRelay === "function") closeRelay();
+  // restore browse scroll when ALL sheets are closed (Epic 16: sidebar scroll-lock)
+  unlockBrowseScroll();
 }
 
 async function readError(err, fallback) {
@@ -1376,30 +1453,152 @@ async function loadDoneRetention(force) {
   }
 }
 
-/* ---- long-press / right-click row action menu (Tag · Share) — Epic 16 ---- */
-let rowMenuFn = null;
-const rowMenu = $("#rowmenu");
+/* ---- Relay-style inline long-press strip (Epic 16 B3) ----
+   Long-press / right-click a row → the row translates aside and a horizontal action
+   strip appears in its place, in the same thumb zone (no reach to mid-screen).
+   The strip is injected into the row; a transparent .relay-scrim captures outside
+   taps / Escape to collapse it back. */
+let relayFn = null;
+let relayRow = null;
+const relayScrim = $("#relay-scrim");
+const relayTpl = $("#relay-strip-tpl");
+
+function relaySourceHref(it) {
+  const m = it.metadata || {};
+  if (it.source === "reddit" && m.subreddit)
+    return "https://www.reddit.com/r/" + encodeURIComponent(m.subreddit);
+  if (it.source === "youtube" && m.channel) {
+    // channel id preferred when present; falls back to the handle/@name
+    const id = m.channel_id || "";
+    if (id) return "https://www.youtube.com/channel/" + encodeURIComponent(id);
+    return "https://www.youtube.com/" + encodeURIComponent(m.channel);
+  }
+  if (it.source === "hackernews")
+    return (
+      "https://news.ycombinator.com/item?id=" +
+      encodeURIComponent(it.source_id || "")
+    );
+  const u = itemUrl(it) || it.url || "";
+  return u;
+}
+function relaySourceLabel(it) {
+  const m = it.metadata || {};
+  if (it.source === "reddit" && m.subreddit) return "r/" + m.subreddit;
+  if (it.source === "youtube" && m.channel) return m.channel;
+  if (it.source === "hackernews") return "HN";
+  // fall back to the URL domain
+  try {
+    const u = itemUrl(it) || it.url || "";
+    if (u) return new URL(u).hostname.replace(/^www\./, "");
+  } catch (e) {}
+  return it.source || "source";
+}
+function relayAuthorHref(it) {
+  const a = (it.author || "").trim();
+  if (!a) return "";
+  if (it.source === "reddit")
+    return "https://www.reddit.com/user/" + encodeURIComponent(a);
+  if (it.source === "hackernews")
+    return "https://news.ycombinator.com/user?id=" + encodeURIComponent(a);
+  if (it.source === "youtube")
+    return "https://www.youtube.com/" + encodeURIComponent(a);
+  return "";
+}
+function relayAuthorLabel(it) {
+  const a = it.author || "";
+  if (!a) return "";
+  if (it.source === "reddit" || it.source === "hackernews") return "u/" + a;
+  return a;
+}
+
+function closeRelay() {
+  if (!relayFn && !relayRow) return;
+  if (relayRow) {
+    relayRow.classList.remove("relay-open");
+    const strip = relayRow.querySelector(".relay-strip");
+    if (strip) strip.remove();
+  }
+  relayFn = null;
+  relayRow = null;
+  if (relayScrim) relayScrim.classList.remove("show");
+}
 function openRowMenu(fn) {
   const it = state.items.find((i) => i.fullname === fn);
   if (!it) return;
-  rowMenuFn = fn;
-  const title = $("#rowmenu-title");
-  if (title) title.textContent = it.title || "(untitled)";
+  const row = rowEl(fn);
+  if (!row || !relayTpl) return;
+  // collapse any prior relay strip first (e.g. right-click after a long-press)
   closeSheets();
-  rowMenu.classList.add("show");
-  scrim.classList.add("show");
+  closeRelay();
+
+  // build the strip from the template, then hydrate the source/author links
+  const frag = relayTpl.content.cloneNode(true);
+  // helper: turn a <button class="relay-btn"> into a navigation <a> with the same
+  // children/classes (buttons don't navigate even with href set).
+  const toLink = (btn, href) => {
+    const a = document.createElement("a");
+    a.className = btn.className;
+    a.setAttribute("data-relay", btn.dataset.relay);
+    a.setAttribute("role", "menuitem");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    while (btn.firstChild) a.appendChild(btn.firstChild);
+    btn.replaceWith(a);
+    return a;
+  };
+  const srcBtn = frag.querySelector('[data-relay="source"]');
+  srcBtn.querySelector('[data-relay-label="source"]').textContent =
+    relaySourceLabel(it);
+  const srcHref = relaySourceHref(it);
+  if (srcHref) toLink(srcBtn, srcHref);
+  else srcBtn.hidden = true;
+  const auBtn = frag.querySelector('[data-relay="author"]');
+  const auLabel = relayAuthorLabel(it);
+  const auHref = relayAuthorHref(it);
+  if (auHref && auLabel) {
+    auBtn.querySelector('[data-relay-label="author"]').textContent = auLabel;
+    toLink(auBtn, auHref);
+  } else {
+    auBtn.hidden = true;
+  }
+
+  row.appendChild(frag);
+  relayFn = fn;
+  relayRow = row;
+  // double-rAF so the strip's enter transition runs (inserted at offset, then translated to 0)
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      row.classList.add("relay-open");
+      if (relayScrim) relayScrim.classList.add("show");
+    }),
+  );
 }
-rowMenu.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-rowmenu]");
+// clicks on the strip (the row's own click handler is for triage/title taps; this is
+// a dedicated listener on itemsEl that only acts when a relay strip is the target)
+itemsEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".relay-btn[data-relay]");
   if (!btn) return;
-  const action = btn.dataset.rowmenu,
-    fn = rowMenuFn;
-  closeSheets();
+  const action = btn.dataset.relay,
+    fn = relayFn;
+  // source/author are real anchors (href set above) — let them navigate, just collapse
+  if (action === "source" || action === "author") {
+    closeRelay();
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+  closeRelay();
   if (!fn) return;
   if (action === "tag") tagEditor.open(fn, rowEl(fn));
-  else if (action === "snooze") snooze(fn);
   else if (action === "share")
     shareItem(state.items.find((i) => i.fullname === fn));
+  else if (action === "snooze") snooze(fn);
+});
+if (relayScrim) relayScrim.addEventListener("click", closeRelay);
+// Escape closes an open relay strip (the global keydown below also routes here)
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && relayFn) closeRelay();
 });
 // desktop has no long-press → right-click a row opens the same menu
 itemsEl.addEventListener("contextmenu", (e) => {
@@ -1671,6 +1870,7 @@ function openDrawer() {
   drawer.classList.add("show");
   scrim.classList.add("show");
   drawer.setAttribute("aria-hidden", "false");
+  lockBrowseScroll();
   // Desktop only: autofocusing the filter pops the on-screen keyboard on mobile (user-reported).
   if (!isPhone())
     setTimeout(() => {

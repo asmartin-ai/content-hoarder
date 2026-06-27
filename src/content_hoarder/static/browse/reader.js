@@ -20,9 +20,22 @@ import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
 import { chIcon } from "../core/icons.js";
 import * as api from "../core/api.js";
-import { imageUrl, imageUrls, mediaType, mountVideo, playableVideoSrc, videoUrls } from "../core/media.js";
+import {
+  imageUrl,
+  imageUrls,
+  mediaType,
+  mountVideo,
+  playableVideoSrc,
+  videoUrls,
+} from "../core/media.js";
 import { isNsfw } from "./render.js";
-import { COMP_LABEL, companionHref, hnUserUrl, itemUrl, shareItem } from "../core/render.js";
+import {
+  COMP_LABEL,
+  companionHref,
+  hnUserUrl,
+  itemUrl,
+  shareItem,
+} from "../core/render.js";
 import { toast } from "../core/toast.js";
 import { pushOverlay, settleTop } from "../core/overlaynav.js";
 
@@ -55,10 +68,13 @@ export function deadThreadCollapseSet(comments) {
   for (let i = 0; i < comments.length; i++) {
     if (!isDeletedComment(comments[i])) continue;
     const len = subtreeLen(comments, i);
-    if (len === 0) continue;                       // no replies → nothing to collapse
+    if (len === 0) continue; // no replies → nothing to collapse
     let allDead = true;
     for (let j = i + 1; j <= i + len; j++) {
-      if (!isDeletedComment(comments[j])) { allDead = false; break; }
+      if (!isDeletedComment(comments[j])) {
+        allDead = false;
+        break;
+      }
     }
     if (allDead) out.add(i);
   }
@@ -70,23 +86,46 @@ export function renderThread(comments, collapsed, helpers) {
   for (let i = 0; i < comments.length; i++) {
     let hidden = false;
     for (const cIdx of collapsed) {
-      if (i > cIdx && i <= cIdx + subtreeLen(comments, cIdx)) { hidden = true; break; }
+      if (i > cIdx && i <= cIdx + subtreeLen(comments, cIdx)) {
+        hidden = true;
+        break;
+      }
     }
     if (hidden) continue;
     const c = comments[i];
     const cap = Math.min(c.depth, 6);
     const isC = collapsed.has(i);
-    html += '<div class="rd-cmt d' + cap + (isC ? " collapsed" : "") + '" data-ci="' + i + '">';
-    html += '<button type="button" class="rd-ctoggle" data-ci="' + i + '" aria-label="' +
-      (isC ? "Expand" : "Collapse") + ' thread">' + (isC ? "+" : "−") + "</button>";
+    html +=
+      '<div class="rd-cmt d' +
+      cap +
+      (isC ? " collapsed" : "") +
+      '" data-ci="' +
+      i +
+      '">';
+    html +=
+      '<button type="button" class="rd-ctoggle" data-ci="' +
+      i +
+      '" aria-label="' +
+      (isC ? "Expand" : "Collapse") +
+      ' thread">' +
+      (isC ? "+" : "−") +
+      "</button>";
     html += '<div class="rd-cmain"><div class="rd-cby">';
-    html += helpers.author ? helpers.author(c.author) : '<span class="rd-au">' + helpers.esc(c.author || "") + "</span>";
-    if (c.author && c.author === helpers.opAuthor) html += '<span class="rd-op">OP</span>';
+    html += helpers.author
+      ? helpers.author(c.author)
+      : '<span class="rd-au">' + helpers.esc(c.author || "") + "</span>";
+    if (c.author && c.author === helpers.opAuthor)
+      html += '<span class="rd-op">OP</span>';
     html += '<span class="rd-cscore">' + (+c.score || 0) + "</span>";
     html += '<span class="rd-cage">' + helpers.ago(c.created_utc) + "</span>";
-    if (isC) html += '<span class="rd-hidden">' + subtreeLen(comments, i) + " replies</span>";
+    if (isC)
+      html +=
+        '<span class="rd-hidden">' +
+        subtreeLen(comments, i) +
+        " replies</span>";
     html += "</div>";
-    if (!isC) html += '<div class="rd-ctext">' + helpers.md(c.body, c.media) + "</div>";
+    if (!isC)
+      html += '<div class="rd-ctext">' + helpers.md(c.body, c.media) + "</div>";
     html += "</div></div>";
   }
   return html;
@@ -96,7 +135,9 @@ const fmtScore = (n) => {
   n = +n || 0;
   if (n < 1000) return String(n);
   const v = n / 1000;
-  return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.round(v))) + "k";
+  return (
+    (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.round(v))) + "k"
+  );
 };
 // Reddit permalinks are often stored RELATIVE ("/r/sub/comments/…"); an <a href> to a
 // relative path resolves against our own origin → a local 404. Absolutize before use.
@@ -106,17 +147,30 @@ const absReddit = (p) => {
   if (/^https?:\/\//i.test(p)) return p;
   return p.startsWith("/") ? "https://www.reddit.com" + p : p;
 };
-export const canEditNoteBody = (it) => !!(it && (it.source === "keep" || it.source === "obsidian"));
-export const READER_SOURCE_IDS = ["reddit", "hackernews", "keep", "obsidian", "youtube", "twitter"];
-export const canOpenInReader = (it) => !!(it && READER_SOURCE_IDS.includes(it.source));
+export const canEditNoteBody = (it) =>
+  !!(it && (it.source === "keep" || it.source === "obsidian"));
+export const READER_SOURCE_IDS = [
+  "reddit",
+  "hackernews",
+  "keep",
+  "obsidian",
+  "youtube",
+  "twitter",
+];
+export const canOpenInReader = (it) =>
+  !!(it && READER_SOURCE_IDS.includes(it.source));
 
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const YT_TRAIL_RE = /(?:&(?:quot|#39|gt|lt);|[)\]}>}."';,:!?])+$/;
 const YT_NON_IDS = new Set(["videoseries", "live_stream", "playlist"]);
 const youtubeHost = (host) => {
   const h = String(host || "").toLowerCase();
-  return h === "youtube.com" || h.endsWith(".youtube.com") ||
-    h === "youtu.be" || h.endsWith(".youtu.be");
+  return (
+    h === "youtube.com" ||
+    h.endsWith(".youtube.com") ||
+    h === "youtu.be" ||
+    h.endsWith(".youtu.be")
+  );
 };
 function cleanCandidateUrl(raw) {
   let u = String(raw || "").trim();
@@ -126,7 +180,11 @@ function cleanCandidateUrl(raw) {
 function youtubeIdFromUrl(raw) {
   const u = cleanCandidateUrl(raw);
   let url;
-  try { url = new URL(u); } catch (e) { return ""; }
+  try {
+    url = new URL(u);
+  } catch (e) {
+    return "";
+  }
   if (url.protocol !== "http:" && url.protocol !== "https:") return "";
   if (!youtubeHost(url.hostname)) return "";
   const parts = url.pathname.split("/").filter(Boolean);
@@ -144,7 +202,8 @@ function youtubeIdFromUrl(raw) {
 export function youtubeIdForItem(it) {
   if (!it) return "";
   const sid = String(it.source_id || "").trim();
-  if (it.source === "youtube" && YT_ID_RE.test(sid) && !YT_NON_IDS.has(sid)) return sid;
+  if (it.source === "youtube" && YT_ID_RE.test(sid) && !YT_NON_IDS.has(sid))
+    return sid;
   return youtubeIdFromUrl(it.url || "");
 }
 export function extractYoutubeIds(text) {
@@ -152,10 +211,16 @@ export function extractYoutubeIds(text) {
   const seen = new Set();
   const add = (raw) => {
     const vid = youtubeIdFromUrl(raw);
-    if (vid && !seen.has(vid)) { seen.add(vid); out.push(vid); }
+    if (vid && !seen.has(vid)) {
+      seen.add(vid);
+      out.push(vid);
+    }
   };
   const src = String(text == null ? "" : text);
-  src.replace(/https?:\/\/\S+/gi, (raw) => { add(raw); return raw; });
+  src.replace(/https?:\/\/\S+/gi, (raw) => {
+    add(raw);
+    return raw;
+  });
   return out;
 }
 
@@ -166,9 +231,15 @@ const decodeEntity = (ent) => {
     const n = parseInt(hex ? e.slice(2) : e.slice(1), hex ? 16 : 10);
     return Number.isFinite(n) ? String.fromCodePoint(n) : "&" + e + ";";
   }
-  return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'" })[e] || "&" + e + ";";
+  return (
+    { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'" }[e] ||
+    "&" + e + ";"
+  );
 };
-const decodeEntities = (s) => String(s || "").replace(/&([a-zA-Z]+|#x[0-9a-fA-F]+|#\d+);/g, (_, e) => decodeEntity(e));
+const decodeEntities = (s) =>
+  String(s || "").replace(/&([a-zA-Z]+|#x[0-9a-fA-F]+|#\d+);/g, (_, e) =>
+    decodeEntity(e),
+  );
 const stripTags = (s) => String(s || "").replace(/<[^>]*>/g, "");
 const hnHref = (href) => {
   let h = decodeEntities(href || "").trim();
@@ -181,19 +252,28 @@ const hnHref = (href) => {
 export function hnHtmlToMarkdown(src) {
   let s = String(src == null ? "" : src);
   if (!s.trim()) return "";
-  s = s.replace(/<script\b[\s\S]*?<\/script>/gi, "")
-       .replace(/<style\b[\s\S]*?<\/style>/gi, "");
-  s = s.replace(/<a\b[^>]*href=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_m, _q, href, label) => {
-    const text = decodeEntities(stripTags(label)).replace(/\s+/g, " ").trim();
-    const url = hnHref(href);
-    return url ? "[" + (text || url).replace(/[\[\]]/g, "") + "](" + url + ")" : text;
-  });
-  s = s.replace(/<br\s*\/?>/gi, "\n")
-       .replace(/<\/p\s*>/gi, "\n\n")
-       .replace(/<p\b[^>]*>/gi, "")
-       .replace(/<\/?(pre|code)\b[^>]*>/gi, "`")
-       .replace(/<[^>]*>/g, "");
-  return decodeEntities(s).replace(/\n{3,}/g, "\n\n").trim();
+  s = s
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "");
+  s = s.replace(
+    /<a\b[^>]*href=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi,
+    (_m, _q, href, label) => {
+      const text = decodeEntities(stripTags(label)).replace(/\s+/g, " ").trim();
+      const url = hnHref(href);
+      return url
+        ? "[" + (text || url).replace(/[\[\]]/g, "") + "](" + url + ")"
+        : text;
+    },
+  );
+  s = s
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p\s*>/gi, "\n\n")
+    .replace(/<p\b[^>]*>/gi, "")
+    .replace(/<\/?(pre|code)\b[^>]*>/gi, "`")
+    .replace(/<[^>]*>/g, "");
+  return decodeEntities(s)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function renderHnHtml(src) {
@@ -210,8 +290,11 @@ function checklistMatch(line) {
   return CHECK_RE.exec(String(line == null ? "" : line));
 }
 export function toggleChecklistLine(body, lineIndex) {
-  const lines = String(body == null ? "" : body).replace(/\r\n?/g, "\n").split("\n");
-  if (lineIndex < 0 || lineIndex >= lines.length) return String(body == null ? "" : body);
+  const lines = String(body == null ? "" : body)
+    .replace(/\r\n?/g, "\n")
+    .split("\n");
+  if (lineIndex < 0 || lineIndex >= lines.length)
+    return String(body == null ? "" : body);
   const m = checklistMatch(lines[lineIndex]);
   if (!m) return String(body == null ? "" : body);
   const nextMark = m[2].toLowerCase() === "x" ? " " : "x";
@@ -230,16 +313,30 @@ function renderChecklistBody(src) {
   };
   for (let i = 0; i < lines.length; i++) {
     const m = checklistMatch(lines[i]);
-    if (!m) { buf.push(lines[i]); continue; }
+    if (!m) {
+      buf.push(lines[i]);
+      continue;
+    }
     flushText();
     const items = [];
     while (i < lines.length) {
       const cm = checklistMatch(lines[i]);
-      if (!cm) { i--; break; }
+      if (!cm) {
+        i--;
+        break;
+      }
       const checked = cm[2].toLowerCase() === "x";
-      const label = stripOuterParagraph(renderMarkdown(cm[4], {})) || esc(cm[4]);
-      items.push('<li><label><input type="checkbox" class="rd-check-toggle" data-rd-check-line="' +
-        i + '"' + (checked ? " checked" : "") + '><span>' + label + "</span></label></li>");
+      const label =
+        stripOuterParagraph(renderMarkdown(cm[4], {})) || esc(cm[4]);
+      items.push(
+        '<li><label><input type="checkbox" class="rd-check-toggle" data-rd-check-line="' +
+          i +
+          '"' +
+          (checked ? " checked" : "") +
+          "><span>" +
+          label +
+          "</span></label></li>",
+      );
       i++;
     }
     out.push('<ul class="rd-keep-checklist">' + items.join("") + "</ul>");
@@ -253,17 +350,25 @@ export function normalizeThreadComments(raw, source) {
   const walk = (nodes, fallbackDepth) => {
     for (const node of Array.isArray(nodes) ? nodes : []) {
       if (!node || typeof node !== "object") continue;
-      const rawDepth = Number.isFinite(+node.depth) ? +node.depth : fallbackDepth;
-      const depth = source === "hackernews" ? Math.max(0, rawDepth - 1) : rawDepth;
-      const score = Number.isFinite(+node.score) ? +node.score
-        : (Number.isFinite(+node.points) ? +node.points : 0);
+      const rawDepth = Number.isFinite(+node.depth)
+        ? +node.depth
+        : fallbackDepth;
+      const depth =
+        source === "hackernews" ? Math.max(0, rawDepth - 1) : rawDepth;
+      const score = Number.isFinite(+node.score)
+        ? +node.score
+        : Number.isFinite(+node.points)
+          ? +node.points
+          : 0;
       out.push({
         ...node,
-        body: node.body != null ? node.body : (node.text != null ? node.text : ""),
+        body:
+          node.body != null ? node.body : node.text != null ? node.text : "",
         score,
         depth,
       });
-      if (Array.isArray(node.children) && node.children.length) walk(node.children, rawDepth + 1);
+      if (Array.isArray(node.children) && node.children.length)
+        walk(node.children, rawDepth + 1);
     }
   };
   walk(raw, 0);
@@ -274,14 +379,19 @@ const SOURCE_META = {
   reddit: {
     label: "Reddit",
     led: "var(--source-reddit)",
-    threadPath: (fn, sort) => "/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
+    threadPath: (fn, sort) =>
+      "/reddit/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
     hydratePath: (fn) => "/reddit/items/" + encodeURIComponent(fn) + "/hydrate",
-    originalHref: (it) => absReddit(it.metadata && it.metadata.permalink) || it.url || "",
+    originalHref: (it) =>
+      absReddit(it.metadata && it.metadata.permalink) || it.url || "",
     author: (author) => {
       const au = esc(author || "");
       return author && author !== "[deleted]"
-        ? '<a class="rd-au" href="https://www.reddit.com/user/' + au +
-          '" target="_blank" rel="noopener noreferrer nofollow">u/' + au + "</a>"
+        ? '<a class="rd-au" href="https://www.reddit.com/user/' +
+            au +
+            '" target="_blank" rel="noopener noreferrer nofollow">u/' +
+            au +
+            "</a>"
         : '<span class="rd-au">u/' + au + "</span>";
     },
     scoreText: (n) => "▲ " + fmtScore(n),
@@ -290,15 +400,19 @@ const SOURCE_META = {
   hackernews: {
     label: "HN",
     led: "var(--source-hackernews)",
-    threadPath: (fn, sort) => "/hackernews/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
+    threadPath: (fn, sort) =>
+      "/hackernews/items/" + encodeURIComponent(fn) + "/thread?sort=" + sort,
     hydratePath: null,
     originalHref: (it) => itemUrl(it) || it.url || "",
     author: (author) => {
       const url = hnUserUrl(author);
       const au = esc(author || "");
       return url
-        ? '<a class="rd-au" href="' + esc(url) +
-          '" target="_blank" rel="noopener noreferrer nofollow">' + au + "</a>"
+        ? '<a class="rd-au" href="' +
+            esc(url) +
+            '" target="_blank" rel="noopener noreferrer nofollow">' +
+            au +
+            "</a>"
         : '<span class="rd-au">' + au + "</span>";
     },
     scoreText: (n) => fmtScore(n) + " pts",
@@ -343,74 +457,122 @@ const SOURCE_META = {
     author: (author) => {
       const handle = String(author || "").replace(/^@+/, "");
       return handle
-        ? '<a class="rd-au" href="https://x.com/' + esc(encodeURIComponent(handle)) +
-          '" target="_blank" rel="noopener noreferrer nofollow">@' + esc(handle) + "</a>"
+        ? '<a class="rd-au" href="https://x.com/' +
+            esc(encodeURIComponent(handle)) +
+            '" target="_blank" rel="noopener noreferrer nofollow">@' +
+            esc(handle) +
+            "</a>"
         : '<span class="rd-au"></span>';
     },
     scoreText: (n) => fmtScore(n),
     bodyHtml: (body) => renderMarkdown(body, {}),
   },
 };
-const sourceMeta = (it) => SOURCE_META[it && it.source] || {
-  label: (it && it.source) || "Item",
-  led: "var(--accent)",
-  threadPath: null,
-  hydratePath: null,
-  originalHref: (x) => itemUrl(x) || x.url || "",
-  author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
-  scoreText: (n) => fmtScore(n),
-  bodyHtml: (body) => renderMarkdown(body, {}),
-};
+const sourceMeta = (it) =>
+  SOURCE_META[it && it.source] || {
+    label: (it && it.source) || "Item",
+    led: "var(--accent)",
+    threadPath: null,
+    hydratePath: null,
+    originalHref: (x) => itemUrl(x) || x.url || "",
+    author: (author) => '<span class="rd-au">' + esc(author || "") + "</span>",
+    scoreText: (n) => fmtScore(n),
+    bodyHtml: (body) => renderMarkdown(body, {}),
+  };
 
 const fmtDur = (secs) => {
   const s = Math.round(+secs || 0);
   if (s <= 0) return "";
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
-  return h ? h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0")
-           : m + ":" + String(r).padStart(2, "0");
+  const h = Math.floor(s / 3600),
+    m = Math.floor((s % 3600) / 60),
+    r = s % 60;
+  return h
+    ? h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0")
+    : m + ":" + String(r).padStart(2, "0");
 };
 const fmtCount = (n) => {
   const v = +n;
   if (!Number.isFinite(v) || v <= 0) return "";
   if (v < 1000) return String(Math.round(v));
-  if (v < 1000000) return (v / 1000).toFixed(v < 10000 ? 1 : 0).replace(/\.0$/, "") + "k";
+  if (v < 1000000)
+    return (v / 1000).toFixed(v < 10000 ? 1 : 0).replace(/\.0$/, "") + "k";
   return (v / 1000000).toFixed(v < 10000000 ? 1 : 0).replace(/\.0$/, "") + "M";
 };
 function detailPills(pairs) {
-  const chips = (pairs || []).filter((p) => p && p[1] !== "" && p[1] != null && !(Array.isArray(p[1]) && !p[1].length))
-    .map(([k, v]) => '<span class="rd-detail"><b>' + esc(k) + '</b> ' +
-      esc(Array.isArray(v) ? v.join(", ") : v) + "</span>");
-  return chips.length ? '<div class="rd-details">' + chips.join("") + "</div>" : "";
+  const chips = (pairs || [])
+    .filter(
+      (p) =>
+        p &&
+        p[1] !== "" &&
+        p[1] != null &&
+        !(Array.isArray(p[1]) && !p[1].length),
+    )
+    .map(
+      ([k, v]) =>
+        '<span class="rd-detail"><b>' +
+        esc(k) +
+        "</b> " +
+        esc(Array.isArray(v) ? v.join(", ") : v) +
+        "</span>",
+    );
+  return chips.length
+    ? '<div class="rd-details">' + chips.join("") + "</div>"
+    : "";
 }
 function youtubeEmbedHtml(id) {
   if (!id) return "";
-  const src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
-  return '<div class="rd-note-video-wrap rd-youtube-video">' +
-    '<iframe src="' + esc(src) + '" title="YouTube video" loading="lazy" ' +
-    'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>';
+  const src =
+    "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
+  return (
+    '<div class="rd-note-video-wrap rd-youtube-video">' +
+    '<iframe src="' +
+    esc(src) +
+    '" title="YouTube video" loading="lazy" ' +
+    'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>'
+  );
 }
 function renderCompanions(item) {
   const list = (item.metadata || {}).companions;
   if (!Array.isArray(list) || !list.length) return "";
-  const links = list.map((c) => {
-    if (!c || typeof c !== "object") return "";
-    const label = COMP_LABEL[c.source] || c.source || "source";
-    const fn = String(c.fullname || "").trim();
-    if (fn) {
-      return '<a class="comp-link" href="/?open=' + esc(encodeURIComponent(fn)) + '">' +
-        esc(label) + "</a>";
-    }
-    const href = companionHref(c);
-    return href ? '<a class="comp-link" href="' + esc(href) +
-      '" target="_blank" rel="noopener">' + esc(label) + " - source</a>" : "";
-  }).filter(Boolean).join("");
-  return links ? '<div class="rd-companions"><span>Companions</span>' + links + "</div>" : "";
+  const links = list
+    .map((c) => {
+      if (!c || typeof c !== "object") return "";
+      const label = COMP_LABEL[c.source] || c.source || "source";
+      const fn = String(c.fullname || "").trim();
+      if (fn) {
+        return (
+          '<a class="comp-link" href="/?open=' +
+          esc(encodeURIComponent(fn)) +
+          '">' +
+          esc(label) +
+          "</a>"
+        );
+      }
+      const href = companionHref(c);
+      return href
+        ? '<a class="comp-link" href="' +
+            esc(href) +
+            '" target="_blank" rel="noopener">' +
+            esc(label) +
+            " - source</a>"
+        : "";
+    })
+    .filter(Boolean)
+    .join("");
+  return links
+    ? '<div class="rd-companions"><span>Companions</span>' + links + "</div>"
+    : "";
 }
 function renderYoutubeReader(it, body) {
   const m = it.metadata || {};
-  const cats = Array.isArray(m.yt_categories) ? m.yt_categories : (Array.isArray(m.categories) ? m.categories : []);
+  const cats = Array.isArray(m.yt_categories)
+    ? m.yt_categories
+    : Array.isArray(m.categories)
+      ? m.categories
+      : [];
   const desc = String(m.description || body || "").trim();
-  return youtubeEmbedHtml(youtubeIdForItem(it)) +
+  return (
+    youtubeEmbedHtml(youtubeIdForItem(it)) +
     detailPills([
       ["Channel", m.channel || it.author || ""],
       ["Duration", fmtDur(m.duration)],
@@ -419,43 +581,97 @@ function renderYoutubeReader(it, body) {
       ["Views", fmtCount(m.view_count)],
       ["Categories", cats],
     ]) +
-    (desc ? '<div class="rd-body rd-youtube-desc">' + renderMarkdown(desc, {}) + "</div>" : "") +
-    renderCompanions(it);
+    (desc
+      ? '<div class="rd-body rd-youtube-desc">' +
+        renderMarkdown(desc, {}) +
+        "</div>"
+      : "") +
+    renderCompanions(it)
+  );
 }
 function tweetPermalink(id, handle) {
   const sid = String(id || "").trim();
   if (!sid) return "";
   const h = String(handle || "").replace(/^@+/, "") || "i";
-  return "https://x.com/" + encodeURIComponent(h) + "/status/" + encodeURIComponent(sid);
+  return (
+    "https://x.com/" +
+    encodeURIComponent(h) +
+    "/status/" +
+    encodeURIComponent(sid)
+  );
 }
 export function renderTweetQuote(q) {
   if (!q || typeof q !== "object") return "";
   const text = String(q.text || q.title || q.body || "").trim();
   const handle = String(q.author_handle || q.handle || "").replace(/^@+/, "");
   const name = String(q.author_name || q.name || "").trim();
-  const href = safeUrl(q.permalink || tweetPermalink(q.id || q.tweet_id || q.source_id, handle));
-  const by = (name || handle) ? '<div class="rd-tweet-quote-by">' +
-    esc(name || ("@" + handle)) + (handle && name ? " @" + esc(handle) : "") + "</div>" : "";
-  const inner = by + (text ? '<div class="rd-tweet-quote-text">' + renderMarkdown(text, {}) + "</div>" : "");
+  const href = safeUrl(
+    q.permalink || tweetPermalink(q.id || q.tweet_id || q.source_id, handle),
+  );
+  const by =
+    name || handle
+      ? '<div class="rd-tweet-quote-by">' +
+        esc(name || "@" + handle) +
+        (handle && name ? " @" + esc(handle) : "") +
+        "</div>"
+      : "";
+  const inner =
+    by +
+    (text
+      ? '<div class="rd-tweet-quote-text">' +
+        renderMarkdown(text, {}) +
+        "</div>"
+      : "");
   if (!inner) return "";
-  return '<blockquote class="rd-tweet-quote">' + inner +
-    (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener nofollow">Open quote</a>' : "") +
-    "</blockquote>";
+  return (
+    '<blockquote class="rd-tweet-quote">' +
+    inner +
+    (href
+      ? '<a href="' +
+        esc(href) +
+        '" target="_blank" rel="noopener nofollow">Open quote</a>'
+      : "") +
+    "</blockquote>"
+  );
 }
 export function renderTweetOutlinks(links) {
-  const safe = (Array.isArray(links) ? links : []).map((u) => safeUrl(String(u || "").trim())).filter(Boolean);
+  const safe = (Array.isArray(links) ? links : [])
+    .map((u) => safeUrl(String(u || "").trim()))
+    .filter(Boolean);
   if (!safe.length) return "";
-  return '<div class="rd-outlinks">' + safe.map((u) =>
-    '<a href="' + esc(u) + '" target="_blank" rel="noopener nofollow">' + esc(u) + "</a>").join("") + "</div>";
+  return (
+    '<div class="rd-outlinks">' +
+    safe
+      .map(
+        (u) =>
+          '<a href="' +
+          esc(u) +
+          '" target="_blank" rel="noopener nofollow">' +
+          esc(u) +
+          "</a>",
+      )
+      .join("") +
+    "</div>"
+  );
 }
 function renderTweetMedia(it, mediaHtml) {
   const imgs = imageUrls(it);
   const vids = videoUrls(it);
   let h = "";
   if (imgs.length) {
-    h += '<div class="rd-tweet-media">' + imgs.map((u) =>
-      '<img class="md-img rd-tweet-img" src="' + esc(u) + '" data-img="' + esc(u) +
-      '" alt="" loading="lazy">').join("") + "</div>";
+    h +=
+      '<div class="rd-tweet-media">' +
+      imgs
+        .map(
+          (u) =>
+            '<img class="md-img rd-tweet-img" src="' +
+            esc(u) +
+            '" data-img="' +
+            esc(u) +
+            '" alt="" loading="lazy">',
+        )
+        .join("") +
+      "</div>";
   }
   if (vids.length && typeof mediaHtml === "function") h += mediaHtml("");
   return h;
@@ -463,15 +679,25 @@ function renderTweetMedia(it, mediaHtml) {
 function renderTwitterReader(it, body, mediaHtml) {
   const m = it.metadata || {};
   const text = String(body || it.title || "").trim();
-  const reply = m.in_reply_to_status_id || m.in_reply_to_screen_name
-    ? '<div class="rd-reply-context">Replying to ' +
-      (m.in_reply_to_screen_name ? "@" + esc(m.in_reply_to_screen_name) : esc(m.in_reply_to_status_id)) +
-      "</div>" : "";
-  return reply +
-    (text ? '<div class="rd-body rd-tweet-text">' + renderMarkdown(text, {}) + "</div>" : "") +
+  const reply =
+    m.in_reply_to_status_id || m.in_reply_to_screen_name
+      ? '<div class="rd-reply-context">Replying to ' +
+        (m.in_reply_to_screen_name
+          ? "@" + esc(m.in_reply_to_screen_name)
+          : esc(m.in_reply_to_status_id)) +
+        "</div>"
+      : "";
+  return (
+    reply +
+    (text
+      ? '<div class="rd-body rd-tweet-text">' +
+        renderMarkdown(text, {}) +
+        "</div>"
+      : "") +
     renderTweetQuote(m.quote_tweet) +
     renderTweetOutlinks(m.outlinks) +
-    renderTweetMedia(it, mediaHtml);
+    renderTweetMedia(it, mediaHtml)
+  );
 }
 
 /* ---- manual tag editor (reader header/meta area) ----
@@ -481,28 +707,50 @@ function renderTwitterReader(it, body, mediaHtml) {
    loads. The pure helpers live at module scope; the stateful ones (which close over
    the reader's item/postEl) are defined inside initReader, below. */
 function tagChipRowHtml(it) {
-  const chips = tagsOf(it).map((t) =>
-    '<button class="rd-chip-tag" type="button" data-rd-rmtag="' + esc(t) + '">' +
-    esc(t) + '<span class="rd-tag-x" aria-hidden="true">✕</span></button>').join("");
-  return chips + '<button class="rd-chip-tag rd-tag-add" type="button" data-rd-tagadd="1">＋ tag</button>';
+  const chips = tagsOf(it)
+    .map(
+      (t) =>
+        '<button class="rd-chip-tag" type="button" data-rd-rmtag="' +
+        esc(t) +
+        '">' +
+        esc(t) +
+        '<span class="rd-tag-x" aria-hidden="true">✕</span></button>',
+    )
+    .join("");
+  return (
+    chips +
+    '<button class="rd-chip-tag rd-tag-add" type="button" data-rd-tagadd="1">＋ tag</button>'
+  );
 }
 function tagEditorHtml(it) {
-  return '<div class="rd-tags" data-rd-tags="1">' +
+  return (
+    '<div class="rd-tags" data-rd-tags="1">' +
     '<span class="rd-tags-label">tags</span>' +
     '<div class="rd-tags-body">' +
-      '<div class="rd-tagrow">' + tagChipRowHtml(it) + "</div>" +
-      '<div class="rd-tag-add-ui" hidden>' +
-        '<input class="rd-tag-add-input" type="search" placeholder="new or existing tag" ' +
-          'autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" ' +
-          'maxlength="40" aria-label="Add a tag">' +
-        '<span class="rd-tag-suggest"></span>' +
-      "</div>" +
-    "</div></div>";
+    '<div class="rd-tagrow">' +
+    tagChipRowHtml(it) +
+    "</div>" +
+    '<div class="rd-tag-add-ui" hidden>' +
+    '<input class="rd-tag-add-input" type="search" placeholder="new or existing tag" ' +
+    'autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" ' +
+    'maxlength="40" aria-label="Add a tag">' +
+    '<span class="rd-tag-suggest"></span>' +
+    "</div>" +
+    "</div></div>"
+  );
 }
-let knownTags = [];        // the user's tag vocabulary, cached from /tags on first open
+let knownTags = []; // the user's tag vocabulary, cached from /tags on first open
 let knownTagsLoading = false;
 
-export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, onClose, onBodySaved } = {}) {
+export function initReader({
+  onTriage,
+  onSnooze,
+  onMedia,
+  onImage,
+  closeSheets,
+  onClose,
+  onBodySaved,
+} = {}) {
   const $ = (s) => document.querySelector(s);
   const reader = $("#reader");
   if (!reader) return { open() {} };
@@ -513,17 +761,25 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   const ledEl = reader.querySelector(".led");
   const scrollEl = reader.querySelector(".rd-scroll");
 
-  let item = null, fullname = null, ooHref = "";
-  let comments = [], collapsed = new Set(), opAuthor = "";
-  let revealed = false, isOpen = false;
+  let item = null,
+    fullname = null,
+    ooHref = "";
+  let comments = [],
+    collapsed = new Set(),
+    opAuthor = "";
+  let revealed = false,
+    isOpen = false;
   let returnTo = "";
-  let postData = null, bodyEditing = false, bodyDraft = "", bodySaving = false;
+  let postData = null,
+    bodyEditing = false,
+    bodyDraft = "",
+    bodySaving = false;
   let noteVideoActive = "";
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
-  let videoTeardown = null;    // teardown function for inline video (stops HLS buffering)
-  let videoEl = null;          // the mounted <video> (also the "video is playing" flag); close pauses+resets it
-  let feedScrollY = 0;         // feed scroll position captured on open; restored on close (reader-lock resets it)
+  let videoTeardown = null; // teardown function for inline video (stops HLS buffering)
+  let videoEl = null; // the mounted <video> (also the "video is playing" flag); close pauses+resets it
+  let feedScrollY = 0; // feed scroll position captured on open; restored on close (reader-lock resets it)
 
   /* ---- manual tag editor: stateful helpers (close over item/fullname/postEl) ---- */
   function refreshReaderTagRow() {
@@ -533,16 +789,32 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   }
   function refreshAddSuggestions(inp) {
     if (!inp) return;
-    const ui = inp.closest(".rd-tag-add-ui"); if (!ui) return;
+    const ui = inp.closest(".rd-tag-add-ui");
+    if (!ui) return;
     const sugg = suggestTags(knownTags, tagsOf(item), inp.value);
     const box = ui.querySelector(".rd-tag-suggest");
-    box.innerHTML = sugg.length ? sugg.map((t) =>
-      '<button class="rd-chip-tag rd-tag-sugg" type="button" data-rd-addtag="' + esc(t) + '">' + esc(t) + "</button>").join("")
-      : (inp.value.trim() ? "" : '<span class="rd-tag-sugg-empty">type to create a new tag</span>');
+    box.innerHTML = sugg.length
+      ? sugg
+          .map(
+            (t) =>
+              '<button class="rd-chip-tag rd-tag-sugg" type="button" data-rd-addtag="' +
+              esc(t) +
+              '">' +
+              esc(t) +
+              "</button>",
+          )
+          .join("")
+      : inp.value.trim()
+        ? ""
+        : '<span class="rd-tag-sugg-empty">type to create a new tag</span>';
   }
   function openReaderTagAdd() {
-    const ui = postEl.querySelector(".rd-tag-add-ui"); if (!ui) return;
-    if (!ui.hidden) { ui.hidden = true; return; }
+    const ui = postEl.querySelector(".rd-tag-add-ui");
+    if (!ui) return;
+    if (!ui.hidden) {
+      ui.hidden = true;
+      return;
+    }
     ui.hidden = false;
     const inp = ui.querySelector(".rd-tag-add-input");
     refreshAddSuggestions(inp);
@@ -556,76 +828,109 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   }
   async function readerAddTag(raw) {
     if (!item) return;
-    const it = item, fn = fullname;            // snapshot: openReader may swap item mid-POST
-    if (!it.metadata) it.metadata = {};        // some items carry no metadata object
-    const tag = normTag(raw); if (!tag) return;
+    const it = item,
+      fn = fullname; // snapshot: openReader may swap item mid-POST
+    if (!it.metadata) it.metadata = {}; // some items carry no metadata object
+    const tag = normTag(raw);
+    if (!tag) return;
     const prev = tagsOf(it).slice();
     if (prev.indexOf(tag) !== -1) return;
     it.metadata.tags = prev.concat([tag]);
-    refreshReaderTagRow();                      // optimistic (item === it here)
+    refreshReaderTagRow(); // optimistic (item === it here)
     try {
-      const res = await api.postJSON("/items/" + encodeURIComponent(fn) + "/tags", { add: [tag] });
-      it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.concat([tag]);
+      const res = await api.postJSON(
+        "/items/" + encodeURIComponent(fn) + "/tags",
+        { add: [tag] },
+      );
+      it.metadata.tags = Array.isArray(res.tags)
+        ? res.tags
+        : prev.concat([tag]);
     } catch (e) {
-      it.metadata.tags = prev;                  // revert
+      it.metadata.tags = prev; // revert
       toast("Couldn't add tag — check connection");
     }
-    if (item === it) {                          // repaint only if still showing this item
+    if (item === it) {
+      // repaint only if still showing this item
       refreshReaderTagRow();
       refreshAddSuggestions(postEl.querySelector(".rd-tag-add-input"));
     }
   }
   async function readerRemoveTag(tag) {
     if (!item) return;
-    const it = item, fn = fullname;
+    const it = item,
+      fn = fullname;
     if (!it.metadata) it.metadata = {};
     const prev = tagsOf(it).slice();
     it.metadata.tags = prev.filter((t) => t !== tag);
     refreshReaderTagRow();
     try {
-      const res = await api.postJSON("/items/" + encodeURIComponent(fn) + "/tags", { remove: [tag] });
-      it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.filter((t) => t !== tag);
+      const res = await api.postJSON(
+        "/items/" + encodeURIComponent(fn) + "/tags",
+        { remove: [tag] },
+      );
+      it.metadata.tags = Array.isArray(res.tags)
+        ? res.tags
+        : prev.filter((t) => t !== tag);
     } catch (e) {
-      it.metadata.tags = prev;                  // revert
+      it.metadata.tags = prev; // revert
       toast("Couldn't remove tag — check connection");
     }
     if (item === it) refreshReaderTagRow();
   }
   function currentBody(post) {
-    return String(((post && post.selftext) || item.body || ""));
+    return String((post && post.selftext) || item.body || "");
   }
   function bodyControlsHtml() {
     if (!canEditNoteBody(item)) return "";
     const edited = item.metadata && item.metadata.body_edited_at;
-    return '<div class="rd-body-tools">' +
+    return (
+      '<div class="rd-body-tools">' +
       '<button type="button" class="rd-oo rd-edit-body" data-rd-body-edit="1">' +
-        (bodyEditing ? "close editor" : "edit body") + "</button>" +
+      (bodyEditing ? "close editor" : "edit body") +
+      "</button>" +
       (edited ? '<span class="rd-edit-stamp">edited</span>' : "") +
-    "</div>";
+      "</div>"
+    );
   }
   function bodyHtml(body, post) {
     if (!bodyEditing) {
       return String(body).trim()
-        ? '<div class="rd-body" data-rd-body-view="1">' + sourceMeta(item).bodyHtml(body, post && post.media) + "</div>"
-        : (canEditNoteBody(item) ? '<div class="rd-body rd-empty" data-rd-body-view="1">No body yet.</div>' : "");
+        ? '<div class="rd-body" data-rd-body-view="1">' +
+            sourceMeta(item).bodyHtml(body, post && post.media) +
+            "</div>"
+        : canEditNoteBody(item)
+          ? '<div class="rd-body rd-empty" data-rd-body-view="1">No body yet.</div>'
+          : "";
     }
-    const preview = renderMarkdown(bodyDraft, { media: post && post.media }) ||
+    const preview =
+      renderMarkdown(bodyDraft, { media: post && post.media }) ||
       '<p class="rd-preview-empty">Nothing in the preview yet.</p>';
-    return '<div class="rd-body-edit" data-rd-body-panel="1">' +
+    return (
+      '<div class="rd-body-edit" data-rd-body-panel="1">' +
       '<textarea class="rd-body-input" data-rd-body-input="1" spellcheck="true" ' +
-        'aria-label="Edit note body">' + esc(bodyDraft) + "</textarea>" +
-      '<div class="rd-body-preview" data-rd-body-preview="1" aria-label="Preview">' + preview + "</div>" +
+      'aria-label="Edit note body">' +
+      esc(bodyDraft) +
+      "</textarea>" +
+      '<div class="rd-body-preview" data-rd-body-preview="1" aria-label="Preview">' +
+      preview +
+      "</div>" +
       '<div class="rd-body-actions">' +
-        '<button type="button" class="rd-save-body" data-rd-body-save="1"' +
-          (bodySaving ? " disabled" : "") + ">" + (bodySaving ? "Saving..." : "Save") + "</button>" +
-        '<button type="button" class="rd-cancel-body" data-rd-body-cancel="1"' +
-          (bodySaving ? " disabled" : "") + ">Cancel</button>" +
-      "</div></div>";
+      '<button type="button" class="rd-save-body" data-rd-body-save="1"' +
+      (bodySaving ? " disabled" : "") +
+      ">" +
+      (bodySaving ? "Saving..." : "Save") +
+      "</button>" +
+      '<button type="button" class="rd-cancel-body" data-rd-body-cancel="1"' +
+      (bodySaving ? " disabled" : "") +
+      ">Cancel</button>" +
+      "</div></div>"
+    );
   }
   function refreshBodyPreview() {
     const box = postEl.querySelector("[data-rd-body-preview]");
     if (!box) return;
-    box.innerHTML = renderMarkdown(bodyDraft, { media: postData && postData.media }) ||
+    box.innerHTML =
+      renderMarkdown(bodyDraft, { media: postData && postData.media }) ||
       '<p class="rd-preview-empty">Nothing in the preview yet.</p>';
   }
   function openBodyEditor() {
@@ -634,22 +939,30 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     bodyDraft = bodyEditing ? currentBody(postData) : "";
     renderPost(postData);
     const inp = postEl.querySelector("[data-rd-body-input]");
-    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    if (inp) {
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
   }
   function cancelBodyEditor() {
     if (bodySaving) return;
-    bodyEditing = false; bodyDraft = "";
+    bodyEditing = false;
+    bodyDraft = "";
     renderPost(postData);
   }
   async function saveBodyEditor() {
     if (!item || !canEditNoteBody(item) || bodySaving) return;
-    const it = item, fn = fullname, next = bodyDraft;
-    bodySaving = true; renderPost(postData);
+    const it = item,
+      fn = fullname,
+      next = bodyDraft;
+    bodySaving = true;
+    renderPost(postData);
     try {
       const updated = await api.setBody(fn, next);
       if (item === it && updated) {
         Object.assign(it, updated);
-        bodyEditing = false; bodyDraft = "";
+        bodyEditing = false;
+        bodyDraft = "";
         toast("Body saved.");
         if (typeof onBodySaved === "function") onBodySaved(updated);
         renderPost(postData);
@@ -657,15 +970,25 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     } catch (e) {
       if (item === it) toast("Couldn't save body — check connection");
     } finally {
-      if (item === it) { bodySaving = false; renderPost(postData); }
+      if (item === it) {
+        bodySaving = false;
+        renderPost(postData);
+      }
     }
   }
   async function toggleChecklistInput(inp) {
     if (!item || !canEditNoteBody(item) || bodySaving || !inp) return;
-    const it = item, fn = fullname;
+    const it = item,
+      fn = fullname;
     const prev = currentBody(postData);
-    const next = toggleChecklistLine(prev, parseInt(inp.getAttribute("data-rd-check-line"), 10));
-    if (next === prev) { renderPost(postData); return; }
+    const next = toggleChecklistLine(
+      prev,
+      parseInt(inp.getAttribute("data-rd-check-line"), 10),
+    );
+    if (next === prev) {
+      renderPost(postData);
+      return;
+    }
     item.body = next;
     renderPost(postData);
     try {
@@ -689,22 +1012,37 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
      pause+reset below is what actually silences those. Also removes note-mode
      YouTube iframes so playback stops on every reader close path. */
   function stopInlineVideo() {
-    if (videoTeardown) { videoTeardown(); videoTeardown = null; }  // stop HLS buffering
+    if (videoTeardown) {
+      videoTeardown();
+      videoTeardown = null;
+    } // stop HLS buffering
     if (videoEl) {
       try {
-        videoEl.pause(); videoEl.removeAttribute("src"); videoEl.load();  // silence + abort fetch
+        videoEl.pause();
+        videoEl.removeAttribute("src");
+        videoEl.load(); // silence + abort fetch
         const wrap = videoEl.closest(".rd-video-wrap") || videoEl;
-        wrap.remove();                                                    // blank the embed
-      } catch (e) { /* no-op */ }
+        wrap.remove(); // blank the embed
+      } catch (e) {
+        /* no-op */
+      }
       videoEl = null;
     }
     postEl.querySelectorAll(".rd-note-video-wrap iframe").forEach((frame) => {
-      try { frame.removeAttribute("src"); } catch (e) { /* no-op */ }
+      try {
+        frame.removeAttribute("src");
+      } catch (e) {
+        /* no-op */
+      }
       const wrap = frame.closest(".rd-note-video-wrap") || frame;
       wrap.remove();
     });
     postEl.querySelectorAll(".rd-note-video-multi iframe").forEach((frame) => {
-      try { frame.removeAttribute("src"); } catch (e) { /* no-op */ }
+      try {
+        frame.removeAttribute("src");
+      } catch (e) {
+        /* no-op */
+      }
     });
   }
 
@@ -713,20 +1051,37 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     return canEditNoteBody(item) ? extractYoutubeIds(body) : [];
   }
   function noteVideoEmbedHtml(id) {
-    const src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
-    return '<div class="rd-note-video-wrap">' +
-      '<iframe src="' + esc(src) + '" title="YouTube video" loading="lazy" ' +
-      'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>';
+    const src =
+      "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
+    return (
+      '<div class="rd-note-video-wrap">' +
+      '<iframe src="' +
+      esc(src) +
+      '" title="YouTube video" loading="lazy" ' +
+      'allow="autoplay; encrypted-media" allowfullscreen></iframe></div>'
+    );
   }
   function noteVideoMultiHtml(ids) {
     if (!ids.length) return "";
     if (ids.indexOf(noteVideoActive) === -1) noteVideoActive = ids[0];
-    return '<div class="rd-note-video-multi" data-note-videos="1">' +
+    return (
+      '<div class="rd-note-video-multi" data-note-videos="1">' +
       noteVideoEmbedHtml(noteVideoActive) +
       '<div class="rd-note-video-tabs" role="tablist" aria-label="Videos in this note">' +
-      ids.map((id, i) => '<button type="button" class="rd-note-video-tab" data-note-video="' +
-        esc(id) + '" aria-selected="' + (id === noteVideoActive) + '">Video ' + (i + 1) + "</button>").join("") +
-      "</div></div>";
+      ids
+        .map(
+          (id, i) =>
+            '<button type="button" class="rd-note-video-tab" data-note-video="' +
+            esc(id) +
+            '" aria-selected="' +
+            (id === noteVideoActive) +
+            '">Video ' +
+            (i + 1) +
+            "</button>",
+        )
+        .join("") +
+      "</div></div>"
+    );
   }
   function noteVideoIdForBody(body) {
     const ids = noteYoutubeIds(body);
@@ -748,41 +1103,64 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     if (noteIds.length === 1) return noteVideoEmbedHtml(noteIds[0]);
     if (noteIds.length > 1) return noteVideoMultiHtml(noteIds);
     const mt = mediaType(item);
-    if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
+    if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video"))
+      return "";
     const m = item.metadata || {};
     // a gallery's first full image is a crisper poster than the small reddit thumbnail (Epic 13 P2)
-    const gal = (Array.isArray(m.gallery) && m.gallery.length) ? m.gallery[0] : "";
+    const gal =
+      Array.isArray(m.gallery) && m.gallery.length ? m.gallery[0] : "";
     const img = imageUrl(item) || gal || m.thumbnail;
     // video/gallery with no poster (thumbnail-less v.redd.it) still gets a glyph-only play
     // tile so it's tappable; an image with no URL has nothing to show.
     if (!img) {
       if (mt.cls === "image") return "";
-      return '<button type="button" class="rd-media noimg" data-media="1" aria-label="' +
-        esc(mt.label || "media") + '"><span class="rd-mglyph" aria-hidden="true">' + mt.icon +
-        "</span></button>";
+      return (
+        '<button type="button" class="rd-media noimg" data-media="1" aria-label="' +
+        esc(mt.label || "media") +
+        '"><span class="rd-mglyph" aria-hidden="true">' +
+        mt.icon +
+        "</span></button>"
+      );
     }
     const blur = isNsfw(item) && !revealed;
-    return '<button type="button" class="rd-media' + (blur ? " nsfw" : "") +
-      '" data-media="1" aria-label="' + esc(mt.label || "media") + '">' +
-      '<img src="' + esc(img) + '" alt="" loading="lazy">' +
-      (mt.cls !== "image" ? '<span class="rd-mglyph" aria-hidden="true">' + mt.icon + "</span>" : "") +
-      (blur ? '<span class="rd-veil">NSFW · tap to reveal</span>' : "") + "</button>";
+    return (
+      '<button type="button" class="rd-media' +
+      (blur ? " nsfw" : "") +
+      '" data-media="1" aria-label="' +
+      esc(mt.label || "media") +
+      '">' +
+      '<img src="' +
+      esc(img) +
+      '" alt="" loading="lazy">' +
+      (mt.cls !== "image"
+        ? '<span class="rd-mglyph" aria-hidden="true">' + mt.icon + "</span>"
+        : "") +
+      (blur ? '<span class="rd-veil">NSFW · tap to reveal</span>' : "") +
+      "</button>"
+    );
   }
   function renderPost(post) {
     const m = item.metadata || {};
     const sm = sourceMeta(item);
     postData = post || null;
-    subEl.textContent = item.source === "reddit" && m.subreddit ? "r/" + m.subreddit : sm.label;
+    subEl.textContent =
+      item.source === "reddit" && m.subreddit ? "r/" + m.subreddit : sm.label;
     const author = (post && post.author) || m.author || item.author || "";
-    const scoreRaw = (post && Number.isFinite(post.score)) ? post.score
-      : (post && Number.isFinite(post.points)) ? post.points
-      : (Number.isFinite(m.score) ? m.score : null);
+    const scoreRaw =
+      post && Number.isFinite(post.score)
+        ? post.score
+        : post && Number.isFinite(post.points)
+          ? post.points
+          : Number.isFinite(m.score)
+            ? m.score
+            : null;
     const created = (post && post.created_utc) || item.created_utc || 0;
     const body = (post && (post.selftext || post.text)) || item.body || "";
     let h = '<h1 class="rd-ttl">' + esc(item.title || "(untitled)") + "</h1>";
     h += '<div class="rd-by">';
     if (author) h += sm.author(author);
-    if (scoreRaw != null) h += '<span class="rd-pscore">' + sm.scoreText(scoreRaw) + "</span>";
+    if (scoreRaw != null)
+      h += '<span class="rd-pscore">' + sm.scoreText(scoreRaw) + "</span>";
     if (created) h += "<span>" + ago(created) + "</span>";
     h += "</div>";
     if (item.source === "youtube") {
@@ -794,21 +1172,27 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       h += bodyControlsHtml();
       if (!isNoteVideoMode(body) || bodyEditing) h += bodyHtml(body, post);
     }
-    h += tagEditorHtml(item);   // header/meta area (not over the media tile)
+    h += tagEditorHtml(item); // header/meta area (not over the media tile)
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
     // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
     // thread load calls renderPost again a few hundred ms after open, which would otherwise
     // wipe the editor the user is typing into. null = the add-UI was closed.
     const openUi = postEl.querySelector(".rd-tag-add-ui");
-    const keep = (openUi && !openUi.hidden)
-      ? ((postEl.querySelector(".rd-tag-add-input") || {}).value || "") : null;
+    const keep =
+      openUi && !openUi.hidden
+        ? (postEl.querySelector(".rd-tag-add-input") || {}).value || ""
+        : null;
     postEl.innerHTML = h;
     if (keep !== null) {
       const ui = postEl.querySelector(".rd-tag-add-ui");
       if (ui) {
         ui.hidden = false;
         const inp = ui.querySelector(".rd-tag-add-input");
-        if (inp) { inp.value = keep; refreshAddSuggestions(inp); inp.focus(); }
+        if (inp) {
+          inp.value = keep;
+          refreshAddSuggestions(inp);
+          inp.focus();
+        }
       }
     }
     if (canEditNoteBody(item)) {
@@ -824,40 +1208,68 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       hydrated: ["ok", "fetched just now"],
       archived: ["arch", "archived copy"],
     };
-    const v = map[kind]; if (!v) { chip.hidden = true; return; }
+    const v = map[kind];
+    if (!v) {
+      chip.hidden = true;
+      return;
+    }
     chip.className = "rd-chip " + v[0];
     chip.textContent = v[1];
     chip.hidden = false;
   }
   const commentsHead = (n) =>
-    '<div class="rd-chead"><span class="rd-cn">' + n + "</span> " +
+    '<div class="rd-chead"><span class="rd-cn">' +
+    n +
+    "</span> " +
     (n === 1 ? "comment" : "comments") +
     '<select class="rd-csort" aria-label="Sort comments">' +
-    ["best", "top", "new"].map((s) =>
-      '<option value="' + s + '"' + (s === threadSort ? " selected" : "") + ">" + s + "</option>").join("") +
+    ["best", "top", "new"]
+      .map(
+        (s) =>
+          '<option value="' +
+          s +
+          '"' +
+          (s === threadSort ? " selected" : "") +
+          ">" +
+          s +
+          "</option>",
+      )
+      .join("") +
     "</select></div>";
   function renderComments() {
-    cmtsEl.innerHTML = commentsHead(comments.length) +
+    cmtsEl.innerHTML =
+      commentsHead(comments.length) +
       (comments.length
         ? renderThread(comments, collapsed, {
             esc,
             author: (author) => sourceMeta(item).author(author),
             md: (body, media) => sourceMeta(item).bodyHtml(body, media),
-            ago, opAuthor })
+            ago,
+            opAuthor,
+          })
         : '<div class="rd-cmtstate">No comments on this post.</div>');
   }
   function applyThread(res, justHydrated) {
     comments = normalizeThreadComments(res.comments, item.source);
-    collapsed = deadThreadCollapseSet(comments);   // auto-collapse fully-dead (deleted) threads on load
-    opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
-    if (!videoEl) renderPost(res.post || null);  // don't clobber a playing inline video
-    setChip(res.archived ? "archived" : (justHydrated ? "hydrated" : "cached"));
+    collapsed = deadThreadCollapseSet(comments); // auto-collapse fully-dead (deleted) threads on load
+    opAuthor =
+      (res.post && res.post.author) ||
+      (item.metadata || {}).author ||
+      item.author ||
+      "";
+    if (!videoEl) renderPost(res.post || null); // don't clobber a playing inline video
+    setChip(res.archived ? "archived" : justHydrated ? "hydrated" : "cached");
     renderComments();
   }
   function failState() {
     const sm = sourceMeta(item);
-    cmtsEl.innerHTML = '<div class="rd-cmtstate err">Couldn’t load the ' + esc(sm.label) + ' thread.' +
-      '<a class="rd-oolink" href="' + esc(ooHref || "#") + '" target="_blank" rel="noopener">' +
+    cmtsEl.innerHTML =
+      '<div class="rd-cmtstate err">Couldn’t load the ' +
+      esc(sm.label) +
+      " thread." +
+      '<a class="rd-oolink" href="' +
+      esc(ooHref || "#") +
+      '" target="_blank" rel="noopener">' +
       "Open original ↗</a></div>";
   }
   async function load() {
@@ -865,41 +1277,78 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     cmtsEl.innerHTML = '<div class="rd-cmtstate">loading thread…</div>';
     const sm = sourceMeta(item);
     let res;
-    try { res = await api.getJSON(sm.threadPath(fn, threadSort)); }
-    catch (e) { if (fullname === fn) failState(); return; }
-    if (fullname !== fn) return;                       // closed / switched mid-fetch
-    if (res && res.cached) { applyThread(res, res.hydrate_status === "hydrated"); return; }
-    if (!sm.hydratePath) { failState(); return; }
-    cmtsEl.innerHTML = '<div class="rd-cmtstate">fetching the live thread…</div>';
-    try { await api.postJSON(sm.hydratePath(fn), {}); }
-    catch (e) { if (fullname === fn) failState(); return; }   // 401 no-auth, 502 network, …
+    try {
+      res = await api.getJSON(sm.threadPath(fn, threadSort));
+    } catch (e) {
+      if (fullname === fn) failState();
+      return;
+    }
+    if (fullname !== fn) return; // closed / switched mid-fetch
+    if (res && res.cached) {
+      applyThread(res, res.hydrate_status === "hydrated");
+      return;
+    }
+    if (!sm.hydratePath) {
+      failState();
+      return;
+    }
+    cmtsEl.innerHTML =
+      '<div class="rd-cmtstate">fetching the live thread…</div>';
+    try {
+      await api.postJSON(sm.hydratePath(fn), {});
+    } catch (e) {
+      if (fullname === fn) failState();
+      return;
+    } // 401 no-auth, 502 network, …
     if (fullname !== fn) return;
-    try { res = await api.getJSON(sm.threadPath(fn, threadSort)); }
-    catch (e) { if (fullname === fn) failState(); return; }
+    try {
+      res = await api.getJSON(sm.threadPath(fn, threadSort));
+    } catch (e) {
+      if (fullname === fn) failState();
+      return;
+    }
     if (fullname !== fn) return;
-    if (res && res.cached) applyThread(res, true); else failState();
+    if (res && res.cached) applyThread(res, true);
+    else failState();
   }
 
   /* ---- open / close (+ history so the system back-gesture returns to feed) ---- */
   function openReader(it, opts) {
     opts = opts || {};
     if (typeof closeSheets === "function") closeSheets();
-    stopInlineVideo();                 // defensive: clear any leftover inline video if reopened without a clean close
-    item = it; fullname = it.fullname;
+    stopInlineVideo(); // defensive: clear any leftover inline video if reopened without a clean close
+    item = it;
+    fullname = it.fullname;
     returnTo = opts.from === "triage" ? "/triage" : "";
-    comments = []; collapsed = new Set(); opAuthor = ""; revealed = false;
-    postData = null; bodyEditing = false; bodyDraft = ""; bodySaving = false; noteVideoActive = "";
+    comments = [];
+    collapsed = new Set();
+    opAuthor = "";
+    revealed = false;
+    postData = null;
+    bodyEditing = false;
+    bodyDraft = "";
+    bodySaving = false;
+    noteVideoActive = "";
+    // reset the triage dock to its collapsed tab on every open (a prior session may
+    // have left it open in the DOM after a keyboard triage closed the reader)
+    const footEl0 = reader.querySelector(".rd-foot");
+    if (footEl0) footEl0.setAttribute("data-dock", "closed");
     const sm = sourceMeta(it);
     reader.dataset.source = it.source || "";
     reader.classList.toggle("from-triage", !!returnTo);
     reader.setAttribute("aria-label", sm.label + " thread reader");
     if (ledEl) ledEl.style.setProperty("--reader-led", sm.led);
-    if (ooEl) ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
+    if (ooEl)
+      ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
     ooHref = sm.originalHref(it);
-    if (ooEl) { ooEl.href = ooHref || "#"; ooEl.hidden = !ooHref; }
+    if (ooEl) {
+      ooEl.href = ooHref || "#";
+      ooEl.hidden = !ooHref;
+    }
     reader.classList.toggle("no-original", !ooHref);
-    renderPost(null);                                 // instant, from the list item
-    reader.style.transition = ""; reader.style.transform = "";
+    renderPost(null); // instant, from the list item
+    reader.style.transition = "";
+    reader.style.transform = "";
     reader.classList.add("show");
     reader.setAttribute("aria-hidden", "false");
     // capture the feed scroll BEFORE the overflow:hidden lock (which resets it) so we can
@@ -912,14 +1361,22 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
     pushOverlay(() => closeReader(true));
     if (it.source === "reddit") load();
-    else if (isNoteVideoMode(currentBody(null))) renderNoteBodyRegion(currentBody(null), null);
+    else if (isNoteVideoMode(currentBody(null)))
+      renderNoteBodyRegion(currentBody(null), null);
     else cmtsEl.innerHTML = "";
     // Lazy-load the tag vocabulary once so the "＋ tag" add-UI can suggest known tags.
     if (!knownTags.length && !knownTagsLoading) {
       knownTagsLoading = true;
-      api.getJSON("/tags").then((d) => {
-        if (d && d.tags && typeof d.tags === "object") knownTags = Object.keys(d.tags).sort();
-      }).catch(() => {}).finally(() => { knownTagsLoading = false; });
+      api
+        .getJSON("/tags")
+        .then((d) => {
+          if (d && d.tags && typeof d.tags === "object")
+            knownTags = Object.keys(d.tags).sort();
+        })
+        .catch(() => {})
+        .finally(() => {
+          knownTagsLoading = false;
+        });
     }
   }
   function closeReader(fromPop) {
@@ -927,37 +1384,75 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     isOpen = false;
     const dest = returnTo;
     returnTo = "";
-    stopInlineVideo();           // pause+reset+remove the <video> so audio doesn't bleed after close
+    stopInlineVideo(); // pause+reset+remove the <video> so audio doesn't bleed after close
     reader.classList.remove("show", "from-triage");
     reader.setAttribute("aria-hidden", "true");
-    reader.style.transition = ""; reader.style.transform = "";
+    reader.style.transition = "";
+    reader.style.transform = "";
     document.documentElement.classList.remove("reader-lock");
     // restore the feed scroll the lock discarded (all close paths funnel here: button, Esc,
     // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
     if (feedScrollY) window.scrollTo(0, feedScrollY);
-    if (typeof onClose === "function") onClose(fullname);  // re-blur the feed thumbnail (Epic 13 P2)
+    if (typeof onClose === "function") onClose(fullname); // re-blur the feed thumbnail (Epic 13 P2)
     // A manual close (button/Esc/swipe/F-A-D keys) unwinds the history entry we pushed; an OS-back
     // (fromPop) already popped it, so the coordinator handled the history side for us.
     if (dest) location.replace(dest);
     else if (!fromPop) settleTop();
   }
-  document.addEventListener("keydown", (e) => {
-    if (!isOpen) return;
-    if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeReader(false); return; }
-    if (isTypingTarget(e.target)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;  // let browser shortcuts (Ctrl/⌘+F/A/D, …) through
-    // Mirror the foot buttons so the reader's OWN item is triaged (not the list
-    // item behind it). This is a capture-phase listener, so it runs before
-    // main.js's bubble keydown; stopPropagation keeps that one from double-firing.
-    const k = e.key.toLowerCase();
-    const status = k === "f" ? "keep" : k === "a" ? "archived" : k === "d" ? "done" : null;
-    if (status) {
-      e.stopPropagation(); e.preventDefault();
-      const fn = fullname;
-      closeReader(false);
-      if (typeof onTriage === "function") onTriage(fn, status);
-    }
-  }, true);
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!isOpen) return;
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+        // If the triage dock is open, the first Esc collapses it back to the tab
+        // instead of closing the reader; a second Esc closes the reader as before.
+        const footEl = reader.querySelector(".rd-foot");
+        if (footEl && footEl.getAttribute("data-dock") === "open") {
+          footEl.setAttribute("data-dock", "closed");
+          return;
+        }
+        closeReader(false);
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // let browser shortcuts (Ctrl/⌘+F/A/D, …) through
+      // Mirror the foot buttons so the reader's OWN item is triaged (not the list
+      // item behind it). This is a capture-phase listener, so it runs before
+      // main.js's bubble keydown; stopPropagation keeps that one from double-firing.
+      const k = e.key.toLowerCase();
+      const status =
+        k === "f" ? "keep" : k === "a" ? "archived" : k === "d" ? "done" : null;
+      if (status) {
+        e.stopPropagation();
+        e.preventDefault();
+        const fn = fullname;
+        closeReader(false);
+        if (typeof onTriage === "function") onTriage(fn, status);
+        return;
+      }
+      // S = Snooze (first-class in the dock; also reachable from the keyboard)
+      if (k === "s") {
+        e.stopPropagation();
+        e.preventDefault();
+        const fn = fullname;
+        closeReader(false);
+        if (typeof onSnooze === "function") onSnooze(fn);
+        return;
+      }
+      // T = Tag — opens the inline tag editor in the reader without closing
+      if (k === "t") {
+        e.stopPropagation();
+        e.preventDefault();
+        const footEl = reader.querySelector(".rd-foot");
+        if (footEl) footEl.setAttribute("data-dock", "open");
+        openReaderTagAdd();
+        return;
+      }
+    },
+    true,
+  );
 
   /* comment-sort selector → reload the thread in the chosen order (server sorts via ?sort) */
   cmtsEl.addEventListener("change", (e) => {
@@ -977,33 +1472,51 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     const inp = e.target.closest(".rd-tag-add-input");
     if (inp) refreshAddSuggestions(inp);
     const bodyInp = e.target.closest("[data-rd-body-input]");
-    if (bodyInp) { bodyDraft = bodyInp.value; refreshBodyPreview(); }
+    if (bodyInp) {
+      bodyDraft = bodyInp.value;
+      refreshBodyPreview();
+    }
   });
   postEl.addEventListener("keydown", (e) => {
     const bodyInp = e.target.closest("[data-rd-body-input]");
     if (bodyInp) {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault(); e.stopPropagation(); saveBodyEditor();
+        e.preventDefault();
+        e.stopPropagation();
+        saveBodyEditor();
       } else if (e.key === "Escape") {
-        e.preventDefault(); e.stopPropagation(); cancelBodyEditor();
+        e.preventDefault();
+        e.stopPropagation();
+        cancelBodyEditor();
       }
       return;
     }
     const inp = e.target.closest(".rd-tag-add-input");
     if (!inp) return;
     if (e.key === "Enter") {
-      e.preventDefault(); e.stopPropagation();
-      if (normTag(inp.value)) { readerAddTag(inp.value); collapseReaderTagAdd(); }
+      e.preventDefault();
+      e.stopPropagation();
+      if (normTag(inp.value)) {
+        readerAddTag(inp.value);
+        collapseReaderTagAdd();
+      }
     } else if (e.key === "Escape") {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       collapseReaderTagAdd();
     }
   });
 
   /* ---- clicks: close, collapse toggle, media reveal/open ---- */
   reader.addEventListener("click", (e) => {
-    if (e.target.closest("#reader-close")) { closeReader(false); return; }
-    if (e.target.closest("#reader-share")) { shareItem(item); return; }
+    if (e.target.closest("#reader-close")) {
+      closeReader(false);
+      return;
+    }
+    if (e.target.closest("#reader-share")) {
+      shareItem(item);
+      return;
+    }
     const tog = e.target.closest(".rd-ctoggle");
     if (tog) {
       const ci = +tog.dataset.ci;
@@ -1025,15 +1538,35 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     }
     // ---- manual tag editor (POST /items/<fn>/tags) ----
     const tagRm = e.target.closest("[data-rd-rmtag]");
-    if (tagRm) { readerRemoveTag(tagRm.getAttribute("data-rd-rmtag")); return; }
+    if (tagRm) {
+      readerRemoveTag(tagRm.getAttribute("data-rd-rmtag"));
+      return;
+    }
     const sugg = e.target.closest("[data-rd-addtag]");
-    if (sugg) { e.preventDefault(); readerAddTag(sugg.getAttribute("data-rd-addtag")); collapseReaderTagAdd(); return; }
+    if (sugg) {
+      e.preventDefault();
+      readerAddTag(sugg.getAttribute("data-rd-addtag"));
+      collapseReaderTagAdd();
+      return;
+    }
     const addBtn = e.target.closest("[data-rd-tagadd]");
-    if (addBtn) { openReaderTagAdd(); return; }
+    if (addBtn) {
+      openReaderTagAdd();
+      return;
+    }
     const editBody = e.target.closest("[data-rd-body-edit]");
-    if (editBody) { openBodyEditor(); return; }
-    if (e.target.closest("[data-rd-body-save]")) { saveBodyEditor(); return; }
-    if (e.target.closest("[data-rd-body-cancel]")) { cancelBodyEditor(); return; }
+    if (editBody) {
+      openBodyEditor();
+      return;
+    }
+    if (e.target.closest("[data-rd-body-save]")) {
+      saveBodyEditor();
+      return;
+    }
+    if (e.target.closest("[data-rd-body-cancel]")) {
+      cancelBodyEditor();
+      return;
+    }
     const noteVideo = e.target.closest("[data-note-video]");
     if (noteVideo) {
       noteVideoActive = noteVideo.getAttribute("data-note-video") || "";
@@ -1049,9 +1582,12 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
     }
     const med = e.target.closest(".rd-media");
     if (med) {
-      if (isNsfw(item) && !revealed) {                // first tap reveals, second opens
-        revealed = true; med.classList.remove("nsfw");
-        const v = med.querySelector(".rd-veil"); if (v) v.remove();
+      if (isNsfw(item) && !revealed) {
+        // first tap reveals, second opens
+        revealed = true;
+        med.classList.remove("nsfw");
+        const v = med.querySelector(".rd-veil");
+        if (v) v.remove();
         return;
       }
       /* Directly-playable video (v.redd.it/HLS or a .mp4/.webm/.mov file) plays inline.
@@ -1062,10 +1598,12 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
       if (vsrc) {
         const m = item.metadata || {};
         const posterUrl = imageUrl(item) || m.thumbnail;
-        const wrap = document.createElement("div");   // replace the tile with a video container
+        const wrap = document.createElement("div"); // replace the tile with a video container
         wrap.className = "rd-video-wrap";
         med.replaceWith(wrap);
-        const { video, destroy } = mountVideo(wrap, vsrc, posterUrl, { autoplay: true });
+        const { video, destroy } = mountVideo(wrap, vsrc, posterUrl, {
+          autoplay: true,
+        });
         videoTeardown = destroy;
         videoEl = video;
         return;
@@ -1075,46 +1613,141 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   });
   const foot = reader.querySelector(".rd-foot");
   if (foot) {
-    foot.querySelectorAll(".rd-act[data-act]").forEach((b) => {        // the app's own icons.js glyphs
+    const dockToggle = () =>
+      foot.setAttribute(
+        "data-dock",
+        foot.getAttribute("data-dock") === "open" ? "closed" : "open",
+      );
+    const closeDock = () => foot.setAttribute("data-dock", "closed");
+    const isDockOpen = () => foot.getAttribute("data-dock") === "open";
+
+    // hydrate icons for the status actions (keep/archive/done). Snooze + Tag stay
+    // label-only — matching the original foot where only [data-act] got glyphs.
+    foot.querySelectorAll(".rd-act[data-act]").forEach((b) => {
       const a = b.dataset.act;
-      b.insertAdjacentHTML("afterbegin", chIcon(a === "archived" ? "archive" : a));
+      if (a === "tag") return; // Tag has no dedicated glyph; label only
+      b.insertAdjacentHTML(
+        "afterbegin",
+        chIcon(a === "archived" ? "archive" : a),
+      );
     });
+
     foot.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-act], [data-snooze]"); if (!b) return;
-      const fn = fullname, status = b.dataset.act;
+      // tab / backdrop toggle (does NOT close the reader)
+      if (e.target.closest("[data-dock-toggle]")) {
+        dockToggle();
+        return;
+      }
+      const b = e.target.closest("[data-act], [data-snooze]");
+      if (!b) return;
+      const fn = fullname,
+        status = b.dataset.act;
+      closeDock();
+      // Tag opens the inline editor in-place and stays in the reader.
+      if (status === "tag") {
+        openReaderTagAdd();
+        return;
+      }
       closeReader(false);
       if (status && typeof onTriage === "function") onTriage(fn, status);
       else if (b.dataset.snooze && typeof onSnooze === "function") onSnooze(fn);
     });
+
+    // swipe-down on the dock collapses it back to the tab (does not close the reader)
+    let dsy = 0,
+      ddragging = false;
+    const dock = foot.querySelector(".rd-dock");
+    if (dock) {
+      dock.addEventListener(
+        "touchstart",
+        (e) => {
+          if (!isDockOpen() || e.touches.length !== 1) return;
+          dsy = e.touches[0].clientY;
+          ddragging = true;
+        },
+        { passive: true },
+      );
+      dock.addEventListener(
+        "touchmove",
+        (e) => {
+          if (!ddragging) return;
+          const dy = e.touches[0].clientY - dsy;
+          if (dy > 24) {
+            ddragging = false;
+            closeDock();
+          }
+        },
+        { passive: true },
+      );
+      dock.addEventListener("touchend", () => {
+        ddragging = false;
+      });
+    }
   }
 
   /* ---- swipe-right → return to feed (Relay-style). Left-edge is left to the
          OS back-gesture, which also closes the reader via popstate. ---- */
-  let sx = 0, sy = 0, dragging = false, decided = false, horizontal = false, verticalClose = false;
-  reader.addEventListener("touchstart", (e) => {
-    if (!isOpen || e.touches.length !== 1) { dragging = false; return; }
-    const x = e.touches[0].clientX;
-    if (x < 24) { dragging = false; return; }         // OS back-gesture zone
-    sx = x; sy = e.touches[0].clientY;
-    dragging = true; decided = false; horizontal = false; verticalClose = false;
-    reader.style.transition = "none";
-  }, { passive: true });
-  reader.addEventListener("touchmove", (e) => {
-    if (!dragging) return;
-    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
-    if (!decided) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      decided = true; horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
-      verticalClose = !horizontal && !!returnTo && dy > 0 && scrollEl && scrollEl.scrollTop <= 0;
-    }
-    if (verticalClose) {
-      e.preventDefault();
-      reader.style.transform = "translateY(" + Math.max(0, dy) + "px)";
-      return;
-    }
-    if (!horizontal) { dragging = false; return; }     // vertical → let it scroll
-    if (dx > 0) { e.preventDefault(); reader.style.transform = "translateX(" + dx + "px)"; }
-  }, { passive: false });
+  let sx = 0,
+    sy = 0,
+    dragging = false,
+    decided = false,
+    horizontal = false,
+    verticalClose = false;
+  reader.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!isOpen || e.touches.length !== 1) {
+        dragging = false;
+        return;
+      }
+      const x = e.touches[0].clientX;
+      if (x < 24) {
+        dragging = false;
+        return;
+      } // OS back-gesture zone
+      sx = x;
+      sy = e.touches[0].clientY;
+      dragging = true;
+      decided = false;
+      horizontal = false;
+      verticalClose = false;
+      reader.style.transition = "none";
+    },
+    { passive: true },
+  );
+  reader.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!dragging) return;
+      const dx = e.touches[0].clientX - sx,
+        dy = e.touches[0].clientY - sy;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
+        verticalClose =
+          !horizontal &&
+          !!returnTo &&
+          dy > 0 &&
+          scrollEl &&
+          scrollEl.scrollTop <= 0;
+      }
+      if (verticalClose) {
+        e.preventDefault();
+        reader.style.transform = "translateY(" + Math.max(0, dy) + "px)";
+        return;
+      }
+      if (!horizontal) {
+        dragging = false;
+        return;
+      } // vertical → let it scroll
+      if (dx > 0) {
+        e.preventDefault();
+        reader.style.transform = "translateX(" + dx + "px)";
+      }
+    },
+    { passive: false },
+  );
   function endSwipe(e) {
     if (!dragging) return;
     dragging = false;
@@ -1128,7 +1761,10 @@ export function initReader({ onTriage, onSnooze, onMedia, onImage, closeSheets, 
   }
   reader.addEventListener("touchend", endSwipe);
   reader.addEventListener("touchcancel", () => {
-    dragging = false; verticalClose = false; reader.style.transition = ""; reader.style.transform = "";
+    dragging = false;
+    verticalClose = false;
+    reader.style.transition = "";
+    reader.style.transform = "";
   });
 
   return { open: openReader };
