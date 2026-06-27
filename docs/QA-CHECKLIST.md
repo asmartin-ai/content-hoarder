@@ -113,7 +113,8 @@ Opening items, the inline reader, triaging from inside it.
       (Archive, Snooze top arc; Keep, Tag, Done bottom arc). Tap the scrim to collapse without closing
       the reader. `F`/`A`/`D` keys still triage the reader's item. ⬛
 - [ ] **Done/Archive/Keep from the reader does NOT refresh the feed** — the list keeps its position;
-      the triaged item leaves lazily on the next load. ⬛
+      the triaged item leaves lazily on the next load. ⬛ *(not yet shipped — A2; spec
+      `delegation/SPEC-a2-no-feed-refresh-on-triage.md` ready but unattempted in the T2 batch)*
 - [ ] **Closing the reader** (back button / ✕ / Esc / swipe) returns to the exact scroll position. ⬛
 - [ ] **Closing the reader stops media playback** (no audio bleed after close). ⬛
 - [ ] **Note editor** (Keep/Obsidian): edit-body toggle, textarea, live preview, save; checklist lines
@@ -146,10 +147,15 @@ The media viewer, zoom, and gallery flows.
 - [ ] **Gallery** (Reddit multi-image) opens the inline stacked lightbox with all images. ⬛
 - [ ] **Reddit video** plays with audio (HLS) inline in the reader; permalink stays navigable. ⬛
 - [ ] **Hold-to-preview** (Relay-style): press-and-hold a thumbnail opens the lightbox temporarily;
-      release closes it. 📱 *(pending — not yet shipped)*
+      release closes it. 📱 *(shipped 2026-06-27 on `staging/mobile-polish-t2`; pending real-device
+      verification of the swipe/long-press race + the click-after-peek suppression)*
 - [ ] **Scroll-lock:** while the lightbox is open, the browse list behind it doesn't scroll. ⬛
 - [ ] **Pinch-zoom / mouse-wheel zoom** inside the lightbox zooms the image (not the page). ⬛
+  *(shipped 2026-06-27 on `staging/mobile-polish-t2`; 1×–4× clamp, `dblclick` resets, gallery image-swap
+  resets; pending real-device pinch verification)*
 - [ ] **Swipe-to-pan** (when zoomed) + **swipe-far-to-close** (Relay-style dismiss). 📱
+  *(not yet shipped — C3, unblocked now that C2 pinch-zoom landed on staging; spec
+  `delegation/SPEC-c3-lightbox-pan-close.md` ready)*
 - [ ] **Back from lightbox** returns to the feed (not exit the app). ⬛
 
 ## Story 8 — "I tag items" (mobile + desktop)
@@ -230,12 +236,16 @@ Resurfacing card, surprise-me, the dice.
 - **Tag-chip overload** on enriched YouTube cards (a wall of raw keyword chips) — display fix pending.
 - **Mobile long-press group-select** deferred from the retention/gallery split (tap-opens-modal shipped).
 - **Swipe physics feel** iceboxed (user: "right now it's fine") — re-activate if it feels laggy/stiff.
-- **Hold-to-preview media** (B4) pending — press-and-hold lightbox peek, ~250ms delay.
-- **Pinch-zoom + pan in lightbox** (C2/C3) pending — blocks on lightbox scroll-lock (C1, shipped).
-- **Don't refresh feed on reader triage** (A2) pending — closeReader doesn't trigger list refetch.
+- **Hold-to-preview media** (B4) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — pending real-device
+  verification of the swipe/long-press race + click-after-peek suppression.
+- **Pinch-zoom in lightbox** (C2) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — 1×–4× wheel +
+  pinch, pending real-device pinch verification. **Pan + swipe-far-to-close** (C3) still open — unblocked
+  now that C2 landed; spec `delegation/SPEC-c3-lightbox-pan-close.md` ready.
+- **Don't refresh feed on reader triage** (A2) still open — spec `delegation/SPEC-a2-no-feed-refresh-on-triage.md`
+  ready but unattempted in the T2 batch.
 - **Scroll-deceleration** (E2) low priority — rapid fling to top feels weird.
-- **Relay strip refinements** — user requested larger buttons, icon-only (no text), per
-  `relay-observations.md`. Currently icons + labels are shipped; the icon-only pass is next.
+- **Relay strip refinements** (P3) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — icon-only,
+  larger touch targets, narrow-screen shrink.
 
 ---
 
