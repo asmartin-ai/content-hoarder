@@ -109,8 +109,9 @@ Opening items, the inline reader, triaging from inside it.
       Twitter stored media + text. Markdown renders (links, bold, quotes, lists, code, inline images). ⬛
 - [ ] **Comment UX:** tap-byline collapses/expands; author `u/name` links to the profile; fully-dead
       threads auto-collapse; OP comments highlighted. ⬛
-- [ ] **Reader triage dock:** Archive / Done / Snooze / Keep buttons work; `F`/`A`/`D` keys triage the
-      reader's own item. ⬛
+- [ ] **Reader triage dock:** bottom tab "Actions" pulls up into a 5-button semi-circle fan
+      (Archive, Snooze top arc; Keep, Tag, Done bottom arc). Tap the scrim to collapse without closing
+      the reader. `F`/`A`/`D` keys still triage the reader's item. ⬛
 - [ ] **Done/Archive/Keep from the reader does NOT refresh the feed** — the list keeps its position;
       the triaged item leaves lazily on the next load. ⬛
 - [ ] **Closing the reader** (back button / ✕ / Esc / swipe) returns to the exact scroll position. ⬛
@@ -145,7 +146,7 @@ The media viewer, zoom, and gallery flows.
 - [ ] **Gallery** (Reddit multi-image) opens the inline stacked lightbox with all images. ⬛
 - [ ] **Reddit video** plays with audio (HLS) inline in the reader; permalink stays navigable. ⬛
 - [ ] **Hold-to-preview** (Relay-style): press-and-hold a thumbnail opens the lightbox temporarily;
-      release closes it. 📱
+      release closes it. 📱 *(pending — not yet shipped)*
 - [ ] **Scroll-lock:** while the lightbox is open, the browse list behind it doesn't scroll. ⬛
 - [ ] **Pinch-zoom / mouse-wheel zoom** inside the lightbox zooms the image (not the page). ⬛
 - [ ] **Swipe-to-pan** (when zoomed) + **swipe-far-to-close** (Relay-style dismiss). 📱
@@ -229,8 +230,12 @@ Resurfacing card, surprise-me, the dice.
 - **Tag-chip overload** on enriched YouTube cards (a wall of raw keyword chips) — display fix pending.
 - **Mobile long-press group-select** deferred from the retention/gallery split (tap-opens-modal shipped).
 - **Swipe physics feel** iceboxed (user: "right now it's fine") — re-activate if it feels laggy/stiff.
-- Some Epic 15 tappable-link and Epic 16 NSFW/scroll items may already be live from the design-v2 pass
-  but aren't ticked in the backlog — confirm and report which are actually working.
+- **Hold-to-preview media** (B4) pending — press-and-hold lightbox peek, ~250ms delay.
+- **Pinch-zoom + pan in lightbox** (C2/C3) pending — blocks on lightbox scroll-lock (C1, shipped).
+- **Don't refresh feed on reader triage** (A2) pending — closeReader doesn't trigger list refetch.
+- **Scroll-deceleration** (E2) low priority — rapid fling to top feels weird.
+- **Relay strip refinements** — user requested larger buttons, icon-only (no text), per
+  `relay-observations.md`. Currently icons + labels are shipped; the icon-only pass is next.
 
 ---
 
