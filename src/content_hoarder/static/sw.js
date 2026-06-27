@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v77"; // v77: relay buttons icon-over-text larger; swipe/long-press mutually exclusive; media long-press exempt
+const CACHE = "ch-shell-v81"; // v81: B4 hold-to-preview media (Relay-style press-and-hold lightbox peek)
 const SHELL = [
   "/",
   "/triage",
