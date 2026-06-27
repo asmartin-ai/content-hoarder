@@ -31,6 +31,7 @@ export function attachSwipe(el, opts) {
     stage2left = false,
     armed = false,
     lpTimer = null;
+  let relayCloseMode = false; // when the relay strip is open, a swipe closes it (no triage)
 
   fg.style.touchAction = "pan-y";
 
@@ -63,19 +64,29 @@ export function attachSwipe(el, opts) {
   el.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" && !opts.mouse) return; // touch-only by default
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    // Only text-entry controls keep their native horizontal caret/selection; links and
-    // buttons no longer block the swipe — taps on them still work because we don't claim
-    // the gesture until it's decided horizontal (and clicks are delegated on itemsEl).
     if (e.target.closest("input, select, textarea")) return;
     if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return; // back-gesture zone
+
+    // If the relay strip is open on this row, swipes CLOSE it instead of triaging —
+    // the two states are mutually exclusive (user 2026-06-27).
+    relayCloseMode = el.classList.contains("relay-open");
+
     dragging = true;
     decided = false;
     horizontal = false;
     startX = e.clientX;
     startY = e.clientY;
     fg.style.transition = "none";
-    if (opts.onLongPress) {
-      // press-and-hold (no drag) → open the row action menu
+
+    if (relayCloseMode) {
+      // no long-press, no triage — a rightward release closes the relay
+      clearTimeout(lpTimer);
+      return;
+    }
+    // long-press opens the relay menu, but NOT when the press started on a media
+    // element (the thumbnail has its own tap → lightbox behavior; long-pressing
+    // it should not bring up the action strip).
+    if (opts.onLongPress && !e.target.closest("[data-media]")) {
       clearTimeout(lpTimer);
       lpTimer = setTimeout(() => {
         lpTimer = null;
@@ -103,6 +114,9 @@ export function attachSwipe(el, opts) {
       }
     }
     if (!horizontal) return; // vertical → let the list scroll
+    // In relay-close mode, don't translate (no blank space to the right on
+    // leftward swipes); we just track the direction for the close gesture.
+    if (relayCloseMode) return;
     if (e.cancelable) e.preventDefault(); // claim the gesture: block link activation / native drag
     fg.style.transform = "translateX(" + dx + "px)";
     el.classList.toggle("swipe-arch", dx > 40 && dx <= COMMIT2); // right → archive
@@ -134,6 +148,15 @@ export function attachSwipe(el, opts) {
     dragging = false;
     clearTimeout(lpTimer);
     const dx = e.clientX - startX;
+    // relay-close mode: a rightward swipe ("swipe back") closes the strip;
+    // leftward does nothing. No triage fires while the relay is open.
+    if (relayCloseMode) {
+      relayCloseMode = false;
+      if (horizontal && dx > 40 && opts.onRelayClose) {
+        opts.onRelayClose(el);
+      }
+      return;
+    }
     if (horizontal) suppressNextClick(); // any decided h-swipe: don't let the trailing click fire
     if (horizontal && Math.abs(dx) >= COMMIT) {
       const dir = dx > 0 ? 1 : -1;
@@ -157,6 +180,7 @@ export function attachSwipe(el, opts) {
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", () => {
     dragging = false;
+    relayCloseMode = false;
     clearTimeout(lpTimer);
     reset();
   });

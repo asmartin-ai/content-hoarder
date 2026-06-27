@@ -260,6 +260,7 @@ function render() {
         onLeft: () => act(fn, "done"),
         onLeftLong: () => snooze(fn),
         onLongPress: () => openRowMenu(fn),
+        onRelayClose: () => closeRelay(),
       });
     }
   });
@@ -1550,7 +1551,8 @@ function openRowMenu(fn) {
   const srcBtn = frag.querySelector('[data-relay="source"]');
   const srcLabel = relaySourceLabel(it);
   srcBtn.setAttribute("aria-label", srcLabel);
-  srcBtn.setAttribute("data-relay-label", srcLabel);
+  const srcLblEl = srcBtn.querySelector('[data-relay-label="source"]');
+  if (srcLblEl) srcLblEl.textContent = srcLabel;
   const srcHref = relaySourceHref(it);
   if (srcHref) toLink(srcBtn, srcHref);
   else srcBtn.hidden = true;
@@ -1559,7 +1561,8 @@ function openRowMenu(fn) {
   const auHref = relayAuthorHref(it);
   if (auHref && auLabel) {
     auBtn.setAttribute("aria-label", auLabel);
-    auBtn.setAttribute("data-relay-label", auLabel);
+    const auLblEl = auBtn.querySelector('[data-relay-label="author"]');
+    if (auLblEl) auLblEl.textContent = auLabel;
     toLink(auBtn, auHref);
   } else {
     auBtn.hidden = true;
