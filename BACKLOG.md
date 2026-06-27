@@ -925,32 +925,22 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   (`.rd-c` carrying the OP author) in `reddit.css`; the `opAuthor` plumbing is already in place so no new data
   is needed.
 
-- [ ] **P2 — Reddit thread thumbnail → reader (not the reddit iframe).** *(User-reported 2026-06-26.)* Tapping a
-  reddit **thread** item's thumbnail currently opens the reddit iframe in the lightbox. For items whose content is
-  **not lightbox-previewable** (a text/post/comment thread with no image/video), the tap should open the **reader
-  view** instead. The routing already exists for title/body taps (`readerUI.open` in `browse/main.js:474`); the
-  `[data-media]` tap path (`main.js:446` → `openMediaFor`) needs to detect "this item has no lightboxable media"
-  and fall through to the reader. Gallery/image/video items keep the current lightbox behavior. Decide the predicate:
-  `media_type` not in `{image, gallery, reddit_video}` AND no `imageUrl(item)` → reader. Related: the
-  empty-gallery placeholder path (`main.js:549`) already avoids the iframe — generalize that gate.
-- [ ] **P2 — Reader triage dock rework (design bakeoff — GLM-5.2).** *(User-reported 2026-06-26.)* The current
-  `.rd-foot` is a flat row of four buttons (Archive · Done · Snooze · Keep) pinned to the bottom of the reader —
-  Snooze feels wedged in and the positioning is awkward on mobile. **Hand this to a GLM-5.2 design bakeoff arm** (per
-  the `frontend-design` skill + Epic 20's design-arm trial) to produce a **dock** redesign: a thumb-reachable,
-  friction-asymmetry-honoring action dock that treats Snooze as a first-class citizen without crowding the
-  reduce-the-backlog actions (Archive/Done cheapest; Keep deliberately pricier; Snooze in between). Scope + lock
-  the design via the skill + visual review before any build. The dock must coexist with the reader's note-editor
-  (`onBodySaved`) and the tag editor (`.rd-tags`). Keep the F/A/D keyboard shortcuts. Pairs with the no-refresh-on-done
-  item below (the dock is the action surface; the feed-position behavior is what happens after).
+- [x] ~~**P2 — Reddit thread thumbnail → reader (not the reddit iframe).**~~ ✅ Shipped 2026-06-27
+  (`browse/main.js openMediaFor`): when the item has no lightboxable media (`!imageUrl(item)` and `media_type`
+  not in `{image,gallery,reddit_video}`), the thumbnail tap routes to `readerUI.open()` instead of the lightbox.
+  Mirror of the empty-gallery gate at `main.js:549`.
+- [x] ~~**P2 — Reader triage dock rework (design bakeoff — GLM-5.2).**~~ ✅ Shipped 2026-06-27
+  (design decision A1: bottom tab that pulls up into a semi-circle dock). `.rd-foot` with `.rd-dock-tab`
+  (collapsed pill → tap to fan open) + 5-button semi-circle fan (Archive, Snooze top arc; Keep, Tag, Done
+  bottom arc). Backdrop tap (`rd-dock-scrim`) collapses without closing the reader. Keyboard shortcuts F/A/D
+  preserved. Snooze is first-class (`data-snooze="7"`).
 - [ ] **P2 — Don't refresh the feed on reader Done/Archive/Keep.** *(User-reported 2026-06-26.)* Triaging the reader's
   item (F/A/D or the dock buttons) currently calls `onTriage` → `act()` → `render()` which can reflow the list and
-  lose scroll position. The reader close already restores `feedScrollY` (`reader.js:937`), but the `act()` path
-  mutates `state.items` (filters out the item) + `render()` repaints. **Desired:** the feed should NOT refresh on a
-  reader triage action — only on a manual pull-to-refresh or a full app reload. The triaged item should disappear
-  from the list lazily (on the next natural loadMore / refresh), and the reader should close to **the exact scroll
-  position** the user was at. Two sub-parts: (a) the reader's `closeReader(false)` + `onTriage` path must NOT trigger
-  a list refetch or a full `render()` — defer the item removal to the next load; (b) preserve scroll across the
-  reader open/close cycle unconditionally (already mostly there via `feedScrollY`, verify it survives the act path).
+  lose scroll position. **Desired:** the feed should NOT refresh on a reader triage action — only on a manual
+  refresh or app reload. The triaged item should disappear lazily (on the next loadMore/refresh), and the reader
+  should close to the exact scroll position. Pairs with the dock (above) — dock is the surface; this is what
+  happens after. **Design decision:** (a) `closeReader(false)` + `onTriage` must not trigger list refetch; (b)
+  preserve scroll across reader open/close unconditionally (`feedScrollY` already handles the close side).
 
 ### Icebox — true WYSIWYG markdown editing *(Epic 15)*
 - [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
@@ -1009,24 +999,25 @@ Absorbs "make the Reddit view more mobile-friendly".*
   paradigm — see preserve-fable-design). Pairs well with the Epic 23 design-language / GLM design-bakeoff lanes.
 - [x] ~~**P2 — Inbox swipe = mobile/touch only.**~~ ✅ v3: `swipe.js:37` ignores `pointerType==="mouse"` unless `{mouse:true}`; `main.js` `attachSwipe` passes no `mouse` flag → desktop uses buttons, touch swipes. *(User decision 2026-06-08.)* Orig: Disable row-swipe on the
   inbox on desktop (desktop uses the action buttons/hover); keep swipe for touch only.
-- [ ] **P2 — Snooze on extended left swipe (browse row).** *(User-reported 2026-06-26.)* The browse row swipe
-  map is: short → = Archive, long → = Keep, short ← = Done, **long ← currently unassigned** (the snooze backend
-  + triage swipe shipped, Epic 20 #1200, but the browse row's `attachSwipe` in `main.js:248` has no `onLeftLong`).
-  Wire `onLeftLong: () => snooze(fn)` mirroring the triage deck's long-left = Snooze. Friction-asymmetry: snooze
-  is priced above Done/Archive (long swipe) but below Keep (right side stays the preserve tax). Underlay color +
-  icon swap at the long-left threshold + a haptic pulse, same as the long-right Keep reveal. Pairs with removing
-  Snooze from the long-press menu (below) since the swipe claims it.
-- [ ] **P2 — Remove Snooze from the long-press / right-click row menu.** *(User-reported 2026-06-26.)* Now that
-  swipe (above) + the reader dock (Epic 15) own Snooze, the `#rowmenu` sheet's Snooze entry (`main.js:1399`,
-  `[data-rowmenu="snooze"]`) is redundant + clutters the menu. Remove it; the row menu keeps Tag + Share.
-  Verify the `snooze()` function is still callable from the swipe + reader paths.
-- [ ] **P2 — Relay-style long-press: pan the item aside + reveal an extended action menu.** *(User-reported 2026-06-26.)*
-  The current long-press opens a centered `#rowmenu` sheet, but when the thumb is already mid-screen (where the
-  thumbnail is), reaching the sheet is awkward. **Target: Relay for reddit's long-press** — the item pans/slides
-  to one side and an extended action menu (Tag, Share, Snooze, Open-original, Copy-link, …) fans out beside it
-  in-place, reachable from the same thumb position. This is a **design bakeoff candidate** (hand to GLM-5.2 with
-  the `frontend-design` skill) to lock the pan + menu geometry before build. Must coexist with the swipe gesture
-  (swipe = quick triage; long-press = extended menu) and not conflict with the Android back-gesture edge deadzone.
+- [x] ~~**P2 — Snooze on extended left swipe (browse row).**~~ ✅ Shipped 2026-06-27
+  (`main.js:264`): `attachSwipe` now passes `onLeftLong: () => snooze(fn)` — long ← = Snooze mirrors the triage
+  deck. Underlay color + icon swap at the long-left threshold + haptic pulse. Friction-asymmetry: Snooze priced
+  above Done/Archive (long swipe) but below Keep (right side).
+- [x] ~~**P2 — Remove Snooze from the long-press / right-click row menu.**~~ ✅ Shipped 2026-06-27:
+  no `data-rowmenu="snooze"` in the template; `openRowMenu` only handles Tag + Share. Snooze lives on
+  the long-left swipe (B1) + reader dock + relay strip.
+- [x] ~~**P2 — Relay-style long-press: pan the item aside + reveal an extended action menu.**~~ ✅ Shipped
+  2026-06-27 (`main.js openRowMenu` + `.relay-strip` template + `browse.css`): long-press/right-click a row →
+  `.item-fg` translates aside, a horizontal action strip (Source, Author, Tag, Share, Snooze) slides in.
+  Design decision B3: Copy Relay — horizontal row with icon-over-label, shows where the item was. Swipe-back
+  (`onRelayClose`) collapses the strip; swipe + relay states are mutually exclusive (`relayCloseMode` in
+  `core/swipe.js`). A transparent `.relay-scrim` captures outside taps / Escape.
+- [ ] **P3 — Relay strip visual polish (icon-only, no text labels).** *(User-requested 2026-06-27.)* The current
+  relay strip has icon + text label (e.g. "Source", "Author", …) — user wants icon-only per
+  `relay-observations.md`. Also: make the buttons larger, ensure 5 evenly-spaced well-sized icons, and fix
+  text overlap on narrow screens. The `flex-direction: column` layout already puts text under icons — this
+  pass removes the text entirely and sizes the touch targets up. No long-press when touching `[data-media]`
+  (already guarded in `swipe.js:90`). Swipe + relay states are already mutually exclusive (`relayCloseMode`).
 - [ ] **P2 — Hold-to-preview media (Relay-style press-and-hold lightbox).** *(User-reported 2026-06-26.)* Pressing
   and **holding** a media thumbnail should open the lightbox **temporarily** — it stays open while the finger is
   down and closes on release (a quick peek, Relay-style). Today `press-and-hold` isn't wired for media (only the
@@ -1039,27 +1030,21 @@ Absorbs "make the Reddit view more mobile-friendly".*
   `scrollTo({behavior:smooth})` path or the native fling interacting with the infinite-scroll loadMore trigger.
   Audit the scroll handler in `main.js` (the `.console.compact` collapse also rides on scroll) + the CSS
   `scroll-behavior` / `overscroll-behavior`. May relate to the Epic 16 P3 swipe-physics icebox item — group them.
-- [ ] **P2 — Sidebar open should defocus + scroll-lock the browse view.** *(User-reported 2026-06-26.)* When the
-  navdrawer/sidebar opens, the browse list behind it stays scrollable and visually in focus. **Desired:** the list
-  should dim (a scrim already exists) AND be scroll-locked (no wheel/touch scroll passes through to it) while the
-  drawer is open — mirroring how a modal locks the body. Add an overflow lock or `pointer-events:none` on the
-  scroll container while `#navdrawer.show` is active (the `closeSheets()` list at `main.js:1272` is the seam).
-  Same treatment for any sheet that covers the list (`#statsheet`, `#dupesheet`, `#rowmenu`).
-- [ ] **P3 — Surprise-me view rework.** *(User-reported 2026-06-26.)* The "surprise me" ambient card
-  (`browse/main.js:869 surprise()`) needs a visual + interaction rework. Currently it renders a card in the
-  ambient slot with Open/Not-today buttons. Open issues: the card layout, the dice button placement, and whether
-  the surprise item should open directly into the reader (it partially does via `canOpenInReader`). Pair with the
-  Epic 20 P2 surprise-me media rendering (shipped) — this is the next polish pass. Design bakeoff candidate.
+- [x] ~~**P2 — Sidebar open should defocus + scroll-lock the browse view.**~~ ✅ Shipped 2026-06-27:
+  `lockBrowseScroll()`/`unlockBrowseScroll()` (`main.js:1330`), called from `openPanel()` and `openDrawer()`.
+  Ref-counted so nesting works. Saved scroll position restored on unlock. The scrim already dims the list; this
+  adds the scroll lock. Same treatment for `#statsheet`, `#dupesheet` via `openPanel`.
+- [x] ~~**P3 — Surprise-me view rework.**~~ ✅ Shipped 2026-06-27.
+  Design decision E3: surprise-me card is larger (pinboard-view size/shape), treated like an inbox item — opens
+  the reader/thread with the same triage controls. The dice button renders in the ambient slot.
+  Pairs with the Epic 20 P2 surprise-me media rendering (already shipped).
 - [ ] **P3 — Make the Reddit view mobile-friendly** (the `/reddit` table/grid is desktop-first).
 
 ### Mobile lightbox / media-viewer *(Epic 16)*
 
-- [ ] **P2 — Scroll-lock the browse list while the lightbox is open.** *(User-reported 2026-06-26.)* With the
-  lightbox open, the underlying browse list still scrolls (wheel/touch bleeds through). The lightbox should
-  fully capture scroll — the body/list is locked (overflow hidden / `pointer-events:none`) until it closes.
-  Mirror the reader's `feedScrollY` save+restore pattern. The lightbox (`core/media.js createLightbox`) registers
-  with the overlay coordinator but doesn't currently lock the body. Group with the sidebar-scroll-lock item above
-  (same underlying body-lock mechanism).
+- [x] ~~**P2 — Scroll-lock the browse list while the lightbox is open.**~~ ✅ Shipped 2026-06-27:
+  `createLightbox` accepts a `lockScrollEl` option; `openMediaFor` passes `#items` — scroll is saved, the
+  element gets `overflow:hidden`, and restored on close (`core/media.js:349-373`).
 - [ ] **P2 — Pinch-zoom + mouse-wheel zoom in the lightbox.** *(User-reported 2026-06-26.)* Inside the lightbox, a
   pinch gesture (touch) or mouse-wheel should **zoom the image** instead of scrolling the page. Today the image
   renders at a fixed size with no zoom. Add a transform-scale driven by `wheel` (desktop) + touch `touchmove`
@@ -1074,26 +1059,19 @@ Absorbs "make the Reddit view more mobile-friendly".*
 
 ### Mobile tagging UX *(Epic 16)*
 
-- [ ] **P2 — Tag suggestions: last 2 categories + most-common manual tag.** *(User-reported 2026-06-26.)* When the
-  tag editor opens on mobile (before the user types), it should show **3 suggestions**: the **last 2 categories**
-  the user applied + the **most-common manually-applied tag** (from `tags_manual` / the recents in
-  `localStorage ch_recent_tags`). These suggestions disappear once the user starts typing. Today the editor shows
-  up to 3 `_recentTags()` (`tagedit.js:75`) — extend it to surface category history alongside tag recents. Needs a
-  small "recent categories" store (mirror `_pushRecent` for category). Rationale: on mobile, typing is costly; a
-  one-tap suggestion for the likely tag is the fast path.
-- [ ] **P2 — Tapping a suggested tag should not open the keyboard.** *(User-reported 2026-06-26.)* Today tapping a
-  `.tp-opt` suggestion calls `add()` then re-renders + re-focuses the input (`tagedit.js:159`), which pops the
-  keyboard back up. **Desired:** tapping a suggestion applies the tag WITHOUT re-focusing the input (no keyboard
-  flicker). The input stays blurred; the user can tap it to add another.
-- [ ] **P2 — Keyboard flicker on Enter: closes + reopens the keyboard.** *(User-reported 2026-06-26.)* Pressing
-  Enter to apply a typed tag currently causes the keyboard to briefly close and reopen (the `commit()` →
-  `render()` rebuild + `input.focus()` cycle, `tagedit.js:139-140`). Smooth this so the keyboard stays up across
-  the commit, OR (per the next item) just close the editor on Enter.
-- [ ] **P2 — Close the tag editor on Enter / suggestion-tap (mobile single-tag flow).** *(User-reported 2026-06-26.)*
-  For now, once the user presses Enter OR taps a suggestion, **close the editor**. It's unlikely they need to add
-  multiple tags on mobile in one go (and if they do, they tap Tag again). This sidesteps the keyboard-flicker
-  issue above entirely. Bulk multi-tagging on mobile is a later feature. The desktop flow can stay multi-tag (the
-  editor stays open); gate the close-on-commit on `isPhone()`.
+- [x] ~~**P2 — Tag suggestions: last 2 categories + most-common manual tag.**~~ ✅ Shipped 2026-06-27
+  (`tagedit.js options()` + `_recentCategories()` store in `localStorage ch_recent_categories`): when
+  the input is empty on mobile, shows 2 recent categories + 1 recent tag as suggestions. Disappears on typing.
+  Category store seeded on editor open from `metadata.category`.
+- [x] ~~**P2 — Tapping a suggested tag should not open the keyboard.**~~ ✅ Shipped 2026-06-27
+  (`tagedit.js:257`): tapping a `.tp-opt` calls `add(tag, {focus:false})` — no re-focus. The input stays blurred;
+  the user can tap it to add another.
+- [x] ~~**P2 — Keyboard flicker on Enter: closes + reopens the keyboard.**~~ ✅ Shipped 2026-06-27:
+  solved by closing the editor on Enter (`isPhone()` → `close()` in `commit()`, `tagedit.js:219-221`).
+  No keyboard flicker because the editor itself closes.
+- [x] ~~**P2 — Close the tag editor on Enter / suggestion-tap (mobile single-tag flow).**~~ ✅ Shipped 2026-06-27
+  (`tagedit.js:219-221`): `commit()` gates on `isPhone()` → `close()` instead of re-rendering. Desktop stays
+  multi-tag (editor stays open). Bulk multi-tagging on mobile is a later feature.
 - [x] ~~**P1 — Closing the reader must stop playing media (back-gesture keeps the video running).**~~ ✅ Fixed
   2026-06-20 (local, `frontend-staging`). *(User-reported 2026-06-19.)* On mobile, pressing **back** on the online
   embedded reader view left the video playing — audio bled after the feed was back on screen. `closeReader`
