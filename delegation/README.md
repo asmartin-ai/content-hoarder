@@ -4,7 +4,42 @@ Five self-contained frontend tasks carved off the just-shipped mobile-polish spr
 T2 agents in **separate git worktrees**. The remaining (more complex) mobile-polish items stay on
 T1 — see "Not in this batch" below.
 
-## How to run an agent on one of these
+## Outcome (2026-06-27)
+
+Three of five tasks were attempted by T2 agents and merged into **`staging/mobile-polish-t2`**:
+
+| Task | Branch | Outcome |
+|------|--------|--------|
+| `c2-lightbox-zoom` | `delegate/c2-lightbox-zoom` (commit `ae3925c`) | ✅ Merged. Pinch + wheel zoom, 1×–4× clamp, full CSS (transform-origin/transition/touch-action/`.zooming`/reduced-motion). Faithful to spec. |
+| `b4-hold-to-preview` | `delegate/b4-hold-to-preview` (commit `1e93bb5`) | ✅ Merged. 250ms hold → peek, window-level release listener, click-after-peek suppression, `{peek}` threaded through all `openMediaFor` branches. Faithful to spec. |
+| `p3-relay-icon-only` | `delegate/p3-relay-icon-only` (commit `664f0f1`) | ✅ Merged. Sr-only labels, 64×72 buttons, 32px icons, narrow-screen shrink, `title` attrs. Faithful to spec. |
+| `c3-lightbox-pan-close` | — | ⏸ Not started (was serial-after-C2; now unblocked — spec ready). |
+| `a2-no-feed-refresh-on-triage` | — | ❌ Not attempted. No worktree, branch, stash, or reflog trace. Spec is current and ready for T1. |
+
+**Staging validation:** `python -m pytest -q -m "not ui"` → same 5 known env failures, no new.
+`python -m pytest -m ui` → 20 passed, 1 skipped. JS syntax valid across all touched files. App
+serves the merged JS/CSS/HTML with no conflict markers. SW cache bumped to `ch-shell-v83`.
+
+**Merge notes:**
+- Order: P3 → C2 → B4 (P3 first as the cleanest; C2 next; B4 last since it touches the most).
+- Two conflicts, both resolved: `sw.js` (each branch set a different cache version → picked v83
+  with a combined comment) and `core/media.js` (C2's zoom state + B4's peek-release helper both
+  inserted after the same `videoTeardown` line → kept both blocks; the `close()` cleanup and
+  `closeVisual`'s `resetZoom()` call auto-merged cleanly below the conflict).
+- `APP_VERSION` in `main.js` auto-merged (all three branches set it to `v74`).
+- The sage-moth worktree had a duplicate P3 layer on top of C2 (an agent conflated tasks);
+  discarded that uncommitted layer, used the zinc-comet P3 branch instead.
+
+**Still pending on T1:**
+- **A2** — spec ready, unattempted. The implementation sketch (an `{fromReader:true}` option on
+  `act()` that skips `clearItemFirstPageCache` + `render()`) is current; `snooze()` needs the same
+  treatment.
+- **C3** — spec ready, unblocked. Builds on C2's zoom state inside `createLightbox`.
+- **Real-device verification** of B4 (swipe/long-press race, click-after-peek) and C2 (real
+  two-finger pinch on a Pixel-6) — the unit + UI smoke suites can't exercise these.
+- **E2 scroll-deceleration** — needs diagnosis before fix; was always T1.
+
+## How to run an agent on one of these (for the remaining tasks)
 
 Each task has its own spec file in this directory. The agent:
 
