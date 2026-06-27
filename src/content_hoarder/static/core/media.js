@@ -368,7 +368,8 @@ export function createLightbox(opts) {
 
   const setZoom = (img, s) => {
     zoomScale = Math.max(1, Math.min(4, s));
-    img.style.transform = `scale(${zoomScale})`;
+    if (zoomScale <= 1.001) { panX = 0; panY = 0; }
+    applyTransform(img);
     img.classList.toggle("zoomed", zoomScale > 1.001);
   };
   const resetZoom = () => {
@@ -439,6 +440,84 @@ export function createLightbox(opts) {
     { passive: true },
   );
 
+  /* ---- C3: swipe-to-pan (zoomed) + swipe-far-to-close (1×) ---- */
+  let panX = 0, panY = 0;
+  let dragStart = null; // {x, y, origPanX, origPanY, moved, img, pointerId} or null
+  const DRAG_CLOSE_THRESHOLD = 120;
+  function applyTransform(img) {
+    img.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+  }
+
+  body.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const img = e.target.closest(".media-img, .gallery-img");
+    if (!img) return;
+    if (zoomScale > 1.001 && dragStart) return; // pinch owns multi-touch
+    dragStart = {
+      x: e.clientX,
+      y: e.clientY,
+      origPanX: panX,
+      origPanY: panY,
+      moved: false,
+      img,
+      pointerId: e.pointerId,
+    };
+    img.classList.add("zooming"); // disable transition during drag
+    img.setPointerCapture(e.pointerId);
+  });
+
+  body.addEventListener("pointermove", (e) => {
+    if (!dragStart) return;
+    if (e.pointerId !== dragStart.pointerId) return;
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragStart.moved = true;
+    if (!dragStart.moved) return;
+    const img = dragStart.img;
+    if (zoomScale > 1.001) {
+      // PAN mode — clamp within zoomed bounds
+      const maxX = Math.max(0, (img.clientWidth * (zoomScale - 1)) / 2);
+      const maxY = Math.max(0, (img.clientHeight * (zoomScale - 1)) / 2);
+      panX = Math.max(-maxX, Math.min(maxX, dragStart.origPanX + dx));
+      panY = Math.max(-maxY, Math.min(maxY, dragStart.origPanY + dy));
+      applyTransform(img);
+    } else {
+      // 1× — vertical drag only (tracks finger for close gesture)
+      panX = 0;
+      panY = dy;
+      applyTransform(img);
+    }
+  });
+
+  body.addEventListener("pointerup", (e) => {
+    if (!dragStart) return;
+    if (e.pointerId !== dragStart.pointerId) return;
+    const wasDrag = dragStart.moved;
+    const img = dragStart.img;
+    dragStart = null;
+    img.classList.remove("zooming"); // re-enable transition for spring-back
+    if (wasDrag) e.stopPropagation(); // suppress backdrop click
+    if (zoomScale > 1.001) {
+      // keep pan where clamped — no spring-back
+    } else if (Math.abs(panY) > DRAG_CLOSE_THRESHOLD) {
+      close(); // swipe-far-to-close
+    } else {
+      panX = 0;
+      panY = 0;
+      if (img) applyTransform(img); // spring back
+    }
+  });
+
+  body.addEventListener("pointercancel", () => {
+    if (!dragStart) return;
+    const img = dragStart.img;
+    dragStart = null;
+    if (img) img.classList.remove("zooming");
+    panX = 0;
+    panY = 0;
+    if (zoomScale <= 1.001 && img) applyTransform(img);
+  });
+
   // B4: window-level release listener for peek mode (auto-closes on pointerup/pointercancel).
   let _peekRelease = null;
   const _attachPeekRelease = () => {
@@ -456,6 +535,8 @@ export function createLightbox(opts) {
   const closeVisual = () => {
     if (modal.hidden) return;
     resetZoom();
+    panX = 0;
+    panY = 0;
     if (videoTeardown) {
       videoTeardown();
       videoTeardown = null;
@@ -526,6 +607,8 @@ export function createLightbox(opts) {
     /* Direct image → simple lightbox (reliable; no Reddit dependency). */
     openImage(url, opts_) {
       if (!safeUrl(url)) return;
+      panX = 0;
+      panY = 0;
       open(
         '<img class="media-img" src="' +
           esc(url) +
@@ -542,6 +625,8 @@ export function createLightbox(opts) {
        (~1080px), NOT the multi-MB 5000px originals, with native loading=lazy; tapping an image
        swaps it up to the full original. */
     openGallery(urls, previews, opts_) {
+      panX = 0;
+      panY = 0;
       const full = (urls || []).filter(safeUrl);
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
