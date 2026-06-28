@@ -2628,7 +2628,7 @@ kbd {
     border-radius: var(--r-sm);
     transform-origin: center center;
     transition: transform 120ms var(--ease);
-    touch-action: pan-y pinch-zoom;
+    touch-action: none;
 }
 #media-body .media-video {
     max-width: 100%;
@@ -2651,7 +2651,7 @@ kbd {
     cursor: zoom-in;
     transform-origin: center center;
     transition: transform 120ms var(--ease);
-    touch-action: pan-y pinch-zoom;
+    touch-action: none;
 } /* placeholder + tap=full-res */
 #media-body .media-img.zoomed,
 #media-body .gallery-img.zoomed { touch-action: none; cursor: grab; }
