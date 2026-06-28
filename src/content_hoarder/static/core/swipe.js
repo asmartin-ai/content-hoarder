@@ -84,14 +84,18 @@ export function attachSwipe(el, opts) {
       clearTimeout(lpTimer);
       return;
     }
-    // long-press opens the relay menu, but NOT when the press started on a media
-    // element (the thumbnail has its own tap → lightbox behavior; long-pressing
-    // it should not bring up the action strip).
-    if (opts.onLongPress && !e.target.closest("[data-media]")) {
+    // long-press opens the relay menu. T3 peek-flicker: do NOT let the lpTimer's
+    // suppressNextClick() run when the press started on a [data-media] element -- media has
+    // its own hold-to-preview (B4), and the 450ms suppressNextClick() would race the peek
+    // release. The swipe itself still works from a media target (dragging is set above);
+    // only the long-press click-suppression is skipped.
+    if (opts.onLongPress) {
       clearTimeout(lpTimer);
+      const target = e.target;
       lpTimer = setTimeout(() => {
         lpTimer = null;
         if (horizontal) return; // a decided swipe already cleared this; guard anyway
+        if (target.closest("[data-media]")) return; // media has its own hold-to-preview
         suppressNextClick(); // swallow the click that follows finger-up
         if (navigator.vibrate) navigator.vibrate(15);
         opts.onLongPress(el);

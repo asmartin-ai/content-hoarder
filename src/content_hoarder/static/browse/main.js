@@ -568,6 +568,7 @@ itemsEl.addEventListener("click", (e) => {
    The release listener is on `window` in createLightbox (core/media.js) so release
    fires even if the finger drifts onto the lightbox content. */
 let holdTimer = null;
+let _peekOpen = false;
 let peeking = false;
 let peekPointerId = null;
 let peekStartX = 0;
@@ -585,11 +586,14 @@ itemsEl.addEventListener("pointerdown", (e) => {
   const fn = media.closest("[data-fullname]")?.dataset.fullname;
   if (!fn) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
+  // bail if a peek is already in progress (e.g., a second finger lands on a different thumb)
+  if (_peekOpen) return;
   peekStartX = e.clientX;
   peekStartY = e.clientY;
   peekPointerId = e.pointerId;
   holdTimer = setTimeout(() => {
     holdTimer = null;
+    _peekOpen = true;            // set BEFORE openMediaFor so the release listener sees it
     peeking = true;
     const item = state.items.find((it) => it.fullname === fn);
     if (item) openMediaFor(item, { peek: true });
@@ -615,7 +619,7 @@ itemsEl.addEventListener("pointerup", (e) => {
     peeking = false;
     // schedule suppression of the trailing click (it arrives after pointerup)
     _suppressNextClick = true;
-    // the lightbox-side window listener (in media.js) handles close on pointerup
+    // _peekOpen is cleared by the lightbox's close() onClose callback (see media.js).
   }
 });
 
@@ -626,6 +630,7 @@ itemsEl.addEventListener("pointercancel", (e) => {
   }
   if (peeking) {
     peeking = false;
+    _peekOpen = false;   // pointercancel means no pointerup will fire; clear here too
   }
 });
 
@@ -695,7 +700,10 @@ const lightbox = createLightbox({
   modal: "#media-modal",
   body: "#media-body",
   lockScrollEl: itemsEl,
-  onClose: () => reblur(lastMediaFn),
+  onClose: () => {
+    _peekOpen = false;       // T3 peek-flicker: a peek close (release/cancel) re-arms the guard
+    reblur(lastMediaFn);
+  },
 });
 function openMediaFor(item, opts) {
   lastMediaFn = item.fullname;
