@@ -70,13 +70,14 @@ export function attachSwipe(el, opts) {
     // If the relay strip is open on this row, swipes CLOSE it instead of triaging —
     // the two states are mutually exclusive (user 2026-06-27).
     relayCloseMode = el.classList.contains("relay-open");
-
     dragging = true;
     decided = false;
     horizontal = false;
     startX = e.clientX;
     startY = e.clientY;
-    fg.style.transition = "none";
+    if (!relayCloseMode) {
+      fg.style.transition = "none";   // only disable transition when we're actually dragging the fg
+    }
 
     if (relayCloseMode) {
       // no long-press, no triage — a rightward release closes the relay
@@ -152,9 +153,12 @@ export function attachSwipe(el, opts) {
     // leftward does nothing. No triage fires while the relay is open.
     if (relayCloseMode) {
       relayCloseMode = false;
-      if (horizontal && dx > 40 && opts.onRelayClose) {
+      // Any deliberate rightward motion closes the relay -- bypass the horizontal decision.
+      // (Triage swipes are disabled in relayCloseMode regardless.)
+      if (dx > 10 && opts.onRelayClose) {
         opts.onRelayClose(el);
       }
+      reset();   // ALWAYS reset, even if we didn't close: clears inline transition/transform
       return;
     }
     if (horizontal) suppressNextClick(); // any decided h-swipe: don't let the trailing click fire

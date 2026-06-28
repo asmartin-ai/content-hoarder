@@ -1669,6 +1669,8 @@ function closeRelay() {
   if (!relayFn && !relayRow) return;
   if (relayRow) {
     relayRow.classList.remove("relay-open");
+    const fg = relayRow.querySelector(".item-fg");
+    if (fg) { fg.style.transition = ""; fg.style.transform = ""; }
     const strip = relayRow.querySelector(".relay-strip");
     if (strip) strip.remove();
   }
