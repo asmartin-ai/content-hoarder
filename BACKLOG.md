@@ -801,7 +801,7 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
 - [x] ~~**P2 — Light/dark theme toggle in settings**~~ — `theme.js` toggle surfaced in the sheet.
 - [x] ~~**P2 — Infinite scroll by default; Focus mode batches.**~~ Shipped: load-on-scroll default,
   Focus mode batches; LOADING control lives in the settings sheet.
-- [ ] **P3 — Focus mode wider on desktop.** Desktop Focus mode should use a wider content column.
+- [x] ~~**P3 — Focus mode wider on desktop.**~~ Desktop Focus mode should use a wider content column.
 - [x] ~~**P3 — "Swipe only on mobile" → now a decision (see Epic 16).**~~ ✅ v3: implemented — `swipe.js:37` ignores mouse pointers, `attachSwipe` is touch-only by default (no toggle). Orig: Inbox swipe is mobile/touch-only by
   default, not a toggle.
 - [x] ~~**P3 — Hide the Stats button under settings.**~~ ✅ v3: Stats is the `#statsheet` panel inside the settings menu (GET /stats), per the 2026-06-12 parallel session. De-cluttered.

@@ -4135,3 +4135,12 @@ a.rd-au:hover {
     color: var(--dim, var(--text-muted));
     align-self: center;
 }
+
+/* Focus mode: wider content column on desktop (Epic 14 P3) */
+@media (min-width: 701px) {
+    body.focus .desk,
+    body.focus .con-row,
+    body.focus .folders {
+        max-width: 1500px;
+    }
+}

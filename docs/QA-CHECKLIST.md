@@ -257,7 +257,7 @@ Use this section after a QA pass to decide what to delegate. Treat **T3** as tig
 | Task | Why T3-safe | Done when |
 |---|---|---|
 | **Add/extend Playwright coverage for QA stories** | Clear oracle; mostly synthetic fixtures and UI assertions. | New tests cover one QA story without requiring private `data/app.db`; `pytest -m ui` passes. |
-| **Focus mode wider on desktop** (`BACKLOG.md` Epic 14) | Small CSS/layout change; low data risk. | Focus mode uses a wider column on desktop, mobile unchanged, light/dark checked. |
+| ~~**Focus mode wider on desktop**~~ (`BACKLOG.md` Epic 14) | Small CSS/layout change; low data risk. | ✅ Shipped |
 | **App icon replacement assets** (`BACKLOG.md` Epic 8) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
 | **QA/docs reconciliation after each sprint** | No app behavior risk; good cleanup work. | Checklist/backlog/delegation docs have no stale branch/staging wording. |
 | **Small CSS polish from an approved spec** | Safe only when the visual decision is already made. | One isolated CSS change, before/after screenshot, no broad refactor. |
