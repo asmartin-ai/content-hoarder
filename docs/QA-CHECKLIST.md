@@ -152,8 +152,8 @@ The media viewer, zoom, and gallery flows.
   *(shipped 2026-06-27; 1×–4× clamp, `dblclick` resets, gallery image-swap resets; pending
   real-device pinch verification)*
 - [ ] **Swipe-to-pan** (when zoomed) + **swipe-far-to-close** (Relay-style dismiss). 📱
-  *(not yet shipped — C3, unblocked now that C2 pinch-zoom landed on staging; spec
-  `delegation/SPEC-c3-lightbox-pan-close.md` ready)*
+  *(shipped 2026-06-27; verify zoomed pan clamps correctly and 1× vertical drag closes without
+  scrolling the page)*
 - [ ] **Back from lightbox** returns to the feed (not exit the app). ⬛
 
 ## Story 8 — "I tag items" (mobile + desktop)
@@ -229,20 +229,61 @@ Resurfacing card, surprise-me, the dice.
 
 ---
 
-## Known gaps / WIP (don't file these as new bugs)
+## Current known gaps / WIP (don't file these as new bugs)
 
-- **Tag-chip overload** on enriched YouTube cards (a wall of raw keyword chips) — display fix pending.
-- **Mobile long-press group-select** deferred from the retention/gallery split (tap-opens-modal shipped).
-- **Swipe physics feel** iceboxed (user: "right now it's fine") — re-activate if it feels laggy/stiff.
-- **Hold-to-preview media** (B4) **shipped 2026-06-27** — pending real-device verification of the
-  swipe/long-press race + click-after-peek suppression.
-- **Pinch-zoom in lightbox** (C2) **shipped 2026-06-27** — 1×–4× wheel + pinch, pending real-device
-  pinch verification. **Pan + swipe-far-to-close** (C3) shipped; verify one-finger pan/close on real device.
-- **Don't refresh feed on reader triage** (A2) shipped; verify feed position and lazy item removal on
-  real device.
-- **Scroll-deceleration** (E2) low priority — rapid fling to top feels weird.
-- **Relay strip refinements** (P3) **shipped 2026-06-27** — icon-only, larger touch targets,
-  narrow-screen shrink.
+- **Mobile long-press group-select** is deferred from the retention/gallery split (tap-opens-modal shipped).
+- **Swipe physics feel** is iceboxed (user: "right now it's fine") — re-activate only if it feels laggy/stiff.
+- **Scroll-deceleration** (E2) is still open — rapid fling-to-top can feel like it overshoots or stops abruptly.
+- **Mobile `/reddit` view** remains desktop-first.
+
+## Shipped mobile features that still merit real-device spot checks
+
+- **Hold-to-preview media** (B4): verify swipe/long-press race + click-after-peek suppression.
+- **Pinch-zoom / pan / swipe-far-to-close lightbox** (C2/C3): verify physical pinch, zoomed pan clamp,
+  and 1× vertical drag close on a Pixel-6-class device.
+- **Reader triage without feed refresh** (A2): verify feed position and lazy item removal on real device.
+- **Sidebar/sheets scroll-lock:** verify drawer/sheets trap scroll and restore the feed position on close.
+- **Tag editor mobile flow:** verify three suggestions, tap-without-keyboard, Enter closes once, no keyboard flicker.
+
+---
+
+## Next work by model tier
+
+Use this section after a QA pass to decide what to delegate. Treat **T3** as tightly-scoped execution,
+**T2** as bounded implementation with tests, and **T1** as diagnosis/design/architecture/live-data work.
+
+### T3 candidates — safe, narrow, easy to review
+
+| Task | Why T3-safe | Done when |
+|---|---|---|
+| **Add/extend Playwright coverage for QA stories** | Clear oracle; mostly synthetic fixtures and UI assertions. | New tests cover one QA story without requiring private `data/app.db`; `pytest -m ui` passes. |
+| **Focus mode wider on desktop** (`BACKLOG.md` Epic 14) | Small CSS/layout change; low data risk. | Focus mode uses a wider column on desktop, mobile unchanged, light/dark checked. |
+| **App icon replacement assets** (`BACKLOG.md` Epic 8) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
+| **QA/docs reconciliation after each sprint** | No app behavior risk; good cleanup work. | Checklist/backlog/delegation docs have no stale branch/staging wording. |
+| **Small CSS polish from an approved spec** | Safe only when the visual decision is already made. | One isolated CSS change, before/after screenshot, no broad refactor. |
+
+### T2 candidates — bounded implementation, needs tests/review
+
+| Task | Why T2-sized | T1 handoff needed first |
+|---|---|---|
+| **RedGifs resolver dry-run** for dead Gfycat links (`BACKLOG.md` Epic 4) | Bounded provider + CLI dry-run + offline tests. | Confirm NSFW/opt-in policy and whether it should archive bytes or only rewrite metadata first. |
+| **Import WL3 / Watch Later export** (`BACKLOG.md` Epic 7) | Existing YouTube import path can be reused; fixture-driven tests. | Provide/export sample format and decide whether this is one-shot import or recurring workflow. |
+| **Live Firefox tab manual push** (`BACKLOG.md` Epic 7) | Bounded local endpoint/bookmarklet/WebExtension shape once chosen. | Pick integration shape: WebExtension, bookmarklet, or `sessionstore` reader. |
+| **Improve Reddit/Youtube tag coverage** (`BACKLOG.md` Epic 9) | Heuristic maps + dry-run counts are testable and reversible. | Decide desired buckets; avoid inventing taxonomy. |
+| **OCR search wiring after engine decision** (`BACKLOG.md` Epic 12) | Once OCR text exists, FTS/search/operator plumbing is straightforward. | T1 must choose engine and image-byte source from a sample accuracy/cost check. |
+| **Keyboard shortcut implementation** (`BACKLOG.md` Epic 5) | Bounded JS + cheatsheet/tests after mapping is approved. | T1/user must approve the new shortcut map first. |
+
+### T1 candidates — keep with a strong model / human decision gate
+
+| Task | Why T1 | First concrete action |
+|---|---|---|
+| **Scroll-deceleration diagnosis** (E2) | Requires reproducing touch/scroll physics and separating CSS, JS, browser, and infinite-scroll effects. | Capture a real-device repro and instrument scroll handlers before editing. |
+| **`v.redd.it` video archiving** (`BACKLOG.md` Epic 4) | Large storage/network design with media formats, throttling, and backup implications. | Design a dry-run plan: count sizes, choose HLS/DASH storage shape, set caps. |
+| **At-save-time media archiving** (`BACKLOG.md` Epic 4) | Touches sync/import paths and can create network/load side effects. | Define opt-in setting, rate limits, and failure semantics. |
+| **Archive.today live smoke + `/recover` opt-in** (`BACKLOG.md` Epic 4) | Live external service, low hit rate, Cloudflare/rate-limit behavior. | Run against a DB copy with one `media_status='gone'` item; only then design UI opt-in. |
+| **OCR engine selection** (`BACKLOG.md` Epic 12) | Needs accuracy/privacy/performance comparison across local engines. | Run a small sample with Tesseract vs local vision and record hit quality. |
+| **Mobile `/reddit` redesign** (`BACKLOG.md` Epic 16) | Design/system-level UI work, not just implementation. | Produce a small spec/screenshot plan before code. |
+| **Bulk-unsave by tag / live Reddit writes** (`BACKLOG.md` Epic 9) | Irreversible external action path; requires safety gates and audit trail. | Design dry-run/count/confirm/audit flow before any live drain. |
 
 ---
 
