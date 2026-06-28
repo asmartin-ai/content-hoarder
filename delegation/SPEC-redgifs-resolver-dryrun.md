@@ -7,10 +7,10 @@
 **Status:** Implemented; targeted RedGifs oracle passes.  
 **Source backlog:** `BACKLOG.md` Epic 4, `P2 — RedGifs resolver for the ~1,090 dead Gfycat links`.
 
-## Current discovery
+## As-built outcome
 
-`src/content_hoarder/redgifs_resolver.py` already exists and `tests/test_redgifs_resolver.py` currently passes
-(`12 passed`). It includes:
+`src/content_hoarder/redgifs_resolver.py` already existed before Batch B, and Batch B wired it into the CLI.
+The shipped path includes:
 
 - `extract_gfycat_id()`
 - `gfycat_to_redgifs_id()`
@@ -18,9 +18,11 @@
 - `resolve_gfycat()` against `/v2/gifs/<id>`
 - `rewrite_item()` metadata rewrite
 - `resolve_all()` scanning `metadata.media_url LIKE '%gfycat.com%'`
+- `resolve-redgifs` CLI wiring in `src/content_hoarder/cli.py`
+- README CLI documentation
+- explicit `--redgifs-ok` network opt-in plus separate `--apply` write gate
 
-But it is not wired into `cli.py`, not documented in the README CLI table, and does not yet expose the explicit
-NSFW/RedGifs opt-in decision made 2026-06-28.
+Targeted oracle: `tests/test_redgifs_resolver.py` passes after the Batch B merge.
 
 ## User decisions
 
@@ -47,9 +49,7 @@ Do **not** touch:
 - live DB files
 - unrelated import/recovery code
 
-## Implementation target
-
-Add a CLI command, suggested name:
+## Implemented CLI
 
 ```bash
 python -m content_hoarder resolve-redgifs [--limit N] [--redgifs-ok] [--apply]
@@ -71,17 +71,16 @@ Behavior:
 5. Preserve triage/user state and all unrelated metadata keys.
 6. Return JSON summary with at least `total`, `resolved`, `failed`, `dry_run`, and `samples`.
 
-## Hardening requested
+## Hardening shipped
 
-- Add dependency injection seams for token/API fetching if needed so tests stay offline. If current monkeypatching is enough,
-  preserve it rather than over-refactoring.
-- Add tests that prove:
+- Existing monkeypatch seams were sufficient; tests stay offline.
+- Tests prove:
   1. CLI/parser exposes the command.
   2. No `--redgifs-ok` means no network function is called.
   3. Dry-run with opt-in does not rewrite item metadata.
-  4. `--apply --redgifs-ok` rewrites only the intended metadata keys and commits.
-  5. Existing `tests/test_redgifs_resolver.py` still pass.
-- Do not add `requests`/`httpx`; project convention is stdlib `urllib`.
+  4. `--apply --redgifs-ok` rewrites only intended metadata keys while preserving triage/user state.
+  5. Existing RedGifs resolver tests still pass.
+- No `requests`/`httpx` dependency was added; project convention remains stdlib `urllib`.
 
 ## Validation
 
@@ -94,16 +93,11 @@ python -m pytest -q -m "not ui"
 
 If the broad suite hits the known Windows UNC SQLite failures, report them separately and prove the targeted RedGifs tests pass.
 
-## Aider/delegation guidance
+## Delegation lesson
 
-This task is a good headless-Aider candidate **after** T1 records the oracle hash for `tests/test_redgifs_resolver.py`.
-Use the `aider-headless-delegate` protocol:
-
-- run on a non-main branch,
-- make `tests/test_redgifs_resolver.py` read-only/context, not editable, unless T1 explicitly asks the agent to add tests first,
-- verify applied edits, git status scope, oracle integrity, and targeted tests.
-
-Because this task may need new tests, a safer split is:
+This task was a good headless/delegated-executor shape because it had a tight offline oracle and a small write set.
+The safer split remains the pattern for future similar tasks:
 
 1. T1 writes/locks failing tests for the desired CLI behavior.
-2. Aider implements only `redgifs_resolver.py` + `cli.py` + README docs until the tests pass.
+2. A weaker executor implements only the bounded source/docs changes until the tests pass.
+3. T1 verifies applied edits, git status scope, oracle integrity, and targeted tests before merging.
