@@ -464,6 +464,7 @@ export function createLightbox(opts) {
     };
     img.classList.add("zooming"); // disable transition during drag
     img.setPointerCapture(e.pointerId);
+    img.style.touchAction = "none"; // claim the gesture exclusively
   });
 
   body.addEventListener("pointermove", (e) => {
@@ -473,6 +474,7 @@ export function createLightbox(opts) {
     const dy = e.clientY - dragStart.y;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragStart.moved = true;
     if (!dragStart.moved) return;
+    if (e.cancelable) e.preventDefault(); // stop the browser from scrolling
     const img = dragStart.img;
     if (zoomScale > 1.001) {
       // PAN mode — clamp within zoomed bounds
@@ -495,7 +497,10 @@ export function createLightbox(opts) {
     const wasDrag = dragStart.moved;
     const img = dragStart.img;
     dragStart = null;
-    img.classList.remove("zooming"); // re-enable transition for spring-back
+    if (img) {
+      img.classList.remove("zooming"); // re-enable transition for spring-back
+      img.style.touchAction = ""; // restore (falls back to CSS)
+    }
     if (wasDrag) e.stopPropagation(); // suppress backdrop click
     if (zoomScale > 1.001) {
       // keep pan where clamped — no spring-back
@@ -512,7 +517,10 @@ export function createLightbox(opts) {
     if (!dragStart) return;
     const img = dragStart.img;
     dragStart = null;
-    if (img) img.classList.remove("zooming");
+    if (img) {
+      img.classList.remove("zooming");
+      img.style.touchAction = ""; // restore (falls back to CSS)
+    }
     panX = 0;
     panY = 0;
     if (zoomScale <= 1.001 && img) applyTransform(img);
