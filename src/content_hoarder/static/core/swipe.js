@@ -76,7 +76,7 @@ export function attachSwipe(el, opts) {
     startX = e.clientX;
     startY = e.clientY;
     if (!relayCloseMode) {
-      fg.style.transition = "none";   // only disable transition when we're actually dragging the fg
+      fg.style.transition = "none"; // only disable transition when we're actually dragging the fg
     }
 
     if (relayCloseMode) {
@@ -121,7 +121,10 @@ export function attachSwipe(el, opts) {
     if (!horizontal) return; // vertical → let the list scroll
     // In relay-close mode, don't translate (no blank space to the right on
     // leftward swipes); we just track the direction for the close gesture.
-    if (relayCloseMode) return;
+    if (relayCloseMode) {
+      if (e.cancelable) e.preventDefault();
+      return;
+    }
     if (e.cancelable) e.preventDefault(); // claim the gesture: block link activation / native drag
     fg.style.transform = "translateX(" + dx + "px)";
     el.classList.toggle("swipe-arch", dx > 40 && dx <= COMMIT2); // right → archive
@@ -159,10 +162,11 @@ export function attachSwipe(el, opts) {
       relayCloseMode = false;
       // Any deliberate rightward motion closes the relay -- bypass the horizontal decision.
       // (Triage swipes are disabled in relayCloseMode regardless.)
+      if (decided || Math.abs(dx) > 8) suppressNextClick();
       if (dx > 10 && opts.onRelayClose) {
         opts.onRelayClose(el);
       }
-      reset();   // ALWAYS reset, even if we didn't close: clears inline transition/transform
+      reset(); // ALWAYS reset, even if we didn't close: clears inline transition/transform
       return;
     }
     if (horizontal) suppressNextClick(); // any decided h-swipe: don't let the trailing click fire

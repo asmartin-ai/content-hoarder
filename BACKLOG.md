@@ -1088,39 +1088,39 @@ Real-device pass on `staging/mobile-polish-t2` surfaced 8 regressions + 1 missin
 batch: `delegation/MOBILE-POLISH-T3-BATCH.md` (7 T2-delegated tasks, branched off staging —
 NOT main, since T2 hasn't merged to main yet). Tests live in `tests/ui/test_mobile_ux.py`.
 
-- [ ] **P1 — Swipe-left reveals blank space after long-press.** T2 regression: `swipe.js pointerdown`
+- [x] **P1 — Swipe-left reveals blank space after long-press.** T2 regression: `swipe.js pointerdown`
   sets `fg.style.transition = "none"` unconditionally (even in `relayCloseMode`); the `end()`
   relay branch returns without `reset()`, leaving the inline `transition: none` to suppress the
   CSS slide-back when `relay-open` is removed → abrupt snap / visible blank strip. Fix:
   `t3-relay-swipe-close` skips the transition disable in `relayCloseMode` and always calls
   `reset()` at the end of the branch.
-- [ ] **P1 — Swipe-right from relay-open doesn't close the relay.** T2 regression: `end()` requires
+- [x] **P1 — Swipe-right from relay-open doesn't close the relay.** T2 regression: `end()` requires
   `horizontal && dx > 40` — the 40px triage-commit threshold is too high for an already-open
   overlay, and the `horizontal` decision can fail on a diagonal swipe. Fix: `t3-relay-swipe-close`
   lowers the close threshold to 10px and bypasses the `horizontal` decision in `relayCloseMode`.
-- [ ] **P1 — Hold-to-preview flickers (opens/closes repeatedly).** T2 regression (B4): the
+- [x] **P1 — Hold-to-preview flickers (opens/closes repeatedly).** T2 regression (B4): the
   window-level peek release listener can fire twice (`pointerup` + `pointercancel`), and
   `swipe.js`'s 450ms long-press timer arms on `[data-media]` targets, racing the 250ms peek.
   Fix: `t3-peek-flicker` adds an idempotency guard (`_peekOpen`), makes the release listener
   fire-once across both event types, and moves the swipe.js `[data-media]` guard to skip the
   lpTimer arming entirely.
-- [ ] **P2 — Only 1 tag suggestion shown (D1 should show 3).** T2 regression: `tagedit.js options()`
+- [x] **P2 — Only 1 tag suggestion shown (D1 should show 3).** T2 regression: `tagedit.js options()`
   slices 2 categories + 1 tag, but `_recentCategories()` is empty unless the item has a
   `metadata.category` → 0 + 1 = 1. Fix: `t3-tag-suggest-three` backfills with recent tags to
   always reach 3 total when the stores have enough candidates.
-- [ ] **P1 — Lightbox swipe-to-close scrolls the page instead.** T2 regression (C3): the
+- [x] **P1 — Lightbox swipe-to-close scrolls the page instead.** T2 regression (C3): the
   `pointermove` handler doesn't `preventDefault` and the image's `touch-action: pan-y` lets the
   browser scroll. Fix: `t3-lightbox-swipe-scroll` adds `preventDefault` on drag + sets
   `touch-action: none` on the image during the drag.
-- [ ] **P2 — Sidebar open still scrolls the browse view.** T2 regression (E1): `lockBrowseScroll`
+- [x] **P2 — Sidebar open still scrolls the browse view.** T2 regression (E1): `lockBrowseScroll`
   only locks `#items`, not the body; the `.navdrawer` lacks `overscroll-behavior: contain` so
   scroll chains. Fix: `t3-sidebar-scroll-lock` locks the body too (ref-counted) and adds
   `overscroll-behavior: contain` to the panels.
-- [ ] **P2 — Drop the reader triage dock (`.rd-foot`).** User decision 2026-06-27: the dock looks
+- [x] **P2 — Drop the reader triage dock (`.rd-foot`).** User decision 2026-06-27: the dock looks
   wrong on mobile; scrap it now, redesign later. Reader stays fully usable via swipe + keyboard
   (F/A/D/T/S/Esc). Fix: `t3-drop-reader-dock` deletes the `.rd-foot` element, its handlers, and
   its CSS. Safe-area inset preserved on `.rd-scroll`.
-- [ ] **P2 — UX verification tooling (Playwright).** T2 gap: the existing `tests/ui/test_smoke.py`
+- [x] **P2 — UX verification tooling (Playwright).** T2 gap: the existing `tests/ui/test_smoke.py`
   covers feed load + gallery + topbar, but NOT relay/peek/tag-suggest/lightbox-swipe/sidebar-lock.
   Fix: `t3-playwright-ux-tests` adds `tests/ui/test_mobile_ux.py` with one test per T3 fix,
   designed to fail on the buggy staging branch and pass once the fixes merge.
