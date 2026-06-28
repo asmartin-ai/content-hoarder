@@ -1,9 +1,7 @@
 # T3 delegation batch — 2026-06-27 (mobile polish regression fixes)
 
-The T2 mobile-polish sprint (`staging/mobile-polish-t2`) shipped 17 items but the real-device pass
-surfaced 8 regressions + 1 missing feature. This batch fixes them via parallel T2 sub-agents in
-**separate git worktrees** branched off **`staging/mobile-polish-t2`** (NOT `main` — T2 hasn't merged
-to main yet, and these fixes build directly on T2's code).
+The T2 mobile-polish sprint shipped 17 items but the real-device pass surfaced 8 regressions + 1
+missing feature. This batch fixed them via parallel T2 sub-agents in separate worktrees.
 
 ## Source of the bug list
 
@@ -23,23 +21,23 @@ real-device session on the staging branch 2026-06-27:
 
 | Task | Branch | Method | Outcome |
 |------|--------|--------|--------|
-| `t3-relay-swipe-close` | `delegate/t3-relay-swipe-close` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review fixed relay test targeting + click/default suppression. |
-| `t3-peek-flicker` | `delegate/t3-peek-flicker` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
-| `t3-tag-suggest-three` | `delegate/t3-tag-suggest-three` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
-| `t3-lightbox-swipe-scroll` | `delegate/t3-lightbox-swipe-scroll` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review added window scroll restoration. |
-| `t3-sidebar-scroll-lock` | `delegate/t3-sidebar-scroll-lock` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
-| `t3-drop-reader-dock` | `delegate/t3-drop-reader-dock` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review removed a stale closing tag. |
-| `t3-playwright-ux-tests` | `delegate/t3-playwright-ux-tests` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; targeted T3 UI suite passes after review fixes. |
+| `t3-relay-swipe-close` | `delegate/t3-relay-swipe-close` | T2 sub-agent | Completed; review fixed relay test targeting + click/default suppression. |
+| `t3-peek-flicker` | `delegate/t3-peek-flicker` | T2 sub-agent | Completed. |
+| `t3-tag-suggest-three` | `delegate/t3-tag-suggest-three` | T2 sub-agent | Completed. |
+| `t3-lightbox-swipe-scroll` | `delegate/t3-lightbox-swipe-scroll` | T2 sub-agent | Completed; review added window scroll restoration. |
+| `t3-sidebar-scroll-lock` | `delegate/t3-sidebar-scroll-lock` | T2 sub-agent | Completed. |
+| `t3-drop-reader-dock` | `delegate/t3-drop-reader-dock` | T2 sub-agent | Completed; review removed a stale closing tag. |
+| `t3-playwright-ux-tests` | `delegate/t3-playwright-ux-tests` | T2 sub-agent | Completed; targeted T3 UI suite passes after review fixes. |
 
-**Staging target:** `staging/mobile-polish-t3`, branched off `staging/mobile-polish-t2`.
+**Integration target:** merge the completed batch through the normal staging branch, then into `main`.
 
 ## How to run an agent on one of these
 
 Each task has its own spec file in this directory (`SPEC-t3-<id>.md`). The agent:
 
-1. Creates a worktree from `staging/mobile-polish-t2` (NOT `main`):
+1. Creates a worktree from the current integration branch for the batch:
    ```
-   git worktree add -b delegate/t3-<task-id> ../content-hoarder-t3-<task-id> staging/mobile-polish-t2
+   git worktree add -b delegate/t3-<task-id> ../content-hoarder-t3-<task-id> <integration-branch>
    cd ../content-hoarder-t3-<task-id>
    ```
 2. Reads its spec file (`delegation/SPEC-t3-<id>.md`) end-to-end **and** the files it names.
@@ -61,9 +59,9 @@ Each task has its own spec file in this directory (`SPEC-t3-<id>.md`). The agent
 
 1. **One task per worktree.** Don't touch files outside the spec's "Files in scope" list. If a
    change is needed elsewhere, note it in the report and stop.
-2. **Branch off `staging/mobile-polish-t2`, not `main`.** All T3 fixes build on T2's code (e.g.
-   `t3-peek-flicker` patches B4's hold-to-preview, which only exists on staging). Branching off
-   `main` would force the agent to re-implement T2 first.
+2. **Branch off the batch integration branch, not necessarily `main`.** All T3 fixes build on T2's
+   code (e.g. `t3-peek-flicker` patches B4's hold-to-preview), so a stacked batch should branch from
+   the branch that already contains its prerequisites.
 3. **Bump the service-worker cache version on any shipped UI change.** `src/content_hoarder/static/sw.js`
    line 7: `const CACHE = "ch-shell-v86";` (current on staging). Each spec names its next version
    string — use it. The `APP_VERSION` constant in `static/browse/main.js` bumps in lockstep.
@@ -80,7 +78,7 @@ Each task has its own spec file in this directory (`SPEC-t3-<id>.md`). The agent
    - `tests/test_hackernews.py::test_hn_saved_and_read`
    - `tests/test_connectors.py::test_hackernews_favorite_db`
 
-   Confirm they were already failing on `staging/mobile-polish-t2` before your change
+   Confirm they were already failing on the batch baseline before your change
    (`git stash && python -m pytest <those> -q; git stash pop`). If your change adds **new**
    failures, that's yours. If it only leaves those five failing, you're clean.
 7. **Commit message** per the global AGENTS.md commit style. One commit per task is fine; squash
@@ -120,7 +118,7 @@ t3-drop-reader-dock    ────> independent (removes code; do before t3-pla
 t3-playwright-ux-tests ────> merge LAST so its assertions match the final shipped behavior
 ```
 
-Suggested merge order onto `staging/mobile-polish-t3`:
+Suggested merge order onto the integration branch:
 
 1. `t3-drop-reader-dock` (deletion — clean base for the rest)
 2. `t3-relay-swipe-close`
@@ -130,8 +128,8 @@ Suggested merge order onto `staging/mobile-polish-t3`:
 6. `t3-sidebar-scroll-lock`
 7. `t3-playwright-ux-tests` (last — assertions match final shipped behavior)
 
-After all seven land on `staging/mobile-polish-t3`, run the full Playwright `pytest -m ui` suite
-on the integration branch before promoting to `main`.
+After all seven land, run the full Playwright `pytest -m ui` suite on the integration branch before
+promoting to `main`.
 
 ## Not in this batch (stays on T1)
 
@@ -150,7 +148,6 @@ After the agents report done, T1 (you, the orchestrator) will:
 1. For each branch: re-review the diff, run `python -m pytest -q -m "not ui"`, run the spec's UI
    smoke check on the real device if it had one.
 2. Merge in the order above to minimize conflicts.
-3. After all seven land on `staging/mobile-polish-t3`, do one combined SW-cache bump pass if any
-   version strings drifted, then a full Playwright `pytest -m ui` run on the integration branch
-   before tagging.
-4. Promote `staging/mobile-polish-t3` to `main` once the device pass is clean.
+3. After all seven land, do one combined SW-cache bump pass if any version strings drifted, then a
+   full Playwright `pytest -m ui` run on the integration branch before tagging.
+4. Promote the integration branch to `main` once the device pass is clean.
