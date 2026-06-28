@@ -2303,11 +2303,23 @@ body.focus .batchstrip {
     z-index: 50;
     opacity: 0;
     pointer-events: none;
+    touch-action: none;
     transition: opacity 140ms var(--ease);
 }
 .scrim.show {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* overscroll-behavior on the panels that scroll internally. Prevents scroll
+   chaining: when the user reaches the edge of the panel's content, the scroll
+   does NOT pass through to the underlying page. */
+.navdrawer,
+#statsheet,
+#dupesheet,
+#settings,
+#kbd {
+    overscroll-behavior: contain;
 }
 .sheetpanel {
     position: fixed;
