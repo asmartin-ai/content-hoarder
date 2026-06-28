@@ -109,10 +109,12 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
         .filter((c) => !applied.has(c))
         .slice(0, 2)
         .map((t) => ({ tag: t, create: false, kind: "category" }));
+      // Always aim for 3 total: backfill with recent tags when fewer than 2 categories.
+      const tagsNeeded = Math.max(0, 3 - cats.length);
       const tags = _recentTags()
         .filter((t) => !applied.has(t))
         .filter((t) => !cats.some((c) => c.tag === t))
-        .slice(0, 1)
+        .slice(0, tagsNeeded)
         .map((t) => ({ tag: t, create: false, kind: "tag" }));
       return [...cats, ...tags];
     }
