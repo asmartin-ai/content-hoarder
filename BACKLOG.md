@@ -1084,9 +1084,9 @@ Absorbs "make the Reddit view more mobile-friendly".*
 
 ### T3 mobile-polish regression batch *(Epic 16)* — 2026-06-27
 
-Real-device pass on `staging/mobile-polish-t2` surfaced 8 regressions + 1 missing feature. Fix
-batch: `delegation/MOBILE-POLISH-T3-BATCH.md` (7 T2-delegated tasks, branched off staging —
-NOT main, since T2 hasn't merged to main yet). Tests live in `tests/ui/test_mobile_ux.py`.
+Real-device pass after the T2 mobile-polish sprint surfaced 8 regressions + 1 missing feature. Fix
+batch: `delegation/MOBILE-POLISH-T3-BATCH.md` (7 delegated tasks). Tests live in
+`tests/ui/test_mobile_ux.py`.
 
 - [x] **P1 — Swipe-left reveals blank space after long-press.** T2 regression: `swipe.js pointerdown`
   sets `fg.style.transition = "none"` unconditionally (even in `relayCloseMode`); the `end()`
