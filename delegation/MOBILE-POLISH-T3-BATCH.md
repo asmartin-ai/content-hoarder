@@ -6,7 +6,7 @@ missing feature. This batch fixed them via parallel T2 sub-agents in separate wo
 ## Source of the bug list
 
 `MOBILE-POLISH-BATCH.md` records what T2 shipped. The 8 user-reported regressions came from a
-real-device session on the staging branch 2026-06-27:
+real-device session on the mobile-polish integration branch 2026-06-27:
 
 1. Swipe-left reveals blank space after long-press (relay + swipe interaction broken)
 2. Swipe-right from relay-open state does not close the relay strip
@@ -29,11 +29,11 @@ real-device session on the staging branch 2026-06-27:
 | `t3-drop-reader-dock` | `delegate/t3-drop-reader-dock` | T2 sub-agent | Completed; review removed a stale closing tag. |
 | `t3-playwright-ux-tests` | `delegate/t3-playwright-ux-tests` | T2 sub-agent | Completed; targeted T3 UI suite passes after review fixes. |
 
-**Integration target:** merge the completed batch through the normal staging branch, then into `main`.
+**Integration result:** the completed batch was merged to `main`; this file is a historical record.
 
-## How to run an agent on one of these
+## Historical agent workflow
 
-Each task has its own spec file in this directory (`SPEC-t3-<id>.md`). The agent:
+Each task had its own spec file in this directory (`SPEC-t3-<id>.md`). The agent:
 
 1. Creates a worktree from the current integration branch for the batch:
    ```
@@ -141,13 +141,9 @@ promoting to `main`.
   its replacement in a later session. Don't sneak a redesign into the deletion task.
 - **Epic 20 P2 — triage visual rework.** Design bakeoff; needs the `frontend-design` skill.
 
-## Merging the worktrees back
+## Merge result
 
-After the agents report done, T1 (you, the orchestrator) will:
-
-1. For each branch: re-review the diff, run `python -m pytest -q -m "not ui"`, run the spec's UI
-   smoke check on the real device if it had one.
-2. Merge in the order above to minimize conflicts.
-3. After all seven land, do one combined SW-cache bump pass if any version strings drifted, then a
-   full Playwright `pytest -m ui` run on the integration branch before tagging.
-4. Promote the integration branch to `main` once the device pass is clean.
+All seven task branches were reviewed, merged, and later cleaned up. The scratch worktrees and merged local
+branches are gone; the remote staging branch used for integration was deleted after it was confirmed to be an
+ancestor of `main`. Keep the merge order above as useful conflict context for future similar batches, not as an
+active checklist.

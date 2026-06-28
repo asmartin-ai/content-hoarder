@@ -171,10 +171,10 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
   processing categories are mirrored into the curated tag vocabulary (`PROCESSING_TAGS`), `/categories`
   cross-filters by source/status, and the browse rail/drawer exposes categories alongside source/tag rows.
   The larger structural model question remains tracked under Epic 26's overall taxonomy reorg.
-- [ ] **P3 — Zoom into the image / gallery modal.** *(Folded into Epic 16 mobile-lightbox items 2026-06-26.)*
-  Scroll/pinch-to-zoom (+ pan) in the media lightbox and gallery viewer — now tracked under Epic 16's
-  "Mobile lightbox / media-viewer" section (pinch-zoom + swipe-to-pan + swipe-far-to-close), which supersedes
-  this v2-era item. The `app.js` references are stale post-v3 (`core/media.js createLightbox` is the current home).
+- [x] ~~**P3 — Zoom into the image / gallery modal.**~~ ✅ SUPERSEDED + SHIPPED via Epic 16
+  mobile-lightbox work (2026-06-27): pinch/mouse-wheel zoom (C2) plus zoomed pan and 1× swipe-far-to-close
+  (C3) now live in `core/media.js createLightbox`. This v2-era item is closed here so it is not delegated
+  twice; the old `app.js` references are stale post-v3.
 - [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
   J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new
   mapping for review. (The `?` cheatsheet already ships.)
@@ -929,11 +929,12 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   (`browse/main.js openMediaFor`): when the item has no lightboxable media (`!imageUrl(item)` and `media_type`
   not in `{image,gallery,reddit_video}`), the thumbnail tap routes to `readerUI.open()` instead of the lightbox.
   Mirror of the empty-gallery gate at `main.js:549`.
-- [x] ~~**P2 — Reader triage dock rework (design bakeoff — GLM-5.2).**~~ ✅ Shipped 2026-06-27
-  (design decision A1: bottom tab that pulls up into a semi-circle dock). `.rd-foot` with `.rd-dock-tab`
-  (collapsed pill → tap to fan open) + 5-button semi-circle fan (Archive, Snooze top arc; Keep, Tag, Done
-  bottom arc). Backdrop tap (`rd-dock-scrim`) collapses without closing the reader. Keyboard shortcuts F/A/D
-  preserved. Snooze is first-class (`data-snooze="7"`).
+- [x] ~~**P2 — Reader triage dock rework (design bakeoff — GLM-5.2).**~~ ✅ Shipped then **removed** 2026-06-27.
+  The first implementation (`.rd-foot` + semi-circle dock) landed during the T2 mobile-polish sprint, but the
+  real-device follow-up showed it felt wrong on mobile. The T3 regression batch deliberately deleted the dock
+  (`t3-drop-reader-dock`): reader actions now stay available through keyboard shortcuts (`F`/`A`/`D`/`T`/`S`),
+  row/list gestures after returning to the feed, and normal reader header affordances. Treat the dock design as
+  superseded, not as current UI.
 - [x] ~~**P2 — Don't refresh the feed on reader Done/Archive/Keep.**~~ ✅ SHIPPED 2026-06-27
   (`delegate/a2-no-feed-refresh-on-triage`, SW v84 → v86 merged). `act()` and `snooze()` gained an
   `{fromReader:true}` option: reader triage (F/A/D keys, dock buttons, S key) skips the leave-animation,
@@ -1013,7 +1014,7 @@ Absorbs "make the Reddit view more mobile-friendly".*
   (`onRelayClose`) collapses the strip; swipe + relay states are mutually exclusive (`relayCloseMode` in
   `core/swipe.js`). A transparent `.relay-scrim` captures outside taps / Escape.
 - [x] ~~**P3 — Relay strip visual polish (icon-only, no text labels).**~~ ✅ Shipped 2026-06-27
-  (T2 delegation, `delegate/p3-relay-icon-only` → staging `mobile-polish-t2`): the `.relay-lbl` spans
+  (T2 delegation, merged through the mobile-polish integration branch and now on `main`): the `.relay-lbl` spans
   are now visually hidden (sr-only pattern: `position:absolute;width:1px;height:1px;clip:rect(0,0,0,0)`)
   — screen readers still announce each button via its `aria-label`. Buttons enlarged 56×60 → 64×72,
   icons 24 → 32px. `@media (max-width:360px)` shrinks to 56×64 / 28px icons so 5 across never overflows
@@ -1024,7 +1025,7 @@ Absorbs "make the Reddit view more mobile-friendly".*
   make the buttons larger, ensure 5 evenly-spaced well-sized icons, and fix text overlap on narrow
   screens.
 - [x] ~~**P2 — Hold-to-preview media (Relay-style press-and-hold lightbox).**~~ ✅ Shipped 2026-06-27
-  (T2 delegation, `delegate/b4-hold-to-preview` → staging `mobile-polish-t2`): `pointerdown` on
+  (T2 delegation, merged through the mobile-polish integration branch and now on `main`): `pointerdown` on
   `[data-media]` starts a 250ms hold timer (10px slop cancels → swipe/scroll wins); when it fires,
   `openMediaFor(item, {peek:true})` opens the lightbox and `_attachPeekRelease()` in `createLightbox`
   registers a `window`-level `pointerup`/`pointercancel` listener that calls `close()` on release
@@ -1059,7 +1060,7 @@ Absorbs "make the Reddit view more mobile-friendly".*
   `createLightbox` accepts a `lockScrollEl` option; `openMediaFor` passes `#items` — scroll is saved, the
   element gets `overflow:hidden`, and restored on close (`core/media.js:349-373`).
 - [x] ~~**P2 — Pinch-zoom + mouse-wheel zoom in the lightbox.**~~ ✅ Shipped 2026-06-27
-  (T2 delegation, `delegate/c2-lightbox-zoom` → staging `mobile-polish-t2`): `createLightbox` gained
+  (T2 delegation, merged through the mobile-polish integration branch and now on `main`): `createLightbox` gained
   zoom state (`zoomScale`, `zoomImg`) + `setZoom`/`resetZoom` helpers. `wheel` on the body drives
   `transform:scale` via `Math.exp(-e.deltaY * 0.0015)` (exponential per-notch), clamped 1×–4×;
   `dblclick` resets. Two-finger `touchstart`/`touchmove`/`touchend` drives pinch zoom (ratio of
@@ -1121,9 +1122,9 @@ batch: `delegation/MOBILE-POLISH-T3-BATCH.md` (7 delegated tasks). Tests live in
   (F/A/D/T/S/Esc). Fix: `t3-drop-reader-dock` deletes the `.rd-foot` element, its handlers, and
   its CSS. Safe-area inset preserved on `.rd-scroll`.
 - [x] **P2 — UX verification tooling (Playwright).** T2 gap: the existing `tests/ui/test_smoke.py`
-  covers feed load + gallery + topbar, but NOT relay/peek/tag-suggest/lightbox-swipe/sidebar-lock.
-  Fix: `t3-playwright-ux-tests` adds `tests/ui/test_mobile_ux.py` with one test per T3 fix,
-  designed to fail on the buggy staging branch and pass once the fixes merge.
+  covered feed load + gallery + topbar, but NOT relay/peek/tag-suggest/lightbox-swipe/sidebar-lock.
+  Fix: `t3-playwright-ux-tests` added `tests/ui/test_mobile_ux.py` with one regression test per T3 fix;
+  the suite now documents the final shipped mobile behavior on `main`.
 
 ### Mobile tagging UX *(Epic 16)*
 
