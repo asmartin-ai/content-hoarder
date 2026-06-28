@@ -2,8 +2,8 @@
 
 > Snapshot as of 2026-06-28.
 
-This captures the decisions needed to start the next bounded delegation batch. It is intentionally a
-planning/spec-prep document, not an implementation branch.
+This captures the decisions that started Batch B and the outcome after RedGifs shipped. It is a dated
+planning/as-built snapshot, not an active implementation branch.
 
 ## Decisions from user
 
@@ -149,7 +149,7 @@ Tier: **T2 after user approves the map**. Implementation may touch `browse/main.
 
 | Task | Status | Recommended next step | Delegation tier |
 |---|---|---|---|
-| RedGifs resolver dry-run | Implemented | CLI + opt-in gate + dry-run/apply oracle tests added. Targeted `tests/test_redgifs_resolver.py` passes; broad non-UI suite still has the known Windows `tmp_path`/SQLite URI failures. | Done; review/merge |
+| RedGifs resolver dry-run | Shipped | `resolve-redgifs` CLI + opt-in gate + dry-run/apply oracle tests landed on `main`. Targeted `tests/test_redgifs_resolver.py` passes; broad non-UI suite still has the known Windows `tmp_path`/SQLite URI failures. | Done |
 | Watch Later/WL3 | Deferred | Use WL2 only for analysis; wait for a real export sample before new connector work. | none now |
 | Firefox synced tabs | Research spike | Find existing Sync client/decryption libraries; prove read-only tab listing before DB work. | T1-led, maybe weak-agent research |
 | Tag landscape | Initial map done | Decide target: HN/Firefox host/domain coverage is the likely lowest-risk expansion. | T2 once target chosen |
@@ -157,6 +157,6 @@ Tier: **T2 after user approves the map**. Implementation may touch `browse/main.
 
 ## Cost/minimization note
 
-Do not use headless Aider yet for research/design decisions. Use it once there is a tight implementation spec with an
-oracle test. Best first aider-compatible task is `redgifs-resolver-dryrun`: create offline fixture tests first, lock them,
-then let DeepSeek implement the provider/CLI changes under the aider integrity gate.
+Do not use headless Aider for research/design decisions. Use it once there is a tight implementation spec with an
+oracle test. RedGifs proved the pattern: lock offline oracle tests first, then let a weaker executor implement the
+bounded code path under the aider integrity gate.

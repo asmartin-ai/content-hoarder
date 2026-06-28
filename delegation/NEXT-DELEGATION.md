@@ -57,21 +57,21 @@ This batch is low-risk and can run in parallel because the write sets are mostly
 | `qa-doc-reconcile` | T3 | Reconcile QA/backlog/delegation wording after the latest pass. | `docs/QA-CHECKLIST.md`, `BACKLOG.md`, `delegation/*.md`. | Can run with code tasks, but merge last to reflect final state. |
 | `app-icon-assets` | T3 after asset decision | Replace icon assets for the approved backwards-E/H mark. | `src/content_hoarder/static/icon.svg`, PNG icons, manifest. | Needs a visual/asset decision first; otherwise keep on T1. |
 
-Recommended merge order for Batch A: tests → CSS/assets → docs. T1 should do the final service-worker cache
-version reconciliation after UI assets/CSS merge.
+Batch A result: Focus-mode desktop width polish and Story 2 Playwright coverage shipped on `main`; keep the
+remaining rows as future small-task examples, not as an active batch checklist.
 
 ### Batch B — Bounded feature implementation (T2, after T1 supplies decisions/samples)
 
-Current kickoff notes live in [`BATCH-B-START.md`](BATCH-B-START.md). The first active implementation spec is
-[`SPEC-redgifs-resolver-dryrun.md`](SPEC-redgifs-resolver-dryrun.md).
+Batch B kickoff notes live in [`BATCH-B-START.md`](BATCH-B-START.md). The RedGifs implementation spec
+[`SPEC-redgifs-resolver-dryrun.md`](SPEC-redgifs-resolver-dryrun.md) is now historical/as-built context.
 
 These can run in parallel if each agent is assigned the listed write scope and fixtures.
 
 | ID | Tier | Task | T1 input required | Suggested write scope | Conflict risk |
 |---|---:|---|---|---|---|
-| `redgifs-resolver-dryrun` | T2 | Epic 4: resolve dead Gfycat IDs against RedGifs, dry-run first. | Confirm NSFW opt-in policy; decide metadata rewrite only vs archive bytes. | New resolver/provider module + CLI/API seam + offline tests/fixtures. | Medium if it touches recovery providers. Keep archive.today code unchanged. |
+| `redgifs-resolver-dryrun` | Done | Epic 4: resolve dead Gfycat IDs against RedGifs, dry-run first. | Shipped: metadata-only dry-run CLI with explicit `--redgifs-ok` network gate. | `resolve-redgifs` CLI + offline tests. | Historical; no active conflict risk. |
 | `watch-later-import-sample` | T2 | Epic 7: support WL3 / browser Watch Later export shape. | Provide a representative export sample and decide one-shot vs recurring workflow. | YouTube connector/parser tests + fixture. | Low if restricted to connector + tests. |
-| `firefox-tabs-manual-push` | T2 | Epic 7: manual push of currently-open Firefox tabs. | Choose WebExtension vs bookmarklet/local endpoint vs sessionstore reader. | Chosen ingest endpoint/connector reuse + tests; maybe docs. | Medium; avoid touching generic import modal unless explicitly scoped. |
+| `firefox-sync-tabs-research` | T1 research | Epic 7: synced Firefox tabs from Firefox Account/Sync. | Find a maintained Sync client/decryption library or prove none is suitable. | Research note / read-only proof of tab listing before DB work. | Do not hand to T2 implementation yet; Sync tabs are encrypted collection data, not a simple account API. |
 | `tag-coverage-expansion` | T2 | Epic 9/26: extend heuristic tag coverage. | T1/user names desired buckets and precision constraints. | `categorize.py` maps + dry-run tests. | Low; run after reviewing dry-run counts. |
 | `keyboard-map-implementation` | T2 | Epic 5: rework keyboard controls. | Approved mapping from user/T1. | JS key handlers + `?` cheatsheet + Playwright/unit tests. | Medium; overlaps browse/triage handlers. Run alone or split browse vs triage. |
 
@@ -111,6 +111,6 @@ Do not give these as direct implementation tasks yet. T1 should either do them o
 
 ## Suggested next action
 
-Recommended next move: run **Batch A** after the real-device QA pass. It is the smallest closeable batch and
-improves confidence before bigger feature work. Done-when: no stale active specs in `delegation/`, QA findings
-are either verified or filed, and any added UI tests pass locally.
+Recommended next move: choose either **HN/Firefox tag coverage expansion** (bounded T2 after sampled target
+selection) or a **Firefox Sync tabs research spike** (T1-led). Done-when: the selected lane has a fresh spec or
+research note and no historical `delegation/` file describes already-merged work as active.
