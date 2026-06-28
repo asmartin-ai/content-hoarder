@@ -1425,6 +1425,20 @@ def cmd_folder_stats(args) -> int:
     return 0
 
 
+def cmd_resolve_redgifs(args) -> int:
+    from content_hoarder import redgifs_resolver as rg
+
+    with _connect() as conn:
+        res = rg.resolve_all(
+            conn,
+            limit=args.limit,
+            dry_run=not args.apply,
+            allow_network=args.redgifs_ok,
+        )
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="content_hoarder", description="Local triage-first content manager."
@@ -2328,6 +2342,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     pf_stats = pf_sub.add_parser("stats", help="Per-folder item counts.")
     pf_stats.set_defaults(func=cmd_folder_stats)
+
+    prr = sub.add_parser(
+        "resolve-redgifs",
+        help="Resolve dead Gfycat links to RedGifs.",
+    )
+    prr.add_argument("--limit", type=int, default=None, help="Max items to attempt.")
+    prr.add_argument(
+        "--redgifs-ok", action="store_true",
+        help="Allow network to RedGifs API.",
+    )
+    prr.add_argument(
+        "--apply", action="store_true",
+        help="Write resolved media metadata (default: dry run).",
+    )
+    prr.set_defaults(func=cmd_resolve_redgifs)
 
     return p
 
