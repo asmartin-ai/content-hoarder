@@ -62,6 +62,9 @@ version reconciliation after UI assets/CSS merge.
 
 ### Batch B — Bounded feature implementation (T2, after T1 supplies decisions/samples)
 
+Current kickoff notes live in [`BATCH-B-START.md`](BATCH-B-START.md). The first active implementation spec is
+[`SPEC-redgifs-resolver-dryrun.md`](SPEC-redgifs-resolver-dryrun.md).
+
 These can run in parallel if each agent is assigned the listed write scope and fixtures.
 
 | ID | Tier | Task | T1 input required | Suggested write scope | Conflict risk |
