@@ -156,10 +156,23 @@ def rewrite_item(conn, fullname: str, info: dict) -> bool:
     return True
 
 
-def resolve_all(conn, *, limit: int | None = None, dry_run: bool = False) -> dict:
+def resolve_all(
+    conn,
+    *,
+    limit: int | None = None,
+    dry_run: bool = False,
+    allow_network: bool = False,
+) -> dict:
     """Find all gfycat items and attempt RedGifs resolution.
 
-    Returns summary counts.
+    Args:
+        allow_network: When False (default), the function counts candidates but never
+            calls the RedGifs API. This safe-by-default behaviour requires an
+            explicit opt-in (``--redgifs-ok``) before any network requests are made.
+
+    Returns:
+        dict with keys ``total``, ``resolved``, ``failed``, ``dry_run``,
+        ``samples``, ``network``, ``requires_opt_in``, and ``message``.
     """
     sql = """
         SELECT fullname, json_extract(metadata, '$.media_url') AS mu
@@ -175,6 +188,22 @@ def resolve_all(conn, *, limit: int | None = None, dry_run: bool = False) -> dic
 
     rows = conn.execute(sql, params).fetchall()
     total = len(rows)
+
+    if not allow_network:
+        return {
+            "total": total,
+            "resolved": 0,
+            "failed": 0,
+            "dry_run": dry_run,
+            "samples": [],
+            "network": False,
+            "requires_opt_in": True,
+            "message": (
+                "RedGifs network resolution is not enabled. "
+                "Re-run with --redgifs-ok to activate RedGifs resolution."
+            ),
+        }
+
     resolved = 0
     failed = 0
     samples: list[dict] = []
@@ -207,4 +236,7 @@ def resolve_all(conn, *, limit: int | None = None, dry_run: bool = False) -> dic
         "failed": failed,
         "dry_run": dry_run,
         "samples": samples,
+        "network": True,
+        "requires_opt_in": False,
+        "message": "",
     }
