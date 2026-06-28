@@ -109,12 +109,10 @@ Opening items, the inline reader, triaging from inside it.
       Twitter stored media + text. Markdown renders (links, bold, quotes, lists, code, inline images). ⬛
 - [ ] **Comment UX:** tap-byline collapses/expands; author `u/name` links to the profile; fully-dead
       threads auto-collapse; OP comments highlighted. ⬛
-- [ ] **Reader triage dock:** bottom tab "Actions" pulls up into a 5-button semi-circle fan
-      (Archive, Snooze top arc; Keep, Tag, Done bottom arc). Tap the scrim to collapse without closing
-      the reader. `F`/`A`/`D` keys still triage the reader's item. ⬛
+- [ ] **Reader has no triage dock:** the old `.rd-foot` action dock is intentionally gone; reader actions
+      remain available via keyboard (`F`/`A`/`D`/`T`/`S`) and row/list gestures after returning. ⬛
 - [ ] **Done/Archive/Keep from the reader does NOT refresh the feed** — the list keeps its position;
-      the triaged item leaves lazily on the next load. ⬛ *(not yet shipped — A2; spec
-      `delegation/SPEC-a2-no-feed-refresh-on-triage.md` ready but unattempted in the T2 batch)*
+      the triaged item leaves lazily on the next load. ⬛ *(shipped on `staging/mobile-polish-t3` via A2)*
 - [ ] **Closing the reader** (back button / ✕ / Esc / swipe) returns to the exact scroll position. ⬛
 - [ ] **Closing the reader stops media playback** (no audio bleed after close). ⬛
 - [ ] **Note editor** (Keep/Obsidian): edit-body toggle, textarea, live preview, save; checklist lines
@@ -239,10 +237,10 @@ Resurfacing card, surprise-me, the dice.
 - **Hold-to-preview media** (B4) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — pending real-device
   verification of the swipe/long-press race + click-after-peek suppression.
 - **Pinch-zoom in lightbox** (C2) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — 1×–4× wheel +
-  pinch, pending real-device pinch verification. **Pan + swipe-far-to-close** (C3) still open — unblocked
-  now that C2 landed; spec `delegation/SPEC-c3-lightbox-pan-close.md` ready.
-- **Don't refresh feed on reader triage** (A2) still open — spec `delegation/SPEC-a2-no-feed-refresh-on-triage.md`
-  ready but unattempted in the T2 batch.
+  pinch, pending real-device pinch verification. **Pan + swipe-far-to-close** (C3) shipped on
+  `staging/mobile-polish-t3`; verify one-finger pan/close on real device.
+- **Don't refresh feed on reader triage** (A2) shipped on `staging/mobile-polish-t3`; verify feed position
+  and lazy item removal on real device.
 - **Scroll-deceleration** (E2) low priority — rapid fling to top feels weird.
 - **Relay strip refinements** (P3) **shipped 2026-06-27 on `staging/mobile-polish-t2`** — icon-only,
   larger touch targets, narrow-screen shrink.

@@ -19,17 +19,17 @@ real-device session on the staging branch 2026-06-27:
 7. The reader `.rd-foot` triage dock looks wrong — **drop it** (user will redesign later)
 8. **No UX verification tooling** — Playwright harness exists but covers none of these gestures
 
-## Outcome (2026-06-27, planned — fill in as agents report)
+## Outcome (2026-06-28)
 
 | Task | Branch | Method | Outcome |
 |------|--------|--------|--------|
-| `t3-relay-swipe-close` | `delegate/t3-relay-swipe-close` | T2 sub-agent | (pending) |
-| `t3-peek-flicker` | `delegate/t3-peek-flicker` | T2 sub-agent | (pending) |
-| `t3-tag-suggest-three` | `delegate/t3-tag-suggest-three` | T2 sub-agent | (pending) |
-| `t3-lightbox-swipe-scroll` | `delegate/t3-lightbox-swipe-scroll` | T2 sub-agent | (pending) |
-| `t3-sidebar-scroll-lock` | `delegate/t3-sidebar-scroll-lock` | T2 sub-agent | (pending) |
-| `t3-drop-reader-dock` | `delegate/t3-drop-reader-dock` | T2 sub-agent | (pending) |
-| `t3-playwright-ux-tests` | `delegate/t3-playwright-ux-tests` | T2 sub-agent | (pending) |
+| `t3-relay-swipe-close` | `delegate/t3-relay-swipe-close` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review fixed relay test targeting + click/default suppression. |
+| `t3-peek-flicker` | `delegate/t3-peek-flicker` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
+| `t3-tag-suggest-three` | `delegate/t3-tag-suggest-three` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
+| `t3-lightbox-swipe-scroll` | `delegate/t3-lightbox-swipe-scroll` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review added window scroll restoration. |
+| `t3-sidebar-scroll-lock` | `delegate/t3-sidebar-scroll-lock` | T2 sub-agent | Merged to `staging/mobile-polish-t3`. |
+| `t3-drop-reader-dock` | `delegate/t3-drop-reader-dock` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; review removed a stale closing tag. |
+| `t3-playwright-ux-tests` | `delegate/t3-playwright-ux-tests` | T2 sub-agent | Merged to `staging/mobile-polish-t3`; targeted T3 UI suite passes after review fixes. |
 
 **Staging target:** `staging/mobile-polish-t3`, branched off `staging/mobile-polish-t2`.
 
