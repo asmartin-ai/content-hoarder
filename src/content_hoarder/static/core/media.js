@@ -519,9 +519,16 @@ export function createLightbox(opts) {
   });
 
   // B4: window-level release listener for peek mode (auto-closes on pointerup/pointercancel).
+  // T3 peek-flicker: use a shared `fired` flag so the listener fires EXACTLY once. pointerup
+  // and pointercancel can both fire for the same gesture (pointercancel then a synthetic
+  // pointerup); without the flag, the second event would call close() again -> settleTop()
+  // -> history.back() -> re-render -> flicker. Remove from BOTH events on first fire.
   let _peekRelease = null;
   const _attachPeekRelease = () => {
+    let fired = false;
     const release = () => {
+      if (fired) return;
+      fired = true;
       window.removeEventListener("pointerup", release);
       window.removeEventListener("pointercancel", release);
       _peekRelease = null;

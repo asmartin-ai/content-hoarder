@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v86"; // v86: C3 lightbox pan/close + A2 no-feed-refresh-on-triage + P3 relay icon-only + C2 lightbox pinch/wheel zoom + B4 hold-to-preview peek
+const CACHE = "ch-shell-v88"; // v88: T3 peek-flicker fix (idempotent peek release + swipe lpTimer guard)
 const SHELL = [
   "/",
   "/triage",
