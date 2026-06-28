@@ -1,0 +1,700 @@
+"""T3 mobile-polish UX regression tests (Playwright, Pixel-6 / PWA-standalone).
+
+Covers the 6 T3 fixes:
+  - relay-swipe-close (5 tests)
+  - peek-flicker        (4 tests)
+  - tag-suggest-three   (3 tests)
+  - lightbox-swipe-scroll (3 tests)
+  - sidebar-scroll-lock (3 tests)
+  - drop-reader-dock    (4 tests)
+
+These tests are EXPECTED TO FAIL on the starting branch `staging/mobile-polish-t2`
+(the bugs are present). They PASS once the corresponding T3 fix branches merge.
+
+Gesture API notes
+-----------------
+- Relay long-press + swipe: the app's `core/swipe.js` rejects `pointerType === "mouse"`
+  (touch-only by default), but Playwright's `page.mouse` ALWAYS emits mouse pointer
+  events even on a mobile context, and `page.touchscreen` only exposes `tap()` (no
+  `down()/up()` for a hold). So relay gestures use a synthetic `PointerEvent` with
+  `pointerType: "touch"` dispatched via `page.evaluate` (see `_touch_press` /
+  `_touch_swipe`). This faithfully triggers the app's `pointerdown/move/up` handlers.
+- Hold-to-preview (B4): `browse/main.js`'s hold handler accepts ALL pointer types,
+  so `page.mouse` works for press-and-hold on a thumbnail.
+- Quick tap (persistent lightbox): the persistent-open path is a `click` listener,
+  so `page.touchscreen.tap` (which synthesizes a click) is used.
+- Lightbox swipe-close: `core/media.js`'s drag handler accepts mouse pointer events,
+  so `page.mouse` is used for the vertical drag.
+"""
+
+import json
+import re
+
+import pytest
+from playwright.sync_api import expect
+
+pytestmark = pytest.mark.ui
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+
+
+def _media_modal_open(page) -> bool:
+    """True when the lightbox (#media-modal) is open (no `hidden` attr)."""
+    return page.evaluate(
+        "() => { const m = document.querySelector('#media-modal'); "
+        "return !!(m && !m.hasAttribute('hidden')); }"
+    )
+
+
+def _reader_open(page) -> bool:
+    return page.evaluate("() => !!document.querySelector('#reader.show')")
+
+
+def _relay_open(page) -> bool:
+    return page.evaluate("() => !!document.querySelector('.row.relay-open')")
+
+
+def _scroll_into_view(page, fullname: str) -> None:
+    """Scroll a row into the vertical center so it isn't under the fixed topbar."""
+    page.evaluate(
+        "(fn) => { const r = document.querySelector('.row[data-fullname=\"' + fn + '\"]'); "
+        "if (r) r.scrollIntoView({block:'center'}); }",
+        fullname,
+    )
+    page.wait_for_timeout(300)
+
+
+def _row_title_center(page, fullname: str):
+    """Return {x, y} at the center of a row's title text (NOT the thumbnail).
+
+    Aiming at the title keeps the press off the [data-media] thumbnail (which would
+    trigger hold-to-preview, not the relay) and inside the ~30px edge deadzone that
+    core/swipe.js rejects for back-gesture detection.
+    """
+    box = page.evaluate(
+        """(fn) => {
+          const r = document.querySelector('.row[data-fullname="' + fn + '"]');
+          if (!r) return null;
+          const t = r.querySelector('h3.title, .title, .snippet') || r;
+          const b = t.getBoundingClientRect();
+          return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) };
+        }""",
+        fullname,
+    )
+    assert box is not None, f"row {fullname} not found"
+    return box
+
+
+def _thumb_center(page, fullname: str):
+    """Return {x, y} at the center of a row's [data-media] thumbnail."""
+    box = page.evaluate(
+        """(fn) => {
+          const r = document.querySelector('.row[data-fullname="' + fn + '"]');
+          if (!r) return null;
+          const m = r.querySelector('[data-media]');
+          if (!m) return null;
+          const b = m.getBoundingClientRect();
+          return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) };
+        }""",
+        fullname,
+    )
+    assert box is not None, f"row {fullname} has no [data-media] thumbnail"
+    return box
+
+
+def _touch_long_press(page, fullname: str, hold_ms: int = 550) -> None:
+    """Press-and-hold on a row's title via a synthetic touch PointerEvent.
+
+    `page.mouse` emits `pointerType: "mouse"` which `core/swipe.js` rejects; this
+    dispatches a real `pointerType: "touch"` PointerEvent so the relay long-press
+    (450ms) fires.
+    """
+    coords = _row_title_center(page, fullname)
+    page.evaluate(
+        """({fn, coords, hold}) => new Promise((resolve) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const el = row.querySelector('h3.title, .title, .snippet') || row;
+          const fire = (type, x, y) => el.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 1, isPrimary: true,
+            clientX: x, clientY: y,
+          }));
+          fire('pointerdown', coords.x, coords.y);
+          setTimeout(() => { fire('pointerup', coords.x, coords.y); resolve(); }, hold);
+        })""",
+        {"fn": fullname, "coords": coords, "hold": hold_ms},
+    )
+    page.wait_for_timeout(300)
+
+
+def _touch_swipe(
+    page, fullname: str, dx: int, dy: int, hold_first: bool = False
+) -> None:
+    """Swipe on a row via synthetic touch PointerEvents (down -> moves -> up).
+
+    If `hold_first` is True, the pointerdown is held for 550ms first (to open the
+    relay), then the swipe begins from the same row. Otherwise it's a plain swipe.
+    """
+    coords = _row_title_center(page, fullname)
+    page.evaluate(
+        """({fn, coords, dx, dy, holdFirst}) => new Promise((resolve) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const el = row.querySelector('h3.title, .title, .snippet') || row;
+          const fire = (type, x, y) => el.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 1, isPrimary: true,
+            clientX: x, clientY: y,
+          }));
+          fire('pointerdown', coords.x, coords.y);
+          const startSwipe = () => {
+            const targetX = coords.x + dx, targetY = coords.y + dy;
+            const steps = 10, stepX = dx / steps, stepY = dy / steps;
+            let i = 0, cx = coords.x, cy = coords.y;
+            const moveNext = () => {
+              i++; cx += stepX; cy += stepY;
+              fire('pointermove', Math.round(cx), Math.round(cy));
+              if (i < steps) setTimeout(moveNext, 16);
+              else { fire('pointerup', targetX, targetY); resolve(); }
+            };
+            moveNext();
+          };
+          if (holdFirst) setTimeout(startSwipe, 550);
+          else startSwipe();
+        })""",
+        {"fn": fullname, "coords": coords, "dx": dx, "dy": dy, "holdFirst": hold_first},
+    )
+    page.wait_for_timeout(400)
+
+
+def _open_reader_on(page, fullname: str) -> None:
+    """Open the reader on a seeded item by clicking its title."""
+    _scroll_into_view(page, fullname)
+    row = page.locator(f'.row[data-fullname="{fullname}"]')
+    expect(row).to_be_visible()
+    title = row.locator("h3.title a").first
+    if not title.count():
+        title = row.locator("h3.title").first
+    title.click()
+    page.wait_for_timeout(500)
+    expect(page.locator("#reader.show")).to_be_visible()
+
+
+def _open_relay_menu(page, fullname: str) -> None:
+    """Open the relay strip via long-press, then return."""
+    _scroll_into_view(page, fullname)
+    _touch_long_press(page, fullname, hold_ms=550)
+    assert _relay_open(page), f"relay should be open on {fullname} after long-press"
+    expect(page.locator(".relay-strip")).to_have_count(1)
+
+
+def _open_browse_tag_editor(page, fullname: str) -> None:
+    """Open the browse-surface tag editor (#tagpop) via the relay menu's tag action.
+
+    The default log/ledger density doesn't render a [data-tagedit] button on rows —
+    tagging is reached via the long-press relay menu's [data-relay="tag"] action.
+    """
+    _open_relay_menu(page, fullname)
+    tag_btn = page.locator('.relay-strip [data-relay="tag"]').first
+    expect(tag_btn).to_be_visible()
+    tag_btn.click()
+    page.wait_for_timeout(400)
+    expect(page.locator("#tagpop")).to_be_visible()
+
+
+# --------------------------------------------------------------------------- #
+# T3 relay-swipe-close
+# --------------------------------------------------------------------------- #
+
+
+def test_relay_long_press_opens_strip(pixel6_page):
+    """Long-press on a row's text (NOT the thumbnail) opens the relay strip."""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_0")
+    # A relay strip exists, the row has .relay-open, and the scrim is showing.
+    expect(page.locator(".relay-strip")).to_have_count(1)
+    assert _relay_open(page)
+    expect(page.locator("#relay-scrim.show")).to_be_visible()
+
+
+def test_relay_swipe_left_is_noop(pixel6_page):
+    """After opening the relay, a leftward swipe does NOT reveal blank space
+    and does NOT close the relay. (Regression guard for the blank-space bug.)"""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_1")
+    # Swipe LEFT (dx=-120). The bug: .item-fg translates past the left edge (blank space).
+    _touch_swipe(page, "reddit:ui_scroll_1", dx=-120, dy=0)
+    # The relay should still be open (leftward swipe is a no-op in relay-close-mode).
+    assert _relay_open(page), "relay should still be open after leftward swipe"
+    # The .item-fg should not have leaked past the left edge.
+    fg_left = page.evaluate(
+        """() => {
+          const row = document.querySelector('.row.relay-open');
+          if (!row) return 0;
+          const fg = row.querySelector('.item-fg');
+          return fg ? fg.getBoundingClientRect().left : 0;
+        }"""
+    )
+    assert fg_left >= -5, (
+        f"relay .item-fg leaked left (blank space): left={fg_left} "
+        "(leftward swipe should be a no-op in relay-close-mode)"
+    )
+
+
+def test_relay_swipe_right_closes(pixel6_page):
+    """After opening the relay, a rightward swipe (>10px) closes the strip
+    and the .item-fg slides back smoothly (no inline transition: none left behind)."""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_2")
+    # Swipe RIGHT (>10px) to close.
+    _touch_swipe(page, "reddit:ui_scroll_2", dx=120, dy=0)
+    page.wait_for_timeout(400)  # allow slide-out transition (~200ms)
+    expect(page.locator(".relay-strip")).to_have_count(0)
+    assert not _relay_open(page), "relay should be closed after rightward swipe"
+    # No stuck inline `transition: none` on the row's .item-fg (the bug left it
+    # behind, causing an abrupt snap on the next open).
+    inline_transition = page.evaluate(
+        """() => {
+          const row = document.querySelector('.row[data-fullname="reddit:ui_scroll_2"]');
+          if (!row) return 'NONE';
+          const fg = row.querySelector('.item-fg');
+          return fg ? fg.style.transition : 'NONE';
+        }"""
+    )
+    assert inline_transition != "none", (
+        "relay .item-fg has stuck inline `transition: none` after close "
+        "(should slide back smoothly, not snap)"
+    )
+
+
+def test_relay_diagonal_swipe_right_closes(pixel6_page):
+    """A slightly-diagonal rightward swipe (dx=25, dy=18) still closes the relay
+    — the close path bypasses the horizontal-decision threshold."""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_3")
+    # Diagonal: dx=+120, dy=+60 (decidedly rightward with vertical drift).
+    _touch_swipe(page, "reddit:ui_scroll_3", dx=120, dy=60)
+    page.wait_for_timeout(400)
+    expect(page.locator(".relay-strip")).to_have_count(0)
+    assert not _relay_open(page), (
+        "diagonal rightward swipe should close the relay "
+        "(close path bypasses the horizontal-decision threshold)"
+    )
+
+
+def test_relay_scrim_tap_closes(pixel6_page):
+    """Tapping the scrim closes the relay with a smooth slide-back
+    (no abrupt snap from a stuck inline transition)."""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_4")
+    scrim = page.locator("#relay-scrim.show")
+    expect(scrim).to_be_visible()
+    scrim.click()
+    page.wait_for_timeout(400)
+    expect(page.locator(".relay-strip")).to_have_count(0)
+    assert not _relay_open(page), "scrim tap should close the relay"
+
+
+# --------------------------------------------------------------------------- #
+# T3 peek-flicker
+# --------------------------------------------------------------------------- #
+
+
+def _open_lightbox_via_hold(page, fullname: str, hold_ms: int = 300) -> None:
+    """Press-and-hold a thumbnail to open the lightbox in peek mode."""
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    page.mouse.move(coords["x"], coords["y"])
+    page.mouse.down()
+    page.wait_for_timeout(hold_ms)
+    page.wait_for_timeout(200)
+    assert _media_modal_open(page), (
+        f"lightbox should open after {hold_ms}ms hold on {fullname}"
+    )
+
+
+def test_hold_to_preview_opens_lightbox(pixel6_page):
+    """Press-and-hold a thumbnail (300ms) opens the lightbox in peek mode."""
+    page = pixel6_page
+    # twitter:1777... has a local /static/icon-192.png thumbnail with media_type=image.
+    _open_lightbox_via_hold(page, "twitter:1777777777777777777", hold_ms=300)
+    assert _media_modal_open(page)
+
+
+def test_hold_to_preview_no_flicker(pixel6_page):
+    """During a 2-second hold, the lightbox opens exactly once and stays open
+    — no open/close cycling. (Regression guard for the flicker bug.)"""
+    page = pixel6_page
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    # Count how many times #media-modal loses its `hidden` attribute (each = one open).
+    page.evaluate(
+        """() => {
+          window.__opens = 0;
+          const m = document.querySelector('#media-modal');
+          if (!m) return;
+          new MutationObserver(() => { if (!m.hasAttribute('hidden')) window.__opens++; })
+            .observe(m, { attributes: true, attributeFilter: ['hidden'] });
+        }"""
+    )
+    page.mouse.move(coords["x"], coords["y"])
+    page.mouse.down()
+    page.wait_for_timeout(2000)
+    opens_while_holding = page.evaluate("window.__opens")
+    assert _media_modal_open(page), "lightbox should be open during the hold"
+    assert opens_while_holding == 1, (
+        f"lightbox flickered: opened {opens_while_holding} times during a single hold "
+        "(should open exactly once and stay open)"
+    )
+    page.mouse.up()
+
+
+def test_hold_to_preview_release_closes(pixel6_page):
+    """Releasing the hold closes the lightbox."""
+    page = pixel6_page
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    page.mouse.move(coords["x"], coords["y"])
+    page.mouse.down()
+    page.wait_for_timeout(300)
+    assert _media_modal_open(page), "lightbox should be open after hold"
+    page.mouse.up()
+    page.wait_for_timeout(400)
+    assert not _media_modal_open(page), (
+        "lightbox should close after releasing the hold (peek mode)"
+    )
+
+
+def test_tap_thumbnail_opens_persistent(pixel6_page):
+    """A quick tap (<250ms) opens the lightbox persistently (the _suppressNextClick
+    guard doesn't swallow the tap's click)."""
+    page = pixel6_page
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    # touchscreen.tap synthesizes a real click (the persistent-open path is a click listener).
+    page.touchscreen.tap(coords["x"], coords["y"])
+    page.wait_for_timeout(500)
+    assert _media_modal_open(page), (
+        "quick tap should open the lightbox persistently "
+        "(_suppressNextClick should not swallow the tap's click)"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# T3 tag-suggest-three
+# --------------------------------------------------------------------------- #
+
+
+def test_tag_suggest_three_with_categories(pixel6_page):
+    """Prime localStorage with 2 categories + 3 tags. Open the tag editor on an
+    item with no category → expect 2 category suggestions + 1 tag (3 total)."""
+    page = pixel6_page
+    page.evaluate(
+        """() => {
+          localStorage.setItem('ch_recent_categories', JSON.stringify(['work','reading']));
+          localStorage.setItem('ch_recent_tags', JSON.stringify(['alpha','beta','gamma']));
+        }"""
+    )
+    _open_browse_tag_editor(page, "reddit:ui_scroll_5")
+    page.wait_for_timeout(300)
+    count = page.locator("#tagpop .tp-sugg .tp-opt").count()
+    # t3-tag-suggest-three surfaces 3 total (2 categories + 1 tag backfill).
+    # On the starting branch only 1 is shown (the bug).
+    assert count >= 3, (
+        f"expected >=3 tag suggestions (2 categories + 1 tag backfill), got {count} "
+        "(t3-tag-suggest-three should surface 3)"
+    )
+
+
+def test_tag_suggest_three_backfill_with_tags(pixel6_page):
+    """Prime localStorage with 0 categories + 3 tags. Open the tag editor →
+    expect 3 tag suggestions (backfill when categories are sparse)."""
+    page = pixel6_page
+    page.evaluate(
+        """() => {
+          localStorage.setItem('ch_recent_categories', JSON.stringify([]));
+          localStorage.setItem('ch_recent_tags', JSON.stringify(['alpha','beta','gamma']));
+        }"""
+    )
+    _open_browse_tag_editor(page, "reddit:ui_scroll_6")
+    page.wait_for_timeout(300)
+    count = page.locator("#tagpop .tp-sugg .tp-opt").count()
+    assert count >= 3, (
+        f"expected >=3 tag suggestions (tag backfill when categories sparse), got {count}"
+    )
+
+
+def test_tag_suggest_zero_when_stores_empty(pixel6_page):
+    """Clear both localStorage stores. Open the tag editor → expect 0 suggestions
+    (don't pad with synthetic placeholders)."""
+    page = pixel6_page
+    page.evaluate(
+        """() => {
+          localStorage.removeItem('ch_recent_categories');
+          localStorage.removeItem('ch_recent_tags');
+        }"""
+    )
+    _open_browse_tag_editor(page, "reddit:ui_scroll_7")
+    page.wait_for_timeout(300)
+    count = page.locator("#tagpop .tp-sugg .tp-opt").count()
+    assert count == 0, (
+        f"expected 0 suggestions when stores empty (no synthetic placeholders), got {count}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# T3 lightbox-swipe-scroll
+# --------------------------------------------------------------------------- #
+
+
+def _open_single_image_lightbox(page, fullname: str) -> None:
+    """Open the lightbox on a single-image item via a quick tap."""
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    page.touchscreen.tap(coords["x"], coords["y"])
+    page.wait_for_timeout(500)
+    assert _media_modal_open(page), f"lightbox should open on {fullname}"
+
+
+def _lightbox_touch_drag(page, dy: int) -> None:
+    """Drag downward by `dy` px on the open lightbox's image via a synthetic
+    touch PointerEvent sequence.
+
+    `page.mouse` produces `pointerType: "mouse"` whose pointermove events get
+    coalesced by the browser and don't reliably drive media.js's drag handler;
+    a synthetic `pointerType: "touch"` PointerEvent on the `.media-img` element
+    drives the close path faithfully (the gesture under test is a touch swipe).
+    """
+    page.evaluate(
+        """(dy) => new Promise((resolve) => {
+          const im = document.querySelector('#media-body .media-img, #media-body .gallery-img');
+          if (!im) { resolve(); return; }
+          const b = im.getBoundingClientRect();
+          const x = Math.round(b.left + b.width / 2);
+          const y0 = Math.round(b.top + b.height / 2);
+          const fire = (type, yy) => im.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 2, isPrimary: true,
+            clientX: x, clientY: yy,
+          }));
+          fire('pointerdown', y0);
+          const steps = 10, stepDy = dy / steps;
+          let i = 0, cy = y0;
+          const moveNext = () => {
+            i++; cy += stepDy;
+            fire('pointermove', Math.round(cy));
+            if (i < steps) setTimeout(moveNext, 16);
+            else { fire('pointerup', Math.round(y0 + dy)); resolve(); }
+          };
+          moveNext();
+        })""",
+        dy,
+    )
+    page.wait_for_timeout(500)
+
+
+def test_lightbox_swipe_down_closes(pixel6_page):
+    """Open the lightbox on a single image. Drag down 150px → lightbox closes.
+    (Regression guard for the swipe-scrolls-page bug.)"""
+    page = pixel6_page
+    _open_single_image_lightbox(page, "twitter:1777777777777777777")
+    _lightbox_touch_drag(page, dy=150)
+    assert not _media_modal_open(page), (
+        "lightbox should close after a 150px downward swipe "
+        "(not scroll the underlying page)"
+    )
+
+
+def test_lightbox_swipe_down_short_springs_back(pixel6_page):
+    """Open the lightbox. Drag down 50px → springs back, lightbox stays open."""
+    page = pixel6_page
+    _open_single_image_lightbox(page, "twitter:1777777777777777777")
+    _lightbox_touch_drag(page, dy=50)
+    assert _media_modal_open(page), (
+        "lightbox should stay open after a short (50px) downward swipe (springs back)"
+    )
+
+
+def test_lightbox_swipe_does_not_scroll_feed(pixel6_page):
+    """Scroll the feed. Open the lightbox. Drag down 150px (closes).
+    Verify the feed's scroll position is unchanged after close."""
+    page = pixel6_page
+    # Scroll the feed. The topbar scroll-anchoring handler nudges scrollY by
+    # ~100px after scrollTo, so capture the ACTUAL settled position as the baseline.
+    page.evaluate("window.scrollTo(0, 500)")
+    page.wait_for_timeout(500)
+    scroll_before = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_before >= 300, f"feed should be scrolled, got {scroll_before}"
+
+    _open_single_image_lightbox(page, "twitter:1777777777777777777")
+    _lightbox_touch_drag(page, dy=150)
+    assert not _media_modal_open(page), "lightbox should close after downward swipe"
+
+    scroll_after = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_after == scroll_before, (
+        f"feed scroll position changed during lightbox swipe-close: "
+        f"{scroll_before} -> {scroll_after} (should be unchanged)"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# T3 sidebar-scroll-lock
+# --------------------------------------------------------------------------- #
+
+
+def _open_navdrawer(page) -> None:
+    """Open the mobile navdrawer via its trigger button."""
+    btn = page.locator("#open-nav")
+    expect(btn).to_be_visible()
+    btn.click()
+    page.wait_for_timeout(300)
+    expect(page.locator("#navdrawer.show")).to_be_visible()
+
+
+def test_sidebar_open_locks_feed_scroll(pixel6_page):
+    """Open the navdrawer. Touch-drag on the feed area → feed does NOT scroll.
+    (Regression guard for the sidebar-scrolls-browse bug.)"""
+    page = pixel6_page
+    page.evaluate("window.scrollTo(0, 0)")
+    page.wait_for_timeout(200)
+    scroll_before = page.evaluate("Math.round(window.scrollY)")
+
+    _open_navdrawer(page)
+    # Try to scroll the feed via a wheel event on #items.
+    page.evaluate(
+        """() => {
+          const el = document.querySelector('#items') || document.body;
+          el.dispatchEvent(new WheelEvent('wheel', { deltaY: 300, bubbles: true }));
+        }"""
+    )
+    page.wait_for_timeout(300)
+    scroll_after = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_after == scroll_before, (
+        f"feed scrolled while navdrawer open: {scroll_before} -> {scroll_after} "
+        "(sidebar-open should lock feed scroll)"
+    )
+
+
+def test_sidebar_scroll_does_not_chain(pixel6_page):
+    """Open the navdrawer. Scroll to the bottom of the drawer's content →
+    the feed behind it does NOT scroll (overscroll-behavior: contain)."""
+    page = pixel6_page
+    page.evaluate("window.scrollTo(0, 0)")
+    page.wait_for_timeout(200)
+    feed_before = page.evaluate("Math.round(window.scrollY)")
+
+    _open_navdrawer(page)
+    page.evaluate(
+        """() => {
+          const d = document.querySelector('#navdrawer');
+          if (!d) return;
+          for (let i = 0; i < 20; i++) {
+            d.dispatchEvent(new WheelEvent('wheel', { deltaY: 200, bubbles: true }));
+          }
+        }"""
+    )
+    page.wait_for_timeout(400)
+    feed_after = page.evaluate("Math.round(window.scrollY)")
+    assert feed_after == feed_before, (
+        f"feed scrolled behind navdrawer (scroll chaining): {feed_before} -> {feed_after} "
+        "(overscroll-behavior: contain should prevent chaining)"
+    )
+
+
+def test_sidebar_close_restores_scroll(pixel6_page):
+    """Scroll feed. Open navdrawer. Close it. Feed scroll position restored."""
+    page = pixel6_page
+    # Scroll the feed. The topbar handler nudges scrollY, so capture the ACTUAL
+    # settled position as the baseline (the test verifies restore, not an exact target).
+    page.evaluate("window.scrollTo(0, 500)")
+    page.wait_for_timeout(500)
+    scroll_before = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_before >= 300, f"feed should be scrolled, got {scroll_before}"
+
+    _open_navdrawer(page)
+    page.wait_for_timeout(200)
+    # Close via the #nav-close button (the #open-nav toggle is hidden behind the drawer).
+    page.locator("#nav-close").click()
+    page.wait_for_timeout(500)
+    scroll_after = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_after == scroll_before, (
+        f"feed scroll not restored after navdrawer close: {scroll_before} -> {scroll_after}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# T3 drop-reader-dock
+# --------------------------------------------------------------------------- #
+
+
+def test_reader_has_no_dock(pixel6_page):
+    """Open the reader → .rd-foot does NOT exist in the DOM."""
+    page = pixel6_page
+    _open_reader_on(page, "reddit:ui_seed")
+    # After t3-drop-reader-dock merges, .rd-foot is removed entirely.
+    expect(page.locator(".rd-foot")).to_have_count(0)
+
+
+def test_reader_t_key_opens_tag_editor(pixel6_page):
+    """With the reader open, press T → the inline tag editor opens
+    (no dock required)."""
+    page = pixel6_page
+    _open_reader_on(page, "reddit:ui_seed")
+    page.wait_for_timeout(200)
+    page.keyboard.press("t")
+    page.wait_for_timeout(400)
+    has_tag_editor = page.evaluate(
+        """() => {
+          const inp = document.querySelector('.rd-tag-add-input');
+          if (inp && inp.offsetParent !== null) return true;
+          const pop = document.querySelector('#tagpop');
+          if (pop && !pop.hidden && pop.offsetParent !== null) return true;
+          return false;
+        }"""
+    )
+    assert has_tag_editor, (
+        "pressing T should open the inline tag editor (no dock required)"
+    )
+
+
+def test_reader_esc_closes(pixel6_page):
+    """With the reader open, press Esc → reader closes (one press, one action;
+    no 'first Esc collapses the dock' behavior)."""
+    page = pixel6_page
+    _open_reader_on(page, "reddit:ui_seed")
+    assert _reader_open(page), "reader should be open"
+    # A SINGLE Esc should close the reader (no dock-collapse-first step).
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(400)
+    assert not _reader_open(page), (
+        "a single Esc press should close the reader "
+        "(no 'first Esc collapses the dock' step — the dock is gone)"
+    )
+
+
+def test_reader_keyboard_triage_works(desktop_page):
+    """On desktop, with the reader open: F → keep, A → archive, D → done.
+    Each closes the reader and updates the feed."""
+    page = desktop_page
+    _open_reader_on(page, "reddit:ui_seed")
+    assert _reader_open(page), "reader should be open"
+    page.keyboard.press("f")
+    page.wait_for_timeout(500)
+    assert not _reader_open(page), "reader should close after F (keep)"
+
+    _open_reader_on(page, "reddit:ui_scroll_8")
+    assert _reader_open(page), "reader should be open for archive test"
+    page.keyboard.press("a")
+    page.wait_for_timeout(500)
+    assert not _reader_open(page), "reader should close after A (archive)"
+
+    _open_reader_on(page, "reddit:ui_scroll_9")
+    assert _reader_open(page), "reader should be open for done test"
+    page.keyboard.press("d")
+    page.wait_for_timeout(500)
+    assert not _reader_open(page), "reader should close after D (done)"
