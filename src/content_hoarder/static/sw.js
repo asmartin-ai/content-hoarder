@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v93"; // v93: T3 review fixes — relay swipe tests, lightbox scroll restore, template cleanup
+const CACHE = "ch-shell-v94"; // v94: Focus-mode desktop width polish + Story 2 UI coverage
 const SHELL = [
   "/",
   "/triage",
