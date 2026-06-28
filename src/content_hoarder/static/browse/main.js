@@ -1487,19 +1487,31 @@ document.addEventListener("keydown", (e) => {
 /* ---- sheets / settings panel ---- */
 const scrim = $("#scrim");
 let _browseLock = 0;
-let _browseLockSaved = 0;
+let _browseLockSaved = 0;       // #items scroll
+let _browseBodyLockSaved = 0;   // body scroll
+
 function lockBrowseScroll() {
-  if (_browseLock === 0) _browseLockSaved = itemsEl.scrollTop;
+  if (_browseLock === 0) {
+    _browseLockSaved = itemsEl.scrollTop;
+    _browseBodyLockSaved = window.scrollY || document.documentElement.scrollTop;
+    document.body.style.overflow = "hidden";   // lock the body too
+  }
   _browseLock++;
   itemsEl.style.overflow = "hidden";
 }
+
 function unlockBrowseScroll() {
   if (_browseLock <= 0) return;
   _browseLock = Math.max(0, _browseLock - 1);
   if (_browseLock === 0) {
     itemsEl.style.overflow = "";
+    document.body.style.overflow = "";          // restore the body
     if (_browseLockSaved) itemsEl.scrollTop = _browseLockSaved;
+    if (_browseBodyLockSaved) {
+      window.scrollTo(0, _browseBodyLockSaved); // restore body scroll position
+    }
     _browseLockSaved = 0;
+    _browseBodyLockSaved = 0;
   }
 }
 function openPanel(id) {
