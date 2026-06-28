@@ -1669,6 +1669,8 @@ function closeRelay() {
   if (!relayFn && !relayRow) return;
   if (relayRow) {
     relayRow.classList.remove("relay-open");
+    const fg = relayRow.querySelector(".item-fg");
+    if (fg) { fg.style.transition = ""; fg.style.transform = ""; }
     const strip = relayRow.querySelector(".relay-strip");
     if (strip) strip.remove();
   }
@@ -1787,7 +1789,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v76";
+const APP_VERSION = "v77";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
