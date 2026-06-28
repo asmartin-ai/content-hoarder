@@ -357,6 +357,7 @@ export function createLightbox(opts) {
       : opts.body;
   const lockEl = opts.lockScrollEl || null; // scroll-lock target (e.g. #items); save/restore scrollY
   let lockSaved = 0;
+  let windowSaved = 0;
 
   let videoTeardown = null; // teardown function for the open video's hls.js instance
 
@@ -564,7 +565,12 @@ export function createLightbox(opts) {
       if (lockSaved) lockEl.scrollTop = lockSaved;
       lockSaved = 0;
     }
+    if (windowSaved) window.scrollTo(0, windowSaved);
     if (typeof opts.onClose === "function") opts.onClose(); // e.g. re-blur the source thumbnail (Epic 13 P2)
+  };
+  const restoreWindowScroll = () => {
+    if (!windowSaved) return;
+    window.scrollTo(0, windowSaved);
   };
   // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
   const close = () => {
@@ -576,6 +582,8 @@ export function createLightbox(opts) {
     if (modal.hidden) return;
     closeVisual();
     settleTop();
+    requestAnimationFrame(restoreWindowScroll);
+    setTimeout(restoreWindowScroll, 50);
   };
   modal.addEventListener("click", (e) => {
     if (e.target === modal || e.target.closest("[data-media-close]")) close();
@@ -589,6 +597,7 @@ export function createLightbox(opts) {
   const open = (html) => {
     body.innerHTML = html;
     modal.hidden = false;
+    windowSaved = window.scrollY || 0;
     pushOverlay(closeVisual);
     // lock the scroll container so the browse list doesn't scroll behind the lightbox
     if (lockEl) {

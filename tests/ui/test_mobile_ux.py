@@ -138,11 +138,25 @@ def _touch_swipe(
     If `hold_first` is True, the pointerdown is held for 550ms first (to open the
     relay), then the swipe begins from the same row. Otherwise it's a plain swipe.
     """
-    coords = _row_title_center(page, fullname)
+    coords = page.evaluate(
+        """(fn) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          if (!row) return null;
+          const target = row.classList.contains('relay-open')
+            ? row.querySelector('.relay-strip')
+            : (row.querySelector('h3.title, .title, .snippet') || row);
+          const b = target.getBoundingClientRect();
+          return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) };
+        }""",
+        fullname,
+    )
+    assert coords is not None, f"row {fullname} not found"
     page.evaluate(
         """({fn, coords, dx, dy, holdFirst}) => new Promise((resolve) => {
           const row = document.querySelector('.row[data-fullname="' + fn + '"]');
-          const el = row.querySelector('h3.title, .title, .snippet') || row;
+          const el = row.classList.contains('relay-open')
+            ? row.querySelector('.relay-strip')
+            : (row.querySelector('h3.title, .title, .snippet') || row);
           const fire = (type, x, y) => el.dispatchEvent(new PointerEvent(type, {
             bubbles: true, cancelable: true, composed: true,
             pointerType: 'touch', pointerId: 1, isPrimary: true,
@@ -228,17 +242,18 @@ def test_relay_swipe_left_is_noop(pixel6_page):
     _touch_swipe(page, "reddit:ui_scroll_1", dx=-120, dy=0)
     # The relay should still be open (leftward swipe is a no-op in relay-close-mode).
     assert _relay_open(page), "relay should still be open after leftward swipe"
-    # The .item-fg should not have leaked past the left edge.
-    fg_left = page.evaluate(
+    # The visible relay strip should remain aligned with the row, not dragged away.
+    strip_delta = page.evaluate(
         """() => {
           const row = document.querySelector('.row.relay-open');
-          if (!row) return 0;
-          const fg = row.querySelector('.item-fg');
-          return fg ? fg.getBoundingClientRect().left : 0;
+          const strip = row && row.querySelector('.relay-strip');
+          if (!row || !strip) return null;
+          return Math.round(strip.getBoundingClientRect().left - row.getBoundingClientRect().left);
         }"""
     )
-    assert fg_left >= -5, (
-        f"relay .item-fg leaked left (blank space): left={fg_left} "
+    assert strip_delta is not None
+    assert abs(strip_delta) <= 5, (
+        f"relay strip moved away from the row: delta={strip_delta} "
         "(leftward swipe should be a no-op in relay-close-mode)"
     )
 
@@ -528,10 +543,15 @@ def test_lightbox_swipe_does_not_scroll_feed(pixel6_page):
     # ~100px after scrollTo, so capture the ACTUAL settled position as the baseline.
     page.evaluate("window.scrollTo(0, 500)")
     page.wait_for_timeout(500)
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
     scroll_before = page.evaluate("Math.round(window.scrollY)")
-    assert scroll_before >= 300, f"feed should be scrolled, got {scroll_before}"
+    assert scroll_before >= 250, f"feed should be scrolled, got {scroll_before}"
 
-    _open_single_image_lightbox(page, "twitter:1777777777777777777")
+    coords = _thumb_center(page, fullname)
+    page.touchscreen.tap(coords["x"], coords["y"])
+    page.wait_for_timeout(500)
+    assert _media_modal_open(page), f"lightbox should open on {fullname}"
     _lightbox_touch_drag(page, dy=150)
     assert not _media_modal_open(page), "lightbox should close after downward swipe"
 
