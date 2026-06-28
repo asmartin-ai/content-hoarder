@@ -3,7 +3,7 @@
 All items from the 2026-06-26 real-usage session have been triaged.
 This file is kept as a reconciliation record for the ~2h build sprint.
 
-## Shipped (13 items)
+## Shipped (17 items)
 
 | # | Item | Where |
 |---|------|-------|
@@ -20,20 +20,43 @@ This file is kept as a reconciliation record for the ~2h build sprint.
 | E1 | Sidebar defocus + scroll-lock | `lockBrowseScroll`/`unlockBrowseScroll` |
 | E3 | Surprise-me view (pinboard card, reader flow) | `main.js surprise()` |
 | — | Swipe+relay mutual exclusion | `swipe.js relayCloseMode` |
+| A2 | No feed refresh on reader triage | `main.js act()` `{fromReader:true}` option |
+| B4 | Hold-to-preview media (press-and-hold lightbox) | `core/media.js createLightbox` `_attachPeekRelease` |
+| C2 | Pinch-zoom + mouse-wheel zoom in lightbox | `core/media.js createLightbox` zoom state |
+| C3 | Swipe-to-pan + swipe-far-to-close lightbox | `core/media.js` pointer-events pan + `close()` |
 
-## Remaining (5 items, folded into BACKLOG.md Epics 15-16)
+## Remaining (1 item, folded into BACKLOG.md Epic 16)
 
 | # | Item | BACKLOG line |
 |---|------|-------------|
-| A2 | Don't refresh feed on reader triage | Epic 15, after dock |
-| B4 | Hold-to-preview media (press-and-hold lightbox) | Epic 16 mobile |
-| C2 | Pinch-zoom + mouse-wheel zoom in lightbox | Epic 16 lightbox |
-| C3 | Swipe-to-pan + swipe-far-to-close lightbox | Epic 16 lightbox |
 | E2 | Scroll-deceleration physics | Epic 16 polish |
 
 ## Design decisions locked (review these on the next build pass)
 
 - **A1:** Bottom tab pulls up into semi-circle dock: [Archive] [Snooze] top arc, [Keep] [Tag] [Done] bottom arc
+  - **REVERSED 2026-06-27 (T3 batch):** the dock shipped but looked wrong on mobile. User scrapped it.
+    `t3-drop-reader-dock` deletes the `.rd-foot` element + handlers + CSS. The reader relies on
+    swipe + keyboard (F/A/D/T/S/Esc) until a redesigned dock ships in a later session.
 - **B3:** Relay-style horizontal row (Source, Author, Tag, Share, Snooze) — icon over label, evenly spaced
   - Refinements requested 2026-06-27: larger buttons, no text on buttons (icons only per relay-observations), fix text overlap
+  - **T3 regression (2026-06-27):** swipe-left revealed blank space after long-press; swipe-right
+    didn't close the relay. Fixed in `t3-relay-swipe-close`.
+- **B4:** Hold-to-preview (press-and-hold lightbox peek)
+  - **T3 regression (2026-06-27):** the peek flickered (opened/closed repeatedly). Fixed in
+    `t3-peek-flicker` (idempotency guard + swipe.js lpTimer skip on `[data-media]`).
+- **C3:** Swipe-to-pan + swipe-far-to-close lightbox
+  - **T3 regression (2026-06-27):** vertical swipe scrolled the page instead of closing. Fixed in
+    `t3-lightbox-swipe-scroll` (`preventDefault` + `touch-action: none` during drag).
+- **D1:** Tag suggestions: last 2 categories + 1 tag
+  - **T3 regression (2026-06-27):** only 1 suggestion showed (categories were sparse). Fixed in
+    `t3-tag-suggest-three` (backfill with tags to always reach 3).
+- **E1:** Sidebar defocus + scroll-lock
+  - **T3 regression (2026-06-27):** browse view still scrolled when the sidebar was open. Fixed in
+    `t3-sidebar-scroll-lock` (lock body too + `overscroll-behavior: contain`).
 - **E3:** Pinboard-sized card, treated as inbox item, opens reader/thread with same controls
+
+## T3 follow-up batch (2026-06-27)
+
+Real-device pass surfaced 8 regressions + 1 missing feature. Fix batch lives in
+`MOBILE-POLISH-T3-BATCH.md` (7 T2-delegated tasks, branched off `staging/mobile-polish-t2`).
+BACKLOG.md Epic 16 has the per-item entries under "T3 mobile-polish regression batch".
