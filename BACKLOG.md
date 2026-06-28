@@ -934,18 +934,13 @@ parallel session added the missing **Stats** panel (`#statsheet`, GET /stats) in
   (collapsed pill → tap to fan open) + 5-button semi-circle fan (Archive, Snooze top arc; Keep, Tag, Done
   bottom arc). Backdrop tap (`rd-dock-scrim`) collapses without closing the reader. Keyboard shortcuts F/A/D
   preserved. Snooze is first-class (`data-snooze="7"`).
-- [ ] **P2 — Don't refresh the feed on reader Done/Archive/Keep.** *(User-reported 2026-06-26.)* Triaging the reader's
-  item (F/A/D or the dock buttons) currently calls `onTriage` → `act()` → `render()` which can reflow the list and
-  lose scroll position. **Desired:** the feed should NOT refresh on a reader triage action — only on a manual
-  refresh or app reload. The triaged item should disappear lazily (on the next loadMore/refresh), and the reader
-  should close to the exact scroll position. Pairs with the dock (above) — dock is the surface; this is what
-  happens after. **Design decision:** (a) `closeReader(false)` + `onTriage` must not trigger list refetch; (b)
-  preserve scroll across reader open/close unconditionally (`feedScrollY` already handles the close side).
-  **Status 2026-06-27:** spec written (`delegation/SPEC-a2-no-feed-refresh-on-triage.md`) but **not attempted**
-  in the T2 batch — no worktree, no branch, no diff. Stays on T1. The spec is current; the implementation sketch
-  (an `{fromReader:true}` option on `act()` that skips `clearItemFirstPageCache` + `render()`, keeping the item in
-  `state.items` with its status updated in memory for lazy removal on next load) is ready to execute. `snooze()`
-  needs the same treatment (it shares `act()`'s `clearItemFirstPageCache`+`render()` shape).
+- [x] ~~**P2 — Don't refresh the feed on reader Done/Archive/Keep.**~~ ✅ SHIPPED 2026-06-27
+  (`delegate/a2-no-feed-refresh-on-triage`, SW v84 → v86 merged). `act()` and `snooze()` gained an
+  `{fromReader:true}` option: reader triage (F/A/D keys, dock buttons, S key) skips the leave-animation,
+  `clearItemFirstPageCache`, item removal, and `render()`. The triaged item stays in `state.items` with its
+  status updated in-memory; removed lazily on the next `loadMore`/refresh. Undo reverts the in-memory status
+  without reflow. Inline row path unchanged. `snooze()` got the same `{fromReader:true}` treatment via the
+  dock's Snooze button and `S` keyboard shortcut. Verified: same 5 known env failures, no new.
 
 ### Icebox — true WYSIWYG markdown editing *(Epic 15)*
 - [ ] **Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing.** *(Deferred 2026-06-19.)*
@@ -1077,7 +1072,58 @@ Absorbs "make the Reddit view more mobile-friendly".*
   matches return null on `<video>`). SW v77 → v83. *(User-reported 2026-06-26.)* Orig: Inside the
   lightbox, a pinch gesture (touch) or mouse-wheel should **zoom the image** instead of scrolling
   the page.
-- [ ] **P2 — Swipe-to-pan + swipe-far-to-close in the lightbox (Relay-style).** *(User-reported 2026-06-26.)* **Unblocked 2026-06-27** — depends on C2 (pinch-zoom, shipped to staging `mobile-polish-t2`); the spec `delegation/SPEC-c3-lightbox-pan-close.md` is ready. When zoomed in, swiping up/down should **pan** the image (not close the lightbox). When zoomed out (or panned to the edge), a large up/down swipe should **close** the lightbox (Relay's dismiss-on-pan-beyond-edge behavior). Two-finger pinch + one-finger pan when zoomed; one-finger swipe = close when at scale 1. Must coordinate with `overlaynav.js` (the close registers with the history stack) — the swipe-close should call the lightbox's `close()`, not a raw `history.back()`.
+- [x] ~~**P2 — Swipe-to-pan + swipe-far-to-close in the lightbox (Relay-style).**~~ ✅ SHIPPED 2026-06-27
+  (`delegate/c3-lightbox-pan-close`, SW v85 → v86 merged). Pointer Events one-finger drag on the lightbox
+  image: when zoomed (`zoomScale > 1.001`) pans with clamping to viewport bounds; at scale 1, vertical
+  drag >120px calls the lightbox's own `close()` (not `history.back()`). `e.stopPropagation()` on drag-up
+  prevents double-close via backdrop click. CSS: `.zoomed { touch-action: none; cursor: grab; }` +
+  `:active { cursor: grabbing; }`. `pointercancel` handler cleans up state. Builds on C2's zoom state
+  (`zoomScale`, `zoomImg`, `setZoom`/`resetZoom`). Two-finger pinch (C2) and one-finger pan (C3) coexist:
+  pinch uses touch events, pan uses pointer events; second pointer is gated when zoomed. Same 5 known env
+  failures, no new.
+
+### T3 mobile-polish regression batch *(Epic 16)* — 2026-06-27
+
+Real-device pass on `staging/mobile-polish-t2` surfaced 8 regressions + 1 missing feature. Fix
+batch: `delegation/MOBILE-POLISH-T3-BATCH.md` (7 T2-delegated tasks, branched off staging —
+NOT main, since T2 hasn't merged to main yet). Tests live in `tests/ui/test_mobile_ux.py`.
+
+- [ ] **P1 — Swipe-left reveals blank space after long-press.** T2 regression: `swipe.js pointerdown`
+  sets `fg.style.transition = "none"` unconditionally (even in `relayCloseMode`); the `end()`
+  relay branch returns without `reset()`, leaving the inline `transition: none` to suppress the
+  CSS slide-back when `relay-open` is removed → abrupt snap / visible blank strip. Fix:
+  `t3-relay-swipe-close` skips the transition disable in `relayCloseMode` and always calls
+  `reset()` at the end of the branch.
+- [ ] **P1 — Swipe-right from relay-open doesn't close the relay.** T2 regression: `end()` requires
+  `horizontal && dx > 40` — the 40px triage-commit threshold is too high for an already-open
+  overlay, and the `horizontal` decision can fail on a diagonal swipe. Fix: `t3-relay-swipe-close`
+  lowers the close threshold to 10px and bypasses the `horizontal` decision in `relayCloseMode`.
+- [ ] **P1 — Hold-to-preview flickers (opens/closes repeatedly).** T2 regression (B4): the
+  window-level peek release listener can fire twice (`pointerup` + `pointercancel`), and
+  `swipe.js`'s 450ms long-press timer arms on `[data-media]` targets, racing the 250ms peek.
+  Fix: `t3-peek-flicker` adds an idempotency guard (`_peekOpen`), makes the release listener
+  fire-once across both event types, and moves the swipe.js `[data-media]` guard to skip the
+  lpTimer arming entirely.
+- [ ] **P2 — Only 1 tag suggestion shown (D1 should show 3).** T2 regression: `tagedit.js options()`
+  slices 2 categories + 1 tag, but `_recentCategories()` is empty unless the item has a
+  `metadata.category` → 0 + 1 = 1. Fix: `t3-tag-suggest-three` backfills with recent tags to
+  always reach 3 total when the stores have enough candidates.
+- [ ] **P1 — Lightbox swipe-to-close scrolls the page instead.** T2 regression (C3): the
+  `pointermove` handler doesn't `preventDefault` and the image's `touch-action: pan-y` lets the
+  browser scroll. Fix: `t3-lightbox-swipe-scroll` adds `preventDefault` on drag + sets
+  `touch-action: none` on the image during the drag.
+- [ ] **P2 — Sidebar open still scrolls the browse view.** T2 regression (E1): `lockBrowseScroll`
+  only locks `#items`, not the body; the `.navdrawer` lacks `overscroll-behavior: contain` so
+  scroll chains. Fix: `t3-sidebar-scroll-lock` locks the body too (ref-counted) and adds
+  `overscroll-behavior: contain` to the panels.
+- [ ] **P2 — Drop the reader triage dock (`.rd-foot`).** User decision 2026-06-27: the dock looks
+  wrong on mobile; scrap it now, redesign later. Reader stays fully usable via swipe + keyboard
+  (F/A/D/T/S/Esc). Fix: `t3-drop-reader-dock` deletes the `.rd-foot` element, its handlers, and
+  its CSS. Safe-area inset preserved on `.rd-scroll`.
+- [ ] **P2 — UX verification tooling (Playwright).** T2 gap: the existing `tests/ui/test_smoke.py`
+  covers feed load + gallery + topbar, but NOT relay/peek/tag-suggest/lightbox-swipe/sidebar-lock.
+  Fix: `t3-playwright-ux-tests` adds `tests/ui/test_mobile_ux.py` with one test per T3 fix,
+  designed to fail on the buggy staging branch and pass once the fixes merge.
 
 ### Mobile tagging UX *(Epic 16)*
 
