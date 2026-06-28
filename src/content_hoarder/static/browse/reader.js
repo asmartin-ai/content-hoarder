@@ -1329,10 +1329,6 @@ export function initReader({
     bodyDraft = "";
     bodySaving = false;
     noteVideoActive = "";
-    // reset the triage dock to its collapsed tab on every open (a prior session may
-    // have left it open in the DOM after a keyboard triage closed the reader)
-    const footEl0 = reader.querySelector(".rd-foot");
-    if (footEl0) footEl0.setAttribute("data-dock", "closed");
     const sm = sourceMeta(it);
     reader.dataset.source = it.source || "";
     reader.classList.toggle("from-triage", !!returnTo);
@@ -1406,13 +1402,6 @@ export function initReader({
       if (e.key === "Escape") {
         e.stopPropagation();
         e.preventDefault();
-        // If the triage dock is open, the first Esc collapses it back to the tab
-        // instead of closing the reader; a second Esc closes the reader as before.
-        const footEl = reader.querySelector(".rd-foot");
-        if (footEl && footEl.getAttribute("data-dock") === "open") {
-          footEl.setAttribute("data-dock", "closed");
-          return;
-        }
         closeReader(false);
         return;
       }
@@ -1445,8 +1434,6 @@ export function initReader({
       if (k === "t") {
         e.stopPropagation();
         e.preventDefault();
-        const footEl = reader.querySelector(".rd-foot");
-        if (footEl) footEl.setAttribute("data-dock", "open");
         openReaderTagAdd();
         return;
       }
@@ -1611,80 +1598,6 @@ export function initReader({
       if (typeof onMedia === "function") onMedia(item);
     }
   });
-  const foot = reader.querySelector(".rd-foot");
-  if (foot) {
-    const dockToggle = () =>
-      foot.setAttribute(
-        "data-dock",
-        foot.getAttribute("data-dock") === "open" ? "closed" : "open",
-      );
-    const closeDock = () => foot.setAttribute("data-dock", "closed");
-    const isDockOpen = () => foot.getAttribute("data-dock") === "open";
-
-    // hydrate icons for the status actions (keep/archive/done). Snooze + Tag stay
-    // label-only — matching the original foot where only [data-act] got glyphs.
-    foot.querySelectorAll(".rd-act[data-act]").forEach((b) => {
-      const a = b.dataset.act;
-      if (a === "tag") return; // Tag has no dedicated glyph; label only
-      b.insertAdjacentHTML(
-        "afterbegin",
-        chIcon(a === "archived" ? "archive" : a),
-      );
-    });
-
-    foot.addEventListener("click", (e) => {
-      // tab / backdrop toggle (does NOT close the reader)
-      if (e.target.closest("[data-dock-toggle]")) {
-        dockToggle();
-        return;
-      }
-      const b = e.target.closest("[data-act], [data-snooze]");
-      if (!b) return;
-      const fn = fullname,
-        status = b.dataset.act;
-      closeDock();
-      // Tag opens the inline editor in-place and stays in the reader.
-      if (status === "tag") {
-        openReaderTagAdd();
-        return;
-      }
-      closeReader(false);
-      if (status && typeof onTriage === "function") onTriage(fn, status);
-      else if (b.dataset.snooze && typeof onSnooze === "function") onSnooze(fn);
-    });
-
-    // swipe-down on the dock collapses it back to the tab (does not close the reader)
-    let dsy = 0,
-      ddragging = false;
-    const dock = foot.querySelector(".rd-dock");
-    if (dock) {
-      dock.addEventListener(
-        "touchstart",
-        (e) => {
-          if (!isDockOpen() || e.touches.length !== 1) return;
-          dsy = e.touches[0].clientY;
-          ddragging = true;
-        },
-        { passive: true },
-      );
-      dock.addEventListener(
-        "touchmove",
-        (e) => {
-          if (!ddragging) return;
-          const dy = e.touches[0].clientY - dsy;
-          if (dy > 24) {
-            ddragging = false;
-            closeDock();
-          }
-        },
-        { passive: true },
-      );
-      dock.addEventListener("touchend", () => {
-        ddragging = false;
-      });
-    }
-  }
-
   /* ---- swipe-right → return to feed (Relay-style). Left-edge is left to the
          OS back-gesture, which also closes the reader via popstate. ---- */
   let sx = 0,
