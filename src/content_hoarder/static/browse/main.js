@@ -926,13 +926,22 @@ new IntersectionObserver(
   { rootMargin: "600px" },
 ).observe($("#sentinel"));
 
-/* ---- mobile floating scroll-to-top (Epic 13) ---- */
+/* ---- mobile floating scroll-to-top (Epic 13 / 16) ---- */
 const gotop = $("#gotop");
 const GOTOP_AT = 700; // px scrolled before the affordance appears
+const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 let gotopTick = false;
 function syncGotop() {
   gotopTick = false;
   gotop.classList.toggle("show", window.scrollY > GOTOP_AT);
+}
+function scrollToBrowseTop() {
+  window.scrollTo({
+    top: 0,
+    left: 0,
+    behavior: reducedMotion?.matches ? "auto" : "smooth",
+  });
+  if (reducedMotion?.matches) requestAnimationFrame(syncGotop);
 }
 window.addEventListener(
   "scroll",
@@ -945,9 +954,7 @@ window.addEventListener(
   },
   { passive: true },
 );
-gotop.addEventListener("click", () =>
-  window.scrollTo({ top: 0, behavior: "smooth" }),
-);
+gotop.addEventListener("click", scrollToBrowseTop);
 
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
 const ambient = $("#ambient");
@@ -1875,7 +1882,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v96";
+const APP_VERSION = "v97";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
@@ -1883,11 +1890,17 @@ const APP_VERSION = "v96";
   if (!head) return;
   // Collapsing/expanding the (sticky) header changes its height, so the browser's scroll-anchoring
   // nudges scrollY to keep content stable — near a threshold that nudge re-triggered the toggle =
-  // flicker (worst near the top, where expanding GROWS the bar). Two guards: (1) a WIDE dead zone
+  // flicker (worst near the top, where expanding GROWS the bar). Three guards: (1) a WIDE dead zone
   // (>110 collapse / <28 expand) bigger than the bar's height change, so the nudge lands inside it;
-  // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle,
-  // then re-checks once from the settled position. Together they can't oscillate.
+  // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle;
+  // (3) defer near-top expansion until scroll settles, unless we are already effectively at y=0.
+  const COLLAPSE_AT = 110;
+  const EXPAND_AT = 28;
+  const TOP_EPSILON = 1;
+  const SCROLL_SETTLE_MS = 120;
   let locked = false;
+  let scrollIdle = true;
+  let settleTimer = 0;
   const set = (compact) => {
     if (compact === head.classList.contains("compact")) return; // already in this state
     head.classList.toggle("compact", compact);
@@ -1900,12 +1913,33 @@ const APP_VERSION = "v96";
   function onScroll() {
     if (locked) return;
     const y = window.scrollY || 0;
-    if (y > 110)
+    if (y > COLLAPSE_AT)
       set(true); // scrolled well down → shrink
-    else if (y < 28) set(false); // back near the top → expand
+    else if (y <= TOP_EPSILON)
+      set(false); // true top → expand immediately
+    else if (y < EXPAND_AT && scrollIdle) set(false); // near top → expand after momentum settles
     // 28..110 = wide dead zone: keep the current state
   }
-  window.addEventListener("scroll", onScroll, { passive: true });
+  function markScrollActive() {
+    scrollIdle = false;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(markScrollIdle, SCROLL_SETTLE_MS);
+  }
+  function markScrollIdle() {
+    clearTimeout(settleTimer);
+    scrollIdle = true;
+    onScroll();
+  }
+  window.addEventListener(
+    "scroll",
+    () => {
+      markScrollActive();
+      onScroll();
+    },
+    { passive: true },
+  );
+  if ("onscrollend" in window)
+    window.addEventListener("scrollend", markScrollIdle, { passive: true });
 })();
 
 /* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
