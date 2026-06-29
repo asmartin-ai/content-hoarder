@@ -26,8 +26,14 @@ export const snoozeItem = (fullname, body) =>
 export const undoSnooze = (body) =>
   postJSON("/snooze/undo", body);
 
-export const recoverItem = (fullname) =>
-  postJSON("/items/" + encodeURIComponent(fullname) + "/recover");
+export const recoverItem = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/recover", body);
+
+export const recoverArchiveToday = (fullname, mode = "apply") =>
+  recoverItem(fullname, {
+    archive_today: mode,
+    confirm_external_archive_today: true,
+  });
 
 export const setBody = (fullname, body) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/body", { body });

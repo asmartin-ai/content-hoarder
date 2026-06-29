@@ -1286,6 +1286,7 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 .recover-btn:disabled { opacity: 0.6; cursor: default; }
 .tcard-recover { margin-top: 0.6rem; }
 .tcard-recover .recover-btn { padding: 0.45rem 0.9rem; border-radius: var(--r-sm); background: var(--panel2); cursor: pointer; }
+.tcard-recover .archive-today-btn { border-color: var(--border-strong); color: var(--muted); }
 .media-box { max-width: 680px; width: 92%; overflow: hidden; }  /* no outer scroll; the iframe scrolls itself */
 #media-body { min-height: 0; }
 #media-body iframe { width: 100% !important; max-width: 100%; border: 0; }
