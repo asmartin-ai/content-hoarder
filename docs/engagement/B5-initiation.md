@@ -35,7 +35,7 @@ For an ADHD user staring at a 12,000-item pile, the bottleneck is not throughput
 ## Takeaways for content-hoarder
 
 - **[P1 · effort S]** *Open to ONE triage card, not the inbox list* — a setting/default that lands on a single swipeable card instead of the wall. Maps to the existing triage card + a new "start screen" preference. Risk: power-users who want the list; keep a one-tap toggle to list view.
-- **[P1 · effort S]** *Pick that first card with the parked triage-score / smart-triage queue* — the "likely-done" model already exists; use it to choose the *one* card so the user never decides what to start. Risk: a bad first pick; allow instant "skip."
+- **[P1 · effort S]** *Pick that first card with the shipped triage-score / smart-triage queue* — the "likely-done" model already exists; use it to choose the *one* card so the user never decides what to start. Risk: a bad first pick; allow instant "skip."
 - **[P1 · effort S]** *"5-card sprint" framing* — open offers a tiny, closable batch ("5 cards") not infinite scroll; a tiny goal beats an open-ended one (Fogg "tiny", GTD "just one"). Maps onto Focus mode's batching. Risk: don't auto-extend the sprint (compulsion); let *them* re-trigger.
 - **[P1 · effort S]** *Resume state — "pick up where you left off"* — persist last position/queue so reopening restarts mid-flow, not from a cold wall (Krug: reduce steps-to-value). Risk: stale resume after long gaps — offer "resume vs fresh 5."
 - **[P2 · effort S]** *One-tap actions, sensible defaults everywhere on the card* — Keep/Archive/Done as single gestures with undo (already present); never require a field or menu to act. Maps to existing swipe + undo. Risk: mis-swipes — keep undo prominent.

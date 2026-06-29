@@ -4,7 +4,7 @@
 
 ## The idea
 
-content-hoarder has ~12,000 items and one user. The job is not "what's objectively best" but "what will *this person* actually act on *right now*." That's a ranking-and-timing problem: score items by likely-action, but deliberately mix in novelty and match the surface to the user's current state. The parked triage-score already does the hard half (behavioral modeling); the work is to un-park it, make its "why" visible, and wrap it in an explore/exploit policy and light context-awareness — all mechanics, no visual overhaul.
+content-hoarder has ~12,000 items and one user. The job is not "what's objectively best" but "what will *this person* actually act on *right now*." That's a ranking-and-timing problem: score items by likely-action, but deliberately mix in novelty and match the surface to the user's current state. The shipped triage-score already does the hard half (behavioral modeling); the work is to tune it, make its "why" visible, and wrap it in an explore/exploit policy and light context-awareness — all mechanics, no visual overhaul.
 
 ## The science
 
