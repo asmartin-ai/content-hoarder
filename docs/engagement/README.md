@@ -10,7 +10,7 @@ line is thin (interest-based nervous system; rejection-sensitive, all-or-nothing
 
 Each doc follows: **the idea → the behavioral science (verified, cited) → how real apps do it → ADHD &
 ethical caveats → concrete prioritized takeaways** mapped to content-hoarder's actual features
-(triage card, daily goal, Stats, Shuffle/Mix, Surprise card, decay, the parked `feat/triage-score`).
+(triage card, daily goal, Stats, Shuffle/Mix, Surprise card, decay, the shipped triage-score via `learn-triage`).
 
 ## Areas
 
@@ -31,7 +31,7 @@ ethical caveats → concrete prioritized takeaways** mapped to content-hoarder's
 ### C · Intelligence & triggers — researched 2026-06-14 ✅
 | # | Doc | One-line |
 |---|-----|----------|
-| C7 | [Smart Surfacing / Personalization](C7-smart-surfacing.md) | Unpark the triage-score as default ranking; explain the "why"; mix in exploration so it never narrows into a rut |
+| C7 | [Smart Surfacing / Personalization](C7-smart-surfacing.md) | Tune the shipped triage-score as default ranking (live on main via `learn-triage`); explain the "why"; mix in exploration so it never narrows into a rut |
 | C8 | [Triggers & Re-engagement](C8-triggers.md) | A self-set "triage o'clock" nudge (verified PWA-push path; or a cheaper digest first) — never a guilt-trip |
 
 ### D · Mindset — researched 2026-06-14 ✅
@@ -48,7 +48,7 @@ Four docs researched independently, and they converge hard.
 2. **Backlog burn-down as net flow** ("down 340 this week", projected days-to-zero). *(A3, A4)* The **safest** high-value lever — pure competence feedback (SDT), informational so it sidesteps overjustification. → Stats (logic now; chart *needs the design pass*).
 3. **Land the home-screen tap on ONE triage card, not the list.** *(A1)* One swipe = one complete loop; kills initiation friction (Fogg "Ability"). → launch route + triage card.
 4. **Reframe the daily goal as a forgiving floor with grace built in** — accumulation ("3 done ✓") + endowed-progress head-start, **no punishing chain**. *(A1, A3, A4)* → daily goal.
-5. **Tune the shipped triage-score (live on main via learn-triage), human-in-the-loop.** *(A1, A2, A4)* It is literally Eyal's "Investment" phase **and** a "Hunt" reward engine **and** an SDT competence/autonomy win — three docs independently say tune it. → feat/triage-score.
+5. **Tune the shipped triage-score (live on main via `learn-triage`), human-in-the-loop.** *(A1, A2, A4)* It is literally Eyal's "Investment" phase **and** a "Hunt" reward engine **and** an SDT competence/autonomy win — three docs independently say tune it. → triage-score tuning.
 
 ### The consensus DON'Ts (every doc warns)
 - ❌ **No rigid punishing streaks.** A broken chain after a rough ADHD week → guilt → abandonment (the "what-the-hell effect"). If you ever add a streak, ship **freezes/grace in v1**, never later.
@@ -78,7 +78,7 @@ rediscovery** (invert the triage score to surface high-value buried items).
 
 ## C · Intelligence & triggers — key takeaways (added 2026-06-14)
 
-**C7 (smart surfacing)** lands on the same centerpiece *yet again*: **unpark the triage-score** as the default ranking, with its **"why this" always-on** (autonomy/trust, SDT). But don't let it only *exploit*:
+**C7 (smart surfacing)** lands on the same centerpiece *yet again*: **tune the shipped triage-score** as the default ranking (live on main via `learn-triage`), with its **"why this" always-on** (autonomy/trust, SDT). But don't let it only *exploit*:
 - **Explore/exploit budget** — draw ~15–20% of the queue from the long tail, and route the **Surprise card as the exploration arm** (multi-armed-bandit framing). Pure exploitation narrows into a rut.
 - **Seen-recently penalty** — decay a skipped item's score before it reappears (Readwise's cheapest anti-monotony trick; reuses DECAY).
 - **Context modes** — a "5 min / 20 min / lots" available-minutes filter (trivial) and **opt-in, user-declared** energy modes (low-energy→listenable). *Honesty:* time-of-day weighting is evidence-based; the ADHD energy→completion link is a *hypothesis to test on your own logs*, not settled — and never silently infer-and-impose (patronising).
@@ -105,7 +105,7 @@ rediscovery** (invert the triage score to surface high-value buried items).
 The whole sweep points at one core, wrapped in kind framing, with a cheap external nudge. Suggested order:
 
 **Phase 1 — the convergent core** (the loudest signal; mostly backend logic, dodges the design freeze)
-1. **Ship the parked `feat/triage-score`** as default smart-triage ranking — *with* an explore-mix (Surprise = the explore arm) + a seen-recently penalty + always-on "why." *(A1·A2·A4·B5·C7 — 5 docs)*
+1. **Tune the shipped triage-score (live on main via `learn-triage`)** as default smart-triage ranking — *with* an explore-mix (Surprise = the explore arm) + a seen-recently penalty + always-on "why." *(A1·A2·A4·B5·C7 — 5 docs)*
 2. **Open to ONE card** (triage-score-picked), not the 12k list. *(B5)*
 3. **Hide the scary total; show "X cleared today" + "your stream" framing.** *(A3·D9)*
 4. **Daily goal → a forgiving floor**, endowed-progress head-start, no punishing chain. *(A1·A3·A4·D9)*
