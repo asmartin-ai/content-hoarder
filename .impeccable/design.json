@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-29T00:00:00Z",
+  "title": "Design System: content-hoarder",
+  "extensions": {
+    "colorMeta": {
+      "night-bg": {
+        "role": "neutral",
+        "displayName": "Night Ops Background",
+        "canonical": "#101216",
+        "tonalRamp": ["#0c0e12", "#101216", "#171a21", "#20242d", "#2a2f3a", "#3d4452", "#636e7e", "#e0e5ec"]
+      },
+      "night-panel": {
+        "role": "neutral",
+        "displayName": "Night Ops Panel",
+        "canonical": "#171a21",
+        "tonalRamp": ["#0c0e12", "#101216", "#171a21", "#20242d", "#2a2f3a", "#3d4452", "#98a2b3", "#e0e5ec"]
+      },
+      "phosphor-accent": {
+        "role": "primary",
+        "displayName": "Apricot Phosphor",
+        "canonical": "#f2a97e",
+        "tonalRamp": ["#2e1605", "#5a2c0e", "#8d4b1d", "#bd7445", "#f2a97e", "#ffc29d", "#ffd8bf", "#fff0e6"]
+      },
+      "keep-blue": {
+        "role": "secondary",
+        "displayName": "Keep Blue",
+        "canonical": "#7da4f5",
+        "tonalRamp": ["#0a1a38", "#163468", "#24549d", "#4278d7", "#7da4f5", "#a8c3ff", "#d0ddff", "#edf3ff"]
+      },
+      "archive-green": {
+        "role": "secondary",
+        "displayName": "Archive Green",
+        "canonical": "#54c794",
+        "tonalRamp": ["#05281b", "#0b4a31", "#16704a", "#2c9c6b", "#54c794", "#85ddb4", "#b8efd4", "#e9fbf2"]
+      },
+      "done-red": {
+        "role": "secondary",
+        "displayName": "Done Red",
+        "canonical": "#ef7568",
+        "tonalRamp": ["#310c07", "#5d1912", "#912c22", "#c64d41", "#ef7568", "#ffa096", "#ffc8c2", "#fff0ee"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Brand-scale headings and empty-state titles only." },
+      "headline": { "displayName": "Headline", "purpose": "Sheet headings and strong panel titles." },
+      "title": { "displayName": "Title", "purpose": "Saved-item titles and compact row hierarchy." },
+      "body": { "displayName": "Body", "purpose": "Readable snippets, settings notes, and recovery explanations." },
+      "label": { "displayName": "Instrument Label", "purpose": "Counts, shortcuts, operators, indexes, and technical readouts." }
+    },
+    "shadows": [
+      { "name": "row", "value": "0 1px 0 rgba(0,0,0,.22)", "purpose": "Structural row separation in dark mode." },
+      { "name": "pop", "value": "0 14px 44px rgba(0,0,0,.5)", "purpose": "Popovers, drawers, sheets, menus, and lightboxes." },
+      { "name": "led-glow", "value": "0 0 8px var(--accent)", "purpose": "The tiny brand/status pebble only." }
+    ],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(.25,.9,.35,1)", "purpose": "House easing for short state transitions." },
+      { "name": "fast", "value": "120ms", "purpose": "Tiny hover/focus response." },
+      { "name": "standard", "value": "150ms", "purpose": "Default product UI transition." },
+      { "name": "slow", "value": "200ms", "purpose": "Sheet or overlay transition ceiling." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "Pixel 6 / Chrome Android target" },
+      { "name": "desktop-shell", "value": "max-width: 1100px console row" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled action button for the most important local action in a panel or empty state.",
+      "html": "<button class=\"ds-btn-primary\">Draw another batch</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:.35rem;height:34px;padding:0 .85rem;border:1px solid transparent;border-radius:8px;background:var(--accent,#f2a97e);color:var(--accent-ink,#2e1605);font:600 .85rem/1 Lexend,system-ui,sans-serif;cursor:pointer;transition:background 150ms cubic-bezier(.25,.9,.35,1),transform 150ms cubic-bezier(.25,.9,.35,1),box-shadow 150ms cubic-bezier(.25,.9,.35,1)}.ds-btn-primary:hover{background:var(--accent-strong,#ffc29d)}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--focus-ring,#f2a97e);outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary navigation or reversible action button.",
+      "html": "<button class=\"ds-btn-ghost\">That’s enough for today</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:.35rem;height:34px;padding:0 .85rem;border:1px solid var(--border-control,#3d4452);border-radius:8px;background:transparent;color:var(--text-body,#e0e5ec);font:600 .85rem/1 Lexend,system-ui,sans-serif;cursor:pointer;transition:border-color 150ms cubic-bezier(.25,.9,.35,1),background-color 150ms cubic-bezier(.25,.9,.35,1),transform 150ms cubic-bezier(.25,.9,.35,1)}.ds-btn-ghost:hover{border-color:var(--accent,#f2a97e);background:var(--accent-tint,rgba(242,169,126,.11))}.ds-btn-ghost:active{transform:translateY(1px)}.ds-btn-ghost:focus-visible{outline:2px solid var(--focus-ring,#f2a97e);outline-offset:2px}"
+    },
+    {
+      "name": "Command Search",
+      "kind": "input",
+      "refersTo": "search-command",
+      "description": "Primary search/operator shell for fuzzy search and command entry.",
+      "html": "<label class=\"ds-command\"><span>/</span><input value=\"source:reddit status:inbox\" aria-label=\"Search\"><kbd>/</kbd></label>",
+      "css": ".ds-command{display:flex;align-items:center;gap:10px;height:42px;padding:0 16px;border:1px solid var(--border-control,#3d4452);border-radius:999px;background:var(--surface-card,#171a21);color:var(--text-body,#e0e5ec);font:400 .85rem/1 Lexend,system-ui,sans-serif}.ds-command:focus-within{border-color:var(--accent,#f2a97e);box-shadow:0 0 0 3px var(--accent-tint,rgba(242,169,126,.11))}.ds-command span{font:700 .85rem/1 JetBrains Mono,ui-monospace,monospace;color:var(--accent,#f2a97e)}.ds-command input{min-width:0;flex:1;border:0;outline:0;background:none;color:inherit;font:inherit}.ds-command kbd{font:600 .73rem/1 JetBrains Mono,ui-monospace,monospace;color:var(--text-dim,#636e7e)}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Applied operator or status filter chip with removable/toggle behavior.",
+      "html": "<button class=\"ds-chip\">status:inbox</button>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:0;border-radius:999px;background:var(--accent-tint,rgba(242,169,126,.11));color:var(--accent-strong,#ffc29d);font:600 .73rem/1 JetBrains Mono,ui-monospace,monospace;cursor:pointer}.ds-chip:hover{background:color-mix(in srgb,var(--accent,#f2a97e) 18%,transparent);color:var(--accent,#f2a97e)}.ds-chip:focus-visible{outline:2px solid var(--focus-ring,#f2a97e);outline-offset:2px}"
+    },
+    {
+      "name": "Saved Item Row",
+      "kind": "card",
+      "refersTo": "item-row",
+      "description": "Core unit of triage: source, title, metadata, tags, media, and F/A/D actions in one scan path.",
+      "html": "<article class=\"ds-row\"><span class=\"ds-avatar\">r/</span><div class=\"ds-row-main\"><h3>Example saved item title that can be scanned quickly</h3><p>r/example · posted 2d ago · 8 min read</p><div><span>tag</span><span>source.com</span></div></div><div class=\"ds-monitor\">media</div></article>",
+      "css": ".ds-row{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border:1px solid var(--border-hairline,#2a2f3a);border-radius:14px;background:var(--surface-card,#171a21);color:var(--text-body,#e0e5ec);box-shadow:var(--shadow-row,0 1px 0 rgba(0,0,0,.22));font-family:Lexend,system-ui,sans-serif}.ds-avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:999px;background:var(--surface-inset,#20242d);color:var(--accent,#f2a97e);font:700 .75rem/1 JetBrains Mono,ui-monospace,monospace}.ds-row-main{min-width:0;flex:1}.ds-row h3{margin:0;color:var(--text-body,#e0e5ec);font:600 .97rem/1.32 Lexend,system-ui,sans-serif}.ds-row p{margin:.2rem 0 0;color:var(--text-muted,#98a2b3);font:400 .85rem/1.4 Lexend,system-ui,sans-serif}.ds-row span{font:600 .73rem/1 JetBrains Mono,ui-monospace,monospace}.ds-monitor{display:grid;place-items:center;width:96px;height:54px;border-radius:8px;background:var(--surface-inset,#20242d);color:var(--text-dim,#636e7e);font:600 .73rem/1 JetBrains Mono,ui-monospace,monospace}"
+    },
+    {
+      "name": "Cleared Empty State",
+      "kind": "custom",
+      "description": "Permission-oriented empty state for focus batches and completed pages.",
+      "html": "<section class=\"ds-empty\"><div aria-hidden=\"true\">✓</div><h2>Page cleared</h2><p>Nothing carries over. Draw another batch or stop here.</p></section>",
+      "css": ".ds-empty{max-width:36rem;margin:2rem auto;padding:1.5rem;border:1px solid var(--border-hairline,#2a2f3a);border-radius:20px;background:var(--surface-card,#171a21);color:var(--text-body,#e0e5ec);text-align:center;font-family:Lexend,system-ui,sans-serif}.ds-empty div{display:grid;place-items:center;width:44px;height:44px;margin:0 auto .75rem;border-radius:999px;background:var(--archive-tint,rgba(84,199,148,.13));color:var(--status-archive,#54c794);font-weight:700}.ds-empty h2{margin:0;font:700 1.45rem/1.26 Lexend,system-ui,sans-serif}.ds-empty p{margin:.5rem 0 0;color:var(--text-muted,#98a2b3);font:400 .97rem/1.55 Lexend,system-ui,sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Local Log Book",
+    "overview": "content-hoarder should feel like a personal operations log for reducing a messy backlog: dense enough to move quickly, calm enough to keep the user from bouncing, and tactile enough that each decision feels confirmed. The v3 browse surface is the primary expression: a dark “night ops” default with a daylight alternate, Lexend for human-readable scanning, JetBrains Mono for instrument readouts, fixed action colors, and source badges that identify content without turning the app into confetti. The system rejects generic SaaS polish, decorative hero language, and any UI that celebrates hoarding more content. Visual decisions serve search, filtering, triage, media review, recovery, and error recovery. Empty states should feel like permission to stop; error states should be specific and non-blaming.",
+    "keyCharacteristics": [
+      "Dense, legible list-first layouts with optional card/pinboard density, not endless nested cards.",
+      "Restrained dark-first palette with one warm phosphor action accent and a stable status triad.",
+      "Tactile controls: pills, pebbles, command bars, row actions, and sheet panels with short state transitions.",
+      "Media previews and source glyphs that help decide quickly without stealing the whole hierarchy.",
+      "Copy that reduces guilt: “Page cleared”, “That’s enough for today”, “nothing carries over”."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "On v3 browse, apricot phosphor is the only product accent. Keep / Archive / Done colors are semantic states, and source hues are identity marks. Do not invent decorative accents.", "section": "colors" },
+      { "name": "The Semantic Status Rule", "body": "Keep is blue, Archive is green, Done is red. Do not remap these by page, density, or mood.", "section": "colors" },
+      { "name": "The No Panic Rule", "body": "Irreversible or failure states can be clear and red-adjacent, but backlog volume and empty/error copy must not become alarmist.", "section": "colors" },
+      { "name": "The Scan First Rule", "body": "Titles, metadata, duration, tags, and source must be distinguishable in one glance. If the user has to reread a row to find the decision signal, the hierarchy failed.", "section": "typography" },
+      { "name": "The Product Type Rule", "body": "No display fonts, ornamental serifs, or huge marketing headers in task surfaces. This is a tool, not a landing page.", "section": "typography" },
+      { "name": "The Ledger, Not Cards Rule", "body": "Use rows, sheets, rails, and tonal groups before reaching for card stacks. Nested cards are prohibited.", "section": "elevation" },
+      { "name": "The Shadow Has a Job Rule", "body": "A shadow means overlay, focus, or separation. If a shadow is only decorative, remove it.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve the dark-first “night ops” identity for v3 browse and the current teal legacy identity until those pages are intentionally migrated.",
+      "Do use semantic aliases from `static/core/tokens.css` for v3 browse components and `static/tokens.css` for legacy `/triage` + `/reddit` pages.",
+      "Do keep Keep / Archive / Done colors fixed and visible across keyboard, pointer, swipe, and touch paths.",
+      "Do write empty states that reduce pressure and offer a next action: another batch, enough for today, adjust filters, or recover context.",
+      "Do make destructive or irreversible flows explicit, scoped, and backed by confirmation / backup language.",
+      "Do verify mobile/PWA behavior when changing browse, triage, media, drawer, dock, swipe, or install-related UI."
+    ],
+    "donts": [
+      "Don't use generic SaaS dashboards with decorative metrics, hero gradients, and marketing-page polish.",
+      "Don't create a hoarding-machine UI that celebrates accumulating more instead of clearing or deciding.",
+      "Don't use guilt-driven productivity copy: streak shame, overdue language, red-alert backlog panic, or scolding empty states.",
+      "Don't use overstimulating neon terminal aesthetics, glassmorphism, ornamental animations, or decorative card grids.",
+      "Don't make ambiguous destructive actions around deletes, Reddit unsave, recovery, archival, or purge flows.",
+      "Don't escape trusted source glyph SVG output from `chIcon()`; visible SVG text is a source-badge regression.",
+      "Don't dedupe `static/core/tokens.css` and `static/tokens.css`; both are intentional until legacy pages migrate."
+    ]
+  }
+}
