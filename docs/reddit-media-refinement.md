@@ -278,7 +278,8 @@ all 54k posts with **zero JS change**. The deliberate parts:
 - `src/content_hoarder/static/sw.js` — bump `CACHE = "ch-shell-vN"` if app.js/JS
   changes (PWA cache).
 - `tests/test_archival.py` — provider + service media tests.
-- `BACKLOG.md` — tick this item; correct the Epic 7 gallery premise
+- `docs/backlog/epic-04-recover-deleted-reddit-content.md` / GitHub issue #11 — keep historical notes
+  current if media-recovery assumptions change. The old Epic 7 gallery premise has already been corrected
   (`media_metadata` IS available from the archives).
 
 ## 8. Open decisions (carry into the build)

@@ -6,21 +6,21 @@ bakeoff + a delegated subagent — 01 `b92fe63` (glm-5p1), 02 `bb5b1d8` (subagen
 (weak bakeoff substrate), deferred. Base is now `254cb91`. The run-order/gates below are the original plan (historical).
 Created 2026-06-14.
 
-Context: frontend-v3 *design* work is parked pending Fable 5 (see memory `frontend-v3-parked`).
-These are the **non-design, offline-testable backlog features** safe to build unsupervised.
-Each is grounded in a real-code dossier (signatures + file:line verified 2026-06-14).
+Context at the time: frontend-v3 *design* work was parked pending Fable 5. These were the
+**non-design, offline-testable backlog features** safe to build unsupervised. This file is now
+historical; active work lives in GitHub Issues, with local history under `docs/backlog/`.
 
 ## The batch (7 items)
 
-| Spec | Feature | BACKLOG | Tier | Touches | Effort |
+| Spec | Feature | Backlog history | Tier | Touches | Effort |
 |---|---|---|---|---|---|
-| [01](01-search-model-b.md) | Model B multi-value search (`source:a,b`, repeat=OR) | Epic 12 #335 | A | backend (search_query.py, db.py) | med |
-| [02](02-http-helper-unify.md) | Unify the 4 HTTP timeout/retry helpers | Epic 19 #540 | A | backend (new `_http.py`) | med |
-| [03](03-archive-fallback-threads.md) | Archive fallback for deleted threads (404) | Epic 24 #749 | A | backend (reddit_hydrate, archival) | med-high |
-| [04](04-hn-nav-chips.md) | HN author link + article chip | Epic 15 #471/#473 | B | frontend (browse/render.js) | low |
-| [05](05-reddit-image-opens-thread.md) | Reddit image-link opens comments thread | Epic 15 #468 | B | frontend (browse/main.js) | low |
-| [06](06-sync-newest-and-relabel.md) | "Sync newest" in browse + relabel drain | Epic 9 #240/#243 | B | frontend + route | med |
-| [07](07-firefox-tabexports-import.md) | Import remaining Firefox TabExports | Epic 7 #135 | data | CLI data job (live DB) | low |
+| [01](01-search-model-b.md) | Model B multi-value search (`source:a,b`, repeat=OR) | `docs/backlog/epic-12-search-operators-in-the-search-bar.md` | A | backend (search_query.py, db.py) | med |
+| [02](02-http-helper-unify.md) | Unify the 4 HTTP timeout/retry helpers | `docs/backlog/epic-19-backend-hardening.md` | A | backend (new `_http.py`) | med |
+| [03](03-archive-fallback-threads.md) | Archive fallback for deleted threads (404) | `docs/backlog/epic-24-reddit-thread-hydration-backfill.md` | A | backend (reddit_hydrate, archival) | med-high |
+| [04](04-hn-nav-chips.md) | HN author link + article chip | `docs/backlog/epic-15-reddit-hn-as-app-navigation.md` | B | frontend (browse/render.js) | low |
+| [05](05-reddit-image-opens-thread.md) | Reddit image-link opens comments thread | `docs/backlog/epic-15-reddit-hn-as-app-navigation.md` | B | frontend (browse/main.js) | low |
+| [06](06-sync-newest-and-relabel.md) | "Sync newest" in browse + relabel drain | `docs/backlog/epic-09-reddit-merge-follow-ups.md` | B | frontend + route | med |
+| [07](07-firefox-tabexports-import.md) | Import remaining Firefox TabExports | `docs/backlog/epic-07-more-sources-live-sync.md` | data | CLI data job (live DB) | low |
 
 Plus [parity-ideas.md](parity-ideas.md) — cross-item-type parity features (suggestions, not yet queued).
 

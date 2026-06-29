@@ -34,6 +34,10 @@ inline reader. The offline PWA already ships.
 - Responsive, installable **PWA** so you can triage on desktop or phone.
 - Runs entirely locally. Minimal dependencies (Flask + SQLite); `yt-dlp` and a local LLM are optional.
 
+## Project tracking
+
+Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues), grouped by one milestone per epic. `BACKLOG.md` is now a compact issue index, while historical/as-built backlog notes are split by epic under [`docs/backlog/`](docs/backlog/README.md) for offline/sandboxed agents.
+
 ## Quickstart
 ```bash
 python -m venv .venv
