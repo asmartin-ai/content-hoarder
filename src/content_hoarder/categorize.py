@@ -601,18 +601,13 @@ def tag_reddit_source(
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                db.merge_upsert(
-                    conn,
-                    {
-                        "fullname": r["fullname"],
-                        "metadata": {"tags": tags},
-                        "last_seen_utc": now,
-                    },
-                )
+                db.set_auto_tags(conn, r["fullname"], tags, last_seen_utc=now)
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
                 untagged_sample.append(label)
+            if retry and not dry_run and md.get("tags_auto"):
+                db.set_auto_tags(conn, r["fullname"], [], last_seen_utc=now)
     if not dry_run:
         conn.commit()
 
@@ -703,10 +698,10 @@ def _extract_host(url: str) -> str:
 _BROWSER_HOST_TAGS = {
     "steampowered": ["gaming"],
     "defensenews": ["defense"],
-    "bloomberg": ["investing"],
-    "marketwatch": ["investing"],
-    "wsj": ["investing"],
-    "cnbc": ["investing"],
+    # Broad business/news hosts (Bloomberg/CNBC/WSJ/etc.) are deliberately NOT
+    # host-tagged as investing: live dry-runs showed too many general labor,
+    # culture, and company-news stories. Let investing titles prove themselves
+    # via the stricter keyword rules below.
     # Existing-tag host extensions (T2 tag-coverage-expansion).
     "hololive": ["vtubers"],
     "nijisanji": ["vtubers"],
@@ -749,7 +744,6 @@ _BROWSER_HOST_TAGS = {
     "lwn.net": ["linux"],
     "archlinux.org": ["linux"],
     "kernel.org": ["linux"],
-    "ycombinator.com": ["startups"],
     "techcrunch.com": ["startups"],
     "wellfound.com": ["startups"],
     "crunchbase.com": ["startups"],
@@ -768,12 +762,18 @@ _BROWSER_HOST_TAGS = {
 # Kept deliberately tight for precision: bare "market(s)" is excluded (it catches
 # housing/job/farmers market); investing keys on stock(s)/earnings/invest*/stock-market.
 _BROWSER_KEYWORD_TAGS = [
-    ("gaming", re.compile(r"\bsteam\b|\bvideo\s+game\b", re.IGNORECASE)),
+    (
+        "gaming",
+        re.compile(
+            r"\bvideo\s+games?\b|\bgame\s+engine\b|\bsteam\s+(?:deck|library|store|games?)\b",
+            re.IGNORECASE,
+        ),
+    ),
     ("defense", re.compile(r"\bmilitary\b", re.IGNORECASE)),
     (
         "investing",
         re.compile(
-            r"\bstocks?\b|\bearnings\b|\binvest(?:ing|or|ors)?\b|\bstock\s+markets?\b",
+            r"\bearnings\s+(?:beat|miss|call|report)\b|\bstock\s+markets?\b|\bindex[- ]fund\b|\bbond\s+yields?\b|\bstocks?\s+(?:rally|fall|falls|selloff|surge|surges|slide|slides)\b|\bvalue\s+investors?\b",
             re.IGNORECASE,
         ),
     ),
@@ -786,14 +786,14 @@ _BROWSER_KEYWORD_TAGS = [
     (
         "ai_ml",
         re.compile(
-            r"\bllm\b|\bgpt\b|\bchatgpt\b|\bclaude\b|\btransformer\b|\bembedding\b|\bneural network\b|\bmachine learning\b|\bdeep learning\b|\bartificial intelligence\b",
+            r"\bllm\b|\bgpt[- ]?\d+\b|\bchatgpt\b|\bclaude\s+(?:\d|ai|model|sonnet|opus|haiku)\b|\btransformer\b|\bembedding\b|\bneural network\b|\bmachine learning\b|\bdeep learning\b|\bartificial intelligence\b",
             re.IGNORECASE,
         ),
     ),
     (
         "web_dev",
         re.compile(
-            r"\bcss\b|\bhtml\b|\breact\b|\bvue\b|\bsvelte\b|\bweb dev\b|\bfrontend\b|\bbackend\b",
+            r"\breact\b|\bvue\b|\bsvelte\b|\bweb dev\b|\bfrontend\b|\bcss\s+(?:grid|flexbox|tricks)\b|\bhtml\s+(?:canvas|forms?|pages?)\b",
             re.IGNORECASE,
         ),
     ),
@@ -814,14 +814,14 @@ _BROWSER_KEYWORD_TAGS = [
     (
         "startups",
         re.compile(
-            r"\bstartup\b|\bycombinator\b|\bYC\b|\bseed round\b|\bseries a\b|\bventure capital\b|\bindie hacker\b",
+            r"\bstartups?\b|\by combinator\b|\byc\s+[ws]\d{2}\b|\bseed round\b|\bseries a\b|\bventure capital\b|\bindie hacker\b",
             re.IGNORECASE,
         ),
     ),
     (
         "crypto",
         re.compile(
-            r"\bbitcoin\b|\bethereum\b|\bcrypto(?:currency)?\b|\bblockchain\b|\bnft\b|\bweb3\b|\bsolidity\b|\bdefi\b",
+            r"\bcryptocurrency\b|\bcrypto\s+(?:wallet|exchange|market|trading|token|coin|currenc(?:y|ies))\b|\bblockchain\b|\bnft\b|\bweb3\b|\bsolidity\b|\bdefi\b",
             re.IGNORECASE,
         ),
     ),
@@ -921,18 +921,13 @@ def tag_browser_source(
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                db.merge_upsert(
-                    conn,
-                    {
-                        "fullname": r["fullname"],
-                        "metadata": {"tags": tags},
-                        "last_seen_utc": now,
-                    },
-                )
+                db.set_auto_tags(conn, r["fullname"], tags, last_seen_utc=now)
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
                 untagged_sample.append(label)
+            if retry and not dry_run and md.get("tags_auto"):
+                db.set_auto_tags(conn, r["fullname"], [], last_seen_utc=now)
     if not dry_run:
         conn.commit()
 
@@ -990,27 +985,27 @@ def tag_youtube_source(
                 if len(sample[t]) < samples:
                     sample[t].append(label)
             if not dry_run:
-                final_tags = [
-                    t for t in existing_tags if t in db.PROCESSING_TAGS
-                ] + topic_tags
-                seen = set()
-                deduped: list[str] = []
-                for t in final_tags:
-                    if t not in seen:
-                        seen.add(t)
-                        deduped.append(t)
-                db.merge_upsert(
+                processing_tags = [t for t in existing_tags if t in db.PROCESSING_TAGS]
+                db.set_auto_tags(
                     conn,
-                    {
-                        "fullname": r["fullname"],
-                        "metadata": {"tags": deduped},
-                        "last_seen_utc": now,
-                    },
+                    r["fullname"],
+                    topic_tags,
+                    preserve_tags=processing_tags,
+                    last_seen_utc=now,
                 )
         else:
             untagged += 1
             if len(untagged_sample) < samples * 2:
                 untagged_sample.append(label)
+            if retry and not dry_run and md.get("tags_auto"):
+                processing_tags = [t for t in existing_tags if t in db.PROCESSING_TAGS]
+                db.set_auto_tags(
+                    conn,
+                    r["fullname"],
+                    [],
+                    preserve_tags=processing_tags,
+                    last_seen_utc=now,
+                )
     if not dry_run:
         conn.commit()
 
