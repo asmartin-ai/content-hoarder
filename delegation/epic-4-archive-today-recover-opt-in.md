@@ -12,6 +12,12 @@ Make archive.today media-byte recovery safe to exercise and safe to expose in th
 - Keep tests offline by using injected HTML fetchers and byte fetchers.
 - Log enough to audit external calls and DB/media writes without turning logs into a privacy leak.
 
+## Implementation status (2026-06-29)
+
+- Branch `epic-4-archive-today-recover-opt-in` implemented the safety slice: generic `/recover` no longer contacts archive.today implicitly, archive.today media-byte recovery is per-item opt-in, and the live-smoke script has no-network default planning plus explicit live/apply gates.
+- Archive.today remains **per-item only** and is still not wired into bulk recovery.
+- Merge validation was offline/deterministic. No live archive.today network smoke was run during this merge; run the documented `CONTENT_HOARDER_ARCHIVE_TODAY_LIVE=1` smoke against a copied DB before trusting live recovery behavior.
+
 ## Confirmed current state
 
 - `ArchiveTodayProvider` is a separate provider shape, not an `ArchiveProvider` subclass. It resolves `archive.ph/newest/<quoted original_url>` HTML and extracts `og:image` plus inline `<img src>` candidates (`src/content_hoarder/archival/providers.py:276-424`).
