@@ -1,6 +1,6 @@
 # Mobile-polish delegation records — 2026-06-27
 
-Status: **closed**. These docs are historical build records, not active work queues.
+Status: **closed / archived (2026-06-28 cleanup)**. These docs are historical build records, not active work queues.
 
 ## What shipped
 
@@ -59,4 +59,4 @@ Current mobile work should be tracked in `BACKLOG.md`, mainly:
 
 ## Historical specs
 
-The old completed `SPEC-*.md` files were deleted on 2026-06-28 because every task they described had already shipped and was recorded in `BACKLOG.md`, `MOBILE-POLISH-BATCH.md`, `MOBILE-POLISH-T3-BATCH.md`, and the UI tests. The two `MOBILE-POLISH-*.md` files remain as historical implementation/regression context only; do not treat their branch/worktree instructions as current unless a new batch explicitly reactivates them.
+The SPEC-*.md, MOBILE-POLISH-BATCH.md, and MOBILE-POLISH-T3-BATCH.md files were deleted in the 2026-06-28 cleanup pass. All shipped mobile-polish work is recorded in BACKLOG.md Epics 16 and the UI test suites. The SPEC-redgifs-resolver-dryrun.md was also deleted (RedGifs resolver is shipped on main).
