@@ -196,7 +196,10 @@ export const playableVideoSrc = (item) => {
   if (mediaType(item).cls !== "video") return "";
   const m = item.metadata || {};
   const src = m.media_url || videoUrls(item)[0] || item.url || "";
-  return hlsManifestUrl(src) || VIDEO_EXT.test(src) ? localUrl(item, src) : "";
+  const local = localUrl(item, src);
+  if (local !== src) return local;
+  const hls = hlsManifestUrl(src);
+  return hls || (VIDEO_EXT.test(src) ? src : "");
 };
 
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.

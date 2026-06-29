@@ -904,7 +904,7 @@ def cmd_scan_media(args) -> int:
 def cmd_archive_media(args) -> int:
     """Download + store media bytes locally so deletions are survivable (Epic 4 P1, hoard the
     bytes). Dry-run by default; --apply fetches + writes content-addressed blobs under data/media/
-    and stamps metadata.archived_media. Scope with --salvageable/--galleries/--images/--twitter
+    and stamps metadata.archived_media. Scope with --salvageable/--galleries/--images/--twitter/--videos
     (default: salvageable + galleries). Resumable (skips already-archived URLs); per-item commit."""
     from content_hoarder import media_archive
 
@@ -915,6 +915,7 @@ def cmd_archive_media(args) -> int:
             ("galleries", args.galleries),
             ("images", args.images),
             ("twitter", args.twitter),
+            ("videos", args.videos),
         )
         if on
     ] or ["salvageable", "galleries"]
@@ -925,6 +926,8 @@ def cmd_archive_media(args) -> int:
             limit=args.limit,
             apply=args.apply,
             throttle=args.throttle,
+            max_video_bytes=args.max_video_bytes,
+            video_timeout=args.video_timeout,
             progress=lambda m: print(m, file=sys.stderr),
         )
     print(json.dumps(res, indent=2))
@@ -2000,6 +2003,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Archive imported Twitter/X bookmark image/video media.",
     )
     pam.add_argument(
+        "--videos",
+        action="store_true",
+        help="Archive Reddit-hosted v.redd.it videos with yt-dlp (explicit opt-in).",
+    )
+    pam.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -2010,6 +2018,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.3,
         help="Seconds between fetches — CDN politeness (default 0.3).",
+    )
+    pam.add_argument(
+        "--max-video-bytes",
+        type=int,
+        default=512 * 1024 * 1024,
+        help="For --videos: skip outputs larger than this many bytes (default 512 MiB).",
+    )
+    pam.add_argument(
+        "--video-timeout",
+        type=float,
+        default=15 * 60,
+        help="For --videos: seconds before one yt-dlp download is abandoned (default 900).",
     )
     pam.add_argument(
         "--apply", action="store_true", help="Fetch + write (default: dry run)."
