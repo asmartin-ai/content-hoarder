@@ -45,10 +45,12 @@ def test_extract_features_shape():
     row = {"source": "reddit", "kind": "post", "created_utc": int(time.time()) - 100,
            "first_seen_utc": 0}
     feats = triage_score.extract_features(
-        row, {"subreddit": "MixedCase", "media_type": "image", "category": "watch"})
+        row, {"subreddit": "MixedCase", "media_type": "image", "category": "watch",
+              "llm": {"verdict": "skip"}})
     # source+kind are one composite feature (correlated pairs would double-count)
     assert "sk:reddit/post" in feats and "sub:mixedcase" in feats
     assert "media:image" in feats and "cat:watch" in feats and "age:<30d" in feats
+    assert "llm:skip" in feats
 
 
 def test_fit_rates_smoothing_and_min_support(conn):
@@ -65,6 +67,16 @@ def test_fit_rates_smoothing_and_min_support(conn):
     # min_support drops rare features
     sparse = triage_score.fit(conn, min_support=15, alpha=2.0)
     assert "sub:goodsub" not in sparse["features"]
+
+
+def test_fit_learns_llm_verdict_feature(conn):
+    for i in range(5):
+        _seed(conn, f"lk{i}", status="done", llm={"verdict": "keep"})
+    for i in range(5):
+        _seed(conn, f"ls{i}", status="inbox", llm={"verdict": "skip"})
+    model = triage_score.fit(conn, min_support=3, alpha=2.0)
+    assert model["features"]["llm:keep"][1] == 5
+    assert model["features"]["llm:skip"][1] == 0
 
 
 def test_score_ranks_good_over_dull_and_why_names_the_feature(conn):

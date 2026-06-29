@@ -66,6 +66,10 @@ def extract_features(row: dict, md: dict, *, now: int | None = None) -> list[str
         feats.append(f"media:{md['media_type']}")
     if md.get("category"):
         feats.append(f"cat:{md['category']}")
+    llm = md.get("llm") if isinstance(md.get("llm"), dict) else {}
+    verdict = str(llm.get("verdict") or "").strip().lower()
+    if verdict in ("keep", "skip"):
+        feats.append(f"llm:{verdict}")
     created = int(row.get("created_utc") or 0)
     anchor = created if created > 0 else int(row.get("first_seen_utc") or now)
     feats.append(f"age:{_age_bucket(max(0, now - anchor))}")
