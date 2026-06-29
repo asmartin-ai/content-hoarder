@@ -23,8 +23,8 @@ Confirmed from the current docs/code state:
 - **Epic 10 (learned triage) is SHIPPED on main.** triage_score.py, learn-triage CLI, smart-triage mode, and triage-drift are all live.
 - **HN/Firefox tag coverage expansion is SHIPPED and applied.** The 2026-06-29 precision pass added
   conservative browser/HN buckets, explicit `metadata.tags_auto` provenance for heuristic tags, preserved
-  human `metadata.tags_manual`, backed up the DB to `data/app.before-tag-coverage-20260629.db`, then applied
-  Firefox (494 rows) and HN (1,189 rows) auto-tags after dry-run review.
+  human `metadata.tags_manual`, backed up the DB locally, then applied Firefox (494 rows) and HN (1,189 rows)
+  auto-tags after dry-run review.
 
 ## Tier definitions
 

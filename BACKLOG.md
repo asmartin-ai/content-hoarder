@@ -422,7 +422,7 @@ false positives.*
   writes programmatic provenance to `metadata.tags_auto` while preserving human `metadata.tags_manual`.
   Precision pass removed broad `ycombinator.com`→`startups`, Bloomberg/CNBC/WSJ host-only `investing`,
   bare `steam`, generic `earnings`/`investing`, bare `claude`, raw `html`/`css`, and payment-footer
-  `bitcoin` false positives. Live apply after DB backup (`data/app.before-tag-coverage-20260629.db`):
+  `bitcoin` false positives. Live apply after a local DB backup:
   Firefox 494/2,269 rows auto-tagged; HN 1,189/9,374 rows auto-tagged; verified `tags_auto`/`tags_manual`
   are subsets of displayed `metadata.tags`. Relates to Epic 26 (taxonomy).
 
