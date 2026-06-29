@@ -41,9 +41,8 @@ Ranking (pick ONE candidate per day, highest first):
    cluster within the last 14 days after ≥90 days of dormancy → "you're back on X —
    want your old saves?"
 2. **Dormant + high propensity:** mean `metadata.triage_score` of the cluster's inbox
-   items (the Epic 10 triage-score model — NOT yet built; only on the unmerged `feat/triage-score`, so
-   this term currently degrades to a dormancy-only prior) × months dormant — surfaces clusters the
-   model thinks he'd actually process.
+   items (the Epic 10 triage-score model — shipped on main via `learn-triage`; the ranking term
+   is active) × months dormant — surfaces clusters the model thinks he'd actually process.
 3. Tie-break random among the top 3 so repeat days vary (bounded surprise).
 
 ## Actions

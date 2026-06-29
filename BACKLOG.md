@@ -1342,8 +1342,9 @@ is the Stage C spec; tokens v3 + `static/core/` shipped (commit b20e977).*
 *ADHD round LOCKED (2026-06-11): the Stage C spec is now **05 + `06-adhd-round.html`** — twelve
 approved additions (win pebbles w/ optional daily goal, no raw backlog counts → "· N new" slice,
 dateline greeting, resurfacing card per the locked one-pager, surprise-me + dice, operator-discovery
-popover, active-filter chips, consume-cost pills, smart sort w/ "why" [build waits on
-feat/triage-score], Focus batch strip → PAGE CLEARED stamp → empty state, live row-clear + undo +
+popover, active-filter chips, consume-cost pills, smart sort w/ "why" [build waits on triage-score
+integration — model is shipped on main; pending: explore/exploit mix, seen-recently penalty,
+always-on why], Focus batch strip → PAGE CLEARED stamp → empty state, live row-clear + undo +
 two-stage Keep swipe ≈90/170px, quiet decay line; ☾ resting-soon markers deferred — need a
 server-side flag). Mockups are gitignored; the additions list also lives in the explorations
 README + plan file. New backend in scope: `GET /pulse` (new_today/cleared_today/swept_recent) and
@@ -1403,8 +1404,8 @@ Stage C design gate:*
   no-renag window. **Design LOCKED 2026-06-11** — one-pager
   [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md) (all 4 questions
   decided) + card rendered verbatim in 06; build = `resurface.py` + `GET /resurface` +
-  dismiss/letgo POSTs in Stage C (triage_score ranking term degrades to dormancy-only
-  until feat/triage-score integrates).
+  dismiss/letgo POSTs in Stage C (triage_score ranking term is active post-`learn-triage` — the model
+  ships on main; further tuning is open).
 - [x] ~~**P2 — "Surprise me" card.**~~ ✅ SHIPPED on v3 2026-06-13: `surprise()` (`browse/main.js:358`) pulls `/random?n=1` into the ambient slot ("DEALT AT RANDOM — NO STRINGS"); ⚄ dice button (`main.js:378`, `render.js:196`). No count/streak. Orig: One bounded random old save on demand — converts the
   rediscovery-joy that sustains the save habit into a deliberate retention loop. Rides
   `db.get_random_batch` (check n=1 / cross-status support). No count, no streak.
