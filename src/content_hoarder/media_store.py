@@ -10,6 +10,7 @@ whole feature can be toggled/removed without touching the rest of the app. A "bl
 on-disk filename (``<64-hex-sha256>.<ext>``); it's what gets stored on ``metadata.archived_media``
 and served by the ``/media/<blob>`` route.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,13 +22,25 @@ from content_hoarder import config
 
 # mime -> extension; the inverse drives the served Content-Type in web.py.
 _MIME_EXT = {
-    "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
-    "image/gif": ".gif", "image/webp": ".webp",
-    "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
 }
-_EXT_MIME = {".jpg": "image/jpeg", ".png": "image/png", ".gif": "image/gif",
-             ".webp": "image/webp", ".mp4": "video/mp4", ".webm": "video/webm",
-             ".mov": "video/quicktime", ".bin": "application/octet-stream"}
+_EXT_MIME = {
+    ".jpg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".bin": "application/octet-stream",
+}
 _BLOB_RE = re.compile(r"^[0-9a-f]{64}(\.(jpg|png|gif|webp|mp4|webm|mov|bin))?$")
 
 
@@ -52,7 +65,9 @@ def mime_for(blob_id: str) -> str:
     return _EXT_MIME.get(ext, "application/octet-stream")
 
 
-def store(data: bytes, *, mime: str = "", url: str = "", base_dir: Path | None = None) -> str:
+def store(
+    data: bytes, *, mime: str = "", url: str = "", base_dir: Path | None = None
+) -> str:
     """Write bytes content-addressed; return the blob id (``<sha256>.<ext>``). Idempotent —
     re-storing identical bytes is a no-op (dedup). Writes via a temp file + atomic replace so a
     crash never leaves a half-written blob."""
@@ -65,6 +80,46 @@ def store(data: bytes, *, mime: str = "", url: str = "", base_dir: Path | None =
         tmp = p.with_name(p.name + ".tmp")
         tmp.write_bytes(data)
         os.replace(tmp, p)  # atomic on the same filesystem
+    return blob_id
+
+
+def store_path(
+    path: str | Path,
+    *,
+    mime: str = "",
+    url: str = "",
+    base_dir: Path | None = None,
+    chunk_size: int = 1024 * 1024,
+) -> str:
+    """Store a file content-addressed without reading it all into memory.
+
+    Returns the blob id (``<sha256>.<ext>``). The finished blob is copied through a temp file and
+    atomically moved into place; re-storing identical bytes is a dedup no-op.
+    """
+    src = Path(path)
+    h = hashlib.sha256()
+    with src.open("rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            h.update(chunk)
+    d = base_dir or media_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    blob_id = h.hexdigest() + ext_for(mime, url or src.name)
+    p = d / blob_id
+    if p.exists():
+        return blob_id
+
+    tmp = p.with_name(p.name + ".tmp")
+    try:
+        with src.open("rb") as r, tmp.open("wb") as w:
+            for chunk in iter(lambda: r.read(chunk_size), b""):
+                w.write(chunk)
+        os.replace(tmp, p)  # atomic on the same filesystem
+    except Exception:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
     return blob_id
 
 
@@ -83,7 +138,16 @@ def path_for(blob_id: str, *, base_dir: Path | None = None) -> Path | None:
     if "." in blob_id:
         p = d / blob_id
         return p if p.exists() else None
-    for e in (".jpg", ".png", ".gif", ".webp", ".mp4", ".webm", ".mov", ".bin"):  # bare hash → find the stored ext
+    for e in (
+        ".jpg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".mp4",
+        ".webm",
+        ".mov",
+        ".bin",
+    ):  # bare hash → find the stored ext
         p = d / (base + e)
         if p.exists():
             return p
