@@ -631,16 +631,50 @@ def create_app(db_path: str | None = None) -> Flask:
         from content_hoarder.archival import service as archival
         from content_hoarder.archival.providers import default_media_providers
 
+        data = request.get_json(silent=True) or {}
+        if any(k in data for k in ("fullnames", "bulk")):
+            return jsonify({"error": "recover is per-item only"}), 400
+        mode = data.get("archive_today") or "off"
+        if mode not in ("off", "preview", "apply"):
+            return jsonify(
+                {"error": "archive_today must be one of off, preview, apply"}
+            ), 400
+
         with conn() as c:
-            res = archival.recover_one(
-                c,
-                fullname,
-                media_providers=default_media_providers(
-                    archival.DEFAULT_USER_AGENT, throttle=False
-                ),
-            )
-        if res is None:
-            return jsonify({"error": "not a recoverable reddit item"}), 400
+            res = archival.recover_one(c, fullname)
+            if res is None:
+                return jsonify({"error": "not a recoverable reddit item"}), 400
+            if mode != "off":
+                if data.get("confirm_external_archive_today") is not True:
+                    return jsonify(
+                        {
+                            "error": "archive.today recovery requires explicit confirmation"
+                        }
+                    ), 400
+                item = c.execute(
+                    "SELECT * FROM items WHERE fullname=?", (fullname,)
+                ).fetchone()
+                item = dict(item) if item else None
+                eligible, reason, _md, _urls = archival.archive_today_media_eligibility(
+                    item
+                )
+                if not eligible:
+                    return jsonify(
+                        {"error": "archive.today not eligible", "reason": reason}
+                    ), 400
+                media = archival.archive_today_recover_media(
+                    c,
+                    fullname,
+                    providers=default_media_providers(
+                        archival.DEFAULT_USER_AGENT, throttle=False
+                    ),
+                    apply_bytes=(mode == "apply"),
+                )
+                res["archive_today"] = media
+                res["bytes_archived"] = media.get("bytes_archived", 0)
+                res["recovered"] = (
+                    bool(res.get("metadata_recovered")) or media.get("result") == "hit"
+                )
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/body")
