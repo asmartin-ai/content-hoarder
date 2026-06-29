@@ -344,7 +344,11 @@ false positives.*
   Reddit view **and** the browse view, plus tag chips rendered on Reddit rows/cards, browse rows, and
   the triage card.
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
-   - Tag landscape snapshot (2026-06-28): 65k reddit, 12k youtube, 9.4k HN, 2.3k firefox items. Largest untagged surfaces: HN (98% untagged, 9.2k), Firefox (97%, 2.2k), Reddit (42%, 27.5k). HN/Firefox host/domain heuristics are the lowest-risk next coverage target.
+  - Tag landscape snapshot (2026-06-29 after HN/Firefox precision pass): browser/HN heuristics are
+    deliberately precision-biased. Firefox applied 494/2,269 auto-tagged rows; HN applied 1,189/9,374.
+    Programmatic tags are now stamped in `metadata.tags_auto`; human/editor tags remain stamped in
+    `metadata.tags_manual`; `metadata.tags` is the displayed/searchable union. This keeps future sorting
+    able to distinguish human vs heuristic tags.
 - [~] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
   Saved list (to migrate to a separate account). (a) ~~**Export by tag**~~ **done** (overnight
   2026-06-10): `GET /export` (CSV/JSON, same q/operator filters as `/items` — the old reddit-view
@@ -407,14 +411,17 @@ false positives.*
   grayed out when nothing is pending, which reads as "broken / not implemented." Relabel (e.g.
   "Unsave queued (N)" / "Drain") so it doesn't collide with incremental "Sync newest".
 - [x] ~~**P2 — Extend tagging to Firefox tabs + Hacker News.**~~ ✅ Shipped 2026-06-17 (F14 bakeoff,
-  GLM-5.1/Aider Arm B + review fixes). `firefox_tags()` / `hackernews_tags()` in `categorize.py` (shared
-  `_browser_bucket_tags()` core: host map + word-bounded title keywords), the new **`investing`** bucket
-  (added to `REDDIT_TAGS`/`FILTER_TAGS`), and pipeline wiring `tag_browser_source()` exposed via
-  `categorize --source firefox|hackernews [--dry-run] [--all]`. Never touches `metadata.category`. Live
-  dry-run preview: firefox 60/2269 tagged (gaming 55 / investing 3 / defense 2), HN 163/9042 (investing 127 /
-  gaming 27 / defense 9). 18 tests (10 oracle + 8 wiring). **Open:** run `--apply` on the live DB is a
-  user-gated data op (review the dry-run first); the bloomberg/cnbc host map over-tags general business
-  stories as `investing` — tighten the seed maps if precision proves too loose. Relates to Epic 26 (taxonomy).
+  GLM-5.1/Aider Arm B + review fixes), then precision-expanded/applied 2026-06-29. `firefox_tags()` /
+  `hackernews_tags()` in `categorize.py` share `_browser_bucket_tags()` (host map + conservative,
+  word-bounded title keywords), with curated buckets including `investing`, `ai_ml`, `web_dev`,
+  `self_hosted`, `linux`, `startups`, `crypto`, and `productivity`. `tag_browser_source()` is exposed via
+  `categorize --source firefox|hackernews [--dry-run] [--all]`, never touches `metadata.category`, and now
+  writes programmatic provenance to `metadata.tags_auto` while preserving human `metadata.tags_manual`.
+  Precision pass removed broad `ycombinator.com`→`startups`, Bloomberg/CNBC/WSJ host-only `investing`,
+  bare `steam`, generic `earnings`/`investing`, bare `claude`, raw `html`/`css`, and payment-footer
+  `bitcoin` false positives. Live apply after DB backup (`data/app.before-tag-coverage-20260629.db`):
+  Firefox 494/2,269 rows auto-tagged; HN 1,189/9,374 rows auto-tagged; verified `tags_auto`/`tags_manual`
+  are subsets of displayed `metadata.tags`. Relates to Epic 26 (taxonomy).
 
 ## Epic 10 — Learned triage: suggest what to process next  (`enhancement`, `area:triage`)
 *Motivation: triage decisions aren't random — the things I mark **done** share signals (source,
