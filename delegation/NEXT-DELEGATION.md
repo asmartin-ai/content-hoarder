@@ -20,6 +20,7 @@ Confirmed from the current docs/code state:
   reader-dock backlog wording has been reconciled to "shipped then removed" in the working tree.
 - **QA checklist already reflects the current mobile state.** `docs/QA-CHECKLIST.md` includes the no-dock
   reader state and marks the shipped gesture features as needing real-device spot checks rather than rebuilds.
+- **Epic 10 (learned triage) is SHIPPED on main.** triage_score.py, learn-triage CLI, smart-triage mode, and triage-drift are all live.
 
 ## Tier definitions
 
@@ -111,6 +112,4 @@ Do not give these as direct implementation tasks yet. T1 should either do them o
 
 ## Suggested next action
 
-Recommended next move: choose either **HN/Firefox tag coverage expansion** (bounded T2 after sampled target
-selection) or a **Firefox Sync tabs research spike** (T1-led). Done-when: the selected lane has a fresh spec or
-research note and no historical `delegation/` file describes already-merged work as active.
+Pick from Batch B: keyboard rework (after user approves the Gmail-aligned keymap) or HN/Firefox tag coverage expansion (after user names target buckets). Delegation cleanup is done — historical files deleted, BATCH-B-START folded into BACKLOG.md.
