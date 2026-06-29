@@ -76,6 +76,7 @@ These can run in parallel if each agent is assigned the listed write scope and f
 |---|---:|---|---|---|---|
 | `redgifs-resolver-dryrun` | Done | Epic 4: resolve dead Gfycat IDs against RedGifs, dry-run first. | Shipped: metadata-only dry-run CLI with explicit `--redgifs-ok` network gate. | `resolve-redgifs` CLI + offline tests. | Historical; no active conflict risk. |
 | `tag-coverage-expansion` | Done | Epic 9/26: extend heuristic tag coverage. | Shipped/applied 2026-06-29: precision-biased HN/Firefox rules, `tags_auto` provenance, DB backup, dry-run + apply complete. | `categorize.py` maps + provenance tests. | Historical; no active conflict risk. |
+| `consolidate-triage-swipe` | Done | Epic 5: refactor triage.js to use shared `core/swipe.js`. | Shipped 2026-06-29: helper extended for left-long/vertical/haptics opt-out; triage migrated to shared handler; Node regressions added. | `core/swipe.js`, `triage.js`, `tests/test_core_swipe.py`. | Historical; no active conflict risk. |
 | `watch-later-import-sample` | T2 | Epic 7: support WL3 / browser Watch Later export shape. | Provide a representative export sample and decide one-shot vs recurring workflow. | YouTube connector/parser tests + fixture. | Low if restricted to connector + tests. |
 | `firefox-sync-tabs-research` | T1 research | Epic 7: synced Firefox tabs from Firefox Account/Sync. | Find a maintained Sync client/decryption library or prove none is suitable. | Research note / read-only proof of tab listing before DB work. | Do not hand to T2 implementation yet; Sync tabs are encrypted collection data, not a simple account API. |
 | `keyboard-map-implementation` | T2 | Epic 5: rework keyboard controls. | Approved mapping from user/T1. | JS key handlers + `?` cheatsheet + Playwright/unit tests. | Medium; overlaps browse/triage handlers. Run alone or split browse vs triage. |
@@ -118,3 +119,9 @@ Do not give these as direct implementation tasks yet. T1 should either do them o
 
 Pick from Batch B: keyboard rework remains ready after the Gmail-aligned keymap is approved. Otherwise,
 `watch-later-import-sample` needs a representative export sample + one-shot vs recurring decision before delegation.
+
+## 2026-06-29 delegation round
+
+Dispatched:
+- `consolidate-triage-swipe` → ✅ Shipped: `core/swipe.js` now supports left-long `commit2`, optional vertical callbacks, and `haptics:false`; `triage.js` uses the shared helper for all card swipe gestures; `tests/test_core_swipe.py` covers the regression seams.
+- `tag-coverage-expansion` → ✅ precision pass + provenance + live apply complete: `metadata.tags_auto` for heuristic tags, `metadata.tags_manual` for human tags, Firefox 494 rows and HN 1,189 rows applied after DB backup/dry-run.
