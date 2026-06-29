@@ -27,7 +27,6 @@ Gesture API notes
   so `page.mouse` is used for the vertical drag.
 """
 
-import json
 import re
 
 import pytest
@@ -233,6 +232,25 @@ def test_relay_long_press_opens_strip(pixel6_page):
     expect(page.locator("#relay-scrim.show")).to_be_visible()
 
 
+def test_relay_menu_labels_are_visible_without_horizontal_scroll(pixel6_page):
+    """The long-press menu should not require icon memorization or side-scroll on Pixel 6."""
+    page = pixel6_page
+    _open_relay_menu(page, "reddit:ui_scroll_0")
+    strip = page.locator(".relay-strip")
+    expect(strip.get_by_text("Tag", exact=True)).to_be_visible()
+    expect(strip.get_by_text("Share", exact=True)).to_be_visible()
+    expect(strip.get_by_text("Snooze", exact=True)).to_be_visible()
+    overflow = page.evaluate(
+        """() => {
+          const strip = document.querySelector('.relay-strip');
+          return strip ? Math.ceil(strip.scrollWidth - strip.clientWidth) : 0;
+        }"""
+    )
+    assert overflow <= 1, (
+        f"relay strip should fit without horizontal scroll, overflow={overflow}px"
+    )
+
+
 def test_relay_swipe_left_is_noop(pixel6_page):
     """After opening the relay, a leftward swipe does NOT reveal blank space
     and does NOT close the relay. (Regression guard for the blank-space bug.)"""
@@ -336,6 +354,65 @@ def test_hold_to_preview_opens_lightbox(pixel6_page):
     # twitter:1777... has a local /static/icon-192.png thumbnail with media_type=image.
     _open_lightbox_via_hold(page, "twitter:1777777777777777777", hold_ms=300)
     assert _media_modal_open(page)
+
+
+# --------------------------------------------------------------------------- #
+# Browse polish regressions
+# --------------------------------------------------------------------------- #
+
+
+def test_dock_search_expands_compact_header_and_focuses(pixel6_page):
+    """Dock Search should reveal the collapsed search field before focusing it."""
+    page = pixel6_page
+    console = page.locator(".console")
+    page.mouse.wheel(0, 700)
+    expect(console).to_have_class(re.compile(r"\bcompact\b"))
+
+    page.locator("#dock-search").click()
+
+    expect(console).not_to_have_class(re.compile(r"\bcompact\b"))
+    expect(page.locator("#q")).to_be_focused()
+    box = page.locator("#q").bounding_box()
+    assert box and box["height"] > 0, "search input should be visible after dock Search"
+
+
+def test_dock_inbox_returns_to_clean_home(pixel6_page):
+    """Dock Inbox is a real home affordance: it clears search/filter status back to Inbox."""
+    page = pixel6_page
+    page.fill("#q", "ui_scroll_00")
+    page.wait_for_timeout(400)  # search debounce
+    page.locator('.statuspills button.spill[data-status="done"]').click()
+    page.wait_for_timeout(300)
+    expect(
+        page.locator('.statuspills button.spill[data-status="done"]')
+    ).to_have_attribute("aria-selected", "true")
+
+    page.locator("#dock-inbox").click()
+
+    expect(
+        page.locator('.statuspills button.spill[data-status="inbox"]')
+    ).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#q")).to_have_value("")
+    expect(page.locator("#dock-inbox")).to_have_attribute("aria-pressed", "true")
+    expect(page.locator(".row[data-fullname]").first).to_be_visible()
+
+
+def test_pinboard_tag_button_is_touch_sized(pixel6_page):
+    """Card density has no row swipe path, so its tag edit affordance must be thumb-sized."""
+    page = pixel6_page
+    page.locator("#dock-settings").click()
+    expect(page.locator("#settings")).to_be_visible()
+    page.locator('#set-density button[data-d="card"]').click()
+    page.keyboard.press("Escape")
+    expect(page.locator("#settings")).not_to_be_visible()
+    page.wait_for_selector(".pin .tag-edit")
+
+    box = page.locator(".pin .tag-edit").first.bounding_box()
+    assert box and box["width"] >= 40 and box["height"] >= 40, (
+        f"pinboard tag button should be a touch target, got {box}"
+    )
+    page.locator(".pin .tag-edit").first.click()
+    expect(page.locator("#tagpop")).to_be_visible()
 
 
 def test_hold_to_preview_no_flicker(pixel6_page):
