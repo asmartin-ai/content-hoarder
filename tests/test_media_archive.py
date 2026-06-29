@@ -25,6 +25,22 @@ def _seed_source(conn, source, sid, **md):
     )
 
 
+def _item(conn, fullname):
+    row = db.get_item(conn, fullname)
+    assert row is not None, fullname
+    return row
+
+
+def _md(conn, fullname):
+    return json.loads(_item(conn, fullname)["metadata"] or "{}")
+
+
+def _path_for(blob):
+    path = media_store.path_for(blob)
+    assert path is not None, blob
+    return path
+
+
 def test_vreddit_url_normalization():
     cases = [
         "https://v.redd.it/abc123",
@@ -106,16 +122,11 @@ def test_archive_salvageable_and_galleries(conn, tmp_path, monkeypatch):
         conn, scopes=["salvageable", "galleries"], apply=True, fetch=fake, throttle=0
     )
     assert res["archived"] == 3 and res["failed"] == 0 and len(calls) == 3
-    sm = json.loads(db.get_item(conn, "reddit:salv")["metadata"])
+    sm = _md(conn, "reddit:salv")
     blob = sm["archived_media"]["https://preview.redd.it/s.jpg"]
     assert blob.endswith(".jpg")
-    assert (
-        media_store.path_for(blob).read_bytes()
-        == b"BYTES-https://preview.redd.it/s.jpg"
-    )
-    assert "archived_media" not in json.loads(
-        db.get_item(conn, "reddit:plain")["metadata"]
-    )
+    assert _path_for(blob).read_bytes() == b"BYTES-https://preview.redd.it/s.jpg"
+    assert "archived_media" not in _md(conn, "reddit:plain")
 
     # resumable: a second run finds nothing left to do
     again = media_archive.archive(
@@ -136,7 +147,7 @@ def test_archive_failed_fetch_is_counted_not_stamped(conn, tmp_path, monkeypatch
         fetch=lambda u, *, max_bytes: (None, "http_404"),
     )
     assert res["failed"] == 1 and res["archived"] == 0
-    assert "archived_media" not in json.loads(db.get_item(conn, "reddit:x")["metadata"])
+    assert "archived_media" not in _md(conn, "reddit:x")
 
 
 def test_archive_item_limit(conn, tmp_path, monkeypatch):
@@ -249,7 +260,7 @@ def test_archive_video_apply_stamps_compatible_metadata_and_is_idempotent(
         throttle=0,
     )
     assert res["items"] == 1 and res["archived"] == 1 and res["failed"] == 0
-    md = json.loads(db.get_item(conn, "reddit:vid")["metadata"])
+    md = _md(conn, "reddit:vid")
     arch = md["archived_media"]
     assert set(arch) == {
         "https://v.redd.it/abc123/DASH_720.mp4?source=fallback",
@@ -258,7 +269,7 @@ def test_archive_video_apply_stamps_compatible_metadata_and_is_idempotent(
     blob = arch["https://v.redd.it/abc123"]
     assert blob.endswith(".mp4")
     assert arch["https://v.redd.it/abc123/DASH_720.mp4?source=fallback"] == blob
-    assert media_store.path_for(blob).read_bytes().endswith(b"fake muxed video")
+    assert _path_for(blob).read_bytes().endswith(b"fake muxed video")
     details = md["archived_media_details"]["https://v.redd.it/abc123"]
     assert details["kind"] == "reddit_video"
     assert details["blob"] == blob
@@ -308,6 +319,7 @@ def test_default_video_downloader_invokes_ytdlp_and_returns_output(
         timeout=12,
     )
     assert path == out
+    assert isinstance(info, dict)
     assert info["mime"] == "video/mp4"
     assert info["downloader"] == "yt-dlp"
     assert info["has_audio"] is True
@@ -387,9 +399,7 @@ def test_archive_video_failure_does_not_stamp_metadata(conn, tmp_path, monkeypat
         throttle=0,
     )
     assert res["failed"] == 1 and res["fail_reasons"] == {"missing_downloader": 1}
-    assert "archived_media" not in json.loads(
-        db.get_item(conn, "reddit:vid")["metadata"]
-    )
+    assert "archived_media" not in _md(conn, "reddit:vid")
 
 
 def test_archive_twitter_images(conn, tmp_path, monkeypatch):
@@ -425,13 +435,13 @@ def test_archive_twitter_images(conn, tmp_path, monkeypatch):
     )
     assert res["items"] == 1 and res["archived"] == 2 and res["failed"] == 0
     assert calls == [img, vid]
-    md = json.loads(db.get_item(conn, "twitter:tw1")["metadata"])
+    md = _md(conn, "twitter:tw1")
     blob = md["archived_media"][img]
     assert blob.endswith(".jpg")
-    assert media_store.path_for(blob).read_bytes() == b"TW-" + img.encode()
+    assert _path_for(blob).read_bytes() == b"TW-" + img.encode()
     vblob = md["archived_media"][vid]
     assert vblob.endswith(".mp4")
-    assert media_store.path_for(vblob).read_bytes() == b"TW-" + vid.encode()
+    assert _path_for(vblob).read_bytes() == b"TW-" + vid.encode()
 
     again = media_archive.archive(
         conn, scopes=["twitter"], apply=True, fetch=fake, throttle=0

@@ -5,7 +5,9 @@ libraries — a thin JSON adapter over the shared ``content_hoarder._http.reques
 transport, preserving the structured ``ArchiveError`` (with ``status``/``retry_after``)
 that providers use for 429 backoff. Ported from reddit-saved-manager.
 """
+
 import json
+from typing import Optional
 
 from content_hoarder import _http
 
@@ -18,7 +20,7 @@ class ArchiveError(Exception):
     in seconds (None when absent, non-numeric, or negative).
     """
 
-    def __init__(self, message: str, status: int = None, retry_after=None):
+    def __init__(self, message: str, status: Optional[int] = None, retry_after=None):
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after

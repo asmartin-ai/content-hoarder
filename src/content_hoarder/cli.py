@@ -1057,7 +1057,9 @@ def cmd_suggest(args) -> int:
 def cmd_reddit_sync(args) -> int:
     from content_hoarder import reddit_sync
 
-    prog = lambda m: print(m, file=sys.stderr)
+    def prog(m):
+        print(m, file=sys.stderr)
+
     with _connect() as conn:
         # Toggle the automatic background sync / PWA-open path (opt-in, default off).
         if args.enable_auto or args.disable_auto:
@@ -1099,7 +1101,9 @@ def cmd_reddit_sync(args) -> int:
 def cmd_hn_sync(args) -> int:
     from content_hoarder import hn_sync
 
-    prog = lambda m: print(m, file=sys.stderr)
+    def prog(m):
+        print(m, file=sys.stderr)
+
     max_pages = args.max_pages if args.max_pages else (50 if args.full else 5)
     with _connect() as conn:
         try:
@@ -1364,7 +1368,7 @@ def cmd_reddit_thumbnails(args) -> int:
 
 
 def cmd_folder_list(args) -> int:
-    from content_hoarder import db, folders
+    from content_hoarder import db
 
     with _connect() as conn:
         folders_list = db.list_folders(conn)
@@ -2444,11 +2448,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prr.add_argument("--limit", type=int, default=None, help="Max items to attempt.")
     prr.add_argument(
-        "--redgifs-ok", action="store_true",
+        "--redgifs-ok",
+        action="store_true",
         help="Allow network to RedGifs API.",
     )
     prr.add_argument(
-        "--apply", action="store_true",
+        "--apply",
+        action="store_true",
         help="Write resolved media metadata (default: dry run).",
     )
     prr.set_defaults(func=cmd_resolve_redgifs)
