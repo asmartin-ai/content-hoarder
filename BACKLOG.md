@@ -160,8 +160,11 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [ ] **P3 — Smooth drag-and-drop to buckets.** Drag cards onto category/status buckets.
   [SortableJS](https://github.com/SortableJS/Sortable) (~20 KB, touch-capable) or
   [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).
-- [ ] **P3 — Consolidate triage swipe onto `swipe.js`.** Refactor `triage.js` to use the shared
-  `window.attachSwipe` helper (now also drives the list's icon reveal). Keep the verified behavior.
+- [x] ~~**P3 — Consolidate triage swipe onto `swipe.js`.**~~ ✅ Shipped 2026-06-29: `triage.js`
+  now uses shared `core/swipe.js` for horizontal + vertical card gestures. The helper grew left-long
+  `commit2` support, optional `onUp`/`onDown` callbacks, and `haptics:false` so triage keeps
+  action-level haptics. Node-backed regressions cover left-long snooze without right-long Keep,
+  opt-in vertical callbacks, and haptics opt-out. Spec: [`docs/specs/triage-swipe-consolidation.md`](docs/specs/triage-swipe-consolidation.md).
 - [x] ~~**Cross-filtered counts.**~~ Shipped: `/stats?source=` + `/sources?status=` cross-filter the
   sidebar status counts and the source-tab counts (the tab list stays stable at 0).
 

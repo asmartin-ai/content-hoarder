@@ -5,6 +5,7 @@ import { getJSON as fetchJSON, postJSON } from "./core/api.js";
 import { normTag, itemTags, suggestTags } from "./core/tags.js";
 import { chIcon, fillIcons } from "./core/icons.js";
 import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
+import { attachSwipe as attachSharedSwipe } from "./core/swipe.js";
 import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-button closes the lightbox, not the app
 
 (function () {
@@ -530,7 +531,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     if (!queue.length) { stack.innerHTML = ""; showEmpty(true); updateProgress(); return; }
     showEmpty(false);
     stack.innerHTML = cardHtml(queue[0]);
-    attachSwipe(stack.querySelector(".tcard"));
+    attachTriageSwipe(stack.querySelector(".tcard"));
     updateProgress();
   }
   // Resume / re-entry (design-language §7): persist the live queue + position so reopening
@@ -671,73 +672,19 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     card.style.transform = "translateX(" + (dir * 130) + "%) rotate(" + (dir * 12) + "deg)";
     card.style.opacity = "0";
   }
-  // Swallow the click the browser synthesizes after a horizontal swipe so a swipe
-  // starting on a link/button/gallery image doesn't ALSO navigate / open it.
-  function suppressNextClick() {
-    var swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
-    window.addEventListener("click", swallow, { capture: true, once: true });
-    setTimeout(function () { window.removeEventListener("click", swallow, true); }, 350);
-  }
-  function attachSwipe(card) {
+  function attachTriageSwipe(card) {
     if (!card) return;
-    var startX = 0, startY = 0, dragging = false, decided = false, horizontal = false, vertical = false;
-    card.addEventListener("pointerdown", function (e) {
-      // Android back-gesture safety: ignore drags starting near a screen edge.
-      if (e.clientX < EDGE_DEADZONE || e.clientX > window.innerWidth - EDGE_DEADZONE) return;
-      // Links/buttons/gallery no longer block the swipe: we don't claim the gesture
-      // until it's decided horizontal, so taps on them still fire (delegated on stack).
-      dragging = true; decided = false; horizontal = false; vertical = false;
-      startX = e.clientX; startY = e.clientY;
-      card.style.transition = "none";
+    attachSharedSwipe(card, {
+      edge: EDGE_DEADZONE,
+      commit: COMMIT_PX,
+      commit2: LONG_LEFT_PX,
+      haptics: false, // triage keeps tactile feedback at the action functions.
+      onRight: function () { commit("archived"); },
+      onLeft: function () { commit("done"); },
+      onLeftLong: function () { commitSnooze(); },
+      onUp: function () { openCurrentInReader(); },
+      onDown: function () { skip(); }
     });
-    card.addEventListener("pointermove", function (e) {
-      if (!dragging) return;
-      var dx = e.clientX - startX, dy = e.clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        decided = true;
-        horizontal = Math.abs(dx) > Math.abs(dy);
-        vertical = !horizontal;
-        if (horizontal) { try { card.setPointerCapture(e.pointerId); } catch (_e) {} }
-      }
-      if (vertical) {
-        if (e.cancelable) e.preventDefault();
-        card.style.transform = "translateY(" + dy + "px) scale(.98)";
-        card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dy) / 360));
-        card.classList.toggle("swipe-open", dy < -40);
-        card.classList.toggle("swipe-skip", dy > 40);
-        return;
-      }
-      if (!horizontal) return;                 // not a horizontal swipe → leave the card be
-      if (e.cancelable) e.preventDefault();    // claim the gesture: block link activation / native drag
-      card.style.transform = "translateX(" + dx + "px) rotate(" + (dx * 0.04) + "deg)";
-      card.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 320));
-      card.classList.toggle("swipe-arch", dx > 40);
-      card.classList.toggle("swipe-done", dx < -40 && dx > -LONG_LEFT_PX);
-      card.classList.toggle("swipe-snooze", dx <= -LONG_LEFT_PX);
-    });
-    function end(e) {
-      if (!dragging) return;
-      dragging = false;
-      if (horizontal || vertical) suppressNextClick();
-      if (!horizontal && !vertical) return;                 // a tap: let the click through
-      var dx = e.clientX - startX, dy = e.clientY - startY;
-      card.style.transition = "transform .2s ease-out, opacity .2s ease-out";
-      if (vertical && Math.abs(dy) >= COMMIT_PX) {
-        if (dy < 0) openCurrentInReader();
-        else skip();
-      } else if (horizontal && Math.abs(dx) >= COMMIT_PX) {
-        if (dx > 0) commit("archived");
-        else if (Math.abs(dx) >= LONG_LEFT_PX) commitSnooze();
-        else commit("done");
-      } else {
-        card.style.transform = "translateX(0) rotate(0)";
-        card.style.opacity = "1";
-        card.classList.remove("swipe-arch", "swipe-done", "swipe-snooze", "swipe-open", "swipe-skip");
-      }
-    }
-    card.addEventListener("pointerup", end);
-    card.addEventListener("pointercancel", function () { dragging = false; renderCurrent(); });
   }
 
   // NSFW reveal + Ask AI + gallery lightbox
