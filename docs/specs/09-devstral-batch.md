@@ -1,8 +1,8 @@
 # Spec 09 — Devstral batch: offline-backend backlog tasks
 
-A self-contained spec for tasks picked from `BACKLOG.md` + `docs/specs/parity-ideas.md`
-that fit a **local Devstral codegen model**. Paste the whole file (or any single Task
-section) into continue.dev.
+Historical self-contained spec for shipped tasks originally picked from the monolithic backlog +
+`docs/specs/parity-ideas.md` that fit a **local Devstral codegen model**. Active work now lives in
+GitHub Issues; local backlog history lives under `docs/backlog/`.
 
 ## Status
 - **Task A — HN comment-thread viewer backend: ✅ SHIPPED 2026-06-25** (`commit 92c8877`).
@@ -68,7 +68,8 @@ separate, non-Devstral task). B and D are complete CLI-driven backend features.
 
 ## Task A — HN comment-thread viewer backend  ✅ SHIPPED 2026-06-25 (`92c8877`)
 
-**Backlog ref:** `docs/specs/parity-ideas.md` item C (HN thread viewer). `BACKLOG.md` Epic 7 (HN).
+**Backlog ref:** `docs/specs/parity-ideas.md` item C (HN thread viewer) + historical HN notes in
+`docs/backlog/epic-07-more-sources-live-sync.md`.
 **Blast radius:** low — additive new module + one new route. Reuses the existing thread cache
 table. No schema change.
 

@@ -43,8 +43,8 @@ Everything else (images, galleries, gifs) has a clear zero-dependency answer and
 
 ## 1. Problem statement
 
-Reddit video and gallery items don't play / render correctly in the inbox (BACKLOG.md:349–353,
-P1, Epic 13). The frontend has rich rendering capability but (a) keys it off the unreliable
+Reddit video and gallery items did not play / render correctly in the inbox (historical backlog:
+`docs/backlog/epic-13-ui-bugs-quick-fixes.md`, Epic 13 media rendering item). The frontend has rich rendering capability but (a) keys it off the unreliable
 `media_type`, (b) hands the `<video>` element a non-media URL, and (c) falls back to the Reddit
 iframe embed (`redditmedia.com`) — which the user has ruled out: it is online-only, third-party,
 themed wrong, frequently refuses to render in an iframe, and leaks browsing to Reddit.
@@ -553,7 +553,7 @@ plays `t3_1plfjv1` **with** `audioDecodedByteCount > 0`; modal close destroys th
 ### Batch of tiny unblocks (one sitting, ⏱ 30 min total)
 
 sw.js bump (if not done in P1) · `.gifv` probe of one live imgur URL · suppress silent-label for
-`is_gif`-ish items · QA-CHECKLIST.md line 166 update · BACKLOG.md Epic 13 P1 tick with one-line
+`is_gif`-ish items · QA checklist update · local history / GitHub issue update with one-line
 as-built note.
 
 ### Icebox (explicit, not now)
@@ -582,4 +582,4 @@ as-built note.
 - Empirical probes (strongest evidence; commands reproducible): this file's §2.4, run 2026-06-12
   against v.redd.it / i.redd.it / preview.redd.it / external-preview.redd.it from this machine.
 - Repo ground truth: `docs/reddit-media-refinement.md` · `archival/providers.py` ·
-  `static/core/media.js` · BACKLOG.md Epic 13 (line 349).
+  `static/core/media.js` · `docs/backlog/epic-13-ui-bugs-quick-fixes.md`.

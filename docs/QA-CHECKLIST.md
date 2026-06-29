@@ -6,8 +6,9 @@ Each story groups related checks so you don't have to jump around the app.
 
 Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
-> **Findings → backlog, not here.** Keep this file a neutral checklist; file anything broken as a
-> `BACKLOG.md` item under the right Epic, not as an inline note.
+> **Findings → GitHub Issues, not here.** Keep this file a neutral checklist; file anything broken as
+> a GitHub issue and link it from `BACKLOG.md` / `docs/backlog/github-issues.json` if it becomes part
+> of the durable backlog.
 
 ## How to run / test
 
@@ -231,10 +232,17 @@ Resurfacing card, surprise-me, the dice.
 
 ## Current known gaps / WIP (don't file these as new bugs)
 
-- **Mobile long-press group-select** is deferred from the retention/gallery split (tap-opens-modal shipped).
-- **Swipe physics feel** is iceboxed (user: "right now it's fine") — re-activate only if it feels laggy/stiff.
-- **Scroll-deceleration** (E2) is still open — rapid fling-to-top can feel like it overshoots or stops abruptly.
-- **Mobile `/reddit` view** remains desktop-first.
+These already have GitHub issues:
+
+- **Lightbox blank-space drag scroll bleed** — #35.
+- **Long-press row menu scroll jump / awkwardness** — #36.
+- **Hold-to-preview pan/zoom empty-space clamp** — #37.
+- **Inbox swipe inertia / Done vs Snooze tuning** — #38.
+- **Text Reddit self-post shows misleading play affordance** — #39.
+- **Scroll-deceleration / rapid fling-to-top feel** — #48.
+- **Mobile `/reddit` view** remains desktop-first — #49.
+- **Deferred long-press group-select** — #44.
+- **Swipe physics feel icebox** — #45.
 
 ## Shipped mobile features that still merit real-device spot checks
 
@@ -257,8 +265,7 @@ Use this section after a QA pass to decide what to delegate. Treat **T3** as tig
 | Task | Why T3-safe | Done when |
 |---|---|---|
 | **Add/extend Playwright coverage for QA stories** | Clear oracle; mostly synthetic fixtures and UI assertions. | New tests cover one QA story without requiring private `data/app.db`; `pytest -m ui` passes. |
-| ~~**Focus mode wider on desktop**~~ (`BACKLOG.md` Epic 14) | Small CSS/layout change; low data risk. | ✅ Shipped |
-| **App icon replacement assets** (`BACKLOG.md` Epic 8) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
+| **App icon replacement assets** (#19) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
 | **QA/docs reconciliation after each sprint** | No app behavior risk; good cleanup work. | Checklist/backlog/delegation docs have no stale branch/staging wording. |
 | **Small CSS polish from an approved spec** | Safe only when the visual decision is already made. | One isolated CSS change, before/after screenshot, no broad refactor. |
 
@@ -266,24 +273,22 @@ Use this section after a QA pass to decide what to delegate. Treat **T3** as tig
 
 | Task | Why T2-sized | T1 handoff needed first |
 |---|---|---|
-| **RedGifs resolver dry-run** for dead Gfycat links (`BACKLOG.md` Epic 4) | Bounded provider + CLI dry-run + offline tests. | Confirm NSFW/opt-in policy and whether it should archive bytes or only rewrite metadata first. |
-| **Import WL3 / Watch Later export** (`BACKLOG.md` Epic 7) | Existing YouTube import path can be reused; fixture-driven tests. | Provide/export sample format and decide whether this is one-shot import or recurring workflow. |
-| **Live Firefox tab manual push** (`BACKLOG.md` Epic 7) | Bounded local endpoint/bookmarklet/WebExtension shape once chosen. | Pick integration shape: WebExtension, bookmarklet, or `sessionstore` reader. |
-| **Improve Reddit/Youtube tag coverage** (`BACKLOG.md` Epic 9) | Heuristic maps + dry-run counts are testable and reversible. | Decide desired buckets; avoid inventing taxonomy. |
-| **OCR search wiring after engine decision** (`BACKLOG.md` Epic 12) | Once OCR text exists, FTS/search/operator plumbing is straightforward. | T1 must choose engine and image-byte source from a sample accuracy/cost check. |
-| **Keyboard shortcut implementation** (`BACKLOG.md` Epic 5) | Bounded JS + cheatsheet/tests after mapping is approved. | T1/user must approve the new shortcut map first. |
+| **Import WL3 / Watch Later export** (#15) | Existing YouTube import path can be reused; fixture-driven tests. | Provide/export sample format and decide whether this is one-shot import or recurring workflow. |
+| **OCR search wiring after engine decision** (#26) | Once OCR text exists, FTS/search/operator plumbing is straightforward. | T1 must choose engine and image-byte source from a sample accuracy/cost check. |
+| **Keyboard shortcut implementation** (#14) | Bounded JS + cheatsheet/tests after mapping is approved. | T1/user must approve the new shortcut map first. |
+| **Text Reddit self-post media affordance fix** (#39) | Bounded rendering/classification bug with a clear repro. | Confirm repro with synthetic row, then adjust media tile selection + UI test. |
+| **Lightbox blank-space scroll-lock regression** (#35) | Clear mobile UI oracle; likely localized to lightbox scroll/pointer handling. | Dragging backdrop/blank space never changes feed scrollY. |
 
 ### T1 candidates — keep with a strong model / human decision gate
 
 | Task | Why T1 | First concrete action |
 |---|---|---|
-| **Scroll-deceleration diagnosis** (E2) | Requires reproducing touch/scroll physics and separating CSS, JS, browser, and infinite-scroll effects. | Capture a real-device repro and instrument scroll handlers before editing. |
-| **`v.redd.it` video archiving** (`BACKLOG.md` Epic 4) | Large storage/network design with media formats, throttling, and backup implications. | Design a dry-run plan: count sizes, choose HLS/DASH storage shape, set caps. |
-| **At-save-time media archiving** (`BACKLOG.md` Epic 4) | Touches sync/import paths and can create network/load side effects. | Define opt-in setting, rate limits, and failure semantics. |
-| **Archive.today live smoke + `/recover` opt-in** (`BACKLOG.md` Epic 4) | Live external service, low hit rate, Cloudflare/rate-limit behavior. | Run against a DB copy with one `media_status='gone'` item; only then design UI opt-in. |
-| **OCR engine selection** (`BACKLOG.md` Epic 12) | Needs accuracy/privacy/performance comparison across local engines. | Run a small sample with Tesseract vs local vision and record hit quality. |
-| **Mobile `/reddit` redesign** (`BACKLOG.md` Epic 16) | Design/system-level UI work, not just implementation. | Produce a small spec/screenshot plan before code. |
-| **Bulk-unsave by tag / live Reddit writes** (`BACKLOG.md` Epic 9) | Irreversible external action path; requires safety gates and audit trail. | Design dry-run/count/confirm/audit flow before any live drain. |
+| **Scroll-deceleration diagnosis** (#48) | Requires reproducing touch/scroll physics and separating CSS, JS, browser, and infinite-scroll effects. | Capture a real-device repro and instrument scroll handlers before editing. |
+| **Local media archiving follow-ups / live smoke** (#11) | Large storage/network design with media formats, throttling, and backup implications. | Use a DB copy; verify one representative `v.redd.it`/archive.today path before any larger pass. |
+| **At-save-time media archiving** (#11 follow-up) | Touches sync/import paths and can create network/load side effects. | Define opt-in setting, rate limits, and failure semantics. |
+| **OCR engine selection** (#26) | Needs accuracy/privacy/performance comparison across local engines. | Run a small sample with Tesseract vs local vision and record hit quality. |
+| **Mobile `/reddit` redesign** (#49) | Design/system-level UI work, not just implementation. | Produce a small spec/screenshot plan before code. |
+| **Triage visual rework + inbox-like filtering** (#57) | Design/system-level UI work across triage, gestures, settings, and reader transition. | Lock a design via `frontend-design` before code. |
 
 ---
 
