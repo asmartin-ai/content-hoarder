@@ -178,6 +178,7 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [ ] **P2 — Rework the keyboard controls.** *(User-requested 2026-06-08.)* The current map (browse
   J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new
   mapping for review. (The `?` cheatsheet already ships.)
+   - Proposed Gmail-aligned keymap ready for review (see archived delegation notes): j/k movement, f keep, e archive, d done, b snooze, x select, t tag, o/Enter open, / search, ? help, z undo. Awaiting user approval before implementation.
 - [x] ~~**P2 — Share button on items.**~~ ✅ SHIPPED 2026-06-22 (browser-verified): Web-Share with clipboard fallback, sharing the **source permalink** — `shareItem()` in `core/render.js` (navigator.share on mobile; clipboard + "Link copied" toast on desktop; reuses `itemUrl()` per source). On the row/card action cluster (`browse/render.js` actsHtml, `data-share`; hidden on touch ROWS where swipe owns the acts, shown on cards) + the reader header (`#reader-share`). Tabler share icon, SW v63. *(User-requested 2026-06-17.)* Orig scope: Add a Share affordance to the item
   (row/card + reader). **Open scope:** native Web Share API (`navigator.share` — works on the mobile PWA,
   falls back to clipboard on desktop) vs. a plain "copy permalink" button; and decide *what* is shared — the
@@ -244,6 +245,7 @@ false positives.*
   "future" on the connector); (c) a bookmarklet/native-messaging bridge. Reuses the existing
   `firefox:<url-hash>` shaping, de-dup, and `open_in_firefox` flag (browse via `is:firefox-tab`). Keep it
   opt-in and manual — no always-on capture (the project's zero-new-friction guardrail).
+   - Research spike (2026-06-28): Firefox Sync stores encrypted tab data — no simple account API endpoint for synced tabs exists. A true integration requires Firefox Sync client auth + key derivation + collection decryption. T1-led research; look for an existing maintained Python Sync client library before implementing.
 - [ ] **P3 — Live Reddit / YouTube API sync.** When API keys arrive, implement `BaseConnector.sync()`
   using the existing `auth_tokens` table.
 - [x] ~~**P2 — HN favorites-page auto-sync (Harmonic → `favorites?id=<user>`).**~~ ✅ SHIPPED:
@@ -342,6 +344,7 @@ false positives.*
   Reddit view **and** the browse view, plus tag chips rendered on Reddit rows/cards, browse rows, and
   the triage card.
   (d) optional local-LLM assist for the untagged tail (Epic 1 pattern).
+   - Tag landscape snapshot (2026-06-28): 65k reddit, 12k youtube, 9.4k HN, 2.3k firefox items. Largest untagged surfaces: HN (98% untagged, 9.2k), Firefox (97%, 2.2k), Reddit (42%, 27.5k). HN/Firefox host/domain heuristics are the lowest-risk next coverage target.
 - [~] **P2 — Export + remove the `nsfw_erotic` set.** Goal: pull the erotic-tagged items out of the
   Saved list (to migrate to a separate account). (a) ~~**Export by tag**~~ **done** (overnight
   2026-06-10): `GET /export` (CSV/JSON, same q/operator filters as `/items` — the old reddit-view
@@ -418,21 +421,19 @@ false positives.*
 subreddit/channel, kind, age, media type, title keywords). The app should learn from my own history
 and surface what I'm most likely to act on, instead of a flat random batch.*
 
-- [~] **P2 — Learn a "likely-done" score from triage history — BUILT, parked on
-  `feat/triage-score` (user decision 2026-06-11: integrate + test after the Epic 20 UI
-  work).** `triage_score.py` — transparent per-feature processed-rate model (composite
+- [x] ~~**P2 — Learn a "likely-done" score from triage history.**~~ SHIPPED on main:
+  triage_score.py, learn-triage CLI, and smart-triage mode (get_random_batch(mode="smart")) are all live.
+  The feat/triage-score branch is merged; the old parking notes about reverting a revert are stale.
+  `triage_score.py` — transparent per-feature processed-rate model (composite
   source/kind, subreddit, channel, media type, category, age buckets; Laplace-smoothed,
   min-support 20; **decay-stamped rows excluded from training**; title tokens deferred).
   `learn-triage` CLI (dry-run default) writes `metadata.triage_score` + top-3 `triage_why`.
   Rehearsed on the live-corpus copy (82k scored in 23s; model card at
   `data\rehearsal-decay\TRIAGE-SCORE-REPORT.md`); the first rehearsal caught source/kind
-  double-counting — fixed via the composite `sk:` feature. The work was reverted off
-  `feat/inbox-decay` (revert `9e2604f`) so this branch merges without it; **to integrate
-  later: revert the revert on a fresh branch off main** (or merge `feat/triage-score`,
-  which snapshots the pre-revert state).
-- [~] **P2 — "Smart triage" mode (recency + likely-done interleave)** — same status:
-  built (`get_random_batch(mode="smart")` + `/random?mode=smart`), parked on
-  `feat/triage-score`. The triage-card UI toggle is an Epic 20 Stage-C item.
+  double-counting — fixed via the composite `sk:` feature.
+- [x] ~~**P2 — "Smart triage" mode (recency + likely-done interleave).**~~ SHIPPED on main:
+  get_random_batch(mode="smart") + /random?mode=smart.
+  The triage-card UI toggle remains an Epic 20 Stage-C item.
 - [x] ~~**P3 — Feedback loop.**~~ ✅ SHIPPED 2026-06-26: `triage_score.drift()` compares two fitted models
   (features added/dropped, rate drift with top movers, prior drift, `drift_score`); `triage-drift` CLI reports
   drift vs the persisted model; `--apply` refits, rescors inbox items, and persists. **Still open:** optionally
