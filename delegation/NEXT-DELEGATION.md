@@ -21,6 +21,10 @@ Confirmed from the current docs/code state:
 - **QA checklist already reflects the current mobile state.** `docs/QA-CHECKLIST.md` includes the no-dock
   reader state and marks the shipped gesture features as needing real-device spot checks rather than rebuilds.
 - **Epic 10 (learned triage) is SHIPPED on main.** triage_score.py, learn-triage CLI, smart-triage mode, and triage-drift are all live.
+- **HN/Firefox tag coverage expansion is SHIPPED and applied.** The 2026-06-29 precision pass added
+  conservative browser/HN buckets, explicit `metadata.tags_auto` provenance for heuristic tags, preserved
+  human `metadata.tags_manual`, backed up the DB to `data/app.before-tag-coverage-20260629.db`, then applied
+  Firefox (494 rows) and HN (1,189 rows) auto-tags after dry-run review.
 
 ## Tier definitions
 
@@ -71,9 +75,9 @@ These can run in parallel if each agent is assigned the listed write scope and f
 | ID | Tier | Task | T1 input required | Suggested write scope | Conflict risk |
 |---|---:|---|---|---|---|
 | `redgifs-resolver-dryrun` | Done | Epic 4: resolve dead Gfycat IDs against RedGifs, dry-run first. | Shipped: metadata-only dry-run CLI with explicit `--redgifs-ok` network gate. | `resolve-redgifs` CLI + offline tests. | Historical; no active conflict risk. |
+| `tag-coverage-expansion` | Done | Epic 9/26: extend heuristic tag coverage. | Shipped/applied 2026-06-29: precision-biased HN/Firefox rules, `tags_auto` provenance, DB backup, dry-run + apply complete. | `categorize.py` maps + provenance tests. | Historical; no active conflict risk. |
 | `watch-later-import-sample` | T2 | Epic 7: support WL3 / browser Watch Later export shape. | Provide a representative export sample and decide one-shot vs recurring workflow. | YouTube connector/parser tests + fixture. | Low if restricted to connector + tests. |
 | `firefox-sync-tabs-research` | T1 research | Epic 7: synced Firefox tabs from Firefox Account/Sync. | Find a maintained Sync client/decryption library or prove none is suitable. | Research note / read-only proof of tab listing before DB work. | Do not hand to T2 implementation yet; Sync tabs are encrypted collection data, not a simple account API. |
-| `tag-coverage-expansion` | T2 | Epic 9/26: extend heuristic tag coverage. | T1/user names desired buckets and precision constraints. | `categorize.py` maps + dry-run tests. | Low; run after reviewing dry-run counts. |
 | `keyboard-map-implementation` | T2 | Epic 5: rework keyboard controls. | Approved mapping from user/T1. | JS key handlers + `?` cheatsheet + Playwright/unit tests. | Medium; overlaps browse/triage handlers. Run alone or split browse vs triage. |
 
 ### Batch C — Research/design spikes (T1-led, maybe subagent research only)
@@ -112,4 +116,5 @@ Do not give these as direct implementation tasks yet. T1 should either do them o
 
 ## Suggested next action
 
-Pick from Batch B: keyboard rework (after user approves the Gmail-aligned keymap) or HN/Firefox tag coverage expansion (after user names target buckets). Delegation cleanup is done — historical files deleted, BATCH-B-START folded into BACKLOG.md.
+Pick from Batch B: keyboard rework remains ready after the Gmail-aligned keymap is approved. Otherwise,
+`watch-later-import-sample` needs a representative export sample + one-shot vs recurring decision before delegation.

@@ -408,3 +408,85 @@ def test_hn_no_match_still_empty():
         "A gentle introduction to category theory", "https://example.org/cat-theory"
     )
     assert cat.hackernews_tags(item) == []
+
+
+# --------------------------------------------------------------------------- #
+# precision regressions from live dry-run samples — prefer missing over over-tagging
+# --------------------------------------------------------------------------- #
+def test_hn_self_link_is_not_startups_by_host_only():
+    item = _hn(
+        "Ask HN: What Happened to Bash.org?", "https://news.ycombinator.com/item?id=1"
+    )
+    assert "startups" not in cat.hackernews_tags(item)
+
+
+def test_hn_general_business_hosts_are_not_investing_by_host_only():
+    item = _hn(
+        "American Workers Are Burned Out, and Bosses Are Struggling to Respond",
+        "https://www.bloomberg.com/news/articles/2022-01-01/workers-burned-out",
+    )
+    assert "investing" not in cat.hackernews_tags(item)
+
+
+def test_hn_steam_non_gaming_meanings_do_not_match_gaming():
+    item = _hn(
+        "Why Wasn't the Steam Engine Invented Earlier?", "https://example.org/post"
+    )
+    assert "gaming" not in cat.hackernews_tags(item)
+
+
+def test_hn_crypto_does_not_mean_cryptography():
+    item = _hn(
+        "NSA, NIST, and post-quantum crypto: my second lawsuit against the US government",
+        "https://example.org/post",
+    )
+    assert "crypto" not in cat.hackernews_tags(item)
+
+
+def test_firefox_stock_inventory_is_not_investing():
+    item = _firefox(
+        "2025 Convention Stock Tracking - Google Sheets",
+        "https://docs.google.com/spreadsheets/d/example",
+        "docs.google.com",
+    )
+    assert "investing" not in cat.firefox_tags(item)
+
+
+def test_hn_personal_earnings_are_not_investing():
+    item = _hn("My Youtube earnings", "https://example.org/post")
+    assert "investing" not in cat.hackernews_tags(item)
+
+
+def test_hn_generic_investing_verb_is_not_investing():
+    item = _hn(
+        "Keep work fresh by teaching your successors and investing a bit in long-term health",
+        "https://example.org/post",
+    )
+    assert "investing" not in cat.hackernews_tags(item)
+
+
+def test_firefox_raw_html_url_title_is_not_web_dev():
+    item = _firefox(
+        "https://www.degruyter.com/document/doi/10.2138/am-2017-5993CCBY/html",
+        "https://www.degruyter.com/document/doi/10.2138/am-2017-5993CCBY/html",
+        "www.degruyter.com",
+    )
+    assert "web_dev" not in cat.firefox_tags(item)
+
+
+def test_firefox_claude_person_name_is_not_ai_ml():
+    item = _firefox(
+        "(17) claude clawmark in the back room - YouTube",
+        "https://www.youtube.com/results?search_query=claude+clawmark+in+the+back+room",
+        "www.youtube.com",
+    )
+    assert "ai_ml" not in cat.firefox_tags(item)
+
+
+def test_firefox_bitcoin_payment_footer_is_not_crypto():
+    item = _firefox(
+        "Bocchi the Rock! - Bocchi-chan's Autograph Jersey (Black x White | Size L) - Bitcoin & Lightning accepted",
+        "https://www.play-asia.com/bocchi-the-rock-bocchi-chans-autograph-jersey/13/70fwxn",
+        "www.play-asia.com",
+    )
+    assert "crypto" not in cat.firefox_tags(item)
