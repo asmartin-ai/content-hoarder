@@ -35,8 +35,7 @@ slice is the **8,495 posts with non-empty body** (selftext), ~5h resumable batch
   permalinks), rebuilds the comment tree from flat `parent_id` adjacency (orphans at root, missing
   permalinks synthesized), marks the post `_archive_sourced` (surfaced by `parse_thread`), and the web
   hydrate route maps `"archived"` → 200. Existing cache is never clobbered. Offline-tested (no live 404 round-trip yet).
-- [ ] **P3 — port note for Epic 22:** AnkiConnect's default `localhost:8765` collides with
-  PKMS's capture service (now live on 8765) — whichever lands second picks a new port.
+- [x] ~~**P3 — port note for Epic 22.**~~ ✅ Captured 2026-06-29 in `docs/engagement/engagement-deck-architecture.md`: do not assume AnkiConnect's conventional `localhost:8765` is free because PKMS's capture service is live there; the eventual Anki lane must make the URL configurable and choose a non-conflicting default after user review.
 
 ### Icebox — comment storage evolution *(decision 2026-06-12: KEEP the blob model for now)*
 Current: whole thread stored as one JSON blob in `reddit_threads.thread_json`, in a sibling

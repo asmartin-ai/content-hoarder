@@ -5,16 +5,7 @@ candidate: **Anki flashcards** interleaved between content cards. Triage becomes
 swipe-stream for "things needing a small decision," and the variety itself is the
 engagement mechanic.*
 
-- [ ] **P3 — Architecture research FIRST (decision gate).** Decide the shape before any build:
-  (a) same Flask app, pluggable card sources behind the existing `/random` batch endpoint
-  (cheapest, no new process); (b) sibling service reading `app.db` directly (SQLite
-  cross-process write coordination needed — triage writes statuses); (c) fully separate app
-  consuming an HTTP API the hoarder exposes (cleanest seam, most work). Overlaps the open
-  PKMS sibling-service question (Epic 21 icebox) — answer them together. Note the tension
-  with Epic 17 (unify surfaces): that unification targeted browse+reddit; triage spinning
-  OUT can coexist, but decide deliberately. Sketch the card-source interface while deciding:
-  a card = `{id, source_app, render(), actions[], on_action()}` — content items, Anki due
-  cards, and the Epic 20 resurfacing/surprise-me cards would all implement it.
+- [x] ~~**P3 — Architecture research FIRST (decision gate).**~~ ✅ Proposed/shipped 2026-06-29 (autonomous run; needs user sign-off): first prototype stays **inside the existing Flask app** behind pluggable backend card sources, not a sibling service yet. `content_hoarder.card_sources` now pins the minimal source/card seam (`cards(limit, **context)`, cards shaped as `{id, source_app, kind, title, actions}` + source payload) and weighted interleaving (`deck()`), with optional lanes disappearing by returning `[]`. Rationale and caveats live in `docs/engagement/engagement-deck-architecture.md`; tests in `tests/test_card_sources.py`. Original gate: decide between (a) same Flask app, pluggable card sources behind `/random`; (b) sibling service reading `app.db` directly; (c) separate app over HTTP, while accounting for Epic 17 and the PKMS sibling-service question.
 - [ ] **P3 — Anki interleave prototype (after the architecture gate).** AnkiConnect
   (localhost:8765 JSON-RPC, requires desktop Anki running) exposes due cards + answering;
   interleave N content cards : 1 due flashcard. Swipe maps to Again/Good at minimum. Offline
