@@ -1,5 +1,3 @@
-import pytest
-
 from content_hoarder import categorize as cat
 from content_hoarder import db, models
 from content_hoarder.models import parse_metadata
@@ -56,6 +54,7 @@ def test_youtube_preservation(conn):
     res = cat.tag_youtube_source(conn, limit=10)
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
+    assert row is not None
     md = parse_metadata(row["metadata"])
     assert sorted(md["tags"]) == ["listenable", "science"]
     assert md["tags_auto"] == ["science"]
@@ -74,6 +73,7 @@ def test_youtube_keyword_noise_drop(conn):
     res = cat.tag_youtube_source(conn, limit=10)
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
+    assert row is not None
     md = parse_metadata(row["metadata"])
     assert md["tags"] == ["watch", "science"]
     assert md["tags_auto"] == ["science"]
@@ -92,6 +92,7 @@ def test_youtube_dry_run(conn):
     assert res["dry_run"] is True
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
+    assert row is not None
     assert parse_metadata(row["metadata"]).get("tags") is None
 
 
@@ -109,9 +110,11 @@ def test_youtube_skip_logic(conn):
     assert res["tagged"] == 0
     assert res["selected"] == 0
     row = db.get_item(conn, fn)
+    assert row is not None
     assert sorted(parse_metadata(row["metadata"])["tags"]) == ["listenable", "science"]
     # retry=True should re-tag
     res = cat.tag_youtube_source(conn, limit=10, retry=True)
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
+    assert row is not None
     assert sorted(parse_metadata(row["metadata"])["tags"]) == ["listenable", "science"]

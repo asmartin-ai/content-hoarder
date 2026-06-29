@@ -1723,7 +1723,7 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 
 /* ---- density: comfortable (two lines + snippet + full-height pinned thumb) ---- */
 .items.density-comfortable .item-av { margin-top: 0.1rem; }
-.items.density-comfortable .item-snippet { -webkit-line-clamp: 1; }
+.items.density-comfortable .item-snippet { -webkit-line-clamp: 1; line-clamp: 1; }
 .items.density-comfortable .tag-chips { display: none; }
 /* ---- density: card — large single-column cards: card-head, hero thumb, bottom tag/action row ---- */
 .items.density-card {
@@ -1756,7 +1756,7 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 }
 .items.density-card .item-main { padding: 0.6rem 0.9rem 0.7rem; gap: 0.35rem; }
 .items.density-card .item-title { font-size: var(--fs-lg); white-space: normal; line-height: var(--lh-tight); }
-.items.density-card .item-snippet { -webkit-line-clamp: 3; }
+.items.density-card .item-snippet { -webkit-line-clamp: 3; line-clamp: 3; }
 .items.density-card .card-tagrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
 .items.density-card .card-tagrow .tag-chips { flex: 1; min-width: 0; margin: 0; }
 .items.density-card .card-tagrow .item-actions { flex-shrink: 0; }
@@ -2050,6 +2050,7 @@ select:focus-visible {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
     line-height: 1.28;
 }
@@ -2064,6 +2065,7 @@ select:focus-visible {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
+    line-clamp: 1;
     overflow: hidden;
 }
 
