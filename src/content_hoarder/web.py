@@ -15,11 +15,20 @@ import tempfile
 import time
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from content_hoarder import config, connectors, db, pipeline, resurface, search_query
+from content_hoarder import (
+    config,
+    connectors,
+    db,
+    firefox_tabs,
+    pipeline,
+    resurface,
+    search_query,
+)
 
 
 def _int(value, default: int = 0) -> int:
@@ -76,7 +85,7 @@ def create_app(db_path: str | None = None) -> Flask:
             src.backup(dst)
         return bak
 
-    def _append_delete_audit(record: dict) -> None:
+    def _append_delete_audit(record: dict[str, Any]) -> None:
         audit_path = Path(app.config["DB_PATH"]).with_name("delete-audit.jsonl")
         with audit_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -132,6 +141,8 @@ def create_app(db_path: str | None = None) -> Flask:
         if not _local_host(host):
             return jsonify({"error": "forbidden host"}), 403
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            if request.path == "/import/firefox-tabs":
+                return None
             origin = request.headers.get("Origin", "")
             try:
                 origin_loc = urlsplit(origin).netloc.lower() if origin else ""
@@ -229,6 +240,30 @@ def create_app(db_path: str | None = None) -> Flask:
                 "Content-Disposition": "attachment; filename=content-hoarder-export.csv"
             },
         )
+
+    @app.post("/import/firefox-tabs")
+    def import_firefox_tabs():
+        def _request_token() -> str:
+            auth = request.headers.get("Authorization", "")
+            if auth.lower().startswith("bearer "):
+                return auth[7:].strip()
+            return request.headers.get("X-Content-Hoarder-Token", "").strip()
+
+        raw_payload = request.get_json(silent=True)
+        payload, error = firefox_tabs.validate_payload(raw_payload)
+        if error or payload is None:
+            return jsonify({"error": error or "invalid payload"}), 400
+
+        with conn() as c:
+            if not firefox_tabs.token_configured(c):
+                return jsonify({"error": "firefox ingest token is not configured"}), 503
+            token = _request_token()
+            if not token:
+                return jsonify({"error": "missing token"}), 401
+            if not firefox_tabs.verify_token(c, token):
+                return jsonify({"error": "invalid token"}), 403
+            result = firefox_tabs.ingest_snapshot(c, payload)
+        return jsonify(result.as_dict())
 
     @app.get("/items")
     def items():
@@ -758,9 +793,7 @@ def create_app(db_path: str | None = None) -> Flask:
         expected_cutoff_raw = body.get("expected_cutoff")
         if not isinstance(
             expected_total_raw, (str, bytes, bytearray, int, float)
-        ) or not isinstance(
-            expected_cutoff_raw, (str, bytes, bytearray, int, float)
-        ):
+        ) or not isinstance(expected_cutoff_raw, (str, bytes, bytearray, int, float)):
             return jsonify(
                 {"error": "expected_total and expected_cutoff are required"}
             ), 400
@@ -887,7 +920,7 @@ def create_app(db_path: str | None = None) -> Flask:
 
     # -- reddit management view (reuses the RSM interface over the items table) --
 
-    def _reddit_view(it: dict) -> dict:
+    def _reddit_view(it: dict[str, Any]) -> dict[str, Any]:
         """Flatten a content-hoarder item into the flat shape the Reddit UI expects."""
         m = it.get("metadata") or {}
         return {
@@ -1290,7 +1323,7 @@ def create_app(db_path: str | None = None) -> Flask:
 
     # -- import modal: /prepare counts a file/URL WITHOUT writing; /commit writes --
 
-    _prepared: dict[str, dict] = {}
+    _prepared: dict[str, dict[str, Any]] = {}
     _YT_RE = re.compile(r"^https?://([\w.-]*\.)?(youtube\.com|youtu\.be)/", re.I)
 
     def _cleanup_prepared():
@@ -1462,6 +1495,6 @@ def create_app(db_path: str | None = None) -> Flask:
                 pass
 
     # exposed for testing the B4 exit-cleanup (the atexit hook is otherwise unreachable)
-    app._prepared = _prepared  # type: ignore[attr-defined]
-    app._cleanup_all_prepared = _cleanup_all_prepared  # type: ignore[attr-defined]
+    setattr(app, "_prepared", _prepared)
+    setattr(app, "_cleanup_all_prepared", _cleanup_all_prepared)
     return app

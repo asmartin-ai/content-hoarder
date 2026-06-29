@@ -6,13 +6,14 @@ The SOLE owner of database writes during import. Connectors only parse and yield
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from content_hoarder import connectors, db
 from content_hoarder.connectors.base import ImportResult
 from content_hoarder.models import parse_metadata
 
 
-def _apply_monotonic_saved_order(conn, items: list[dict]) -> None:
+def _apply_monotonic_saved_order(conn, items: list[dict[str, Any]]) -> None:
     """Assign each reddit import's synthetic ``saved_utc`` as a contiguous block ABOVE all prior
     ingests, so "sort by saved newest" stays coherent across imports made at different times
     (the older per-import wall-clock anchor left disjoint bands). Imports AND cookie syncs share
@@ -50,7 +51,7 @@ def import_path(
     p = Path(path)
     connector = connectors.get(source) if source else connectors.dispatch(p)
     result = ImportResult()
-    batch: list[dict] = []
+    batch: list[dict[str, Any]] = []
     do_reconcile = reconcile or reconcile_dry_run
     present = {"post": set(), "comment": set()}
     items = list(connector.import_file(p))

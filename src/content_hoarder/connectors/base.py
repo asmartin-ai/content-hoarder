@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 
 @dataclass
@@ -19,7 +19,7 @@ class ImportResult:
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
     #: Per-kind unsave-reconciliation summary when ``import_path(reconcile=True)``; else None.
-    reconcile: dict | None = None
+    reconcile: dict[str, Any] | None = None
 
 
 class BaseConnector(ABC):
@@ -36,14 +36,14 @@ class BaseConnector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def import_file(self, path: Path) -> Iterable[dict]:
+    def import_file(self, path: Path) -> Iterable[dict[str, Any]]:
         """Yield normalized item dicts (via ``models.new_item``). No DB writes."""
         raise NotImplementedError
 
-    def enrich(self, items: list[dict]) -> list[dict]:
+    def enrich(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Optionally fill sparse rows from an external API. Default: no-op."""
         return items
 
-    def sync(self) -> Iterable[dict]:
+    def sync(self) -> Iterable[dict[str, Any]]:
         """Optional live pull (OAuth/API). Not implemented in Phase 1."""
         raise NotImplementedError(f"{self.id} has no live sync yet")
