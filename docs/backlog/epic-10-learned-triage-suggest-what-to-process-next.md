@@ -18,9 +18,10 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
   The triage-card UI toggle remains an Epic 20 Stage-C item.
 - [x] ~~**P3 — Feedback loop.**~~ ✅ SHIPPED 2026-06-26: `triage_score.drift()` compares two fitted models
   (features added/dropped, rate drift with top movers, prior drift, `drift_score`); `triage-drift` CLI reports
-  drift vs the persisted model; `--apply` refits, rescores inbox items, and persists. **Still open:** optionally
-  fold in the local-LLM keep/skip suggestion (`assist/llm.py`) and the heuristic category (`categorize.py`)
-  as additional features.
+  drift vs the persisted model; `--apply` refits, rescores inbox items, and persists. **Follow-up shipped
+  2026-06-29:** local-LLM keep/skip suggestions stored by `assist/llm.py` now feed the transparent model as
+  `llm:keep` / `llm:skip` features (category was already included as `cat:<category>`). The suggestion still
+  never changes status on its own; it only becomes one explainable ranking signal when present.
 - [ ] **P2 — Research analytics/content algorithms for better smart-sort + triage addiction loop.**
   *(Mobile test 2026-06-29.)* Study how recommendation feeds, spaced-review queues, email triage, and
   addictive-but-ethical content algorithms rank items; adapt the useful parts to `smart:desc` and triage
