@@ -12,12 +12,26 @@ from typing import Any
 
 # Full, ordered list of columns in the ``items`` table. Keep in sync with db.py.
 ITEM_FIELDS: tuple[str, ...] = (
-    "fullname", "source", "source_id", "kind",
-    "title", "body", "url", "author",
-    "created_utc", "saved_utc",
-    "is_saved", "first_seen_utc", "last_seen_utc", "hydrated_at",
-    "status", "processed_utc", "status_prev",
-    "search_text", "metadata", "raw_json",
+    "fullname",
+    "source",
+    "source_id",
+    "kind",
+    "title",
+    "body",
+    "url",
+    "author",
+    "created_utc",
+    "saved_utc",
+    "is_saved",
+    "first_seen_utc",
+    "last_seen_utc",
+    "hydrated_at",
+    "status",
+    "processed_utc",
+    "status_prev",
+    "search_text",
+    "metadata",
+    "raw_json",
 )
 
 VALID_STATUSES = ("inbox", "keep", "archived", "done")
@@ -27,7 +41,15 @@ VALID_STATUSES = ("inbox", "keep", "archived", "done")
 NSFW_TAGS = ("nsfw_erotic", "nsfw_other", "nsfw_talk")
 
 # Metadata keys that are worth folding into the full-text search blob.
-_META_SEARCH_KEYS = ("subreddit", "channel", "tags", "labels", "playlist", "domain")
+_META_SEARCH_KEYS = (
+    "subreddit",
+    "channel",
+    "tags",
+    "labels",
+    "playlist",
+    "domain",
+    "ocr_text",
+)
 
 
 def _now() -> int:

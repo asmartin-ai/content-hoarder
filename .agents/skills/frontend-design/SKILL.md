@@ -96,6 +96,11 @@ When building self-contained HTML mockups with a phone-frame toggle (the v3 Gate
   `scroller.scrollWidth - scroller.clientWidth === 0`, fixed row heights via
   `getComputedStyle().height`, and overlay rects within the frame rect. "The element
   exists" catches none of these.
+- **Playwright scrim clicks on bottom sheets:** `locator("#scrim").click()` aims at
+  the scrim's center; on mobile bottom sheets the visible sheet often covers that
+  point, so Playwright reports an intercept from a sheet child. Close sheets with
+  `Escape` or click a measured coordinate outside the sheet instead of assuming the
+  scrim locator itself is clickable.
 - Container queries (`container-type:inline-size` on the frame) make the phone toggle
   genuinely responsive — but see the `Codex-preview-verify` skill (#6/#7) before
   asserting any of it in the preview (0-width fresh viewports; frozen transitions).
