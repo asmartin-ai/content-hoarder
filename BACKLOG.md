@@ -423,7 +423,7 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
 
 - [x] ~~**P2 — Learn a "likely-done" score from triage history.**~~ SHIPPED on main:
   triage_score.py, learn-triage CLI, and smart-triage mode (get_random_batch(mode="smart")) are all live.
-  The feat/triage-score branch is merged; the old parking notes about reverting a revert are stale.
+  The former triage-score feature branch is merged; the old parking notes about reverting a revert are stale.
   `triage_score.py` — transparent per-feature processed-rate model (composite
   source/kind, subreddit, channel, media type, category, age buckets; Laplace-smoothed,
   min-support 20; **decay-stamped rows excluded from training**; title tokens deferred).
