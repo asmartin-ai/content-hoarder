@@ -385,21 +385,104 @@ def test_import_prepare_temp_file_cleaned_on_exit(tmp_db):
     assert all(not os.path.exists(p) for p in paths)
 
 
-def test_recover_route(tmp_db, monkeypatch):
+def test_recover_route_defaults_metadata_only(tmp_db, monkeypatch):
     import content_hoarder.archival.service as svc
     seen = {}
 
     def fake(c, fn, **k):
         seen.update(k)
-        return {"recovered": True, "title": "X", "body": "Y", "url": "Z",
-                "bytes_archived": 0}
+        return {"recovered": True, "metadata_recovered": True,
+                "title": "X", "body": "Y", "url": "Z", "bytes_archived": 0}
 
     monkeypatch.setattr(svc, "recover_one", fake)
     r = _client(tmp_db).post("/items/reddit:t3_a/recover")
     assert r.status_code == 200 and r.get_json()["recovered"] is True
-    # The live route must wire archive.today (a non-empty media_providers list), not leave
-    # it dormant — this is the assertion that the feature is actually live in the app.
-    assert seen.get("media_providers"), "route did not pass media_providers (archive.today dormant)"
+    assert "media_providers" not in seen, "generic recover must not contact archive.today"
+
+
+def test_recover_route_archive_today_requires_confirmation(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+
+    monkeypatch.setattr(svc, "recover_one", lambda c, fn, **k: {
+        "recovered": False, "metadata_recovered": False,
+        "title": "X", "body": "Y", "url": "Z", "bytes_archived": 0,
+    })
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover", json={"archive_today": "preview"})
+    assert r.status_code == 400
+    assert "confirmation" in r.get_json()["error"]
+
+
+def test_recover_route_archive_today_preview_opt_in(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+    seen = {}
+
+    monkeypatch.setattr(svc, "recover_one", lambda c, fn, **k: {
+        "recovered": False, "metadata_recovered": False,
+        "title": "X", "body": "Y", "url": "Z", "bytes_archived": 0,
+    })
+    monkeypatch.setattr(svc, "archive_today_media_eligibility",
+                        lambda item: (True, "eligible", {}, ["https://i.redd.it/x.jpg"]))
+
+    def fake_media(c, fn, **k):
+        seen.update(k)
+        return {"eligible": True, "attempted": True, "mode": "preview",
+                "bytes_archived": 0, "snapshot_candidates": 1,
+                "result": "hit", "errors": []}
+
+    monkeypatch.setattr(svc, "archive_today_recover_media", fake_media)
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover", json={
+        "archive_today": "preview",
+        "confirm_external_archive_today": True,
+    })
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["archive_today"]["mode"] == "preview"
+    assert seen["apply_bytes"] is False
+
+
+def test_recover_route_archive_today_apply_opt_in(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+    seen = {}
+
+    monkeypatch.setattr(svc, "recover_one", lambda c, fn, **k: {
+        "recovered": False, "metadata_recovered": False,
+        "title": "X", "body": "Y", "url": "Z", "bytes_archived": 0,
+    })
+    monkeypatch.setattr(svc, "archive_today_media_eligibility",
+                        lambda item: (True, "eligible", {}, ["https://i.redd.it/x.jpg"]))
+
+    def fake_media(c, fn, **k):
+        seen.update(k)
+        return {"eligible": True, "attempted": True, "mode": "apply",
+                "bytes_archived": 1, "snapshot_candidates": 0,
+                "result": "hit", "errors": []}
+
+    monkeypatch.setattr(svc, "archive_today_recover_media", fake_media)
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover", json={
+        "archive_today": "apply",
+        "confirm_external_archive_today": True,
+    })
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["bytes_archived"] == 1
+    assert seen["apply_bytes"] is True
+
+
+def test_recover_route_archive_today_non_eligible_400(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+
+    monkeypatch.setattr(svc, "recover_one", lambda c, fn, **k: {
+        "recovered": False, "metadata_recovered": False,
+        "title": "X", "body": "Y", "url": "Z", "bytes_archived": 0,
+    })
+    monkeypatch.setattr(svc, "archive_today_media_eligibility",
+                        lambda item: (False, "media_not_gone", {}, []))
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover", json={
+        "archive_today": "preview",
+        "confirm_external_archive_today": True,
+    })
+    assert r.status_code == 400
+    assert r.get_json()["reason"] == "media_not_gone"
 
 
 def test_recover_route_non_reddit_400(tmp_db):
