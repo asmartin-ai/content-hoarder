@@ -30,7 +30,8 @@ Gesture API notes
 import re
 
 import pytest
-from playwright.sync_api import expect
+
+expect = pytest.importorskip("playwright.sync_api").expect
 
 pytestmark = pytest.mark.ui
 

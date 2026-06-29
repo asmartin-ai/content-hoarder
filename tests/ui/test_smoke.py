@@ -6,7 +6,8 @@ behaviour) — these only show up in a real browser at a mobile viewport.
 import re
 
 import pytest
-from playwright.sync_api import expect
+
+expect = pytest.importorskip("playwright.sync_api").expect
 
 pytestmark = pytest.mark.ui
 
@@ -117,3 +118,40 @@ def test_topbar_no_flicker_near_top(pixel6_page):
     toggles = page.evaluate("window.__t")
     assert toggles <= 4, f"top bar flickered: {toggles} class mutations (expected ~2: collapse + expand)"
     expect(page.locator(".console")).not_to_have_class(re.compile(r"\bcompact\b"))  # settled expanded
+
+
+def test_gotop_scrolls_to_top_and_expands_topbar(pixel6_page):
+    """The mobile ↑ affordance should finish at the true top with chrome expanded and hidden again."""
+    page = pixel6_page
+    page.evaluate(
+        "() => { window.__t = 0; const h = document.querySelector('.console');"
+        " new MutationObserver(() => { window.__t++; }).observe(h, {attributes: true, attributeFilter: ['class']});"
+        " window.scrollTo(0, document.documentElement.scrollHeight); }"
+    )
+    page.wait_for_function(
+        "window.scrollY > 700 && document.querySelector('#gotop').classList.contains('show')"
+    )
+    expect(page.locator(".console")).to_have_class(re.compile("(^| )compact( |$)"))
+
+    page.locator("#gotop").click()
+    page.wait_for_function("Math.round(window.scrollY) === 0")
+    expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
+    expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))
+    toggles = page.evaluate("window.__t")
+    assert toggles <= 4, f"↑ caused top-bar flicker: {toggles} class mutations"
+
+
+def test_gotop_respects_reduced_motion(pixel6_page):
+    """Reduced-motion users get an immediate jump, not a long programmatic smooth scroll."""
+    page = pixel6_page
+    page.emulate_media(reduced_motion="reduce")
+    page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+    page.wait_for_function(
+        "window.scrollY > 700 && document.querySelector('#gotop').classList.contains('show')"
+    )
+
+    page.locator("#gotop").click()
+    page.evaluate("() => new Promise(requestAnimationFrame)")
+    assert round(page.evaluate("window.scrollY")) == 0
+    expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
+    expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))
