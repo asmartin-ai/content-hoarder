@@ -6,14 +6,38 @@ from content_hoarder.archival.providers import ArcticShiftProvider, PullPushProv
 
 
 def _seed_removed(conn):
-    db.merge_upsert(conn, models.new_item(
-        source="reddit", source_id="t3_aaa", kind="post",
-        title="[removed]", body="[removed]", metadata={"permalink": "/r/x/comments/aaa/t/"}))
-    db.merge_upsert(conn, models.new_item(
-        source="reddit", source_id="t1_bbb", kind="comment",
-        body="", author="orig_author", metadata={"subreddit": "x"}))
-    db.merge_upsert(conn, models.new_item(   # a normal item that should NOT be targeted
-        source="reddit", source_id="t3_ccc", kind="post", title="Fine", body="has text"))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_aaa",
+            kind="post",
+            title="[removed]",
+            body="[removed]",
+            metadata={"permalink": "/r/x/comments/aaa/t/"},
+        ),
+    )
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t1_bbb",
+            kind="comment",
+            body="",
+            author="orig_author",
+            metadata={"subreddit": "x"},
+        ),
+    )
+    db.merge_upsert(
+        conn,
+        models.new_item(  # a normal item that should NOT be targeted
+            source="reddit",
+            source_id="t3_ccc",
+            kind="post",
+            title="Fine",
+            body="has text",
+        ),
+    )
     conn.commit()
 
 
@@ -22,7 +46,14 @@ def _fake_json(post_recs=None, comment_recs=None):
         if "submission" in url or "/posts/" in url:
             return 200, {}, {"data": post_recs or []}
         return 200, {}, {"data": comment_recs or []}
+
     return gj
+
+
+def _item(conn, fullname):
+    row = db.get_item(conn, fullname)
+    assert row is not None, fullname
+    return row
 
 
 def test_recover_overlays_and_preserves_triage(tmp_db):
@@ -30,60 +61,123 @@ def test_recover_overlays_and_preserves_triage(tmp_db):
     _seed_removed(conn)
     db.set_status(conn, "reddit:t1_bbb", "keep")  # prove triage survives recovery
 
-    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(
-        post_recs=[{"id": "aaa", "title": "Real Title", "selftext": "Real body",
-                    "author": "alice", "subreddit": "x", "created_utc": 1600000000, "score": 5}],
-        comment_recs=[{"id": "bbb", "body": "Recovered comment", "author": "bob",
-                       "subreddit": "x", "created_utc": 1600000001}]))
+    prov = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {
+                    "id": "aaa",
+                    "title": "Real Title",
+                    "selftext": "Real body",
+                    "author": "alice",
+                    "subreddit": "x",
+                    "created_utc": 1600000000,
+                    "score": 5,
+                }
+            ],
+            comment_recs=[
+                {
+                    "id": "bbb",
+                    "body": "Recovered comment",
+                    "author": "bob",
+                    "subreddit": "x",
+                    "created_utc": 1600000001,
+                }
+            ],
+        ),
+    )
     res = archival.recover(conn, providers=[prov])
     assert res["selected"] == 2 and res["recovered"] == 2 and res["missed"] == 0
 
-    post = db.get_item(conn, "reddit:t3_aaa")
+    post = _item(conn, "reddit:t3_aaa")
     assert post["title"] == "Real Title" and post["body"] == "Real body"
     assert post["author"] == "alice" and post["hydrated_at"]
     assert json.loads(post["metadata"]).get("score") == 5
 
-    comment = db.get_item(conn, "reddit:t1_bbb")
+    comment = _item(conn, "reddit:t1_bbb")
     assert comment["body"] == "Recovered comment"
-    assert comment["status"] == "keep"      # triage state preserved
+    assert comment["status"] == "keep"  # triage state preserved
     assert comment["hydrated_at"]
 
 
 def test_placeholder_falls_through_to_next_provider(tmp_db):
     conn = db.connect(tmp_db)
     _seed_removed(conn)
-    pp = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(
-        post_recs=[{"id": "aaa", "title": "[removed]", "selftext": "[removed]"}]))
-    ar = ArcticShiftProvider("ua", min_interval=0.0, get_json=_fake_json(
-        post_recs=[{"id": "aaa", "title": "Arctic Title", "selftext": "Arctic body"}]))
+    pp = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[{"id": "aaa", "title": "[removed]", "selftext": "[removed]"}]
+        ),
+    )
+    ar = ArcticShiftProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {"id": "aaa", "title": "Arctic Title", "selftext": "Arctic body"}
+            ]
+        ),
+    )
     res = archival.recover(conn, providers=[pp, ar])
-    assert db.get_item(conn, "reddit:t3_aaa")["title"] == "Arctic Title"
+    assert _item(conn, "reddit:t3_aaa")["title"] == "Arctic Title"
     assert res["by_provider"].get("arctic", 0) >= 1
 
 
 def test_targets_include_admin_removed(tmp_db):
     conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_adm", kind="post",
-                    title="Some title", body="[ Removed by reddit on account of violating the content policy ]"))
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_du", kind="post",
-                    title="Deleted by user", body=""))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_adm",
+            kind="post",
+            title="Some title",
+            body="[ Removed by reddit on account of violating the content policy ]",
+        ),
+    )
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_du",
+            kind="post",
+            title="Deleted by user",
+            body="",
+        ),
+    )
     conn.commit()
     assert archival.count_targets(conn) == 2
 
 
 def test_scope_all_targets_every_reddit_item(tmp_db):
     conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_norm", kind="post",
-                    title="Normal post", body="has content"))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_norm",
+            kind="post",
+            title="Normal post",
+            body="has content",
+        ),
+    )
     conn.commit()
-    assert archival.count_targets(conn, scope="removed") == 0   # has content, not a target
-    assert archival.count_targets(conn, scope="all") == 1       # --scores hydrates it anyway
+    assert (
+        archival.count_targets(conn, scope="removed") == 0
+    )  # has content, not a target
+    assert archival.count_targets(conn, scope="all") == 1  # --scores hydrates it anyway
 
 
 def test_recover_no_targets(tmp_db):
     conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_ok", kind="post",
-                    title="Fine", body="text"))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit", source_id="t3_ok", kind="post", title="Fine", body="text"
+        ),
+    )
     conn.commit()
     assert archival.recover(conn, providers=[])["selected"] == 0
 
@@ -94,44 +188,96 @@ def test_recover_marks_attempted_so_rerun_skips(tmp_db):
     none_prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json([], []))
     r1 = archival.recover(conn, providers=[none_prov])
     assert r1["selected"] == 2 and r1["recovered"] == 0
-    assert archival.recover(conn, providers=[none_prov])["selected"] == 0  # all hydrated now
+    assert (
+        archival.recover(conn, providers=[none_prov])["selected"] == 0
+    )  # all hydrated now
 
 
 def test_recover_one(tmp_db):
     conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(source="reddit", source_id="t3_zz", kind="post",
-                    title="[removed]", body="[removed]", metadata={"permalink": "/r/x/comments/zz/t/"}))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_zz",
+            kind="post",
+            title="[removed]",
+            body="[removed]",
+            metadata={"permalink": "/r/x/comments/zz/t/"},
+        ),
+    )
     conn.commit()
-    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(
-        post_recs=[{"id": "zz", "title": "Got it back", "selftext": "Recovered body"}]))
+    prov = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {"id": "zz", "title": "Got it back", "selftext": "Recovered body"}
+            ]
+        ),
+    )
     res = archival.recover_one(conn, "reddit:t3_zz", providers=[prov])
+    assert res is not None
     assert res["recovered"] is True and res["title"] == "Got it back"
-    assert db.get_item(conn, "reddit:t3_zz")["body"] == "Recovered body"
+    assert _item(conn, "reddit:t3_zz")["body"] == "Recovered body"
     assert archival.recover_one(conn, "reddit:t3_missing") is None  # not in DB
 
 
 def test_provider_url_construction():
     pp = PullPushProvider("ua")
-    assert pp._ids_url("posts", ["abc"]) == "https://api.pullpush.io/reddit/search/submission/?ids=abc"
-    assert pp._ids_url("comments", ["xy"]) == "https://api.pullpush.io/reddit/search/comment/?ids=xy"
+    assert (
+        pp._ids_url("posts", ["abc"])
+        == "https://api.pullpush.io/reddit/search/submission/?ids=abc"
+    )
+    assert (
+        pp._ids_url("comments", ["xy"])
+        == "https://api.pullpush.io/reddit/search/comment/?ids=xy"
+    )
     ar = ArcticShiftProvider("ua")
-    assert ar._ids_url("posts", ["abc"]) == "https://arctic-shift.photon-reddit.com/api/posts/ids?ids=abc"
+    assert (
+        ar._ids_url("posts", ["abc"])
+        == "https://arctic-shift.photon-reddit.com/api/posts/ids?ids=abc"
+    )
 
 
 def test_norm_post_extracts_media():
     from content_hoarder.archival.providers import _norm_post
-    img = _norm_post({"post_hint": "image", "thumbnail": "https://b.thumbs.redditmedia.com/t.jpg",
-                      "preview": {"images": [{"source": {"url": "https://preview.redd.it/x.png?s=1&amp;a=2"}}]},
-                      "url_overridden_by_dest": "https://i.redd.it/x.png"})
+
+    img = _norm_post(
+        {
+            "post_hint": "image",
+            "thumbnail": "https://b.thumbs.redditmedia.com/t.jpg",
+            "preview": {
+                "images": [
+                    {"source": {"url": "https://preview.redd.it/x.png?s=1&amp;a=2"}}
+                ]
+            },
+            "url_overridden_by_dest": "https://i.redd.it/x.png",
+        }
+    )
     assert img["media_type"] == "image"
-    assert img["thumbnail"] == "https://preview.redd.it/x.png?s=1&a=2"   # &amp; unescaped
+    assert (
+        img["thumbnail"] == "https://preview.redd.it/x.png?s=1&a=2"
+    )  # &amp; unescaped
     assert img["media_url"] == "https://i.redd.it/x.png"
-    vid = _norm_post({"is_video": True,
-                      "media": {"reddit_video": {"fallback_url": "https://v.redd.it/v/DASH.mp4"}},
-                      "url_overridden_by_dest": "https://v.redd.it/v"})
-    assert vid["media_type"] == "reddit_video" and vid["media_url"] == "https://v.redd.it/v/DASH.mp4"
-    gal = _norm_post({"is_gallery": True, "thumbnail": "https://b.thumbs.redditmedia.com/g.jpg",
-                      "url_overridden_by_dest": "https://www.reddit.com/gallery/g"})
+    vid = _norm_post(
+        {
+            "is_video": True,
+            "media": {"reddit_video": {"fallback_url": "https://v.redd.it/v/DASH.mp4"}},
+            "url_overridden_by_dest": "https://v.redd.it/v",
+        }
+    )
+    assert (
+        vid["media_type"] == "reddit_video"
+        and vid["media_url"] == "https://v.redd.it/v/DASH.mp4"
+    )
+    gal = _norm_post(
+        {
+            "is_gallery": True,
+            "thumbnail": "https://b.thumbs.redditmedia.com/g.jpg",
+            "url_overridden_by_dest": "https://www.reddit.com/gallery/g",
+        }
+    )
     assert gal["media_type"] == "gallery" and gal["thumbnail"].endswith("/g.jpg")
     assert gal["media_url"] == "https://www.reddit.com/gallery/g"
     # sentinel thumbnail with no preview → "", and a text post → no media_type (heuristic kept)
@@ -139,91 +285,192 @@ def test_norm_post_extracts_media():
     assert txt["media_type"] == "" and txt["thumbnail"] == ""
     # an external rich embed (e.g. a YouTube link) is NOT reddit-hosted video → "" so the
     # connector's URL heuristic ("youtube") survives instead of being clobbered.
-    ext = _norm_post({"post_hint": "rich:video", "is_video": False,
-                      "url_overridden_by_dest": "https://www.youtube.com/watch?v=x"})
+    ext = _norm_post(
+        {
+            "post_hint": "rich:video",
+            "is_video": False,
+            "url_overridden_by_dest": "https://www.youtube.com/watch?v=x",
+        }
+    )
     assert ext["media_type"] == ""
 
 
 def test_norm_post_extracts_gallery_images():
     from content_hoarder.archival.providers import _norm_post
-    g = _norm_post({"is_gallery": True,
-                    "gallery_data": {"items": [{"media_id": "m2"}, {"media_id": "m1"}]},
-                    "media_metadata": {
-                        "m1": {"s": {"u": "https://preview.redd.it/m1.jpg?width=1&amp;s=a"}},
-                        "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?s=b"}}}})
+
+    g = _norm_post(
+        {
+            "is_gallery": True,
+            "gallery_data": {"items": [{"media_id": "m2"}, {"media_id": "m1"}]},
+            "media_metadata": {
+                "m1": {"s": {"u": "https://preview.redd.it/m1.jpg?width=1&amp;s=a"}},
+                "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?s=b"}},
+            },
+        }
+    )
     assert g["media_type"] == "gallery"
     # order follows gallery_data.items; &amp; is unescaped
-    assert g["gallery"] == ["https://preview.redd.it/m2.jpg?s=b",
-                            "https://preview.redd.it/m1.jpg?width=1&s=a"]
+    assert g["gallery"] == [
+        "https://preview.redd.it/m2.jpg?s=b",
+        "https://preview.redd.it/m1.jpg?width=1&s=a",
+    ]
     assert _norm_post({"post_hint": "image"})["gallery"] == []  # non-gallery -> empty
 
 
 def test_norm_post_extracts_sized_gallery_preview():
     from content_hoarder.archival.providers import _norm_post
-    g = _norm_post({"is_gallery": True,
-                    "gallery_data": {"items": [{"media_id": "m1"}, {"media_id": "m2"}]},
-                    "media_metadata": {
-                        "m1": {"s": {"u": "https://preview.redd.it/m1.jpg?width=5000&s=a"},
-                               "p": [{"x": 640, "u": "https://preview.redd.it/m1-640.jpg?s=p640"},
-                                     {"x": 1080, "u": "https://preview.redd.it/m1-1080.jpg?s=p1080"},
-                                     {"x": 2000, "u": "https://preview.redd.it/m1-2000.jpg?s=p2000"}]},
-                        "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?width=3000&s=b"}}}})  # no p
+
+    g = _norm_post(
+        {
+            "is_gallery": True,
+            "gallery_data": {"items": [{"media_id": "m1"}, {"media_id": "m2"}]},
+            "media_metadata": {
+                "m1": {
+                    "s": {"u": "https://preview.redd.it/m1.jpg?width=5000&s=a"},
+                    "p": [
+                        {"x": 640, "u": "https://preview.redd.it/m1-640.jpg?s=p640"},
+                        {"x": 1080, "u": "https://preview.redd.it/m1-1080.jpg?s=p1080"},
+                        {"x": 2000, "u": "https://preview.redd.it/m1-2000.jpg?s=p2000"},
+                    ],
+                },
+                "m2": {"s": {"u": "https://preview.redd.it/m2.jpg?width=3000&s=b"}},
+            },
+        }
+    )  # no p
     # gallery stays the full originals; gallery_preview is parallel (same order/length):
     #   m1 -> largest p <= 1080 (the 1080 rendition); m2 (no p) -> falls back to the full s.u
-    assert g["gallery"] == ["https://preview.redd.it/m1.jpg?width=5000&s=a",
-                            "https://preview.redd.it/m2.jpg?width=3000&s=b"]
-    assert g["gallery_preview"] == ["https://preview.redd.it/m1-1080.jpg?s=p1080",
-                                    "https://preview.redd.it/m2.jpg?width=3000&s=b"]
+    assert g["gallery"] == [
+        "https://preview.redd.it/m1.jpg?width=5000&s=a",
+        "https://preview.redd.it/m2.jpg?width=3000&s=b",
+    ]
+    assert g["gallery_preview"] == [
+        "https://preview.redd.it/m1-1080.jpg?s=p1080",
+        "https://preview.redd.it/m2.jpg?width=3000&s=b",
+    ]
     assert len(g["gallery_preview"]) == len(g["gallery"])
     # every variant larger than target -> the smallest available; non-gallery -> empty
-    only_big = _norm_post({"is_gallery": True,
-                           "gallery_data": {"items": [{"media_id": "x"}]},
-                           "media_metadata": {"x": {"s": {"u": "https://preview.redd.it/x.jpg?s=s"},
-                               "p": [{"x": 2000, "u": "https://preview.redd.it/x-2000.jpg?s=p"}]}}})
+    only_big = _norm_post(
+        {
+            "is_gallery": True,
+            "gallery_data": {"items": [{"media_id": "x"}]},
+            "media_metadata": {
+                "x": {
+                    "s": {"u": "https://preview.redd.it/x.jpg?s=s"},
+                    "p": [{"x": 2000, "u": "https://preview.redd.it/x-2000.jpg?s=p"}],
+                }
+            },
+        }
+    )
     assert only_big["gallery_preview"] == ["https://preview.redd.it/x-2000.jpg?s=p"]
     assert _norm_post({"post_hint": "image"})["gallery_preview"] == []
 
 
 def test_recover_stores_gallery(tmp_db):
     conn = db.connect(tmp_db)
-    db.merge_upsert(conn, models.new_item(
-        source="reddit", source_id="t3_gal", kind="post", title="G",
-        metadata={"permalink": "/r/x/comments/gal/g/", "media_type": "reddit_media"}))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_gal",
+            kind="post",
+            title="G",
+            metadata={
+                "permalink": "/r/x/comments/gal/g/",
+                "media_type": "reddit_media",
+            },
+        ),
+    )
     conn.commit()
-    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(post_recs=[
-        {"id": "gal", "title": "G", "is_gallery": True,
-         "gallery_data": {"items": [{"media_id": "a"}, {"media_id": "b"}]},
-         "media_metadata": {"a": {"s": {"u": "https://preview.redd.it/a.jpg?s=1"}},
-                            "b": {"s": {"u": "https://preview.redd.it/b.jpg?s=2"}}}}]))
+    prov = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {
+                    "id": "gal",
+                    "title": "G",
+                    "is_gallery": True,
+                    "gallery_data": {"items": [{"media_id": "a"}, {"media_id": "b"}]},
+                    "media_metadata": {
+                        "a": {"s": {"u": "https://preview.redd.it/a.jpg?s=1"}},
+                        "b": {"s": {"u": "https://preview.redd.it/b.jpg?s=2"}},
+                    },
+                }
+            ]
+        ),
+    )
     archival.recover(conn, scope="all", providers=[prov])
-    md = json.loads(db.get_item(conn, "reddit:t3_gal")["metadata"])
+    md = json.loads(_item(conn, "reddit:t3_gal")["metadata"])
     assert md["media_type"] == "gallery"
-    assert md["gallery"] == ["https://preview.redd.it/a.jpg?s=1", "https://preview.redd.it/b.jpg?s=2"]
+    assert md["gallery"] == [
+        "https://preview.redd.it/a.jpg?s=1",
+        "https://preview.redd.it/b.jpg?s=2",
+    ]
 
 
 def test_recover_gallery_preview_backfill_scope(tmp_db):
     conn = db.connect(tmp_db)
     # an ALREADY-hydrated gallery with full URLs but no sized variant (Epic 13 P2 backfill target)
-    db.merge_upsert(conn, models.new_item(
-        source="reddit", source_id="t3_galp", kind="post", title="G",
-        metadata={"permalink": "/r/x/comments/galp/g/", "media_type": "gallery",
-                  "gallery": ["https://preview.redd.it/a.jpg?width=5000&s=1"]}))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_galp",
+            kind="post",
+            title="G",
+            metadata={
+                "permalink": "/r/x/comments/galp/g/",
+                "media_type": "gallery",
+                "gallery": ["https://preview.redd.it/a.jpg?width=5000&s=1"],
+            },
+        ),
+    )
     conn.execute("UPDATE items SET hydrated_at=123 WHERE fullname='reddit:t3_galp'")
     # a gallery that already HAS a preview must be excluded by the scope
-    db.merge_upsert(conn, models.new_item(
-        source="reddit", source_id="t3_done", kind="post", title="D",
-        metadata={"media_type": "gallery", "gallery": ["https://preview.redd.it/d.jpg?s=9"],
-                  "gallery_preview": ["https://preview.redd.it/d-1080.jpg?s=9"]}))
+    db.merge_upsert(
+        conn,
+        models.new_item(
+            source="reddit",
+            source_id="t3_done",
+            kind="post",
+            title="D",
+            metadata={
+                "media_type": "gallery",
+                "gallery": ["https://preview.redd.it/d.jpg?s=9"],
+                "gallery_preview": ["https://preview.redd.it/d-1080.jpg?s=9"],
+            },
+        ),
+    )
     conn.commit()
     # scope selects only the un-backfilled gallery, even though it's already hydrated (retry=True)
     assert archival.count_targets(conn, retry=True, scope="gallery_preview") == 1
-    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(post_recs=[
-        {"id": "galp", "title": "G", "is_gallery": True,
-         "gallery_data": {"items": [{"media_id": "a"}]},
-         "media_metadata": {"a": {"s": {"u": "https://preview.redd.it/a.jpg?width=5000&s=1"},
-             "p": [{"x": 1080, "u": "https://preview.redd.it/a-1080.jpg?s=p"}]}}}]))
+    prov = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {
+                    "id": "galp",
+                    "title": "G",
+                    "is_gallery": True,
+                    "gallery_data": {"items": [{"media_id": "a"}]},
+                    "media_metadata": {
+                        "a": {
+                            "s": {"u": "https://preview.redd.it/a.jpg?width=5000&s=1"},
+                            "p": [
+                                {
+                                    "x": 1080,
+                                    "u": "https://preview.redd.it/a-1080.jpg?s=p",
+                                }
+                            ],
+                        }
+                    },
+                }
+            ]
+        ),
+    )
     archival.recover(conn, scope="gallery_preview", retry=True, providers=[prov])
-    md = json.loads(db.get_item(conn, "reddit:t3_galp")["metadata"])
+    md = json.loads(_item(conn, "reddit:t3_galp")["metadata"])
     assert md["gallery_preview"] == ["https://preview.redd.it/a-1080.jpg?s=p"]
     assert len(md["gallery_preview"]) == len(md["gallery"])
 
@@ -232,32 +479,75 @@ def test_media_refinement_overrides_heuristic_and_keeps_video_url(tmp_db):
     conn = db.connect(tmp_db)
     # two media posts as the connector's URL-heuristic imported them: generic reddit_media,
     # permalink standing in as the click URL.
-    for sid, perma in (("t3_img", "/r/x/comments/img/p/"), ("t3_vid", "/r/x/comments/vid/p/")):
-        db.merge_upsert(conn, models.new_item(
-            source="reddit", source_id=sid, kind="post", title="M",
-            url="https://www.reddit.com" + perma,
-            metadata={"permalink": perma, "media_type": "reddit_media"}))
+    for sid, perma in (
+        ("t3_img", "/r/x/comments/img/p/"),
+        ("t3_vid", "/r/x/comments/vid/p/"),
+    ):
+        db.merge_upsert(
+            conn,
+            models.new_item(
+                source="reddit",
+                source_id=sid,
+                kind="post",
+                title="M",
+                url="https://www.reddit.com" + perma,
+                metadata={"permalink": perma, "media_type": "reddit_media"},
+            ),
+        )
     conn.commit()
-    prov = PullPushProvider("ua", min_interval=0.0, get_json=_fake_json(post_recs=[
-        {"id": "img", "title": "M", "post_hint": "image",
-         "preview": {"images": [{"source": {"url": "https://preview.redd.it/x.png?s=1&amp;a=2"}}]},
-         "url_overridden_by_dest": "https://i.redd.it/x.png", "url": "https://i.redd.it/x.png"},
-        {"id": "vid", "title": "M", "is_video": True,
-         "media": {"reddit_video": {"fallback_url": "https://v.redd.it/v/DASH.mp4"}},
-         "thumbnail": "https://b.thumbs.redditmedia.com/v.jpg",
-         "url_overridden_by_dest": "https://v.redd.it/v", "url": "https://v.redd.it/v"}]))
+    prov = PullPushProvider(
+        "ua",
+        min_interval=0.0,
+        get_json=_fake_json(
+            post_recs=[
+                {
+                    "id": "img",
+                    "title": "M",
+                    "post_hint": "image",
+                    "preview": {
+                        "images": [
+                            {
+                                "source": {
+                                    "url": "https://preview.redd.it/x.png?s=1&amp;a=2"
+                                }
+                            }
+                        ]
+                    },
+                    "url_overridden_by_dest": "https://i.redd.it/x.png",
+                    "url": "https://i.redd.it/x.png",
+                },
+                {
+                    "id": "vid",
+                    "title": "M",
+                    "is_video": True,
+                    "media": {
+                        "reddit_video": {"fallback_url": "https://v.redd.it/v/DASH.mp4"}
+                    },
+                    "thumbnail": "https://b.thumbs.redditmedia.com/v.jpg",
+                    "url_overridden_by_dest": "https://v.redd.it/v",
+                    "url": "https://v.redd.it/v",
+                },
+            ]
+        ),
+    )
     archival.recover(conn, scope="all", providers=[prov])
 
-    img = db.get_item(conn, "reddit:t3_img")
+    img = _item(conn, "reddit:t3_img")
     imd = json.loads(img["metadata"])
-    assert imd["media_type"] == "image"                       # reddit_media heuristic overridden
+    assert imd["media_type"] == "image"  # reddit_media heuristic overridden
     assert imd["thumbnail"] == "https://preview.redd.it/x.png?s=1&a=2"
     assert imd["media_url"] == "https://i.redd.it/x.png"
-    assert img["url"] == "https://i.redd.it/x.png"            # image URL is navigable → overwritten
-    assert img["title"] == "M" and img["status"] == "inbox"  # overlay is non-destructive
+    assert (
+        img["url"] == "https://i.redd.it/x.png"
+    )  # image URL is navigable → overwritten
+    assert (
+        img["title"] == "M" and img["status"] == "inbox"
+    )  # overlay is non-destructive
 
-    vid = db.get_item(conn, "reddit:t3_vid")
+    vid = _item(conn, "reddit:t3_vid")
     vmd = json.loads(vid["metadata"])
     assert vmd["media_type"] == "reddit_video"
     assert vmd["media_url"] == "https://v.redd.it/v/DASH.mp4"
-    assert vid["url"] == "https://www.reddit.com/r/x/comments/vid/p/"  # NOT clobbered to bare v.redd.it
+    assert (
+        vid["url"] == "https://www.reddit.com/r/x/comments/vid/p/"
+    )  # NOT clobbered to bare v.redd.it
