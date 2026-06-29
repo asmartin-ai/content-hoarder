@@ -48,7 +48,7 @@ Four docs researched independently, and they converge hard.
 2. **Backlog burn-down as net flow** ("down 340 this week", projected days-to-zero). *(A3, A4)* The **safest** high-value lever — pure competence feedback (SDT), informational so it sidesteps overjustification. → Stats (logic now; chart *needs the design pass*).
 3. **Land the home-screen tap on ONE triage card, not the list.** *(A1)* One swipe = one complete loop; kills initiation friction (Fogg "Ability"). → launch route + triage card.
 4. **Reframe the daily goal as a forgiving floor with grace built in** — accumulation ("3 done ✓") + endowed-progress head-start, **no punishing chain**. *(A1, A3, A4)* → daily goal.
-5. **Ship the parked `feat/triage-score`, human-in-the-loop.** *(A1, A2, A4)* It is literally Eyal's "Investment" phase **and** a "Hunt" reward engine **and** an SDT competence/autonomy win — three docs independently say unpark it. → feat/triage-score.
+5. **Tune the shipped triage-score (live on main via learn-triage), human-in-the-loop.** *(A1, A2, A4)* It is literally Eyal's "Investment" phase **and** a "Hunt" reward engine **and** an SDT competence/autonomy win — three docs independently say tune it. → feat/triage-score.
 
 ### The consensus DON'Ts (every doc warns)
 - ❌ **No rigid punishing streaks.** A broken chain after a rough ADHD week → guilt → abandonment (the "what-the-hell effect"). If you ever add a streak, ship **freezes/grace in v1**, never later.
