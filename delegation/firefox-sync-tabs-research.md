@@ -15,6 +15,12 @@ Size estimate for the recommended first implementation: **medium** (roughly 1-2 
 Concrete next action after this research: **refactor the current Firefox connector shaping into a pure helper that accepts normalized tab records, then add fixture tests for extension-style JSON input**.  
 Done-when for Phase 1: **a user-triggered local snapshot imports tabs idempotently, YouTube tabs still promote, no external auth is required, and route/connector tests pass offline**.
 
+## Implementation status (2026-06-29)
+
+- Branch `firefox-sync-tabs-research` was promoted beyond research into a local tab-ingest slice: Firefox tab helpers, connector/CLI/route plumbing, docs, and offline tests were added.
+- This is **not** a full Mozilla Firefox Sync implementation: no Mozilla account auth, encrypted Sync collection read/decrypt flow, WebExtension packaging, or live external account flow was implemented or run.
+- Merged scope is local/manual tab ingestion with idempotent import behavior. Account-backed live Firefox Sync tabs remain a follow-up.
+
 ## Confirmed current state
 
 ### Existing Firefox ingestion

@@ -8,6 +8,11 @@ Make rapid upward scrolling in the v3 browse list feel native and predictable on
 
 **Size estimate:** medium. The code change is probably small, but the hard part is isolating the cause on a real mobile/PWA scroll path and adding non-flaky regression coverage.
 
+## Implementation status (2026-06-29)
+
+- Branch `epic-16-scroll-deceleration` implemented the conservative browser-native scroll stabilization slice and added/updated Pixel-6/PWA Playwright regression coverage.
+- Validation covered the local headless UI suite, not a physical Pixel 6 / Chrome Android device. Treat real-device tactile feel as the remaining acceptance check.
+
 ## Confirmed current state
 
 - **The open backlog item is specifically browse-list mobile physics.** `BACKLOG.md:1053-1057` says: rapid fling-scrolling to the top of the browse list has weird deceleration physics, possibly from `scrollTo({behavior:"smooth"})`, native fling + infinite-scroll interaction, the `.console.compact` scroll handler, or CSS `scroll-behavior` / `overscroll-behavior`.

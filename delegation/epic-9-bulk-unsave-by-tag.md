@@ -14,6 +14,12 @@ The feature should reuse the existing `reddit_unsave` queue/drain architecture:
 
 Done-when criterion: a user can preview `tag=nsfw_erotic`, confirm a local enqueue, review the drain plan, then run a capped live drain with explicit double confirmation; every live Reddit mutation is audited and all tests remain offline/deterministic.
 
+## Implementation status (2026-06-29)
+
+- Branch `bulk-unsave-reddit-posts-by-tag` implemented the safety-critical hardening slice: by-tag queueing remains local/reversible, and the web drain path now defaults to preview and requires explicit live confirmation before contacting Reddit.
+- No live Reddit drain was run during this merge. Validation was offline only.
+- Durable bulk batch IDs/cancel-by-batch were **not** implemented; follow-up cancellation should use the existing pending queue/item paths unless a batch schema is added later.
+
 ## Confirmed current state
 
 Confirmed from the current codebase:
