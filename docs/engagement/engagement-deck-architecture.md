@@ -1,5 +1,7 @@
 # Engagement deck architecture decision
 
+> Snapshot as of 2026-06-29.
+
 Status: **proposed / needs user sign-off** (2026-06-29 autonomous run)
 
 ## Decision
