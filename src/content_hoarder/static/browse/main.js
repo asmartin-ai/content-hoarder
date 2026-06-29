@@ -235,6 +235,8 @@ async function loadItems(reset) {
 
 function render() {
   itemsEl.className = "items density-" + state.density;
+  syncSelectionToVisibleItems();
+  paintBulk();
   if (!state.items.length) {
     itemsEl.innerHTML = emptyHtml(state.focus);
     paintBatch();
@@ -245,9 +247,10 @@ function render() {
     curated: state.curated,
     nsfwRevealed: false,
   });
-  // re-apply NSFW reveals + attach swipe per row (touch-only inside attachSwipe)
+  // re-apply transient row state + attach swipe per row (touch-only inside attachSwipe)
   $$(".row, .pin").forEach((row) => {
     const fn = row.dataset.fullname;
+    if (selected.has(fn)) row.classList.add("selected");
     if (nsfwRevealed.has(fn)) {
       row
         .querySelectorAll(".monitor.nsfw, .screen.nsfw")
@@ -880,8 +883,19 @@ function clearSelection() {
   $$(".selected").forEach((el) => el.classList.remove("selected"));
   paintBulk();
 }
+function syncSelectionToVisibleItems() {
+  const visible = new Set(state.items.map((it) => it.fullname));
+  [...selected].forEach((fn) => {
+    if (!visible.has(fn)) selected.delete(fn);
+  });
+}
 function paintBulk() {
-  $("#bulkcnt").textContent = String(selected.size).padStart(2, "0");
+  const cnt = $("#bulkcnt");
+  cnt.textContent = String(selected.size).padStart(2, "0");
+  cnt.setAttribute(
+    "aria-label",
+    selected.size === 1 ? "1 item selected" : selected.size + " items selected",
+  );
   $("#bulktray").classList.toggle("show", selected.size > 0);
 }
 $("#bulkclear").addEventListener("click", clearSelection);
@@ -1972,6 +1986,9 @@ window.addEventListener("keydown", (e) => {
 });
 // desktop has no long-press → right-click a row opens the same menu
 itemsEl.addEventListener("contextmenu", (e) => {
+  // Keep the native browser menu on real links so users can copy/open URLs.
+  // Right-clicking row chrome/text still opens the row action strip.
+  if (e.target.closest("a[href]")) return;
   const card = e.target.closest(".row[data-fullname]");
   if (!card) return;
   e.preventDefault();

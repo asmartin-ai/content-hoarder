@@ -88,7 +88,7 @@ a:focus-visible {
     border: 1px solid var(--border-control);
     border-radius: var(--r-pill);
     padding: 0 16px;
-    height: 42px;
+    height: var(--touch-min);
     min-width: 0;
     position: relative;
 }
@@ -260,8 +260,8 @@ a:focus-visible {
 }
 
 .icon-btn {
-    min-width: 42px;
-    height: 42px;
+    min-width: var(--touch-min);
+    height: var(--touch-min);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -286,7 +286,7 @@ a:focus-visible {
     border: none;
     border-radius: var(--r-pill);
     padding: 0 18px;
-    height: 42px;
+    height: var(--touch-min);
     cursor: pointer;
     white-space: nowrap;
     text-decoration: none;
@@ -371,7 +371,7 @@ a:focus-visible {
     border: 1px solid var(--border-hairline);
     border-radius: var(--r-pill);
     padding: 0 15px;
-    height: 42px;
+    min-height: var(--touch-min);
     cursor: pointer;
     white-space: nowrap;
     display: inline-flex;
@@ -669,9 +669,9 @@ a:focus-visible {
 /* ===================== ambient slot (locked #4/#5) ===================== */
 .ambient {
     margin: var(--sp-3) var(--sp-4) 0;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-hairline);
-    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface-inset));
+    border: 1px solid
+        color-mix(in srgb, var(--accent) 34%, var(--border-hairline));
     border-radius: var(--r-md);
     padding: 14px 16px;
 }
@@ -1311,6 +1311,7 @@ body.focus .batchstrip {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     border: 1px solid var(--border-hairline);
     background: transparent;
     border-radius: var(--r-pill);
@@ -1318,12 +1319,17 @@ body.focus .batchstrip {
     height: 32px;
     cursor: pointer;
     opacity: 0.75;
-    transition: all var(--dur-fast) var(--ease);
+    transition:
+        opacity var(--dur-fast) var(--ease),
+        border-color var(--dur-fast) var(--ease),
+        background var(--dur-fast) var(--ease),
+        transform var(--dur-fast) var(--ease);
 }
 .act svg {
     width: 15px;
     height: 15px;
     display: block;
+    flex: none;
 }
 .act:active {
     transform: scale(0.88);
@@ -1341,8 +1347,25 @@ body.focus .batchstrip {
     color: var(--text-muted);
     font: var(--fw-bold) 0.72rem/1 var(--font-mono);
 }
+
 .act.sh {
     color: var(--text-muted);
+}
+.decidebtn {
+    display: none;
+    min-height: var(--touch-min);
+    padding: 0 13px;
+    border: 1px solid var(--border-control);
+    border-radius: var(--r-pill);
+    background: var(--surface-inset);
+    color: var(--text-body);
+    font: var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+}
+.decidebtn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 .act.k:hover {
     border-color: var(--status-keep);
@@ -1377,11 +1400,22 @@ body.focus .batchstrip {
     opacity: 1;
     border-color: var(--border-control);
 }
+
 @media (hover: none) {
     .items .row .acts {
         display: none;
     }
-} /* touch: swipe + long-press */
+    .items .row .decidebtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .items .row.selected .decidebtn {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+    }
+} /* touch: labeled tray owns tap actions; swipe + long-press stay accelerators */
 
 /* ===================== LOG (comfortable, fixed 100px) ===================== */
 .items.density-comfortable .item-fg {
@@ -1722,8 +1756,8 @@ body.focus .batchstrip {
     flex: none;
 }
 /* ---- Relay-style inline long-press strip (Epic 16 B3) ----
-   When a row is .relay-open, its .item-fg translates aside and a .relay-strip
-   slides into the freed space — same thumb zone, no reach to mid-screen. */
+   Right-click / long-press overlays an action strip in the row's own space.
+   Keep it clipped to the sheet — the row foreground must never slide under the rail. */
 .relay-scrim {
     position: fixed;
     inset: 0;
@@ -1743,16 +1777,16 @@ body.focus .batchstrip {
     }
 }
 
-/* the row yields its space: translate the foreground aside, unclip so the strip
-   can sit beside it. The .row itself stays in flow (no layout shift). */
+/* The row stays in flow and clipped. The action strip sits over the dimmed row,
+   so the original content cannot leak outside the feed when the menu opens. */
 .row.relay-open {
-    overflow: visible;
+    overflow: clip;
     z-index: 50; /* above .relay-scrim (49) so strip buttons are clickable */
 }
 .row.relay-open .item-fg {
-    transform: translateX(-100%);
-    transition: transform var(--dur-slow) var(--ease);
-    opacity: 0.55;
+    opacity: 0.18;
+    pointer-events: none;
+    transition: opacity var(--dur-slow) var(--ease);
 }
 
 /* the strip — a horizontal row of icon+label buttons that appears in the row's place */
@@ -1765,7 +1799,8 @@ body.focus .batchstrip {
     gap: var(--sp-2);
     padding: 0 var(--sp-3);
     background: var(--surface-card);
-    transform: translateX(100%);
+    z-index: 2;
+    transform: translateY(6px);
     opacity: 0;
     transition:
         transform var(--dur-slow) var(--ease),
@@ -3055,7 +3090,6 @@ kbd {
         flex-wrap: wrap;
         gap: var(--sp-2);
         padding: 10px var(--sp-3);
-        transition: padding 0.2s var(--ease);
     }
     .cmd {
         order: 5;
@@ -3104,6 +3138,16 @@ kbd {
     .statuspills {
         display: flex;
     }
+    .shelf .right,
+    .fchips {
+        gap: var(--sp-2);
+    }
+    .minibtn,
+    .shelf select,
+    .fchip,
+    .fclear {
+        min-height: var(--touch-min);
+    }
     .dock {
         display: flex;
     }
@@ -3149,7 +3193,9 @@ kbd {
     }
     .items.density-comfortable .item-fg {
         grid-template-columns: 4px minmax(0, 1fr) auto;
-        height: 100px;
+        min-height: 120px;
+        height: auto;
+        align-items: center;
     }
     .items.density-comfortable .item-fg .idx {
         display: block;
@@ -3157,12 +3203,23 @@ kbd {
     .items.density-comfortable .avatar {
         display: none;
     }
+    .items.density-comfortable .trail {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .items.density-comfortable .decidebtn {
+        width: 88px;
+    }
     .items.density-comfortable .snippet {
         display: none;
     }
     .monitor {
         width: 96px;
         height: 64px;
+    }
+    .items.density-comfortable .monitor {
+        width: 88px;
+        height: 56px;
     }
     .monitor.empty {
         display: none;
@@ -3269,6 +3326,8 @@ html.reader-lock {
     overflow: hidden;
 }
 .reader {
+    --reader-max: 920px;
+    --reader-text-max: 72ch;
     position: fixed;
     inset: 0;
     z-index: 53;
@@ -3297,8 +3356,11 @@ html.reader-lock {
     align-items: center;
     gap: 10px;
     flex: none;
-    padding: calc(env(safe-area-inset-top) + var(--sp-3)) var(--sp-3)
-        var(--sp-3);
+    padding-block: calc(env(safe-area-inset-top) + var(--sp-3)) var(--sp-3);
+    padding-inline: max(
+        var(--sp-3),
+        calc((100vw - var(--reader-max)) / 2 + var(--sp-3))
+    );
     border-bottom: 1px solid var(--border-hairline);
     background: var(--surface-card);
 }
@@ -3335,6 +3397,11 @@ html.reader-lock {
 .rd-oo:hover {
     color: var(--text-body);
     border-color: var(--accent);
+}
+.rd-oo:focus-visible,
+.rd-x:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 .rd-share {
     margin-left: 8px;
@@ -3401,19 +3468,24 @@ html.reader-lock {
     overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding: var(--sp-3) 0 env(safe-area-inset-bottom);
 }
 
 /* ---- post ---- */
 .rd-post {
+    width: min(calc(100% - var(--sp-5) - var(--sp-5)), var(--reader-max));
+    margin: 0 auto;
     padding: var(--sp-4) var(--sp-4) var(--sp-3);
     border-bottom: 1px solid var(--border-hairline);
+    box-sizing: border-box;
 }
 .rd-ttl {
+    max-width: var(--reader-text-max);
     margin: 0 0 var(--sp-2);
     font: var(--fw-semibold) var(--fs-xl)/1.28 var(--font-disp);
     letter-spacing: -0.01em;
     color: var(--text-body);
+    text-wrap: balance;
 }
 .rd-by {
     display: flex;
@@ -3431,9 +3503,11 @@ html.reader-lock {
     font-variant-numeric: tabular-nums;
 }
 .rd-body {
+    max-width: var(--reader-text-max);
     margin-top: var(--sp-3);
-    font: var(--fw-regular) var(--fs-md)/1.6 var(--font-sans);
+    font: var(--fw-regular) var(--fs-md)/1.65 var(--font-sans);
     color: var(--text-body);
+    text-wrap: pretty;
 }
 .rd-body.rd-empty {
     color: var(--text-dim);
@@ -3606,10 +3680,14 @@ html.reader-lock {
 .rd-tweet-quote {
     margin: var(--sp-3) 0 0;
     padding: var(--sp-3);
-    border: 1px solid var(--border-hairline);
-    border-left: 3px solid var(--source-twitter);
+    border: 1px solid
+        color-mix(in srgb, var(--source-twitter) 42%, var(--border-hairline));
     border-radius: var(--r-sm);
-    background: var(--surface-inset);
+    background: color-mix(
+        in srgb,
+        var(--source-twitter) 7%,
+        var(--surface-inset)
+    );
     color: var(--text-body);
 }
 .rd-tweet-quote-by {
@@ -3692,9 +3770,11 @@ html.reader-lock {
 .rd-ctext blockquote,
 .rd-body-preview blockquote {
     margin: 0 0 var(--sp-2);
-    padding: 2px 0 2px var(--sp-3);
-    border-left: 3px solid var(--border-hairline);
-    color: var(--text-dim);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--r-sm);
+    background: var(--surface-inset);
+    color: var(--text-muted);
 }
 .rd-body ul,
 .rd-body ol,
@@ -3735,8 +3815,8 @@ html.reader-lock {
 }
 .rd-media {
     display: block;
-    width: 100%;
-    margin-top: var(--sp-3);
+    width: min(100%, 760px);
+    margin: var(--sp-3) auto 0;
     padding: 0;
     position: relative;
     border: 1px solid var(--border-hairline);
@@ -3911,7 +3991,10 @@ html.reader-lock {
 
 /* ---- comments ---- */
 .rd-comments {
-    padding: var(--sp-2) var(--sp-3) var(--sp-5);
+    width: min(calc(100% - var(--sp-5) - var(--sp-5)), var(--reader-max));
+    margin: 0 auto;
+    padding: var(--sp-2) 0 var(--sp-5);
+    box-sizing: border-box;
 }
 .rd-chead {
     display: flex;
@@ -4053,10 +4136,12 @@ a.rd-au:hover {
     color: var(--accent);
 }
 .rd-ctext {
-    font: var(--fw-regular) var(--fs-sm)/1.55 var(--font-sans);
+    max-width: var(--reader-text-max);
+    font: var(--fw-regular) var(--fs-sm)/1.6 var(--font-sans);
     color: var(--text-body);
     overflow-wrap: anywhere;
     white-space: pre-wrap;
+    text-wrap: pretty;
 }
 .rd-cmt.collapsed .rd-cmain {
     opacity: 0.82;
@@ -4175,6 +4260,25 @@ a.rd-au:hover {
     font-size: var(--fs-xs);
     color: var(--dim, var(--text-muted));
     align-self: center;
+}
+
+@media (max-width: 700px) {
+    .reader {
+        --reader-text-max: none;
+    }
+    .rd-scroll {
+        padding-top: 0;
+    }
+    .rd-post,
+    .rd-comments {
+        width: 100%;
+    }
+    .rd-comments {
+        padding: var(--sp-2) var(--sp-3) var(--sp-5);
+    }
+    .rd-media {
+        width: 100%;
+    }
 }
 
 /* Focus mode: wider content column on desktop (Epic 14 P3) */
