@@ -24,16 +24,26 @@ The shared seam is `content_hoarder.card_sources`:
 
 - GitHub `FooSoft/anki-connect` is archived and says the project moved to SourceHut.
 - SourceHut's current README fetch was blocked by bot protection during this run.
-- The archived/local backlog already records the relevant integration facts for the decision gate: AnkiConnect is localhost JSON-RPC, requires desktop Anki running, and commonly uses port `8765`.
+- The archived GitHub tag `23.10.29.0` still carries the AnkiConnect docs used for the backend prototype: local HTTP JSON-RPC, default `127.0.0.1:8765`, request shape `{action, version, params, key?}`, response shape `{result, error}`, `findCards`, `cardsInfo`, and `answerCards` with ease `1` = Again and `3` = Good.
 
-## Deferred until the Anki prototype
+## Backend prototype shipped in this run
 
-- exact AnkiConnect URL default and env/config key;
-- due-card query shape;
-- answer action mapping beyond the backlog minimum of Again/Good;
+`content_hoarder.anki_connect` adds an optional AnkiConnect adapter:
+
+- `invoke()` posts version-6 JSON-RPC through the shared stdlib `_http.request` primitive;
+- `AnkiDueCardSource` queries due cards with `findCards("is:due")`, fetches `cardsInfo`, and emits engagement-deck cards;
+- offline/unavailable Anki returns `[]`, so the lane disappears without an error/guilt state;
+- `answer_card()` exposes only the backlog-minimum actions: `again` → ease `1`, `good` → ease `3`.
+
+## Deferred until UI/user review
+
+- exact AnkiConnect URL default if `8765` conflicts locally, plus env/config key;
 - UI placement and swipe gestures;
+- whether to expose Hard/Easy beyond Again/Good;
 - live AnkiConnect smoke test.
 
 ## Tests
 
 `tests/test_card_sources.py` pins the normalized card shape, weighted interleaving, empty optional lanes, and invalid weight rejection.
+
+`tests/test_anki_connect.py` pins the AnkiConnect request/response adapter, API-key pass-through, offline disappearance, due-card card shape, and Again/Good answering.
