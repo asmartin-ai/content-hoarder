@@ -911,6 +911,7 @@ def search_items(
         # categorize to reliably tag (gitignored subreddit rules), so a tag-only filter left
         # over_18-but-untagged items visible under "Hide NSFW" (Epic 13 P2). COALESCE keeps an
         # absent over_18 from NULL-propagating through `NOT (… OR …)` and hiding SFW rows.
+        pred = ""
         if nsfw or hide_nsfw:
             ph = ",".join("?" for _ in NSFW_TAGS)
             pred = (
