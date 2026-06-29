@@ -867,14 +867,29 @@ def create_app(db_path: str | None = None) -> Flask:
         from content_hoarder import reddit_unsave as ru
 
         body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            body = {}
         # Cap per request (~50s at the 1 req/s throttle) — an unbounded drain of a big
         # queue is a 30+ minute HTTP request. The response's `remaining` lets the UI
-        # loop; the CLI/scheduled job is the right tool for bulk drains.
-        limit = min(max(_int(body.get("max"), 50), 1), 500)
+        # loop; the CLI/scheduled job is the right tool for bulk drains. Accept both
+        # `max` (web/API proposal) and `limit` (older helper) for compatibility.
+        raw_limit = body.get("max") if "max" in body else body.get("limit")
+        limit = min(max(_int(raw_limit, 50), 1), 500)
+        live = bool(body.get("live"))
+        confirmed = bool(body.get("confirm") or body.get("yes"))
         with conn() as c:
+            if not live or not confirmed:
+                res = ru.drain(c, limit=limit, dry_run=True)
+                res["remaining"] = max(ru.count_pending(c) - res.get("selected", 0), 0)
+                res["live_required"] = ["live", "confirm"]
+                if live and not confirmed:
+                    res["ok"] = False
+                    res["error"] = "live drain requires confirm=true or yes=true"
+                    return jsonify(res), 409
+                return jsonify(res)
             # Pass the shared audit appender: a web-initiated live drain is a real money-action and
             # must leave the same reconstructable unsave-audit.jsonl trail as the CLI/trickle paths.
-            res = ru.drain(c, limit=limit, audit=_unsave_audit)
+            res = ru.drain(c, limit=limit, dry_run=False, audit=_unsave_audit)
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/resave")
@@ -1056,16 +1071,21 @@ def create_app(db_path: str | None = None) -> Flask:
         tag = str(body.get("tag", "") or "").strip()
         if not tag:
             return jsonify({"error": "tag required"}), 400
-        apply = bool(
-            body.get("confirm") or body.get("apply") or body.get("dry_run") is False
-        )
+        apply_requested = bool(body.get("apply") or body.get("confirm"))
+        confirmed = bool(body.get("yes"))
+        apply = apply_requested and confirmed
         with conn() as c:
             res = db.enqueue_unsave_by_tag(c, tag, dry_run=not apply)
         res["confirmed"] = apply
+        res["confirmation_required"] = ["apply", "yes"]
         res["message"] = (
             "This only queues local unsaves. Reddit is not contacted until the existing "
             "explicit drain action runs."
         )
+        if apply_requested and not confirmed:
+            res["ok"] = False
+            res["error"] = "local by-tag enqueue requires yes=true"
+            return jsonify(res), 409
         return jsonify(res)
 
     @app.post("/reddit/items/<path:fullname>/undo")

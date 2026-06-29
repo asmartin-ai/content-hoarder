@@ -113,22 +113,46 @@ def test_unsave_by_tag_route_previews_then_confirms(tmp_db):
     assert preview["confirmed"] is False
     assert preview["eligible"] == 1
     assert preview["enqueued"] == 0
+    assert preview["sample"][0]["fullname"] == "reddit:t3_tagged"
     assert "only queues local unsaves" in preview["message"]
 
     c = db.connect(tmp_db)
     assert c.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] == 0
     c.close()
 
+    dry_run_false = cl.post(
+        "/reddit/unsave/enqueue-by-tag",
+        json={"tag": tag, "dry_run": False},
+    ).get_json()
+    assert dry_run_false["confirmed"] is False
+    assert dry_run_false["enqueued"] == 0
+
+    c = db.connect(tmp_db)
+    assert c.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] == 0
+    c.close()
+
+    refused = cl.post(
+        "/reddit/unsave/enqueue-by-tag",
+        json={"tag": tag, "apply": True},
+    )
+    assert refused.status_code == 409
+    assert refused.get_json()["confirmed"] is False
+
     applied = cl.post(
         "/reddit/unsave/enqueue-by-tag",
-        json={"tag": tag, "confirm": True},
+        json={"tag": tag, "apply": True, "yes": True},
     ).get_json()
     assert applied["confirmed"] is True
     assert applied["enqueued"] == 1
 
+    c = db.connect(tmp_db)
+    saved = c.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_tagged'").fetchone()[0]
+    c.close()
+    assert saved == 1
+
     again = cl.post(
         "/reddit/unsave/enqueue-by-tag",
-        json={"tag": tag, "confirm": True},
+        json={"tag": tag, "apply": True, "yes": True},
     ).get_json()
     assert again["enqueued"] == 0
     assert again["skipped"]["already_queued"] == 1
