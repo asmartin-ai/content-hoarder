@@ -23,7 +23,7 @@ from content_hoarder.reddit_unsave import (
     cookie_user_agent,
     get_auth,
 )
-from content_hoarder.archival.providers import _bare_id, _PLACEHOLDERS, default_providers
+from content_hoarder.archival.providers import _bare_id, _PLACEHOLDERS, _norm_post, default_providers
 
 _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
 # The submission base36 id sits between ``/comments/`` and the next ``/`` in a comment
@@ -158,6 +158,82 @@ def backfill_titles_network(conn, *, providers=None, user_agent=None,
     return res
 
 
+def _post_data_from_thread_blob(thread_json: str) -> dict | None:
+    try:
+        data = json.loads(thread_json)
+        post = data[0]["data"]["children"][0]["data"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+    return post if isinstance(post, dict) else None
+
+
+def _gallery_payload_from_post(post: dict) -> dict | None:
+    fields = _norm_post(post)
+    gallery = fields.get("gallery") or []
+    if not gallery:
+        return None
+    previews = fields.get("gallery_preview") or []
+    return {
+        "media_type": "gallery",
+        "media_url": fields.get("media_url") or "",
+        "thumbnail": fields.get("thumbnail") or (previews or gallery)[0],
+        "gallery": gallery,
+        "gallery_preview": previews,
+    }
+
+
+def hydrate_gallery(conn, fullname: str, *, getf=None, user_agent=None, providers=None) -> dict:
+    """Cache-first on-demand gallery metadata hydration for one Reddit item."""
+    row = conn.execute(
+        "SELECT source, metadata FROM items WHERE fullname=?", (fullname,)
+    ).fetchone()
+    if not row:
+        return {"status": "not_found", "fullname": fullname}
+    if row["source"] != "reddit":
+        return {"status": "no_permalink", "fullname": fullname}
+
+    md = models.parse_metadata(row["metadata"])
+    if isinstance(md.get("gallery"), list) and md.get("gallery"):
+        return {
+            "status": "cached",
+            "source": "metadata",
+            "fullname": fullname,
+            "gallery": md["gallery"],
+            "gallery_preview": md.get("gallery_preview") or [],
+        }
+
+    post = None
+    cached = db.get_reddit_thread(conn, fullname)
+    if cached and cached.get("thread_json"):
+        post = _post_data_from_thread_blob(cached["thread_json"])
+
+    hydrate_status = "cached"
+    if post is None:
+        res = hydrate_one(conn, fullname, getf=getf, user_agent=user_agent, providers=providers)
+        hydrate_status = res.get("status") or "error"
+        cached = db.get_reddit_thread(conn, fullname)
+        if cached and cached.get("thread_json"):
+            post = _post_data_from_thread_blob(cached["thread_json"])
+        if post is None:
+            return {"status": hydrate_status, "fullname": fullname}
+
+    payload = _gallery_payload_from_post(post)
+    if not payload:
+        return {"status": "no_gallery", "fullname": fullname}
+
+    if db.patch_item_metadata(conn, fullname, payload, only_if_missing=False):
+        conn.commit()
+    return {
+        "status": "hydrated" if hydrate_status in ("hydrated", "archived") else "cached",
+        "source": "thread" if hydrate_status == "cached" else hydrate_status,
+        "fullname": fullname,
+        "gallery": payload["gallery"],
+        "gallery_preview": payload["gallery_preview"],
+        "media_url": payload["media_url"],
+        "thumbnail": payload["thumbnail"],
+    }
+
+
 def _permalink_path(permalink: str) -> str:
     """The bare ``r/<sub>/comments/<id>/<slug>`` path of a permalink — host-stripped, no
     surrounding slashes — so a transport can prefix it with either ``www.reddit.com`` (cookie)
@@ -194,6 +270,7 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     # login`, so until then this is the cookie path, byte-for-byte unchanged.
     oauth_token = (reddit_oauth.access_token(conn)
                    if (getf is None and reddit_oauth.is_configured(conn)) else None)
+    auth = None
     if oauth_token:
         host, ua = "https://oauth.reddit.com", reddit_oauth.oauth_user_agent(conn)
     else:
@@ -208,6 +285,7 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
         if oauth_token:
             data = reddit_oauth.oauth_get(url, bearer=oauth_token, user_agent=ua)
         else:
+            assert auth is not None
             data = (getf or _http_get)(url, session_cookie=auth["session_cookie"], user_agent=ua)
     except RedditNotFoundError:
         return hydrate_one_from_archive(conn, fullname, providers=providers, user_agent=user_agent)
@@ -497,7 +575,7 @@ def hydrate_one_from_archive(conn, fullname: str, *, providers=None, user_agent=
             chosen_provider = prov
             break
 
-    if post_data is None:
+    if post_data is None or chosen_provider is None:
         return {"status": "archived", "fullname": fullname, "comments": 0}
 
     try:

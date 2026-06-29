@@ -172,3 +172,4 @@ def request(url, *, method="GET", headers=None, data=None, timeout=20.0,
         # and do NOT go through URLError — catch them so a stall can't escape unwrapped.
         except (TimeoutError, OSError) as e:
             raise HttpError(f"connection error for {url}: {e}", kind="conn") from e
+    raise HttpError(f"request retry loop exhausted for {url}", kind="conn")
