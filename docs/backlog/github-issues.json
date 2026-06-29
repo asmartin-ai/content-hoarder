@@ -1,0 +1,1156 @@
+[
+  {
+    "key": "epic-04-hoard-the-bytes-not-just-the-link-local-media-archiving",
+    "title": "Hoard the BYTES, not just the link: local media archiving",
+    "state": "~",
+    "epic_num": 4,
+    "epic_title": "Recover deleted Reddit content",
+    "milestone": "Epic 4 — Recover deleted Reddit content",
+    "labels": [
+      "area:recovery",
+      "needs:sample-data",
+      "priority:P1",
+      "safety:external-action",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP1 — Hoard the BYTES, not just the link: local media archiving. ✅ Infra + images + explicit video archiver DONE (Epic 4: `media_store.py` blob store + `archive-media`/`scan-media` CLI + same-origin `/media/<blob>` route + prefer-local frontend, on main). Live run 2026-06-22: `scan-media` classified deletions (2,394 `gone`, 32 salvaged); galleries + salvageable archived; the bulk images pass archived 22,052 blobs (98.9% ok, 249 already-deleted) → `data/media/` = 32,506 blobs / 18 GB, 25,706 items now carry a local copy that survives remote deletion (frontend already prefers it + falls back on 404). Video slice shipped 2026-06-29: `archive-media --videos` is an explicit opt-in scope using lazy…\n\n## Local context for agents\n\n- Epic: 4 — Recover deleted Reddit content\n- Full local history/spec: `docs/backlog/epic-04-recover-deleted-reddit-content.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-04-recover-deleted-reddit-content.md",
+    "number": 11,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/11"
+  },
+  {
+    "key": "epic-04-repostsleuth-reverse-image-hash-recovery-spike",
+    "title": "RepostSleuth reverse-image-hash recovery (spike)",
+    "state": " ",
+    "epic_num": 4,
+    "epic_title": "Recover deleted Reddit content",
+    "milestone": "Epic 4 — Recover deleted Reddit content",
+    "labels": [
+      "area:recovery",
+      "needs:sample-data",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — RepostSleuth reverse-image-hash recovery (spike). *(Research 2026-06-22.)* Novel recovery angle for already-deleted images: even when the original `i.redd.it` is 404, a still-live repost of the same image elsewhere on Reddit can be found via perceptual-hash lookup against RepostSleuth's index (undocumented API at `repostsleuth.com`; the bot u/repostsleuthbot is the public face). For a `gone` item we can query by the original Reddit submission id / url (which RepostSleuth indexed before deletion) and, if it returns a live duplicate post, pull *that* post's still-live image and archive the bytes. Spike first — the API is undocumented + may have broken with Reddit's API changes, hashing is…\n\n## Local context for agents\n\n- Epic: 4 — Recover deleted Reddit content\n- Full local history/spec: `docs/backlog/epic-04-recover-deleted-reddit-content.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-04-recover-deleted-reddit-content.md",
+    "number": 12,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/12"
+  },
+  {
+    "key": "epic-05-smooth-drag-and-drop-to-buckets",
+    "title": "Smooth drag-and-drop to buckets",
+    "state": " ",
+    "epic_num": 5,
+    "epic_title": "Inbox redesign follow-ups",
+    "milestone": "Epic 5 — Inbox redesign follow-ups",
+    "labels": [
+      "area:ui",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Smooth drag-and-drop to buckets. Drag cards onto category/status buckets. [SortableJS](https://github.com/SortableJS/Sortable) (~20 KB, touch-capable) or [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).\n\n## Local context for agents\n\n- Epic: 5 — Inbox redesign follow-ups\n- Full local history/spec: `docs/backlog/epic-05-inbox-redesign-follow-ups.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-05-inbox-redesign-follow-ups.md",
+    "number": 13,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/13"
+  },
+  {
+    "key": "epic-05-rework-the-keyboard-controls",
+    "title": "Rework the keyboard controls",
+    "state": " ",
+    "epic_num": 5,
+    "epic_title": "Inbox redesign follow-ups",
+    "milestone": "Epic 5 — Inbox redesign follow-ups",
+    "labels": [
+      "area:ui",
+      "needs:design",
+      "needs:user-decision",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Rework the keyboard controls. *(User-requested 2026-06-08.)* The current map (browse J/K · S/E/Y · X; triage S/E/Y) needs a redesigned, more ergonomic one-hand scheme — propose a new mapping for review. (The `?` cheatsheet already ships.) - Proposed Gmail-aligned keymap ready for review (see archived delegation notes): j/k movement, f keep, e archive, d done, b snooze, x select, t tag, o/Enter open, / search, ? help, z undo. Awaiting user approval before implementation.\n\n## Local context for agents\n\n- Epic: 5 — Inbox redesign follow-ups\n- Full local history/spec: `docs/backlog/epic-05-inbox-redesign-follow-ups.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-05-inbox-redesign-follow-ups.md",
+    "number": 14,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/14"
+  },
+  {
+    "key": "epic-07-import-wl3-watch-later",
+    "title": "Import WL3 + Watch Later",
+    "state": " ",
+    "epic_num": 7,
+    "epic_title": "More sources & live sync",
+    "milestone": "Epic 7 — More sources & live sync",
+    "labels": [
+      "area:connectors",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Import WL3 + Watch Later. WL3 via the same `yt-dlp --flat-playlist` flow; main Watch Later via a browser-extension export (the connector already accepts a flat array).\n\n## Local context for agents\n\n- Epic: 7 — More sources & live sync\n- Full local history/spec: `docs/backlog/epic-07-more-sources-live-sync.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-07-more-sources-live-sync.md",
+    "number": 15,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/15"
+  },
+  {
+    "key": "epic-07-live-reddit-youtube-api-sync",
+    "title": "Live Reddit / YouTube API sync",
+    "state": " ",
+    "epic_num": 7,
+    "epic_title": "More sources & live sync",
+    "milestone": "Epic 7 — More sources & live sync",
+    "labels": [
+      "area:connectors",
+      "priority:P3",
+      "safety:external-action",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Live Reddit / YouTube API sync. When API keys arrive, implement `BaseConnector.sync()` using the existing `auth_tokens` table.\n\n## Local context for agents\n\n- Epic: 7 — More sources & live sync\n- Full local history/spec: `docs/backlog/epic-07-more-sources-live-sync.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-07-more-sources-live-sync.md",
+    "number": 16,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/16"
+  },
+  {
+    "key": "epic-07-per-item-added-to-playlist-watch-later-date-needs-api",
+    "title": "Per-item \"added to playlist / Watch Later\" date (needs API)",
+    "state": " ",
+    "epic_num": 7,
+    "epic_title": "More sources & live sync",
+    "milestone": "Epic 7 — More sources & live sync",
+    "labels": [
+      "area:connectors",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Per-item \"added to playlist / Watch Later\" date (needs API). User wants \"added to this playlist 1 day ago\". Source: YouTube Data API `playlistItems.list` → `snippet.publishedAt` (the moment an item was added to the playlist) — API key for public playlists, OAuth for Watch Later. `yt-dlp --flat-playlist` does not expose it, so this is gated on `feat/reddit-oauth`-style API work. Store it in `saved_utc` (or `metadata.added_to_playlist_utc`) so the existing date display picks it up. Note: Reddit's save-date is genuinely unavailable — no cookie/OAuth endpoint returns *when* you saved an item (`saved.json` gives newest-first *order* only, no timestamp). Don't chase it.\n\n## Local context for agents\n\n- Epic: 7 — More sources & live sync\n- Full local history/spec: `docs/backlog/epic-07-more-sources-live-sync.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-07-more-sources-live-sync.md",
+    "number": 17,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/17"
+  },
+  {
+    "key": "epic-08-optional-karakeep-bridge",
+    "title": "Optional Karakeep bridge",
+    "state": " ",
+    "epic_num": 8,
+    "epic_title": "Polish & infra",
+    "milestone": "Epic 8 — Polish & infra",
+    "labels": [
+      "area:infra",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:chore"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Optional Karakeep bridge (already a stub) if a stock instance is adopted for a forward-capture library.\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-08-polish-infra.md",
+    "number": 18,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/18"
+  },
+  {
+    "key": "epic-08-redesign-the-app-icon",
+    "title": "Redesign the app icon",
+    "state": " ",
+    "epic_num": 8,
+    "epic_title": "Polish & infra",
+    "milestone": "Epic 8 — Polish & infra",
+    "labels": [
+      "area:infra",
+      "needs:design",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:chore"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Redesign the app icon. New mark: a backwards \"E\" forming an \"H\" (hoarder). Replace `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-08-polish-infra.md",
+    "number": 19,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/19"
+  },
+  {
+    "key": "epic-08-60fps-ui",
+    "title": "60fps UI",
+    "state": " ",
+    "epic_num": 8,
+    "epic_title": "Polish & infra",
+    "milestone": "Epic 8 — Polish & infra",
+    "labels": [
+      "area:infra",
+      "needs:real-device",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — 60fps UI. Audit list/scroll/swipe for jank (avoid layout thrash, prefer transforms / `will-change`, throttle handlers); target smooth 60fps on the Pixel-6 target.\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-08-polish-infra.md",
+    "number": 20,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/20"
+  },
+  {
+    "key": "epic-08-data-saving-mode-mobile-performance-pass",
+    "title": "Data-saving mode + mobile performance pass",
+    "state": " ",
+    "epic_num": 8,
+    "epic_title": "Polish & infra",
+    "milestone": "Epic 8 — Polish & infra",
+    "labels": [
+      "area:infra",
+      "priority:P2",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:chore"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Data-saving mode + mobile performance pass. *(Mobile test 2026-06-29.)* Loading media, comment threads, and new feed pages still feels slow on mobile. Add a settings toggle for Data Saver / Performance mode that can dial down expensive work: prefer thumbnails/`gallery_preview` over full-res until tap/zoom, reduce or disable automatic next-thread prefetch, limit offscreen media warmup, shrink browse page size on slow connections, and optionally skip remote embeds until user taps. Pair with instrumentation (network count/bytes, time-to-reader, time-to-first-media) so we can compare before/after. Keep normal mode unchanged; this is for mobile data / slow tailnet sessions.\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-08-polish-infra.md",
+    "number": 21,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/21"
+  },
+  {
+    "key": "epic-08-trial-glm-5-2-as-a-design-bakeoff-arm-gated-by-the-frontend-design-skill-visual",
+    "title": "Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review)",
+    "state": " ",
+    "epic_num": 8,
+    "epic_title": "Polish & infra",
+    "milestone": "Epic 8 — Polish & infra",
+    "labels": [
+      "area:infra",
+      "needs:design",
+      "needs:user-decision",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review). *(User idea 2026-06-19.)* GLM already wins several of our *code* bakeoff arms (5.1/5p2); the research says design is GLM-5.2's standout strength — #1 on Design Arena (Elo ~1360, blind human-preference design tasks, ahead of Claude Fable 5 / GPT-5.5), #2 on Code Arena: Frontend (+29 over Claude Opus 4.7 Thinking), and 94.8 vs 77.3 (Claude Opus 4.6) on Design2Code for the GLM-5V vision variant — and it's open-weights + multimodal (screenshot→code). Trial scope: hand it (a) a *greenfield/exploratory* design task (where it's strongest) and (b) a \"build this from a screenshot/Figma\" task (Design2Code)…\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-08-polish-infra.md",
+    "number": 22,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/22"
+  },
+  {
+    "key": "epic-09-reddit-auto-categorization",
+    "title": "Reddit auto-categorization",
+    "state": "~",
+    "epic_num": 9,
+    "epic_title": "Reddit merge follow-ups",
+    "milestone": "Epic 9 — Reddit merge follow-ups",
+    "labels": [
+      "area:reddit",
+      "needs:sample-data",
+      "priority:P2",
+      "safety:external-action",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Reddit auto-categorization (migrated from RSM's \"inbox + autotagging\" backlog). Backend shipped: `categorize.py` now multi-label tags reddit items into `metadata.tags` (a post can be `minecraft` + `memes`), keyless heuristics = subreddit map + conservative subreddit/title keyword fallback. Buckets: `nsfw_erotic`, `nsfw_other`, `vtubers`, `coding`, `japan`, `anime`, `memes`, `minecraft`, `defense`, `science`, `tips`. CLI `categorize --source reddit [--dry-run]` (dry-run previews counts + samples, no writes). Validated on the real corpus: ~43% tagged after a top-150 subreddit-map expansion, good precision (body-keyword matching dropped). Remaining: (a) more coverage — ~57% still untagged;…\n\n## Local context for agents\n\n- Epic: 9 — Reddit merge follow-ups\n- Full local history/spec: `docs/backlog/epic-09-reddit-merge-follow-ups.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-09-reddit-merge-follow-ups.md",
+    "number": 23,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/23"
+  },
+  {
+    "key": "epic-10-research-analytics-content-algorithms-for-better-smart-sort-triage-addiction-loo",
+    "title": "Research analytics/content algorithms for better smart-sort + triage addiction loop",
+    "state": " ",
+    "epic_num": 10,
+    "epic_title": "Learned triage: suggest what to process next",
+    "milestone": "Epic 10 — Learned triage: suggest what to process next",
+    "labels": [
+      "area:triage",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Research analytics/content algorithms for better smart-sort + triage addiction loop. *(Mobile test 2026-06-29.)* Study how recommendation feeds, spaced-review queues, email triage, and addictive-but-ethical content algorithms rank items; adapt the useful parts to `smart:desc` and triage without violating the ADHD guardrails (no guilt counters/streaks/dark patterns). Candidate signals: recent successful triage streaks, source/category diversity, novelty vs familiarity, media/text effort, skip/snooze friction, old-save resurfacing, and exploration/exploitation. Output should be a short research note + concrete scoring changes, then offline rehearsal against a DB copy before any default-so…\n\n## Local context for agents\n\n- Epic: 10 — Learned triage: suggest what to process next\n- Full local history/spec: `docs/backlog/epic-10-learned-triage-suggest-what-to-process-next.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-10-learned-triage-suggest-what-to-process-next.md",
+    "number": 24,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/24"
+  },
+  {
+    "key": "epic-10-per-source-per-subreddit-auto-archive-likely-skip-assist",
+    "title": "Per-source / per-subreddit \"auto-archive likely-skip\" assist",
+    "state": " ",
+    "epic_num": 10,
+    "epic_title": "Learned triage: suggest what to process next",
+    "milestone": "Epic 10 — Learned triage: suggest what to process next",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Per-source / per-subreddit \"auto-archive likely-skip\" assist. Where the learned skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.\n\n## Local context for agents\n\n- Epic: 10 — Learned triage: suggest what to process next\n- Full local history/spec: `docs/backlog/epic-10-learned-triage-suggest-what-to-process-next.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-10-learned-triage-suggest-what-to-process-next.md",
+    "number": 25,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/25"
+  },
+  {
+    "key": "epic-12-image-text-search-via-ocr",
+    "title": "Image text search via OCR",
+    "state": " ",
+    "epic_num": 12,
+    "epic_title": "Search operators in the search bar",
+    "milestone": "Epic 12 — Search operators in the search bar",
+    "labels": [
+      "area:search",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Image text search via OCR. *(User-requested 2026-06-17.)* Make text *inside* images searchable — screenshots, infographics, memes with captions, slide/diagram images — so a bare query matches words that only appear in the picture, not the title/body. Two halves: - OCR enrich pass (the real work): a new opt-in pass (e.g. `enrich --source <s> --ocr` or a dedicated `ocr` CLI) that runs OCR over an item's image(s), stores the extracted text on `metadata.ocr_text`, and stamps an `ocr_at` timestamp so it's skip-if-present + resumable (mirror the existing enrich/recovery passes: `--limit`, dry-run, chunked). Covers reddit image/gallery posts, HN/firefox link previews, and any item with a store…\n\n## Local context for agents\n\n- Epic: 12 — Search operators in the search bar\n- Full local history/spec: `docs/backlog/epic-12-search-operators-in-the-search-bar.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-12-search-operators-in-the-search-bar.md",
+    "number": 26,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/26"
+  },
+  {
+    "key": "epic-12-revisit-operator-names-for-intuitiveness-icebox",
+    "title": "Revisit operator names for intuitiveness (Icebox)",
+    "state": " ",
+    "epic_num": 12,
+    "epic_title": "Search operators in the search bar",
+    "milestone": "Epic 12 — Search operators in the search bar",
+    "labels": [
+      "area:search",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Revisit operator names for intuitiveness (Icebox). *(User idea 2026-06-17.)* The current vocabulary (`source:`/`kind:`/`status:`/`subreddit:`/`tag:`/`is:`/`has:`/`before:`/`after:`/`score:`) should be revisited for names that read more intuitively. Pairs with the bare-`r/` shorthand above. Gather the rename list before touching `search_query.py` + `operators.js` (keep old names as aliases for a transition). Reactivate when the user has a concrete naming preference.\n\n## Local context for agents\n\n- Epic: 12 — Search operators in the search bar\n- Full local history/spec: `docs/backlog/epic-12-search-operators-in-the-search-bar.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-12-search-operators-in-the-search-bar.md",
+    "number": 27,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/27"
+  },
+  {
+    "key": "epic-13-research-mimic-reddit-app-thumbnail-cropping",
+    "title": "Research + mimic reddit-app thumbnail cropping",
+    "state": " ",
+    "epic_num": 13,
+    "epic_title": "UI bugs & quick fixes",
+    "milestone": "Epic 13 — UI bugs & quick fixes",
+    "labels": [
+      "area:ui",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Research + mimic reddit-app thumbnail cropping. *(User-requested 2026-06-20.)* Survey how the major Reddit apps (Apollo, RedReader, Boost, Sync, official, Relay) crop/frame post thumbnails (aspect ratio, fill vs fit, focal-point/top anchoring, portrait handling) and adopt the best fit for our card/list densities. Builds on the T4 cover work (`browse.css` `.pin .screen` / `.monitor`). Output: a short comparison + a concrete sizing proposal before touching CSS.\n\n## Local context for agents\n\n- Epic: 13 — UI bugs & quick fixes\n- Full local history/spec: `docs/backlog/epic-13-ui-bugs-quick-fixes.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-13-ui-bugs-quick-fixes.md",
+    "number": 28,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/28"
+  },
+  {
+    "key": "epic-13-ask-glm-what-looks-better-for-log-view-title-wrapping-cutoff",
+    "title": "Ask GLM what looks better for Log-view title wrapping/cutoff",
+    "state": " ",
+    "epic_num": 13,
+    "epic_title": "UI bugs & quick fixes",
+    "milestone": "Epic 13 — UI bugs & quick fixes",
+    "labels": [
+      "area:ui",
+      "needs:design",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Ask GLM what looks better for Log-view title wrapping/cutoff. *(User-requested 2026-06-20.)* In the log density, get a design opinion (GLM, via the frontend-design skill) on title wrapping vs. ellipsis cutoff — current is a 2-line clamp at `--fs-md`. Compare options (clamp lines, fade-out, single-line ellipsis, wrap-all) and pick. Relates to the shipped row-title shrink + the Epic 8 GLM-5.2 design-trial item.\n\n## Local context for agents\n\n- Epic: 13 — UI bugs & quick fixes\n- Full local history/spec: `docs/backlog/epic-13-ui-bugs-quick-fixes.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-13-ui-bugs-quick-fixes.md",
+    "number": 29,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/29"
+  },
+  {
+    "key": "epic-13-video-not-fetching-properly",
+    "title": "Video not fetching properly",
+    "state": " ",
+    "epic_num": 13,
+    "epic_title": "UI bugs & quick fixes",
+    "milestone": "Epic 13 — UI bugs & quick fixes",
+    "labels": [
+      "area:ui",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Video not fetching properly. *(User-reported 2026-06-19 — needs a repro.)* The report is terse: a video isn't fetching/loading correctly. Source + repro item TBD — get a specific permalink from the user before chasing it. Likely suspects to check once a repro is in hand: the `v.redd.it` media path — archive fetch populating `metadata.media_url`/`is_video` (`providers`, Epic 4), the HLS manifest derivation in `core/media.js` `openVideo` (`/HLSPlaylist.m3u8` + vendored `hls.min.js`), and the reader/lightbox video tile (`browse/reader.js` + `core/media.js`). Could also be YouTube enrich (`yt-dlp --dump-single-json`) failing to fetch. Pin down which source/post first.\n\n## Local context for agents\n\n- Epic: 13 — UI bugs & quick fixes\n- Full local history/spec: `docs/backlog/epic-13-ui-bugs-quick-fixes.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-13-ui-bugs-quick-fixes.md",
+    "number": 30,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/30"
+  },
+  {
+    "key": "epic-15-reader-text-post-preview-blurbs",
+    "title": "Reader/text-post preview blurbs",
+    "state": " ",
+    "epic_num": 15,
+    "epic_title": "Reddit / HN as-app navigation",
+    "milestone": "Epic 15 — Reddit / HN as-app navigation",
+    "labels": [
+      "area:reddit",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Reader/text-post preview blurbs. *(Mobile test 2026-06-29.)* For text-heavy Reddit posts, generate a compact preview before opening the full thread. Start with a non-AI version first if possible (first meaningful selftext paragraph, top N comments once cached, title+subreddit context, link/domain summary); then optionally add local-LLM summaries when `assist/llm.py` is configured. Keep it cached in metadata or `reddit_threads`-derived side data, never block opening the reader, and label AI output clearly.\n\n## Local context for agents\n\n- Epic: 15 — Reddit / HN as-app navigation\n- Full local history/spec: `docs/backlog/epic-15-reddit-hn-as-app-navigation.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-15-reddit-hn-as-app-navigation.md",
+    "number": 31,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/31"
+  },
+  {
+    "key": "epic-15-show-post-text-under-image-lightbox-when-a-reddit-post-has-media-selftext",
+    "title": "Show post text under image lightbox when a Reddit post has media + selftext",
+    "state": " ",
+    "epic_num": 15,
+    "epic_title": "Reddit / HN as-app navigation",
+    "milestone": "Epic 15 — Reddit / HN as-app navigation",
+    "labels": [
+      "area:reddit",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Show post text under image lightbox when a Reddit post has media + selftext. *(Mobile test 2026-06-29; Relay reference: “Halloween couple costume idea”.)* Some posts have both an image and accompanying text. The media lightbox should render the post text/caption below the image, similar to Relay for Reddit, without turning the image preview into the full reader. Keep links markdown-safe and make the text collapsible for long posts.\n\n## Local context for agents\n\n- Epic: 15 — Reddit / HN as-app navigation\n- Full local history/spec: `docs/backlog/epic-15-reddit-hn-as-app-navigation.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-15-reddit-hn-as-app-navigation.md",
+    "number": 32,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/32"
+  },
+  {
+    "key": "epic-15-video-lightbox-swipe-gestures-parity-with-images",
+    "title": "Video lightbox swipe gestures parity with images",
+    "state": " ",
+    "epic_num": 15,
+    "epic_title": "Reddit / HN as-app navigation",
+    "milestone": "Epic 15 — Reddit / HN as-app navigation",
+    "labels": [
+      "area:reddit",
+      "needs:design",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Video lightbox swipe gestures parity with images. *(Mobile test 2026-06-29.)* Nice-to-have: vertical swipe-to-close / pan-like gestures for videos mirroring image lightbox behavior. Risk: video controls, HLS/hls.js, browser fullscreen, and pointer capture can conflict, so design/test carefully and keep normal video controls reliable. ### Icebox — true WYSIWYG markdown editing *(Epic 15)*\n\n## Local context for agents\n\n- Epic: 15 — Reddit / HN as-app navigation\n- Full local history/spec: `docs/backlog/epic-15-reddit-hn-as-app-navigation.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-15-reddit-hn-as-app-navigation.md",
+    "number": 33,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/33"
+  },
+  {
+    "key": "epic-15-icebox-obsidian-grade-wysiwyg-type-and-see-formatting-note-editing",
+    "title": "Icebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing",
+    "state": " ",
+    "epic_num": 15,
+    "epic_title": "Reddit / HN as-app navigation",
+    "milestone": "Epic 15 — Reddit / HN as-app navigation",
+    "labels": [
+      "area:reddit",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nIcebox — Obsidian-grade WYSIWYG (type-and-see-formatting) note editing. *(Deferred 2026-06-19.)* Live-preview rich editing rather than the raw-markdown textarea above. High effort + fidelity risk: the no-build-step constraint means vendoring a CodeMirror/ProseMirror-class editor; markdown↔rich-text round-tripping loses fidelity; and Obsidian's superset (`[[wikilinks]]`, `![[embeds]]`, callouts, frontmatter, Dataview) gets corrupted by a generic WYSIWYG. Reactivate only if raw-markdown editing proves insufficient — otherwise prefer deep-linking out to Obsidian for rich editing.\n\n## Local context for agents\n\n- Epic: 15 — Reddit / HN as-app navigation\n- Full local history/spec: `docs/backlog/epic-15-reddit-hn-as-app-navigation.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-15-reddit-hn-as-app-navigation.md",
+    "number": 34,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/34"
+  },
+  {
+    "key": "epic-16-lightbox-blank-space-drag-must-not-scroll-the-inbox",
+    "title": "Lightbox blank-space drag must not scroll the inbox",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P1",
+      "sandbox:local-spec",
+      "type:bug"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP1 — Lightbox blank-space drag must not scroll the inbox. When the media preview lightbox is open, sliding on blank/backdrop space can still move the underlying inbox. Treat the whole lightbox/backdrop as a scroll-locked overlay: blank-space drags should either do nothing or close the lightbox via the existing gesture, but never scroll `#items`/document behind it. Add a mobile UI regression around feed scroll staying fixed while dragging blank lightbox space.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 35,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/35"
+  },
+  {
+    "key": "epic-16-long-press-row-menu-shifts-scroll-position-feels-awkward",
+    "title": "Long-press row menu shifts scroll position / feels awkward",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P1",
+      "sandbox:local-spec",
+      "type:chore"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP1 — Long-press row menu shifts scroll position / feels awkward. Long-pressing an inbox item to open the Relay strip can move the feed scroll position, making the item jump under the finger. Reproduce on real mobile, then keep the row anchored during long-press activation (likely snapshot scrollY + item rect, avoid layout-height changes, and prevent accidental drag/scroll during the activation window). Consider whether long-press should be narrowed to a handle or replaced by a less awkward gesture.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 36,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/36"
+  },
+  {
+    "key": "epic-16-hold-to-preview-lightbox-allows-panning-zooming-into-empty-space",
+    "title": "Hold-to-preview lightbox allows panning/zooming into empty space",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P1",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP1 — Hold-to-preview lightbox allows panning/zooming into empty space. A long-press media preview can zoom out or pan right even when there is only blank space. Clamp zoom scale to `>=1`, clamp pan bounds to the image/video content box, reset transform on close/open, and disable pan while the preview is in temporary “peek” mode unless zoomed in.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 37,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/37"
+  },
+  {
+    "key": "epic-16-revisit-inbox-swipe-controls-inertia",
+    "title": "Revisit inbox swipe controls / inertia",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P2",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Revisit inbox swipe controls / inertia. Rapid left swipes currently tend to hit the long-left Snooze action; in real use, a fast decisive swipe probably means Done, not Snooze. Re-tune gesture recognition so velocity and travel are considered separately (fast flick → primary action; deliberate long hold/travel → secondary action), or revisit the whole left/right action map. This may supersede the current friction-asymmetry mapping from Epic 20.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 38,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/38"
+  },
+  {
+    "key": "epic-16-text-reddit-post-rendered-with-a-misleading-preview-play-button",
+    "title": "Text Reddit post rendered with a misleading preview play button",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:bug"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Text Reddit post rendered with a misleading preview play button. Repro: Reddit post titled a text-only Reddit self-post shows a preview/play affordance even though it is an r/AskReddit text post. Fix media classification/rendering so text/self posts without playable media show a text/thread preview affordance, not a play button. Likely area: `media_type`, thumbnail fallback, and `browse/render.js` media tile selection.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 39,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/39"
+  },
+  {
+    "key": "epic-16-reader-should-swipe-up-from-bottom-when-opened-via-triage-swipe-up",
+    "title": "Reader should swipe up from bottom when opened via triage swipe-up",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Reader should swipe up from bottom when opened via triage swipe-up. The triage ↑ gesture currently opens the reader functionally, but the transition should match the gesture: reader sheet/card enters upward from the bottom and returns to the triage deck on close. Coordinate with `overlaynav.js` so OS back and nested lightboxes still close correctly.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 40,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/40"
+  },
+  {
+    "key": "epic-16-surprise-me-view-should-include-a-preview-blurb",
+    "title": "Surprise-me view should include a preview/blurb",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Surprise-me view should include a preview/blurb. The Surprise card already renders media and opens the reader; add a short preview (text snippet, cached summary, or non-AI blurb) so the user can decide whether to open it. Cross-links Epic 20 Surprise card and Epic 15 reader/text-post preview blurbs.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 41,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/41"
+  },
+  {
+    "key": "epic-16-bring-back-subtle-triage-card-tilt-on-side-swipes",
+    "title": "Bring back subtle triage-card tilt on side swipes",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:real-device",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Bring back subtle triage-card tilt on side swipes. Low priority: the old Tinder-like tilt made triage swipes feel more physical. Restore a subtle `rotate()`/depth animation during horizontal triage drags, respecting reduced-motion and keeping the current shared `core/swipe.js` path.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 42,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/42"
+  },
+  {
+    "key": "epic-16-research-design-ref-capture-relay-style-interaction-video-for-analysis",
+    "title": "Research / design-ref — Capture Relay-style interaction video for analysis",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:design",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nResearch / design-ref — Capture Relay-style interaction video for analysis. User may provide a new video showing Relay-like features (lightbox captions, row gestures, reader motion, etc.). Once provided, analyze it into concrete design notes before implementing more gesture polish.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 43,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/43"
+  },
+  {
+    "key": "epic-16-deferred-long-press-on-a-thumbnail-enters-group-select",
+    "title": "DEFERRED: long-press on a thumbnail enters group-select",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — DEFERRED: long-press on a thumbnail enters group-select. ✅ tap-opens-modal SHIPPED on v3 (`main.js:161-180` delegated `[data-media]` → `openMediaFor`). The long-press → group-select half is intentionally deferred from the retention/gallery split: `swipe.js` has no long-press, and selection still lives on the avatar `[data-select]` button. Reactivate this when group-select returns to scope. Orig: Today a thumbnail tap on mobile doesn't open the modal.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 44,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/44"
+  },
+  {
+    "key": "epic-16-icebox-swipe-physics-feel",
+    "title": "ICEBOX: Swipe physics feel",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — ICEBOX: Swipe physics feel. *(Iceboxed 2026-06-22 — user: \"right now it's fine.\")* The current swipe is a little stiff; could add momentum/spring + better thresholds for a smoother feel. Reactivate if the swipe starts to feel laggy/stiff in real use.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 45,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/45"
+  },
+  {
+    "key": "epic-16-mobile-friendly-scrollbar",
+    "title": "Mobile-friendly scrollbar",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Mobile-friendly scrollbar (Nova-Launcher-style fast-scroll handle).\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 46,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/46"
+  },
+  {
+    "key": "epic-16-visual-rework-of-the-collapsing-top-bar",
+    "title": "Visual rework of the collapsing top bar",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:design",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Visual rework of the collapsing top bar. *(User-requested 2026-06-22.)* The shrink-on-scroll shipped and works (Relay-style: scroll down → `.console.compact` collapses the search row + TODAY counter; expands at the top / on scroll-up — `browse/main.js` scroll handler + `.compact` rules in `browse.css`), but it wants a visual polish pass. Open ideas: smoother/spring collapse easing; decide what stays vs. hides when compact (shrink the brand? a slim always-tappable search affordance instead of fully hiding it? what the status pills do); a subtle elevation/shadow once scrolled; tune the down/up thresholds + add hysteresis so it doesn't flicker on tiny scrolls. Keep it inside the Fable desi…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 47,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/47"
+  },
+  {
+    "key": "epic-16-scroll-deceleration-physics-feel-rapid-scroll-to-top",
+    "title": "Scroll-deceleration physics feel (rapid scroll to top)",
+    "state": "~",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:real-device",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Scroll-deceleration physics feel (rapid scroll to top). *(User-reported 2026-06-26.)* ✅ Conservative browser-native stabilization shipped 2026-06-29: the floating ↑ button now routes through a reduced-motion-aware `scrollToBrowseTop()` helper, and the collapsing top-bar scroll handler uses `scrollend`/debounced idle coordination so header expansion doesn't fight active scroll momentum. Pixel-6 PWA Playwright coverage was added/updated, but physical Pixel 6 / Chrome Android tactile verification is still pending; keep this half-open until a real-device pass confirms the fling/↑ feel is clean.\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 48,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/48"
+  },
+  {
+    "key": "epic-16-make-the-reddit-view-mobile-friendly",
+    "title": "Make the Reddit view mobile-friendly",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Make the Reddit view mobile-friendly (the `/reddit` table/grid is desktop-first). ### Mobile lightbox / media-viewer *(Epic 16)*\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 49,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/49"
+  },
+  {
+    "key": "epic-16-icebox-ship-content-hoarder-as-a-gecko-rendered-standalone-android-app",
+    "title": "ICEBOX: ship content-hoarder as a Gecko-rendered standalone Android app",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:real-device",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:icebox",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — ICEBOX: ship content-hoarder as a Gecko-rendered standalone Android app. *(Researched + decision 2026-06-19.)* Goal: a real standalone app on the Pixel without a Chromium engine (user prefers Firefox/no-Chrome). Findings: Firefox Android can't make a true install (no WebAPK; \"Add app to Home screen\" = shortcut-class with the URL bar). WebAPK minting is Chromium+Google-Play-Services only, so every turnkey route (TWA/Bubblewrap, WebView wrappers like Hermit/Native Alpha) is Chromium. The only Gecko paths are: (a) a custom GeckoView wrapper — a ~50-line Java Android app bundling Mozilla's official GeckoView that loads the `.ts.net` URL full-screen (smallest trust surface = you + Mozilla; c…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 50,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/50"
+  },
+  {
+    "key": "epic-16-explore-cromite-or-similar-adblock-chromium-fork-as-the-pwa-host-browser",
+    "title": "Explore Cromite (or similar adblock Chromium fork) as the PWA host browser",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Explore Cromite (or similar adblock Chromium fork) as the PWA host browser. *(User idea 2026-06-22.)* Chrome-for-Android can't run ad-blocking extensions, so the reader's \"Open original ↗\" + any embedded web/reddit content carries ads. Cromite (maintained Bromite successor — de-Googled Chromium fork with built-in adblock + anti-fingerprinting) can mint a real WebAPK (standalone PWA install, same as Chrome) AND block ads engine-side — getting BOTH the standalone-install goal and adblock WITHOUT a Chromium-engine extension or the GeckoView custom-wrapper maintenance burden. This likely supersedes the GeckoView icebox above (Cromite = the Chromium-adblock path; GeckoView = the no-Chromium…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 51,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/51"
+  },
+  {
+    "key": "epic-16-explore-chrome-custom-tabs-trusted-web-activity",
+    "title": "Explore Chrome Custom Tabs (+ Trusted Web Activity)",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Explore Chrome Custom Tabs (+ Trusted Web Activity). *(User idea 2026-06-22.)* Chrome Custom Tabs (CCT) is Android's native \"embed a real Chrome tab inside an app\" surface — faster than a cold browser launch, themeable (match the app bar), shares the user's Chrome session/cookies, and has a back-arrow that returns to the app. Two angles for content-hoarder: - (a) In-app link opening. Today the reader's \"Open original ↗\" + external source links bounce out to the full browser and lose the app. If content-hoarder ever runs inside a native shell, those links could open in a Custom Tab — stay-in-app feel without us rendering remote pages ourselves. *(Pure-PWA caveat: a plain installed PWA ca…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 52,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/52"
+  },
+  {
+    "key": "epic-16-icebox-watch-the-web-haptics-api-amplitude-intensity-haptics-for-the-pwa",
+    "title": "ICEBOX: watch the Web Haptics API (amplitude/intensity haptics for the PWA)",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:icebox",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — ICEBOX: watch the Web Haptics API (amplitude/intensity haptics for the PWA). *(Researched 2026-06-22.)* Our haptics are capped by `navigator.vibrate()` being duration-only — no amplitude knob (Android's `VibrationEffect` amplitude exists natively but is not bridged to the web), so \"stronger\" can only mean \"longer,\" which is why tuning firmness is a tradeoff against crispness. The fix in flight is the Web Haptics API (WICG incubation + Microsoft-Edge explainer, with Chromium interest — a BlinkOn 21 talk): semantic effects (`hint`/`edge`/`tick`/`align`) with optional intensity `0.0–1.0` = real amplitude, declarative (`@haptic` CSS) or imperative. ICEBOXED because it's not shipped (incubat…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 53,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/53"
+  },
+  {
+    "key": "epic-16-icebox-remotely-turn-on-the-server-from-the-phone",
+    "title": "ICEBOX: remotely \"turn on\" the server from the phone",
+    "state": " ",
+    "epic_num": 16,
+    "epic_title": "Mobile UX",
+    "milestone": "Epic 16 — Mobile UX",
+    "labels": [
+      "area:mobile",
+      "needs:real-device",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:icebox",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — ICEBOX: remotely \"turn on\" the server from the phone. *(Researched 2026-06-20.)* Problem: the app is a single Flask process + a SQLite file (`content_hoarder serve`, `data/app.db`) on the home PC, reached from the Pixel over Tailscale (`docs/MOBILE_TAILSCALE.md`). When the PC is off/asleep the inbox is unreachable, so the user asked how to remotely command it on. Two distinct layers: (B) host on, app not running — the easy half: don't remote-start it, run `serve` as an auto-restarting managed service (Windows: NSSM / Task Scheduler \"at startup\"; Linux: a `systemd` unit with `Restart=always`); `tailscale serve --bg` already persists the HTTPS front across reboots, so the app is up whenev…\n\n## Local context for agents\n\n- Epic: 16 — Mobile UX\n- Full local history/spec: `docs/backlog/epic-16-mobile-ux.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-16-mobile-ux.md",
+    "number": 54,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/54"
+  },
+  {
+    "key": "epic-17-one-unified-surface",
+    "title": "One unified surface",
+    "state": " ",
+    "epic_num": 17,
+    "epic_title": "Unify the Reddit and Inbox/Triage surfaces",
+    "milestone": "Epic 17 — Unify the Reddit and Inbox/Triage surfaces",
+    "labels": [
+      "area:ui",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — One unified surface. Fold the dedicated `/reddit` view's capabilities (subreddit rail, table/grid, thread viewer) into the main inbox + triage so there aren't two UIs to maintain. Large; sequence after the settings + mobile work.\n\n## Local context for agents\n\n- Epic: 17 — Unify the Reddit and Inbox/Triage surfaces\n- Full local history/spec: `docs/backlog/epic-17-unify-the-reddit-and-inbox-triage-surfaces.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-17-unify-the-reddit-and-inbox-triage-surfaces.md",
+    "number": 55,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/55"
+  },
+  {
+    "key": "epic-18-a-youtube-specific-surface",
+    "title": "A YouTube-specific surface",
+    "state": " ",
+    "epic_num": 18,
+    "epic_title": "Custom YouTube view",
+    "milestone": "Epic 18 — Custom YouTube view",
+    "labels": [
+      "area:youtube",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — A YouTube-specific surface. A view tuned for video triage (duration, channel grouping, watch/listen processing-areas, playlist order), analogous to the `/reddit` view.\n\n## Local context for agents\n\n- Epic: 18 — Custom YouTube view\n- Full local history/spec: `docs/backlog/epic-18-custom-youtube-view.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-18-custom-youtube-view.md",
+    "number": 56,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/56"
+  },
+  {
+    "key": "epic-20-triage-visual-rework-inbox-like-filtering",
+    "title": "Triage visual rework + inbox-like filtering",
+    "state": " ",
+    "epic_num": 20,
+    "epic_title": "Frontend v3 overhaul",
+    "milestone": "Epic 20 — Frontend v3 overhaul",
+    "labels": [
+      "area:ui",
+      "needs:design",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Triage visual rework + inbox-like filtering. *(User ideas 2026-06-22 + mobile test 2026-06-29.)* A fresh visual pass on the triage card/deck — hand it to a design bakeoff arm (GLM, per the Epic 20 P3 GLM-5.2 design-arm trial). Pair with the 4-directional gesture item above: the new ↑/↓ affordances need visual hinting (edge cues / peek), the reader should animate up from the bottom when opened by ↑, and side-swipe tilt can return as low-priority polish. Add inbox-like filtering so triage can process a selected slice (source/tag/status/category/smart-sort subset) instead of the whole inbox. Move light/dark controls into a settings menu, and make the bottom triage buttons match the inbox s…\n\n## Local context for agents\n\n- Epic: 20 — Frontend v3 overhaul\n- Full local history/spec: `docs/backlog/epic-20-frontend-v3-overhaul.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-20-frontend-v3-overhaul.md",
+    "number": 57,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/57"
+  },
+  {
+    "key": "epic-20-unused-app-css-selectors-i3-defer",
+    "title": "Unused `app.css` selectors (I3) — defer",
+    "state": " ",
+    "epic_num": 20,
+    "epic_title": "Frontend v3 overhaul",
+    "milestone": "Epic 20 — Frontend v3 overhaul",
+    "labels": [
+      "area:ui",
+      "needs:design",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Unused `app.css` selectors (I3) — defer. `app.css` (~2100 lines, consumed only by the legacy `/triage` page) has many unreferenced selectors (e.g. `.ai-*` suggest-UI classes), but confidence on individual selectors is medium. Defer to a triage redesign; don't bulk-delete without per-selector usage checks.\n\n## Local context for agents\n\n- Epic: 20 — Frontend v3 overhaul\n- Full local history/spec: `docs/backlog/epic-20-frontend-v3-overhaul.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-20-frontend-v3-overhaul.md",
+    "number": 58,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/58"
+  },
+  {
+    "key": "epic-21-defense-bucket-review-time-sensitive-vs-evergreen-before-sweeping",
+    "title": "Defense bucket: review time-sensitive vs evergreen before sweeping",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Defense bucket: review time-sensitive vs evergreen before sweeping. *(Deferred from WP1 P13, 2026-06-26.)* Breakdown: 5,825 defense-tagged items — 75% defense memes (keep), 16% evergreen defense tech (keep), 9% Ukraine-war subs (sweep candidates). Review the 4 Ukraine-war subs before running: `ukraine` (171), `CombatFootage` (162), `UkraineWarVideoReport` (111), `UkrainianConflict` (88). Dry-run: `content_hoarder decay --tag defense --subreddit ukraine,CombatFootage,UkraineWarVideoReport,UkrainianConflict --before 90d --dry-run`.\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 59,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/59"
+  },
+  {
+    "key": "epic-21-future-decay-waves-for-the-remaining-entertainment-buckets",
+    "title": "Future decay waves for the remaining entertainment buckets",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "needs:design",
+      "needs:user-decision",
+      "priority:P2",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Future decay waves for the remaining entertainment buckets. `anime` (5.9k), `vtubers` (2.8k), `minecraft` (2.2k), `defense` (5.8k — includes aviation + Ukraine-war subs; review before sweeping) stay tagged in the inbox. Each is one command when ready: `decay --tag <bucket> --before <date> --label swept [--apply]`. `japan` is excluded — user decision 2026-06-11: it's a resurfacing cluster (see [`docs/resurfacing-card-design.md`](docs/resurfacing-card-design.md)), not decay material.\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 60,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/60"
+  },
+  {
+    "key": "epic-21-rolling-decay-automation-icebox",
+    "title": "Rolling decay automation (Icebox)",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Rolling decay automation (Icebox). Reactivate after the backfill proves out and ~a month of new saves accumulates.\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 61,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/61"
+  },
+  {
+    "key": "epic-21-pkms-promote-pipeline-export-wrapper-icebox",
+    "title": "PKMS promote-pipeline export wrapper (Icebox)",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — PKMS promote-pipeline export wrapper (Icebox). The read path already exists (`db.get_reddit_thread`, db.py:834; 672 threads cached); build the thread-JSON→markdown export only when PKMS Phase 3 starts. Don't build capture/promote here before then. Related open question (PKMS side, Kenja decides later): whether the PKMS mobile `/capture` endpoint lives inside this Flask app (same tailnet host) or as a sibling service. UI surface (user idea 2026-06-17): the eventual trigger is a per-item \"Move to PKMS\" button in content-hoarder — deferred with this item (don't build the button before the promote pipeline exists). Ambitious icebox add-on (mobile test 2026-06-29): while reading a thread, le…\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 62,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/62"
+  },
+  {
+    "key": "epic-21-llm-identity-vs-actionable-classifier-icebox",
+    "title": "LLM identity-vs-actionable classifier (Icebox)",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — LLM identity-vs-actionable classifier (Icebox). v1 approximates it with tag buckets (memes/vtubers = identity; tips/coding/science = actionable); reactivate when the resurfacing card (Epic 20) needs better candidates. Reuses the Epic 1/10 local-LLM lane.\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 63,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/63"
+  },
+  {
+    "key": "epic-21-content-based-ephemeral-detection-icebox",
+    "title": "Content-based ephemeral detection (Icebox)",
+    "state": " ",
+    "epic_num": 21,
+    "epic_title": "ADHD-research adoption: guilt-free decay",
+    "milestone": "Epic 21 — ADHD-research adoption: guilt-free decay",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement",
+      "type:icebox"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Content-based ephemeral detection (Icebox). Event posts whose time-limited nature isn't visible from subreddit/title (announcement bodies, \"ends Sunday\" buried in text) need body analysis — local-LLM lane once the GPU is back in service. The subreddit + title-keyword v1 above covers the high-precision bulk first.\n\n## Local context for agents\n\n- Epic: 21 — ADHD-research adoption: guilt-free decay\n- Full local history/spec: `docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-21-adhd-research-adoption-guilt-free-decay.md",
+    "number": 64,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/64"
+  },
+  {
+    "key": "epic-22-architecture-research-first-decision-gate",
+    "title": "Architecture research FIRST (decision gate)",
+    "state": " ",
+    "epic_num": 22,
+    "epic_title": "Triage as a separate app: the engagement deck",
+    "milestone": "Epic 22 — Triage as a separate app: the engagement deck",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:icebox",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Architecture research FIRST (decision gate). Decide the shape before any build: (a) same Flask app, pluggable card sources behind the existing `/random` batch endpoint (cheapest, no new process); (b) sibling service reading `app.db` directly (SQLite cross-process write coordination needed — triage writes statuses); (c) fully separate app consuming an HTTP API the hoarder exposes (cleanest seam, most work). Overlaps the open PKMS sibling-service question (Epic 21 icebox) — answer them together. Note the tension with Epic 17 (unify surfaces): that unification targeted browse+reddit; triage spinning OUT can coexist, but decide deliberately. Sketch the card-source interface while deciding:…\n\n## Local context for agents\n\n- Epic: 22 — Triage as a separate app: the engagement deck\n- Full local history/spec: `docs/backlog/epic-22-triage-as-a-separate-app-the-engagement-deck.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-22-triage-as-a-separate-app-the-engagement-deck.md",
+    "number": 65,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/65"
+  },
+  {
+    "key": "epic-22-anki-interleave-prototype-after-the-architecture-gate",
+    "title": "Anki interleave prototype (after the architecture gate)",
+    "state": " ",
+    "epic_num": 22,
+    "epic_title": "Triage as a separate app: the engagement deck",
+    "milestone": "Epic 22 — Triage as a separate app: the engagement deck",
+    "labels": [
+      "area:triage",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Anki interleave prototype (after the architecture gate). AnkiConnect (localhost:8765 JSON-RPC, requires desktop Anki running) exposes due cards + answering; interleave N content cards : 1 due flashcard. Swipe maps to Again/Good at minimum. Offline Anki = the lane simply doesn't appear (no error state, no guilt).\n\n## Local context for agents\n\n- Epic: 22 — Triage as a separate app: the engagement deck\n- Full local history/spec: `docs/backlog/epic-22-triage-as-a-separate-app-the-engagement-deck.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-22-triage-as-a-separate-app-the-engagement-deck.md",
+    "number": 66,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/66"
+  },
+  {
+    "key": "epic-24-lean-middle-option-normalize-to-a-comments-table",
+    "title": "Lean middle option: normalize to a `comments` table",
+    "state": " ",
+    "epic_num": 24,
+    "epic_title": "Reddit thread hydration backfill",
+    "milestone": "Epic 24 — Reddit thread hydration backfill",
+    "labels": [
+      "area:reddit",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nLean middle option: normalize to a `comments` table. One row per comment with only the UI fields (`thread_fullname, parent_id, author, body, score, created_utc, depth`) — smaller than the blob AND queryable; tree via adjacency list (`parent_id`). (Reactivate when you want sort-in-SQL instead of in-Python, or single-comment writes.)\n\n## Local context for agents\n\n- Epic: 24 — Reddit thread hydration backfill\n- Full local history/spec: `docs/backlog/epic-24-reddit-thread-hydration-backfill.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-24-reddit-thread-hydration-backfill.md",
+    "number": 67,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/67"
+  },
+  {
+    "key": "epic-24-advanced-comment-search-pagination",
+    "title": "Advanced: comment search + pagination",
+    "state": " ",
+    "epic_num": 24,
+    "epic_title": "Reddit thread hydration backfill",
+    "milestone": "Epic 24 — Reddit thread hydration backfill",
+    "labels": [
+      "area:reddit",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nAdvanced: comment search + pagination. FTS over comment bodies; paginate the few multi-thousand-comment monster threads instead of loading the whole tree. Builds on the lean table (+ optional materialized-path/closure table for subtree queries). (Reactivate when comment search is actually wanted or a giant thread causes a real UX/memory problem.)\n\n## Local context for agents\n\n- Epic: 24 — Reddit thread hydration backfill\n- Full local history/spec: `docs/backlog/epic-24-reddit-thread-hydration-backfill.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-24-reddit-thread-hydration-backfill.md",
+    "number": 68,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/68"
+  },
+  {
+    "key": "epic-25-human-mimic-jitter-for-hydration-pacing-learning-experiment",
+    "title": "\"Human-mimic\" jitter for hydration pacing (learning experiment)",
+    "state": " ",
+    "epic_num": 25,
+    "epic_title": "Reddit access de-risking",
+    "milestone": "Epic 25 — Reddit access de-risking",
+    "labels": [
+      "area:reddit",
+      "needs:sample-data",
+      "priority:P3",
+      "safety:external-action",
+      "safety:live-network",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — \"Human-mimic\" jitter for hydration pacing (learning experiment). *(User idea 2026-06-16; explicitly a learning project — Kenja wants to build it himself.)* Replace/augment the uniform `_http.jittered_throttle` with a human-shaped delay distribution. Honest verdict — don't expect a real win: it won't save speed (real browse timing is heavy-tailed/log-normal and *slower* on average — it embeds read-pauses a bot doesn't need; for raw speed just lower `--throttle`, OAuth has ~4× headroom under 100 QPM), and the anti-detection gain is marginal (uniform already kills the exact-interval fingerprint; Reddit isn't distribution-profiling low-volume authenticated reads). The value is the *learning…\n\n## Local context for agents\n\n- Epic: 25 — Reddit access de-risking\n- Full local history/spec: `docs/backlog/epic-25-reddit-access-de-risking.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-25-reddit-access-de-risking.md",
+    "number": 69,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/69"
+  },
+  {
+    "key": "epic-26-user-tag-table-pre-create-empty-tags-rename-in-vocabulary",
+    "title": "User-tag table: pre-create empty tags + rename-in-vocabulary",
+    "state": " ",
+    "epic_num": 26,
+    "epic_title": "Tag & category taxonomy reorganization",
+    "milestone": "Epic 26 — Tag & category taxonomy reorganization",
+    "labels": [
+      "area:tags",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:enhancement"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — User-tag table: pre-create empty tags + rename-in-vocabulary. *(Follow-up to the shipped registry, 2026-06-22.)* The registry derives the vocabulary from `metadata.tags_manual`, so a tag exists exactly while it is applied to ≥1 item — two things derive-from-usage cannot do, both needing a real `user_tags` table (or a settings list): (a) create an empty tag ahead of applying it (a 0-item tag has nowhere to live); (b) rename a user tag across the vocabulary in one action (today a rename = re-tag every item and the old name vanishes everywhere; a `user_tags` row carrying a stable id + display name lets one UPDATE rewrite `metadata.tags`/`tags_manual` in bulk). Also unlocks delete-from-voca…\n\n## Local context for agents\n\n- Epic: 26 — Tag & category taxonomy reorganization\n- Full local history/spec: `docs/backlog/epic-26-tag-category-taxonomy-reorganization.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-26-tag-category-taxonomy-reorganization.md",
+    "number": 70,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/70"
+  },
+  {
+    "key": "epic-26-audit-reddit-coverage-for-ai-ml-tagging",
+    "title": "Audit Reddit coverage for `ai_ml` tagging",
+    "state": " ",
+    "epic_num": 26,
+    "epic_title": "Tag & category taxonomy reorganization",
+    "milestone": "Epic 26 — Tag & category taxonomy reorganization",
+    "labels": [
+      "area:tags",
+      "needs:sample-data",
+      "priority:P3",
+      "sandbox:local-spec",
+      "type:research"
+    ],
+    "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP3 — Audit Reddit coverage for `ai_ml` tagging. *(Mobile test 2026-06-29.)* User noticed there may be no `ai_ml` tagged Reddit items. Confirm whether the curated taxonomy actually includes `ai_ml` for Reddit (vs HN/Firefox/browser buckets), inspect current counts by source, and either add conservative subreddit/title/domain rules for Reddit AI/ML communities or document why the existing `coding`/`science` buckets intentionally absorb them. Use dry-run samples before applying.\n\n## Local context for agents\n\n- Epic: 26 — Tag & category taxonomy reorganization\n- Full local history/spec: `docs/backlog/epic-26-tag-category-taxonomy-reorganization.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
+    "local_history": "docs/backlog/epic-26-tag-category-taxonomy-reorganization.md",
+    "number": 71,
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/71"
+  }
+]

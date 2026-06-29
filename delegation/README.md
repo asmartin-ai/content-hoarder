@@ -1,62 +1,28 @@
-# Mobile-polish delegation records — 2026-06-27
+# Delegation handoff
 
-Status: **closed / archived (2026-06-28 cleanup)**. These docs are historical build records, not active work queues.
+This directory is intentionally small. Active work is tracked in GitHub Issues; local backlog history is split under `docs/backlog/` so sandboxed agents do not need to read one monolithic file.
 
-## What shipped
+## Source of truth
 
-Two mobile-polish waves landed on `main`:
+- Active issue tracker: <https://github.com/asmartin-ai/content-hoarder/issues>
+- Local issue/epic index: `BACKLOG.md`
+- Offline backlog history: `docs/backlog/README.md` + `docs/backlog/epic-*.md`
+- Issue mapping for scripts/agents: `docs/backlog/github-issues.json`
+- Current delegation queue: `delegation/NEXT-DELEGATION.md`
+- Mobile/PWA verification guidance: `docs/QA-CHECKLIST.md` and `tests/ui/`
 
-1. **T2 batch** — initial Relay/lightbox polish:
-   - `c2-lightbox-zoom`: pinch + mouse-wheel zoom, 1×–4× clamp.
-   - `b4-hold-to-preview`: 250ms hold-to-peek lightbox, release-to-close, click suppression.
-   - `p3-relay-icon-only`: icon-only relay strip with larger touch targets and sr-only labels.
-   - `c3-lightbox-pan-close`: zoomed pan + 1× swipe-far-to-close.
-   - `a2-no-feed-refresh-on-triage`: reader triage updates in memory without feed reflow/refetch.
+## Recently folded/migrated (2026-06-29)
 
-2. **T3 regression batch** — real-device follow-up fixes:
-   - relay swipe-close regressions fixed;
-   - hold-to-preview flicker/race fixed;
-   - tag suggestions consistently show three options when candidates exist;
-   - lightbox swipe-to-close no longer scrolls the page;
-   - sidebar/sheet scroll locking fixed;
-   - reader triage dock intentionally removed;
-   - Playwright mobile UX regression tests added in `tests/ui/test_mobile_ux.py`.
+- Historical per-task delegation specs were folded into `BACKLOG.md` / `docs/backlog/` and removed.
+- 61 active/half-open backlog items were migrated to GitHub Issues (#11–#71).
+- 26 GitHub milestones were created, one per epic.
+- Labels now encode priority, type, area, safety, and validation needs.
 
-## Validation record
+## Delegation rules
 
-- T2 integration validation recorded: `python -m pytest -q -m "not ui"` showed only the known Windows env failures; `python -m pytest -m ui` passed with 20 passed / 1 skipped.
-- T3 added focused Playwright coverage for the mobile UX regressions.
-- Some gesture details still benefit from real-device spot checks because headless Chromium cannot fully prove physical pinch/long-press feel.
-
-## Cleanup record
-
-The scratch worktrees and merged local branches from these batches were removed after merge:
-
-- `delegate/a2-no-feed-refresh-on-triage`
-- `delegate/b4-hold-to-preview`
-- `delegate/c2-lightbox-zoom`
-- `delegate/c3-lightbox-pan-close`
-- `delegate/p3-relay-icon-only`
-- `delegate/t3-drop-reader-dock`
-- `delegate/t3-lightbox-swipe-scroll`
-- `delegate/t3-peek-flicker`
-- `delegate/t3-playwright-ux-tests`
-- `delegate/t3-relay-swipe-close`
-- `delegate/t3-sidebar-scroll-lock`
-- `delegate/t3-tag-suggest-three`
-
-The merged remote staging branch `origin/staging/mobile-polish-t2` was also deleted after confirmation that it was an ancestor of `main`.
-
-## Current orchestration plan
-
-Use [`NEXT-DELEGATION.md`](NEXT-DELEGATION.md) for the current agent plan: what is done, what should happen next, which tasks require T1 vs T2/T3, and which tasks can safely run in parallel.
-
-Current mobile work should be tracked in `BACKLOG.md`, mainly:
-
-- Epic 16: `P3 — Scroll-deceleration physics feel (rapid scroll to top)`.
-- Epic 16: `P3 — Make the Reddit view mobile-friendly`.
-- Real-device QA checklist spot checks in `docs/QA-CHECKLIST.md`, especially media gestures.
-
-## Historical specs
-
-The SPEC-*.md, MOBILE-POLISH-BATCH.md, and MOBILE-POLISH-T3-BATCH.md files were deleted in the 2026-06-28 cleanup pass. All shipped mobile-polish work is recorded in BACKLOG.md Epics 16 and the UI test suites. The SPEC-redgifs-resolver-dryrun.md was also deleted (RedGifs resolver is shipped on main).
+1. Use one task per branch/worktree and keep write scopes disjoint.
+2. If delegating to a sandboxed/offline agent, include the GitHub issue body in the prompt and point it to the relevant `docs/backlog/epic-*.md` file.
+3. No live/private data or external account mutations in delegated work unless explicitly authorized.
+4. UI work must use the project `frontend-design` skill and update/bump service-worker cache versions when needed.
+5. Tests should be offline and deterministic; UI tests use synthetic DB fixtures.
+6. For Reddit unsave, archive.today, media downloads, or anything irreversible/costly, keep preview/dry-run as the default and require explicit live/apply gates.
