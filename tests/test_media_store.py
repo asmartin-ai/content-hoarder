@@ -1,4 +1,5 @@
 """media_store: content-addressed on-disk blob store (Epic 4 P1)."""
+
 from content_hoarder import media_store
 
 
@@ -15,6 +16,35 @@ def test_store_is_content_addressed_and_idempotent(tmp_path):
     assert f.stat().st_mtime_ns == mtime
     # different bytes -> different id
     assert media_store.store(b + b"x", mime="image/png", base_dir=d) != id1
+
+
+def test_store_path_streams_video_and_dedups(tmp_path):
+    d = tmp_path / "media"
+    src = tmp_path / "fixture.mp4"
+    data = b"\x00\x00\x00 ftypmp42" + (b"x" * 4096)
+    src.write_bytes(data)
+
+    blob = media_store.store_path(src, mime="video/mp4", base_dir=d, chunk_size=1024)
+    assert blob.endswith(".mp4") and len(blob.split(".")[0]) == 64
+    stored = media_store.path_for(blob, base_dir=d)
+    assert stored is not None and stored.read_bytes() == data
+    mtime = stored.stat().st_mtime_ns
+
+    assert (
+        media_store.store_path(src, mime="video/mp4", base_dir=d, chunk_size=512)
+        == blob
+    )
+    assert stored.stat().st_mtime_ns == mtime
+
+
+def test_store_path_extension_can_come_from_source_url(tmp_path):
+    d = tmp_path / "media"
+    src = tmp_path / "downloaded"
+    src.write_bytes(b"webm-ish")
+    blob = media_store.store_path(
+        src, url="https://example.test/video.webm?x=1", base_dir=d
+    )
+    assert blob.endswith(".webm")
 
 
 def test_ext_and_mime():
@@ -45,7 +75,9 @@ def test_path_for_resolves_and_rejects(tmp_path):
     assert media_store.path_for(h, base_dir=d) is None  # not stored yet
     (d / (h + ".jpg")).write_bytes(b"x")
     assert media_store.path_for(h + ".jpg", base_dir=d).name == h + ".jpg"
-    assert media_store.path_for(h, base_dir=d).name == h + ".jpg"  # bare hash finds the ext
+    assert (
+        media_store.path_for(h, base_dir=d).name == h + ".jpg"
+    )  # bare hash finds the ext
     (d / (h + ".jpg")).unlink()
     (d / (h + ".mp4")).write_bytes(b"v")
     assert media_store.path_for(h, base_dir=d).name == h + ".mp4"
