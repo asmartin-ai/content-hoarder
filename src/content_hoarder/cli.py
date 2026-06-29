@@ -6,6 +6,7 @@ import argparse
 import datetime
 import json
 import sys
+from typing import Any
 
 from content_hoarder import config
 
@@ -374,6 +375,35 @@ def cmd_consolidate(args) -> int:
     return 0
 
 
+def cmd_firefox_token(args) -> int:
+    from content_hoarder import firefox_tabs
+
+    with _connect() as conn:
+        if not args.generate:
+            configured = firefox_tabs.token_configured(conn)
+            print(json.dumps({"configured": configured}, indent=2))
+            if configured:
+                print(
+                    "A Firefox ingest token is configured. Re-run with --generate to rotate it.",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "No Firefox ingest token is configured. Re-run with --generate to create one.",
+                    file=sys.stderr,
+                )
+            return 0
+
+        token = firefox_tabs.generate_token()
+        firefox_tabs.store_token_hash(conn, token)
+    print(json.dumps({"token": token}, indent=2))
+    print(
+        "Copy this token into the Firefox extension now; only its SHA-256 hash was stored.",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def cmd_serve(args) -> int:
     from content_hoarder.web import create_app
 
@@ -413,6 +443,9 @@ def cmd_bankruptcy(args) -> int:
     before_utc, rc = _parse_date(args.before, "--before")
     if rc:
         return rc
+    if before_utc is None:
+        print("error: --before is required", file=sys.stderr)
+        return 2
     with _connect() as conn:
         n = db.bankruptcy(conn, before_utc, source=args.source, dry_run=args.dry_run)
     verb = "would archive" if args.dry_run else "archived"
@@ -601,14 +634,15 @@ def cmd_snooze(args) -> int:
         window_days = int(args.window_days)
         until_utc = now + window_days * 86400
 
-    selectors = dict(
-        fullnames=args.fullname,
-        until_utc=until_utc,
-        window_days=window_days,
-        escalate_after=args.escalate_after,
-    )
     with _connect() as conn:
-        plan = db.snooze(conn, **selectors, apply=False)
+        plan = db.snooze(
+            conn,
+            fullnames=args.fullname,
+            until_utc=until_utc,
+            window_days=window_days,
+            escalate_after=args.escalate_after,
+            apply=False,
+        )
         if not args.apply:
             print(json.dumps(plan, indent=2))
             print(
@@ -623,7 +657,14 @@ def cmd_snooze(args) -> int:
             print("refusing: snooze needs BOTH --apply and --yes.", file=sys.stderr)
             return 3
         bak = _backup_db(conn, "pre-snooze")
-        res = db.snooze(conn, **selectors, apply=True)
+        res = db.snooze(
+            conn,
+            fullnames=args.fullname,
+            until_utc=until_utc,
+            window_days=window_days,
+            escalate_after=args.escalate_after,
+            apply=True,
+        )
         res["backup"] = str(bak)
         audit_path = Path(config.db_path()).with_name("snooze-audit.jsonl")
         audit = {
@@ -744,18 +785,29 @@ def cmd_delete(args) -> int:
     if rc:
         return rc
 
-    selectors = dict(
-        tags=args.tag,
-        subreddits=args.subreddit,
-        before_utc=before_utc,
-        source=args.source,
-        status=args.status,
-        swept=args.swept,
-        fullnames=args.fullname,
-        also_unsave=args.also_unsave,
-    )
+    selectors: dict[str, Any] = {
+        "tags": args.tag,
+        "subreddits": args.subreddit,
+        "before_utc": before_utc,
+        "source": args.source,
+        "status": args.status,
+        "swept": args.swept,
+        "fullnames": args.fullname,
+        "also_unsave": args.also_unsave,
+    }
     with _connect() as conn:
-        plan = db.delete_items(conn, **selectors, apply=False)
+        plan = db.delete_items(
+            conn,
+            tags=args.tag,
+            subreddits=args.subreddit,
+            before_utc=before_utc,
+            source=args.source,
+            status=args.status,
+            swept=args.swept,
+            fullnames=args.fullname,
+            also_unsave=args.also_unsave,
+            apply=False,
+        )
         if not args.apply:
             print(json.dumps(plan, indent=2))
             print(
@@ -774,7 +826,19 @@ def cmd_delete(args) -> int:
 
         bak = _backup_db(conn, "pre-delete")
 
-        res = db.delete_items(conn, **selectors, apply=True, max_rows=args.max)
+        res = db.delete_items(
+            conn,
+            tags=args.tag,
+            subreddits=args.subreddit,
+            before_utc=before_utc,
+            source=args.source,
+            status=args.status,
+            swept=args.swept,
+            fullnames=args.fullname,
+            also_unsave=args.also_unsave,
+            apply=True,
+            max_rows=args.max,
+        )
         res["backup"] = str(bak)
 
         audit_path = Path(config.db_path()).with_name("delete-audit.jsonl")
@@ -1318,7 +1382,7 @@ def cmd_folder_list(args) -> int:
 def cmd_folder_create(args) -> int:
     from content_hoarder import db
 
-    qd: dict = {}
+    qd: dict[str, Any] = {}
     if args.source:
         qd["source"] = args.source
     if args.tag:
@@ -1722,6 +1786,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Commit changes (default: dry run). Run against a DB copy first.",
     )
     pm.set_defaults(func=cmd_migrate_firefox_tabs)
+
+    pft = sub.add_parser(
+        "firefox-token",
+        help="Show Firefox ingest-token status or generate/rotate the local token.",
+    )
+    pft.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate a new token, store only its SHA-256 hash, and print it once.",
+    )
+    pft.set_defaults(func=cmd_firefox_token)
 
     pmy = sub.add_parser(
         "migrate-note-youtube",
