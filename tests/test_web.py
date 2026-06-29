@@ -1,11 +1,18 @@
 import io
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, Protocol, cast
 
 from content_hoarder import db, models
 from content_hoarder.web import create_app
 
 NOW = 2_000_000_000
+
+
+class _ImportCleanupApp(Protocol):
+    _prepared: dict[str, dict[str, Any]]
+    _cleanup_all_prepared: Callable[[], None]
 
 
 def _seed(dbp):
@@ -374,14 +381,15 @@ def test_import_prepare_temp_file_cleaned_on_exit(tmp_db):
 
     _seed(tmp_db)
     app = create_app(tmp_db)
+    cleanup_app = cast(_ImportCleanupApp, cast(object, app))
     cl = app.test_client()
     blob = json.dumps(_yt_playlist("abc123", "def456")).encode()
     data = {"file": (io.BytesIO(blob), "wl.json")}
     cl.post("/import/prepare", data=data, content_type="multipart/form-data")
-    paths = [v["path"] for v in app._prepared.values()]
+    paths = [v["path"] for v in cleanup_app._prepared.values()]
     assert paths and all(os.path.exists(p) for p in paths)  # staged, never committed
-    app._cleanup_all_prepared()
-    assert not app._prepared
+    cleanup_app._cleanup_all_prepared()
+    assert not cleanup_app._prepared
     assert all(not os.path.exists(p) for p in paths)
 
 
