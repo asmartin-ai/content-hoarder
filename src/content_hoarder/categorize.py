@@ -133,6 +133,14 @@ REDDIT_TAGS = (
     "gaming",
     "investing",
     "ephemeral",
+    # T2 tag-coverage-expansion — browser host/keyword surface needs these facets.
+    "ai_ml",
+    "web_dev",
+    "self_hosted",
+    "linux",
+    "startups",
+    "crypto",
+    "productivity",
 )
 
 # The curated vocabulary the browse tag-rail filters on: the reddit topic/NSFW tags plus the
@@ -150,9 +158,11 @@ FILTER_TAGS = REDDIT_TAGS + db.PROCESSING_TAGS
 # both are test-locked (test_tag_groups), so adding a new curated tag forces grouping it.
 # The tuple ORDER is the rail order. Labels are display-only; edit freely to retune the taxonomy.
 TAG_GROUPS = (
+    ("Tech & AI", ("ai_ml", "web_dev", "self_hosted", "linux")),
+    ("Business", ("startups", "crypto", "investing")),
     ("Gaming", ("gaming", "esports", "minecraft")),
     ("Anime & Otaku", ("anime", "vtubers", "wotagei")),
-    ("Educational", ("science", "coding", "tips", "investing")),
+    ("Educational", ("science", "coding", "tips", "productivity")),
     ("Watchlist", ("watch", "listenable")),
     ("Memes & Trivial", ("memes", "ephemeral")),
     ("World & Culture", ("defense", "japan")),
@@ -697,6 +707,61 @@ _BROWSER_HOST_TAGS = {
     "marketwatch": ["investing"],
     "wsj": ["investing"],
     "cnbc": ["investing"],
+    # Existing-tag host extensions (T2 tag-coverage-expansion).
+    "hololive": ["vtubers"],
+    "nijisanji": ["vtubers"],
+    "vshojo": ["vtubers"],
+    "melonbooks": ["anime"],
+    "aniwave": ["anime"],
+    "crunchyroll": ["anime"],
+    "modrinth": ["minecraft"],
+    "curseforge": ["minecraft"],
+    "planetminecraft": ["minecraft"],
+    "feed-the-beast": ["minecraft"],
+    "stardewvalleywiki": ["gaming"],
+    "pzwiki": ["gaming"],
+    "game8": ["gaming"],
+    "github.com": ["coding"],
+    "gitlab.com": ["coding"],
+    "stackoverflow.com": ["coding"],
+    "nature.com": ["science"],
+    "arxiv.org": ["science"],
+    "ieee.org": ["science"],
+    "sciencedirect.com": ["science"],
+    # New-tag host seeds (T2 tag-coverage-expansion).
+    "openai.com": ["ai_ml"],
+    "anthropic.com": ["ai_ml"],
+    "huggingface.co": ["ai_ml"],
+    "deeplearning.ai": ["ai_ml"],
+    "cohere.com": ["ai_ml"],
+    "replicate.com": ["ai_ml"],
+    "together.ai": ["ai_ml"],
+    "css-tricks.com": ["web_dev"],
+    "smashingmagazine.com": ["web_dev"],
+    "frontendmasters.com": ["web_dev"],
+    "vercel.com": ["web_dev"],
+    "netlify.com": ["web_dev"],
+    "selfh.st": ["self_hosted"],
+    "linuxserver.io": ["self_hosted"],
+    "nextcloud.com": ["self_hosted"],
+    "owncloud.com": ["self_hosted"],
+    "linuxjournal.com": ["linux"],
+    "lwn.net": ["linux"],
+    "archlinux.org": ["linux"],
+    "kernel.org": ["linux"],
+    "ycombinator.com": ["startups"],
+    "techcrunch.com": ["startups"],
+    "wellfound.com": ["startups"],
+    "crunchbase.com": ["startups"],
+    "coindesk.com": ["crypto"],
+    "cointelegraph.com": ["crypto"],
+    "decrypt.co": ["crypto"],
+    "ethereum.org": ["crypto"],
+    "bitcoinmagazine.com": ["crypto"],
+    "notion.so": ["productivity"],
+    "obsidian.md": ["productivity"],
+    "todoist.com": ["productivity"],
+    "gettingthingsdone.com": ["productivity"],
 }
 
 # Title keywords (word-bounded), applied ONLY when the host map produced no tag.
@@ -709,6 +774,61 @@ _BROWSER_KEYWORD_TAGS = [
         "investing",
         re.compile(
             r"\bstocks?\b|\bearnings\b|\binvest(?:ing|or|ors)?\b|\bstock\s+markets?\b",
+            re.IGNORECASE,
+        ),
+    ),
+    # Existing-tag keyword extensions (T2 tag-coverage-expansion).
+    ("vtubers", re.compile(r"\bvtuber\b|hololive|nijisanji|vshojo", re.IGNORECASE)),
+    ("anime", re.compile(r"\banime\b|\bmanga\b", re.IGNORECASE)),
+    ("minecraft", re.compile(r"\bminecraft\b|modrinth|feedthebeast", re.IGNORECASE)),
+    ("japan", re.compile(r"\bjapan(ese)?\b|\btokyo\b", re.IGNORECASE)),
+    # New-tag keyword seeds (T2 tag-coverage-expansion).
+    (
+        "ai_ml",
+        re.compile(
+            r"\bllm\b|\bgpt\b|\bchatgpt\b|\bclaude\b|\btransformer\b|\bembedding\b|\bneural network\b|\bmachine learning\b|\bdeep learning\b|\bartificial intelligence\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "web_dev",
+        re.compile(
+            r"\bcss\b|\bhtml\b|\breact\b|\bvue\b|\bsvelte\b|\bweb dev\b|\bfrontend\b|\bbackend\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "self_hosted",
+        re.compile(
+            r"\bself[- ]?hosted\b|\bhomelab\b|\bnextcloud\b|\bhome server\b|\bpi-hole\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "linux",
+        re.compile(
+            r"\blinux\b|\bkernel\b|\bdebian\b|\barch linux\b|\bwayland\b|\bsystemd\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "startups",
+        re.compile(
+            r"\bstartup\b|\bycombinator\b|\bYC\b|\bseed round\b|\bseries a\b|\bventure capital\b|\bindie hacker\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "crypto",
+        re.compile(
+            r"\bbitcoin\b|\bethereum\b|\bcrypto(?:currency)?\b|\bblockchain\b|\bnft\b|\bweb3\b|\bsolidity\b|\bdefi\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "productivity",
+        re.compile(
+            r"\bproductivity\b|\bnote-taking\b|\bgetting things done\b|\bpomodoro\b|\btime management\b",
             re.IGNORECASE,
         ),
     ),
