@@ -39,7 +39,9 @@ def test_firefox_pipeline_writes_tags(conn):
     assert res["source"] == "firefox"
     assert res["tagged"] == 1
     assert res["by_tag"] == {"investing": 1}
-    md = parse_metadata(db.get_item(conn, fn)["metadata"])
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    md = parse_metadata(item_get["metadata"])
     assert md["tags"] == ["investing"]
     assert md["tags_auto"] == ["investing"]
 
@@ -55,7 +57,9 @@ def test_firefox_pipeline_keyword_path(conn):
         metadata={"domain": "blog.example.com"},
     )
     cat.tag_browser_source(conn, "firefox")
-    assert parse_metadata(db.get_item(conn, fn)["metadata"])["tags"] == ["gaming"]
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    assert parse_metadata(item_get["metadata"])["tags"] == ["gaming"]
 
 
 def test_hackernews_pipeline_writes_tags(conn):
@@ -68,7 +72,9 @@ def test_hackernews_pipeline_writes_tags(conn):
     )
     res = cat.tag_browser_source(conn, "hackernews")
     assert res["tagged"] == 1
-    assert parse_metadata(db.get_item(conn, fn)["metadata"])["tags"] == ["defense"]
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    assert parse_metadata(item_get["metadata"])["tags"] == ["defense"]
 
 
 def test_browser_pipeline_dry_run_does_not_write(conn):
@@ -83,11 +89,13 @@ def test_browser_pipeline_dry_run_does_not_write(conn):
     res = cat.tag_browser_source(conn, "firefox", dry_run=True)
     assert res["dry_run"] is True
     assert res["tagged"] == 1
-    assert parse_metadata(db.get_item(conn, fn)["metadata"]).get("tags") is None
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    assert parse_metadata(item_get["metadata"]).get("tags") is None
 
 
 def test_browser_pipeline_skips_already_tagged_unless_retry(conn):
-    fn = _add(
+    _add(
         conn,
         source="hackernews",
         sid="hn|skip",
@@ -115,7 +123,9 @@ def test_browser_pipeline_no_match_leaves_untagged(conn):
     res = cat.tag_browser_source(conn, "firefox")
     assert res["tagged"] == 0
     assert res["untagged"] == 1
-    assert parse_metadata(db.get_item(conn, fn)["metadata"]).get("tags") is None
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    assert parse_metadata(item_get["metadata"]).get("tags") is None
 
 
 def test_browser_pipeline_never_introduces_category(conn):
@@ -130,7 +140,9 @@ def test_browser_pipeline_never_introduces_category(conn):
         metadata={"domain": "x.example.com"},
     )
     cat.tag_browser_source(conn, "firefox")
-    md = parse_metadata(db.get_item(conn, fn)["metadata"])
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    md = parse_metadata(item_get["metadata"])
     assert md["tags"] == ["investing"]
     assert md["tags_auto"] == ["investing"]
     assert md.get("category") is None
@@ -149,7 +161,9 @@ def test_browser_retry_clears_stale_auto_tags_but_keeps_manual(conn):
     db.set_tags(conn, fn, add=["Recipes"])
     res = cat.tag_browser_source(conn, "firefox", retry=True)
     assert res["tagged"] == 0
-    md = parse_metadata(db.get_item(conn, fn)["metadata"])
+    item_get = db.get_item(conn, fn)
+    assert item_get is not None
+    md = parse_metadata(item_get["metadata"])
     assert md["tags"] == ["recipes"]
     assert md["tags_manual"] == ["recipes"]
     assert "tags_auto" not in md

@@ -153,7 +153,7 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/manifest.webmanifest")
     def manifest():
         return send_from_directory(
-            app.static_folder,
+            app.static_folder or os.path.join(app.root_path, "static"),
             "manifest.webmanifest",
             mimetype="application/manifest+json",
         )
@@ -754,12 +754,20 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.post("/settings/done-retention/purge")
     def done_retention_purge():
         body = request.get_json(silent=True) or {}
-        expected_total = body.get("expected_total")
-        expected_cutoff = body.get("expected_cutoff")
+        expected_total_raw = body.get("expected_total")
+        expected_cutoff_raw = body.get("expected_cutoff")
+        if not isinstance(
+            expected_total_raw, (str, bytes, bytearray, int, float)
+        ) or not isinstance(
+            expected_cutoff_raw, (str, bytes, bytearray, int, float)
+        ):
+            return jsonify(
+                {"error": "expected_total and expected_cutoff are required"}
+            ), 400
         try:
-            expected_total = int(expected_total)
-            expected_cutoff = int(expected_cutoff)
-        except (TypeError, ValueError):
+            expected_total = int(expected_total_raw)
+            expected_cutoff = int(expected_cutoff_raw)
+        except ValueError:
             return jsonify(
                 {"error": "expected_total and expected_cutoff are required"}
             ), 400
@@ -1378,7 +1386,7 @@ def create_app(db_path: str | None = None) -> Flask:
 
         try:
             connector = connectors.get(forced) if forced else connectors.dispatch(path)
-            items = list(connector.import_file(path))
+            items = list(connector.import_file(Path(path)))
         except KeyError:
             os.unlink(path)
             return jsonify({"error": f"unknown source '{forced}'"}), 400
@@ -1454,6 +1462,6 @@ def create_app(db_path: str | None = None) -> Flask:
                 pass
 
     # exposed for testing the B4 exit-cleanup (the atexit hook is otherwise unreachable)
-    app._prepared = _prepared
-    app._cleanup_all_prepared = _cleanup_all_prepared
+    app._prepared = _prepared  # type: ignore[attr-defined]
+    app._cleanup_all_prepared = _cleanup_all_prepared  # type: ignore[attr-defined]
     return app
