@@ -336,7 +336,7 @@ import { esc } from "./core/util.js";
         return fetch('/reddit/unsave/enqueue-by-tag', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tag, confirm: true }),
+          body: JSON.stringify({ tag, apply: true, yes: true }),
         }).then(r => r.json());
       })
       .then(result => {

@@ -64,5 +64,5 @@ export const fetchStats = (params) =>
 
 /* ---- reddit unsave queue ---- */
 export const unsaveStatus = () => getJSON("/reddit/unsave/status");
-export const unsaveDrain = (limit) =>
-  postJSON("/reddit/unsave/drain", limit ? { limit } : undefined);
+export const unsaveDrain = (body) =>
+  postJSON("/reddit/unsave/drain", body || { dry_run: true });

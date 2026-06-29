@@ -899,9 +899,9 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     if (willOpen) { setActiveChip(); ruRefreshPop(); }
   });
 
-  // Reddit unsave: the button DRAINS the unsave queue (unsaves the queued items on
-  // Reddit) — labelled "Unsave queued (N)" so it doesn't read as a content sync. Only
-  // shown when a cookie is configured.
+  // Reddit unsave: the button first previews the queued drain scope, then requires an
+  // explicit second confirmation before contacting Reddit. Queueing is local/reversible;
+  // this live drain is the external mutation.
   function ruRefreshPop() {
     if (!ruPop) return;
     fetchJSON("/reddit/unsave/status").then(function (s) {
@@ -913,14 +913,42 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     }).catch(function () {});
   }
   if (ruSyncBtn) ruSyncBtn.addEventListener("click", function () {
+    var maxDrain = 50;
     ruSyncBtn.disabled = true;
-    ruPopStatus.textContent = "Unsaving…";
+    ruPopStatus.textContent = "Reviewing queued unsaves…";
     fetchJSON("/reddit/unsave/drain", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
-    }).then(function (res) {
-      if (res.auth_error) toast("Reddit session expired — re-paste your cookie on Browse", false);
-      else toast("Unsaved " + res.unsaved + (res.failed ? " · " + res.failed + " failed" : ""), false);
-      ruRefreshPop();
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dry_run: true, max: maxDrain })
+    }).then(function (plan) {
+      if (!plan.selected) {
+        toast("Nothing queued to unsave", false);
+        ruRefreshPop();
+        return;
+      }
+      var sample = (plan.sample || []).slice(0, 3).map(function (it) {
+        return "• " + (it.subreddit ? "r/" + it.subreddit + " · " : "") + (it.title || it.fullname || "queued item");
+      }).join("\n");
+      var more = plan.remaining ? "\n\n" + plan.remaining + " more will remain queued after this batch." : "";
+      var msg = "Unsave " + plan.selected + " queued Reddit item" + (plan.selected === 1 ? "" : "s") +
+        " from your REAL Reddit Saved list?\n\n" +
+        (sample || "No sample available.") + more +
+        "\n\nThis is a live Reddit write. Cancel leaves the local queue unchanged.";
+      if (!window.confirm(msg)) {
+        toast("Unsave cancelled — queue unchanged", false);
+        ruRefreshPop();
+        return;
+      }
+      ruPopStatus.textContent = "Unsaving confirmed batch…";
+      return fetchJSON("/reddit/unsave/drain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ live: true, confirm: true, max: maxDrain })
+      }).then(function (res) {
+        if (res.auth_error) toast("Reddit session expired — re-paste your cookie on Browse", false);
+        else toast("Unsaved " + res.unsaved + (res.failed ? " · " + res.failed + " failed" : ""), false);
+        ruRefreshPop();
+      });
     }).catch(function () { toast("Sync failed", false); ruRefreshPop(); });
   });
   if (batchChips) batchChips.addEventListener("click", function (e) {
