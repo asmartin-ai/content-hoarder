@@ -28,8 +28,10 @@ const glyph = (item) => {
 };
 
 /* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters.
-   Share is NOT here on desktop (use the right-click row menu); the whole .acts cluster is
-   hidden on touch via @media(hover:none), so mobile uses long-press → row menu for share too. */
+   Share is NOT here on desktop (use the right-click row menu). On touch, a visible
+   per-row Decide button opens the labeled tray; swipe/long-press stay accelerators. */
+const decideBtn =
+  '<button type="button" class="decidebtn" data-select="1" aria-label="Select this item for Keep, Archive, or Done actions">Decide</button>';
 const actsHtml = (status) =>
   '<div class="acts">' +
   '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' +
@@ -195,7 +197,7 @@ export const logRow = (item, opts) => {
     underlay +
     '<div class="item-fg">' +
     '<span class="idx"></span>' +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' +
+    '<button type="button" class="avatar" data-select="1" title="Select for action tray" aria-label="Select for action tray"><span class="g">' +
     glyph(item) +
     "</span></button>" +
     '<div class="t">' +
@@ -212,6 +214,7 @@ export const logRow = (item, opts) => {
     '<div class="trail">' +
     monitorHtml(item, o.nsfwRevealed) +
     actsHtml(o.view) +
+    decideBtn +
     "</div>" +
     "</div></div>"
   );
@@ -238,7 +241,7 @@ export const ledgerRow = (item, n, opts) => {
     '<span class="idx">' +
     String(n).padStart(2, "0") +
     "</span>" +
-    '<button type="button" class="avatar" data-select="1" aria-label="Select"><span class="g">' +
+    '<button type="button" class="avatar" data-select="1" title="Select for action tray" aria-label="Select for action tray"><span class="g">' +
     glyph(item) +
     "</span></button>" +
     '<div class="t">' +
@@ -254,6 +257,7 @@ export const ledgerRow = (item, n, opts) => {
     '<div class="trail">' +
     play +
     actsHtml(o.view) +
+    decideBtn +
     "</div>" +
     "</div></div>"
   );
@@ -308,7 +312,7 @@ export const pinCard = (item, opts) => {
     '<div class="head">' +
     '<button type="button" class="avatar" data-select="1" style="--src:' +
     srcAccent(item.source) +
-    '" aria-label="Select"><span class="g">' +
+    '" title="Select for action tray" aria-label="Select for action tray"><span class="g">' +
     glyph(item) +
     "</span></button>" +
     '<span class="meta">' +

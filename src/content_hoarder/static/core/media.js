@@ -377,6 +377,9 @@ export function createLightbox(opts) {
   const lockEl = opts.lockScrollEl || null; // scroll-lock target (e.g. #items); save/restore scrollY
   let lockSaved = 0;
   let windowSaved = 0;
+  let windowSavedDoc = 0;
+  let windowSavedBody = 0;
+  let bodyLock = null;
 
   let videoTeardown = null; // teardown function for the open video's hls.js instance
 
@@ -571,6 +574,63 @@ export function createLightbox(opts) {
     window.addEventListener("pointerup", release);
     window.addEventListener("pointercancel", release);
   };
+  const savedWindowScroll = () =>
+    windowSaved || windowSavedDoc || windowSavedBody || 0;
+  const restoreWindowScroll = (saved) => {
+    if (saved == null) return;
+    window.scrollTo(0, saved);
+    document.documentElement.scrollTop = saved;
+    document.body.scrollTop = saved;
+  };
+  const restoreWindowScrollSoon = (saved) => {
+    restoreWindowScroll(saved);
+    requestAnimationFrame(() => {
+      restoreWindowScroll(saved);
+      requestAnimationFrame(() => restoreWindowScroll(saved));
+    });
+    setTimeout(() => restoreWindowScroll(saved), 50);
+    setTimeout(() => restoreWindowScroll(saved), 150);
+  };
+  function lockPageScroll() {
+    windowSaved =
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+    windowSavedDoc = document.documentElement.scrollTop || 0;
+    windowSavedBody = document.body.scrollTop || 0;
+    bodyLock = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      left: document.body.style.left,
+      right: document.body.style.right,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    };
+    document.body.style.position = "fixed";
+    document.body.style.top = "-" + savedWindowScroll() + "px";
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+  }
+  function unlockPageScroll() {
+    if (!bodyLock) return;
+    document.body.style.position = bodyLock.position;
+    document.body.style.top = bodyLock.top;
+    document.body.style.left = bodyLock.left;
+    document.body.style.right = bodyLock.right;
+    document.body.style.width = bodyLock.width;
+    document.body.style.overflow = bodyLock.overflow;
+    bodyLock = null;
+    const saved = savedWindowScroll();
+    windowSaved = 0;
+    windowSavedDoc = 0;
+    windowSavedBody = 0;
+    restoreWindowScrollSoon(saved);
+  }
+
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
   const closeVisual = () => {
     if (modal.hidden) return;
@@ -589,12 +649,8 @@ export function createLightbox(opts) {
       if (lockSaved) lockEl.scrollTop = lockSaved;
       lockSaved = 0;
     }
-    if (windowSaved) window.scrollTo(0, windowSaved);
+    unlockPageScroll();
     if (typeof opts.onClose === "function") opts.onClose(); // e.g. re-blur the source thumbnail (Epic 13 P2)
-  };
-  const restoreWindowScroll = () => {
-    if (!windowSaved) return;
-    window.scrollTo(0, windowSaved);
   };
   // Manual close (backdrop / Esc / close-button / public API): tear down AND unwind our history entry.
   const close = () => {
@@ -604,10 +660,10 @@ export function createLightbox(opts) {
       _peekRelease = null;
     }
     if (modal.hidden) return;
+    const savedWindow = savedWindowScroll();
     closeVisual();
     settleTop();
-    requestAnimationFrame(restoreWindowScroll);
-    setTimeout(restoreWindowScroll, 50);
+    restoreWindowScrollSoon(savedWindow);
   };
   modal.addEventListener("click", (e) => {
     if (e.target === modal || e.target.closest("[data-media-close]")) close();
@@ -623,7 +679,7 @@ export function createLightbox(opts) {
     body.innerHTML = html;
     modal.hidden = false;
     if (alreadyOpen) return; // content replacement: don't push another history overlay
-    windowSaved = window.scrollY || 0;
+    lockPageScroll();
     pushOverlay(closeVisual);
     // lock the scroll container so the browse list doesn't scroll behind the lightbox
     if (lockEl) {
