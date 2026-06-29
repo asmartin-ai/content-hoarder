@@ -56,11 +56,21 @@ def test_enqueue_unsave_by_tag_preview_apply_and_idempotency(conn):
         "invalid_id": 1,
         "already_queued": 1,
     }
+    assert len(preview["sample"]) == 1
+    sample = preview["sample"][0]
+    assert sample["fullname"] == "reddit:t3_tagged"
+    assert sample["reddit_id"] == "t3_tagged"
+    assert sample["title"] == "tagged"
+    assert sample["subreddit"] is None
+    assert sample["kind"] == "post"
+    assert {"created_utc", "saved_utc", "first_seen_utc"} <= set(sample)
+    assert preview["truncated"] is False
     assert conn.execute("SELECT COUNT(*) FROM reddit_unsave").fetchone()[0] == 1
 
     res = db.enqueue_unsave_by_tag(conn, tag)
     assert res["dry_run"] is False
     assert res["enqueued"] == 1
+    assert conn.execute("SELECT is_saved FROM items WHERE fullname='reddit:t3_tagged'").fetchone()[0] == 1
 
     rows = conn.execute(
         "SELECT fullname, state FROM reddit_unsave ORDER BY fullname"

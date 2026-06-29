@@ -430,10 +430,64 @@ def test_reddit_unsave_status_and_enable(tmp_db):
     assert cl.get("/reddit/unsave/status").get_json()["enabled"] is True
 
 
-def test_reddit_unsave_drain_no_auth_no_network(tmp_db):
-    # real drain short-circuits to auth_error when no cookie is configured (no network)
+def test_reddit_unsave_drain_default_is_dry_run(tmp_db, monkeypatch):
+    import content_hoarder.reddit_unsave as ru
+
+    calls = []
+
+    def fake_drain(conn, **kwargs):
+        calls.append(kwargs)
+        assert kwargs.get("dry_run") is True
+        return {"dry_run": True, "selected": 1, "by_subreddit": {"hh": 1}, "sample": []}
+
+    monkeypatch.setattr(ru, "drain", fake_drain)
     r = _client(tmp_db).post("/reddit/unsave/drain", json={})
-    assert r.status_code == 200 and r.get_json()["auth_error"] is True
+    data = r.get_json()
+    assert r.status_code == 200
+    assert data["dry_run"] is True
+    assert data["live_required"] == ["live", "confirm"]
+    assert calls and calls[0]["limit"] == 50
+
+
+def test_reddit_unsave_drain_live_requires_confirm(tmp_db, monkeypatch):
+    import content_hoarder.reddit_unsave as ru
+
+    calls = []
+
+    def fake_drain(conn, **kwargs):
+        calls.append(kwargs)
+        assert kwargs.get("dry_run") is True
+        return {"dry_run": True, "selected": 1, "by_subreddit": {"hh": 1}, "sample": []}
+
+    monkeypatch.setattr(ru, "drain", fake_drain)
+    r = _client(tmp_db).post("/reddit/unsave/drain", json={"live": True})
+    data = r.get_json()
+    assert r.status_code == 409
+    assert data["ok"] is False
+    assert data["dry_run"] is True
+    assert "confirm" in data["error"]
+    assert calls and calls[0]["dry_run"] is True
+
+
+def test_reddit_unsave_drain_live_with_double_confirm(tmp_db, monkeypatch):
+    import content_hoarder.reddit_unsave as ru
+
+    calls = []
+
+    def fake_drain(conn, **kwargs):
+        calls.append(kwargs)
+        assert kwargs.get("dry_run") is False
+        assert kwargs.get("audit") is not None
+        return {"selected": 1, "unsaved": 1, "failed": 0, "auth_error": False, "remaining": 0}
+
+    monkeypatch.setattr(ru, "drain", fake_drain)
+    r = _client(tmp_db).post(
+        "/reddit/unsave/drain", json={"live": True, "confirm": True, "max": 7}
+    )
+    data = r.get_json()
+    assert r.status_code == 200
+    assert data["unsaved"] == 1
+    assert calls and calls[0]["limit"] == 7
 
 
 def test_reddit_unsave_auth_route(tmp_db, monkeypatch):

@@ -1340,21 +1340,27 @@ def preview_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> dict:
             "invalid_id": 0,
             "already_queued": 0,
         },
+        "sample": [],
         "fullnames": [],
+        "truncated": False,
     }
     if not tag:
         return summary
 
     rows = conn.execute(
-        "SELECT i.fullname, i.source, i.source_id, i.is_saved, q.fullname AS queued "
+        "SELECT i.fullname, i.source, i.source_id, i.kind, i.title, i.is_saved, "
+        "i.created_utc, i.saved_utc, i.first_seen_utc, "
+        "json_extract(i.metadata, '$.subreddit') AS subreddit, q.fullname AS queued "
         "FROM items i "
         "LEFT JOIN reddit_unsave q ON q.fullname = i.fullname "
-        "WHERE EXISTS (SELECT 1 FROM json_each(i.metadata, '$.tags') WHERE value = ?)",
+        "WHERE EXISTS (SELECT 1 FROM json_each(i.metadata, '$.tags') WHERE value = ?) "
+        "ORDER BY COALESCE(i.saved_utc, i.first_seen_utc, i.created_utc, 0) DESC, i.fullname ASC",
         (tag,),
     ).fetchall()
     summary["matched"] = len(rows)
 
     fullnames: list[str] = []
+    sample: list[dict] = []
     skipped = summary["skipped"]
     for row in rows:
         if row["source"] != "reddit":
@@ -1371,9 +1377,24 @@ def preview_unsave_by_tag(conn: sqlite3.Connection, tag: str) -> dict:
             skipped["already_queued"] += 1
             continue
         fullnames.append(row["fullname"])
+        if len(sample) < 20:
+            sample.append(
+                {
+                    "fullname": row["fullname"],
+                    "reddit_id": sid,
+                    "title": (row["title"] or "")[:120],
+                    "subreddit": row["subreddit"],
+                    "kind": row["kind"],
+                    "created_utc": row["created_utc"],
+                    "saved_utc": row["saved_utc"],
+                    "first_seen_utc": row["first_seen_utc"],
+                }
+            )
 
     summary["eligible"] = len(fullnames)
+    summary["sample"] = sample
     summary["fullnames"] = fullnames[:200]
+    summary["truncated"] = len(fullnames) > 200
     return summary
 
 
