@@ -1,5 +1,7 @@
 # Batch B kickoff notes — 2026-06-28
 
+> **FOLDED INTO BACKLOG.md (2026-06-28).** The keyboard proposal, Firefox Sync research, and tag landscape data have been folded into BACKLOG.md Epics 5, 7, and 9. Retained as an archived decision record.
+
 > Snapshot as of 2026-06-28.
 
 This captures the decisions that started Batch B and the outcome after RedGifs shipped. It is a dated
