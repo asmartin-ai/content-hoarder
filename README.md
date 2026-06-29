@@ -24,11 +24,10 @@ inline reader. The offline PWA already ships.
   over your unified library; the **Triage** link drops you straight into Reddit-only swipe triage.
 - **Content recovery (non-destructive):** restore `[removed]`/`[deleted]` Reddit posts/comments (and
   un-hydrated saved comments) from PullPush/Arctic-Shift, and `[Private/Deleted video]` YouTube titles
-  from the Wayback Machine. The in-app **"↻ Recover"** button (`recover_one`) runs the metadata chain
-  per-item and then, for reddit images whose originals are already 404 (`media_status='gone'`, a
-  last-resort step), probes **archive.today** for the snapshot's image bytes and stores them locally so
-  the image renders again — low hit rate (archive.today must have snapshotted the exact `i.redd.it` URL
-  while live), per-item only (Cloudflare-gated, no bulk API).
+  from the Wayback Machine. The in-app **"↻ Recover text from archives"** button (`recover_one`) runs
+  the metadata chain per-item only. Deleted reddit media byte recovery through **archive.today** is a
+  separate explicit opt-in action/API mode for reddit images whose originals are already 404
+  (`media_status='gone'`) — low hit rate, Cloudflare-gated, and never bulk.
 - **Duplicate detection:** flag possible duplicates (by URL or title) and reversibly resolve them.
 - Per-item status: `inbox` → `keep` / `archived` / `done`, with one-step undo and a reversible
   "content bankruptcy" bulk-archive.

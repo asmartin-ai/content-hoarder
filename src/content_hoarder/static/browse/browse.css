@@ -2691,6 +2691,22 @@ kbd {
     color: var(--accent);
     font: var(--fw-semibold) var(--fs-xs)/1 var(--font-sans);
 }
+#media-body button.media-fallback {
+    padding: 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-pill);
+    background: var(--surface-card);
+    cursor: pointer;
+}
+#media-body button.media-fallback:disabled {
+    opacity: 0.65;
+    cursor: default;
+}
+#media-body .media-note {
+    display: block;
+    color: var(--text-muted);
+    font-weight: var(--fw-medium);
+}
 #media-body .media-img.zooming,
 #media-body .gallery-img.zooming {
     transition: none;

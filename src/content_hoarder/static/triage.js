@@ -4,7 +4,7 @@ import { esc, safeUrl, isTypingTarget, ago } from "./core/util.js";
 import { getJSON as fetchJSON, postJSON } from "./core/api.js";
 import { normTag, itemTags, suggestTags } from "./core/tags.js";
 import { chIcon, fillIcons } from "./core/icons.js";
-import { imageUrl, mediaType, playableVideoSrc, mountVideo } from "./core/media.js";   // shared media (parity with browse)
+import { imageUrl, mediaType, playableVideoSrc, mountVideo, canRecoverArchiveToday, archiveTodayConfirmText } from "./core/media.js";   // shared media (parity with browse)
 import { attachSwipe as attachSharedSwipe } from "./core/swipe.js";
 import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-button closes the lightbox, not the app
 
@@ -442,9 +442,10 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       _rmStart.test(item.title || "") || _rmPhrase.test(item.title || "");
   }
   function recoverHtml(item) {
-    return isRemoved(item)
-      ? '<div class="tcard-recover"><button class="recover-btn" data-recover type="button">↻ Recover from archives</button></div>'
-      : "";
+    var bits = [];
+    if (isRemoved(item)) bits.push('<button class="recover-btn" data-recover type="button">↻ Recover text from archives</button>');
+    if (canRecoverArchiveToday(item)) bits.push('<button class="recover-btn archive-today-btn" data-recover-archive-today type="button">Recover deleted media via archive.today</button>');
+    return bits.length ? '<div class="tcard-recover">' + bits.join(" ") + '</div>' : "";
   }
   // "Why this surfaced" — the top signals from the learned triage score, humanized by
   // stripping the model's feature prefixes (sub:/sk:/chan:/media:/cat:/age:) and the ×lift.
@@ -736,13 +737,46 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       }
       return;
     }
+    var ab = e.target.closest("[data-recover-archive-today]");
+    if (ab) {
+      var acard = ab.closest(".tcard");
+      var afn = acard ? acard.getAttribute("data-fullname") : "";
+      if (!afn || !window.confirm(archiveTodayConfirmText)) return;
+      ab.disabled = true; ab.textContent = "checking…";
+      fetchJSON("/items/" + encodeURIComponent(afn) + "/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive_today: "apply", confirm_external_archive_today: true })
+      })
+        .then(function (d) {
+          var media = d && d.archive_today;
+          if (media && media.bytes_archived) {
+            ab.textContent = "✓ media recovered";
+            toast("Recovered " + media.bytes_archived + " image" + (media.bytes_archived === 1 ? "" : "s"), false);
+            return fetchJSON("/items/" + encodeURIComponent(afn)).then(function (updated) {
+              var item = itemByFn(afn);
+              if (item && updated) Object.assign(item, updated);
+              renderCurrent();
+            });
+          }
+          ab.disabled = false;
+          ab.textContent = media && media.result === "miss" ? "no archive.today hit" : "try archive.today later";
+          toast(media && media.result === "miss" ? "No archive.today snapshot found" : "Archive.today did not recover media", false);
+        })
+        .catch(function () { ab.disabled = false; ab.textContent = "Recover deleted media via archive.today"; toast("Archive.today recovery failed", false); });
+      return;
+    }
     var rb = e.target.closest("[data-recover]");
     if (rb) {
       var rcard = rb.closest(".tcard");
       var rfn = rcard ? rcard.getAttribute("data-fullname") : "";
       if (!rfn) return;
       rb.disabled = true; rb.textContent = "…";
-      fetchJSON("/items/" + encodeURIComponent(rfn) + "/recover", { method: "POST" })
+      fetchJSON("/items/" + encodeURIComponent(rfn) + "/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata: true, archive_today: "off" })
+      })
         .then(function (d) {
           if (d && d.recovered) {
             var ttl = rcard.querySelector(".tcard-title");
@@ -756,11 +790,11 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
               }
               if (snip) snip.textContent = d.body.slice(0, 400);
             }
-            rb.textContent = "✓ recovered";
-            toast("Recovered from archives", false);
+            rb.textContent = "✓ text recovered";
+            toast("Text recovered from archives", false);
           } else { rb.disabled = false; rb.textContent = "not archived"; }
         })
-        .catch(function () { rb.disabled = false; rb.textContent = "↻ Recover from archives"; });
+        .catch(function () { rb.disabled = false; rb.textContent = "↻ Recover text from archives"; });
       return;
     }
     // ---- manual tag editor (mirrors the cat-chip network pattern, POSTs to /tags) ----
