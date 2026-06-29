@@ -472,6 +472,8 @@ def set_tags(
     Manual tags live in ``metadata.tags`` (the displayed list) AND are stamped in
     ``metadata.tags_manual`` so the pipeline (``categorize`` re-tag / ``merge_upsert``
     re-import) can't clobber them — the stamp is re-unioned wherever tags get rewritten.
+    Heuristic/programmatic tags are stamped separately in ``metadata.tags_auto`` by
+    :func:`set_auto_tags`, so future sorting/filtering can distinguish human vs auto tags.
     Rebuilds ``search_text`` but does NOT move ``last_seen_utc`` (a tag edit shouldn't
     reorder the feed). Returns the resulting tag list, or ``None`` if the item is missing.
     Caller commits."""
@@ -508,6 +510,61 @@ def set_tags(
             (json.dumps(md, ensure_ascii=False), build_search_text(item, md), fullname),
         )
     return tags
+
+
+def set_auto_tags(
+    conn: sqlite3.Connection,
+    fullname: str,
+    tags,
+    *,
+    preserve_tags=None,
+    last_seen_utc: int | None = None,
+) -> list[str] | None:
+    """Replace an item's programmatic/heuristic tag stamp.
+
+    ``metadata.tags_auto`` records the auto-generated subset, while ``metadata.tags``
+    remains the displayed/searchable union of preserved base tags + auto + manual tags.
+    Clearing auto tags (``tags=[]``) removes ``tags_auto`` and leaves any preserved tags
+    and ``tags_manual`` entries visible. This is intentionally separate from
+    :func:`set_tags`, which is the human edit path.
+    Returns the resulting displayed tag list, or ``None`` if the item is missing.
+    Caller commits.
+    """
+    row = get_item(conn, fullname)
+    if row is None:
+        return None
+    md = parse_metadata(row.get("metadata"))
+    preserved = _tag_list(preserve_tags)
+    auto = _tag_list(tags)
+    manual = _tag_list(md.get("tags_manual"))
+    final: list[str] = []
+    for t in preserved + auto + manual:
+        if t not in final:
+            final.append(t)
+
+    if final:
+        md["tags"] = final
+    else:
+        md.pop("tags", None)
+    if auto:
+        md["tags_auto"] = auto
+    else:
+        md.pop("tags_auto", None)
+
+    item = dict(row)
+    metadata_json = json.dumps(md, ensure_ascii=False)
+    search_text = build_search_text(item, md)
+    if last_seen_utc is None:
+        conn.execute(
+            "UPDATE items SET metadata=?, search_text=? WHERE fullname=?",
+            (metadata_json, search_text, fullname),
+        )
+    else:
+        conn.execute(
+            "UPDATE items SET metadata=?, search_text=?, last_seen_utc=? WHERE fullname=?",
+            (metadata_json, search_text, int(last_seen_utc), fullname),
+        )
+    return final
 
 
 def normalize_processing_tags(conn: sqlite3.Connection) -> int:
@@ -648,12 +705,13 @@ def merge_upsert(conn: sqlite3.Connection, item: dict) -> str:
         emd = metadata_with_category_tag(emd, incoming_category)
     elif emd.get("category"):
         emd = metadata_with_category_tag(emd, str(emd.get("category") or ""))
-    # User-applied (manual) tags survive any tag rewrite/replace above: re-union the
-    # stamped subset back into tags. Additive — only fires when tags_manual is present.
-    manual = _tag_list(emd.get("tags_manual"))
-    if manual:
+    # Stamped tag subsets survive any tag rewrite/replace above: re-union the
+    # programmatic and human subsets back into tags. Auto tags remain replaceable via
+    # set_auto_tags(tags=[]); manual tags remain replaceable via set_tags(remove=...).
+    stamped = _tag_list(emd.get("tags_auto")) + _tag_list(emd.get("tags_manual"))
+    if stamped:
         tags = _tag_list(emd.get("tags"))
-        for t in manual:
+        for t in stamped:
             if t not in tags:
                 tags.append(t)
         emd["tags"] = tags

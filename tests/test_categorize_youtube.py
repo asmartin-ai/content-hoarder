@@ -1,6 +1,8 @@
-from content_hoarder.models import parse_metadata
 import pytest
-from content_hoarder import categorize as cat, db, models
+
+from content_hoarder import categorize as cat
+from content_hoarder import db, models
+from content_hoarder.models import parse_metadata
 
 
 def test_youtube_tags_channel_hit():
@@ -54,8 +56,10 @@ def test_youtube_preservation(conn):
     res = cat.tag_youtube_source(conn, limit=10)
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
-    assert sorted(parse_metadata(row["metadata"])["tags"]) == ["listenable", "science"]
-    assert parse_metadata(row["metadata"])["category"] == "listenable"
+    md = parse_metadata(row["metadata"])
+    assert sorted(md["tags"]) == ["listenable", "science"]
+    assert md["tags_auto"] == ["science"]
+    assert md["category"] == "listenable"
 
 
 def test_youtube_keyword_noise_drop(conn):
@@ -70,7 +74,9 @@ def test_youtube_keyword_noise_drop(conn):
     res = cat.tag_youtube_source(conn, limit=10)
     assert res["tagged"] == 1
     row = db.get_item(conn, fn)
-    assert parse_metadata(row["metadata"])["tags"] == ["watch", "science"]
+    md = parse_metadata(row["metadata"])
+    assert md["tags"] == ["watch", "science"]
+    assert md["tags_auto"] == ["science"]
 
 
 def test_youtube_dry_run(conn):
