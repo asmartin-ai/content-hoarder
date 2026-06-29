@@ -706,6 +706,25 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify(res), 502
         return jsonify(res), 500
 
+    @app.post("/reddit/items/<path:fullname>/hydrate-gallery")
+    def hydrate_gallery_item(fullname):
+        from content_hoarder import reddit_hydrate
+
+        with conn() as c:
+            res = reddit_hydrate.hydrate_gallery(c, fullname)
+        status = res.get("status")
+        if status in ("cached", "hydrated", "no_gallery"):
+            return jsonify(res), 200
+        if status == "not_found":
+            return jsonify(res), 404
+        if status in ("no_permalink", "bad_shape"):
+            return jsonify(res), 400
+        if status in ("auth_missing", "auth_expired"):
+            return jsonify(res), 401
+        if status == "network_error":
+            return jsonify(res), 502
+        return jsonify(res), 500
+
     @app.post("/items/<path:fullname>/category")
     def set_category(fullname):
         from content_hoarder.categorize import VALID_CATEGORIES

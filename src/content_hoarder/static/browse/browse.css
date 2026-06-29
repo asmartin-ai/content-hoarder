@@ -2635,6 +2635,8 @@ kbd {
     align-items: center;
     justify-content: center;
     padding: 24px;
+    touch-action: none;
+    overscroll-behavior: contain;
 }
 #media-modal[hidden] {
     display: none;
@@ -2644,6 +2646,7 @@ kbd {
     max-height: 90vh;
     overflow-y: auto;
     text-align: center;
+    touch-action: auto;
 }
 #media-body .media-img {
     max-width: 100%;
@@ -2670,12 +2673,15 @@ kbd {
     gap: 10px;
 }
 #media-body .gallery-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--r-sm);
     background: var(--surface-inset);
     cursor: zoom-in;
     transform-origin: center center;
     transition: transform 120ms var(--ease);
-    touch-action: none;
-} /* placeholder + tap=full-res */
+    touch-action: pan-y;
+} /* stacked gallery: swipe scrolls; tap=full-res */
 #media-body .media-img.zoomed,
 #media-body .gallery-img.zoomed {
     touch-action: none;

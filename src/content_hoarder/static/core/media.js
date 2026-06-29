@@ -399,12 +399,14 @@ export function createLightbox(opts) {
     }
   };
 
-  // wheel — desktop. Attach on body; match .media-img or .gallery-img.
+  // wheel — desktop. Single images zoom; stacked galleries keep normal vertical scroll
+  // unless the image is already zoomed (then wheel adjusts zoom like the single-image view).
   body.addEventListener(
     "wheel",
     (e) => {
       const img = e.target.closest(".media-img, .gallery-img");
       if (!img) return;
+      if (img.classList.contains("gallery-img") && zoomScale <= 1.001) return;
       e.preventDefault();
       zoomImg = img;
       const cur = zoomImg.style.transform ? zoomScale : 1;
@@ -472,6 +474,9 @@ export function createLightbox(opts) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const img = e.target.closest(".media-img, .gallery-img");
     if (!img) return;
+    // Stacked gallery images are inside a real scroller. At 1×, a vertical swipe should
+    // scroll down the album, not drag-close the lightbox as if it were a single image.
+    if (img.classList.contains("gallery-img") && zoomScale <= 1.001) return;
     if (zoomScale > 1.001 && dragStart) return; // pinch owns multi-touch
     dragStart = {
       x: e.clientX,
@@ -614,8 +619,10 @@ export function createLightbox(opts) {
   // Open over the page + register with the coordinator so the OS back-button closes the lightbox
   // (returns to the feed/inbox) instead of navigating away / exiting the PWA.
   const open = (html) => {
+    const alreadyOpen = !modal.hidden;
     body.innerHTML = html;
     modal.hidden = false;
+    if (alreadyOpen) return; // content replacement: don't push another history overlay
     windowSaved = window.scrollY || 0;
     pushOverlay(closeVisual);
     // lock the scroll container so the browse list doesn't scroll behind the lightbox

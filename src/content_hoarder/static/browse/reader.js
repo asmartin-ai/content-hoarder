@@ -780,6 +780,8 @@ export function initReader({
   let videoTeardown = null; // teardown function for inline video (stops HLS buffering)
   let videoEl = null; // the mounted <video> (also the "video is playing" flag); close pauses+resets it
   let feedScrollY = 0; // feed scroll position captured on open; restored on close (reader-lock resets it)
+  let readerScrollFullname = "";
+  let readerScrollTop = 0;
 
   /* ---- manual tag editor: stateful helpers (close over item/fullname/postEl) ---- */
   function refreshReaderTagRow() {
@@ -1249,6 +1251,15 @@ export function initReader({
           })
         : '<div class="rd-cmtstate">No comments on this post.</div>');
   }
+  function saveReaderScroll() {
+    if (!fullname || !scrollEl) return;
+    readerScrollFullname = fullname;
+    readerScrollTop = scrollEl.scrollTop || 0;
+  }
+  function restoreReaderScroll(fn, top) {
+    if (!scrollEl || !fn || fn !== fullname) return;
+    scrollEl.scrollTop = Math.max(0, top || 0);
+  }
   function applyThread(res, justHydrated) {
     comments = normalizeThreadComments(res.comments, item.source);
     collapsed = deadThreadCollapseSet(comments); // auto-collapse fully-dead (deleted) threads on load
@@ -1260,6 +1271,11 @@ export function initReader({
     if (!videoEl) renderPost(res.post || null); // don't clobber a playing inline video
     setChip(res.archived ? "archived" : justHydrated ? "hydrated" : "cached");
     renderComments();
+    if (readerScrollFullname === fullname && readerScrollTop) {
+      requestAnimationFrame(() =>
+        restoreReaderScroll(fullname, readerScrollTop),
+      );
+    }
   }
   function failState() {
     const sm = sourceMeta(item);
@@ -1316,9 +1332,17 @@ export function initReader({
   function openReader(it, opts) {
     opts = opts || {};
     if (typeof closeSheets === "function") closeSheets();
+    if (isOpen) saveReaderScroll();
     stopInlineVideo(); // defensive: clear any leftover inline video if reopened without a clean close
+    const nextFullname = it.fullname;
+    const restoreTop =
+      readerScrollFullname === nextFullname ? readerScrollTop : 0;
+    if (readerScrollFullname && readerScrollFullname !== nextFullname) {
+      readerScrollFullname = "";
+      readerScrollTop = 0;
+    }
     item = it;
-    fullname = it.fullname;
+    fullname = nextFullname;
     returnTo = opts.from === "triage" ? "/triage" : "";
     comments = [];
     collapsed = new Set();
@@ -1351,7 +1375,7 @@ export function initReader({
     // restore the user's place on close (Epic 16 P2)
     feedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.documentElement.classList.add("reader-lock");
-    if (scrollEl) scrollEl.scrollTop = 0;
+    if (scrollEl) scrollEl.scrollTop = restoreTop;
     isOpen = true;
     // Register with the shared overlay coordinator: OS-back closes the reader (or, if a lightbox is
     // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
@@ -1380,6 +1404,7 @@ export function initReader({
     isOpen = false;
     const dest = returnTo;
     returnTo = "";
+    saveReaderScroll();
     stopInlineVideo(); // pause+reset+remove the <video> so audio doesn't bleed after close
     reader.classList.remove("show", "from-triage");
     reader.setAttribute("aria-hidden", "true");
