@@ -12,6 +12,12 @@ Non-goals for this slice:
 
 Done-when criterion for the eventual implementation: `archive-media --videos --apply` can archive a representative `v.redd.it` item into `data/media/<sha>.mp4`, stamp a backward-compatible `metadata.archived_media` entry, skip the item on the next run, and let the existing `/media/<blob>` route serve a locally playable video without mutating triage/user state.
 
+## Implementation status (2026-06-29)
+
+- Branch `epic-4-vreddit-video-archiving` implemented the opt-in archive path: `archive-media --videos`, video byte storage/serving support, backward-compatible metadata handling, and offline downloader/store tests.
+- The path remains explicit and storage-heavy by design; videos are not included in the default archive scopes.
+- Validation used offline/fake downloaders only. No live representative `v.redd.it` download was run during this merge; runtime success still depends on a working `yt-dlp`/muxing toolchain for real videos.
+
 ## Confirmed current state
 
 Confirmed from code/docs inspection only; no network probes were run.
