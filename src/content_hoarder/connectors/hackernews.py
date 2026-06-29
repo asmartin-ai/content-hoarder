@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html as _html
 import json
+import os
 import re
 import sqlite3
 import time
@@ -29,15 +30,33 @@ _BARE_ID = re.compile(r"\b(\d{4,})\b")
 _FIREBASE = "https://hacker-news.firebaseio.com/v0/item/{}.json"
 _FAVORITE_TABLES = ("favorite", "favorites", "saved")
 
+
+def _sqlite_path(p: Path) -> str:
+    r"""Normalise a Path for use in a ``file:`` sqlite3 URI on all platforms.
+
+    On Windows, pytest ``tmp_path`` fixtures can produce ``\\?\C:\...``
+    extended-length paths.  ``Path.as_posix()`` turns that into
+    ``//?/C:/...`` which sqlite3's URI parser rejects as an invalid
+    authority.  Strip the prefix before building the URI."""
+    s = str(p)
+    if s.startswith("\\\\?\\"):
+        s = s[4:]
+    return s.replace("\\", "/")
+
+
 # Open Graph thumbnail extraction (Epic 15 P3). We parse only the document <head>
 # from a capped slice of the body, preferring og:image and falling back to
 # twitter:image. Attribute order varies wildly across sites, so we tokenize each
 # <meta> tag's attributes rather than matching a fixed property→content order.
 _META_TAG = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
-_META_ATTR = re.compile(
-    r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
-_OG_KEYS = ("og:image", "og:image:url", "og:image:secure_url",
-            "twitter:image", "twitter:image:src")
+_META_ATTR = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
+_OG_KEYS = (
+    "og:image",
+    "og:image:url",
+    "og:image:secure_url",
+    "twitter:image",
+    "twitter:image:src",
+)
 _OG_FETCH_CAP = 262144  # bytes of body to parse for <head> (256 KiB is plenty)
 
 
@@ -66,12 +85,14 @@ def _og_image(html_text: str, base_url: str) -> str:
 def _favorites_table(path: Path):
     """Return the name of the favorites/saved table in a Materialistic DB, or None."""
     try:
-        con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{_sqlite_path(path)}?mode=ro", uri=True)
     except sqlite3.Error:
         return None
     try:
-        names = {r[0].lower(): r[0] for r in
-                 con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        names = {
+            r[0].lower(): r[0]
+            for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
         for cand in _FAVORITE_TABLES:
             if cand in names:
                 return names[cand]
@@ -93,14 +114,17 @@ class HNConnector(BaseConnector):
 
     def can_import(self, path: Path) -> bool:
         p = Path(path)
-        if not p.is_file():
+        if not os.path.isfile(str(p)):
             return False
         suf = p.suffix.lower()
         if suf in (".db", ".sqlite", ".sqlite3"):
             return _favorites_table(p) is not None
         if suf in (".html", ".htm"):
             try:
-                return "news.ycombinator.com" in p.read_text("utf-8", errors="ignore")[:16384]
+                return (
+                    "news.ycombinator.com"
+                    in p.read_text("utf-8", errors="ignore")[:16384]
+                )
             except OSError:
                 return False
         if suf == ".json":
@@ -108,8 +132,10 @@ class HNConnector(BaseConnector):
                 data = json.loads(p.read_text("utf-8", errors="ignore"))
             except (ValueError, OSError):
                 return False
-            return bool(data) and isinstance(data, list) and all(
-                isinstance(x, (int, str)) for x in data[:20]
+            return (
+                bool(data)
+                and isinstance(data, list)
+                and all(isinstance(x, (int, str)) for x in data[:20])
             )
         return False
 
@@ -139,12 +165,18 @@ class HNConnector(BaseConnector):
             if not sid or sid in seen:
                 continue
             seen.add(sid)
-            yield new_item(source="hackernews", source_id=sid, kind="story",
-                           title="", url=_hn_url(sid), metadata={"hn_url": _hn_url(sid)})
+            yield new_item(
+                source="hackernews",
+                source_id=sid,
+                kind="story",
+                title="",
+                url=_hn_url(sid),
+                metadata={"hn_url": _hn_url(sid)},
+            )
 
     def _from_db(self, p: Path):
         try:
-            con = sqlite3.connect(f"file:{p.as_posix()}?mode=ro", uri=True)
+            con = sqlite3.connect(f"file:{_sqlite_path(p)}?mode=ro", uri=True)
         except sqlite3.Error:
             return
         con.row_factory = sqlite3.Row
@@ -152,11 +184,22 @@ class HNConnector(BaseConnector):
         try:
             table = _favorites_table(p)
             if table:
-                cols = {r[1].lower(): r[1] for r in con.execute(f"PRAGMA table_info({table})")}
-                id_c = next((cols[c] for c in ("itemid", "item_id", "story_id", "id") if c in cols),
-                            cols.get("_id"))
+                cols = {
+                    r[1].lower(): r[1]
+                    for r in con.execute(f"PRAGMA table_info({table})")
+                }
+                id_c = next(
+                    (
+                        cols[c]
+                        for c in ("itemid", "item_id", "story_id", "id")
+                        if c in cols
+                    ),
+                    cols.get("_id"),
+                )
                 title_c, url_c = cols.get("title"), cols.get("url")
-                time_c = cols.get("time") or cols.get("timestamp") or cols.get("created")
+                time_c = (
+                    cols.get("time") or cols.get("timestamp") or cols.get("created")
+                )
                 for row in con.execute(f"SELECT * FROM {table}"):
                     d = dict(row)
                     sid = str(d.get(id_c)) if id_c and d.get(id_c) is not None else ""
@@ -169,21 +212,29 @@ class HNConnector(BaseConnector):
                         continue
                     seen.add(sid)
                     ts = int(d.get(time_c) or 0) if time_c else 0
-                    if ts > 10 ** 12:   # Materialistic stores the saved time in MILLISECONDS
+                    if (
+                        ts > 10**12
+                    ):  # Materialistic stores the saved time in MILLISECONDS
                         ts //= 1000
                     yield new_item(
-                        source="hackernews", source_id=sid, kind="story",
+                        source="hackernews",
+                        source_id=sid,
+                        kind="story",
                         title=(d.get(title_c) or "") if title_c else "",
                         url=url or _hn_url(sid),
-                        created_utc=ts, saved_utc=ts,
+                        created_utc=ts,
+                        saved_utc=ts,
                         metadata={"hn_url": _hn_url(sid), "hn_list": "saved"},
                     )
             # Materialistic also keeps a `read` history table (itemid only) — import as bare
             # items (titles arrive via enrich), tagged hn_list=read so they stay separable.
             has_read = con.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='read'").fetchone()
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='read'"
+            ).fetchone()
             has_itemid = has_read and any(
-                r[1].lower() == "itemid" for r in con.execute("PRAGMA table_info('read')"))
+                r[1].lower() == "itemid"
+                for r in con.execute("PRAGMA table_info('read')")
+            )
             if has_itemid:
                 for row in con.execute("SELECT itemid FROM read"):
                     sid = str(row[0]) if row[0] is not None else ""
@@ -191,8 +242,11 @@ class HNConnector(BaseConnector):
                         continue
                     seen.add(sid)
                     yield new_item(
-                        source="hackernews", source_id=sid, kind="story",
-                        title="", url=_hn_url(sid),
+                        source="hackernews",
+                        source_id=sid,
+                        kind="story",
+                        title="",
+                        url=_hn_url(sid),
                         status="archived",  # read-but-not-saved is history, not inbox triage
                         metadata={"hn_url": _hn_url(sid), "hn_list": "read"},
                     )
@@ -222,7 +276,9 @@ class HNConnector(BaseConnector):
             # og_image, so re-enriching (`--all`) won't refetch article pages.
             art = (data.get("url") or it.get("url") or "").strip()
             existing = it.get("metadata") or {}
-            if isinstance(existing, str):  # rows can arrive with metadata still a JSON string
+            if isinstance(
+                existing, str
+            ):  # rows can arrive with metadata still a JSON string
                 try:
                     existing = json.loads(existing)
                 except (ValueError, TypeError):
@@ -235,7 +291,8 @@ class HNConnector(BaseConnector):
                     meta["og_image"] = og
             out.append(
                 new_item(
-                    source="hackernews", source_id=str(sid),
+                    source="hackernews",
+                    source_id=str(sid),
                     kind=data.get("type") or "story",
                     title=data.get("title") or it.get("title") or "",
                     body=data.get("text") or "",
@@ -243,7 +300,8 @@ class HNConnector(BaseConnector):
                     author=data.get("by") or "",
                     created_utc=int(data.get("time") or 0),
                     hydrated_at=int(time.time()),
-                    metadata=meta, raw=data,
+                    metadata=meta,
+                    raw=data,
                 )
             )
         return out
@@ -267,7 +325,11 @@ class HNConnector(BaseConnector):
 
         try:
             _status, headers, raw = _http.request(
-                url, timeout=10.0, retries=1, backoff=2.0, jitter=True,
+                url,
+                timeout=10.0,
+                retries=1,
+                backoff=2.0,
+                jitter=True,
                 user_agent=config.get("USER_AGENT"),
                 headers={"Accept": "text/html,application/xhtml+xml"},
             )
