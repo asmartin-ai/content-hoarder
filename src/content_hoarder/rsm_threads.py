@@ -11,22 +11,29 @@ via the public ``db`` helpers, like ``firefox_youtube.migrate``.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
 from content_hoarder import db
 
 
-def migrate_threads(conn: sqlite3.Connection, rsm_db_path, *, only_existing: bool = True) -> dict:
+def migrate_threads(
+    conn: sqlite3.Connection, rsm_db_path, *, only_existing: bool = True
+) -> dict:
     """Copy non-empty RSM ``thread_json`` rows into ``reddit_threads``.
 
     With ``only_existing`` (default), threads whose item isn't present locally are
     skipped so we don't accumulate orphans. Returns ``{migrated, skipped}``.
     """
     src = Path(rsm_db_path)
-    if not src.is_file():
+    if not os.path.isfile(str(src)):
         raise ValueError(f"RSM database not found: {src}")
-    ro = sqlite3.connect(f"file:{src.as_posix()}?mode=ro", uri=True)
+    # Normalise away Windows \\?\ extended-length prefix (pytest tmp_path).
+    s = str(src)
+    if s.startswith("\\\\?\\"):
+        s = s[4:]
+    ro = sqlite3.connect(f"file:{s.replace(chr(92), '/')}?mode=ro", uri=True)
     ro.row_factory = sqlite3.Row
     migrated = skipped = 0
     try:
@@ -43,7 +50,9 @@ def migrate_threads(conn: sqlite3.Connection, rsm_db_path, *, only_existing: boo
             if only_existing and db.get_item(conn, fn) is None:
                 skipped += 1
                 continue
-            db.set_reddit_thread(conn, fn, row["thread_json"], row["hydrated_at"], commit=False)
+            db.set_reddit_thread(
+                conn, fn, row["thread_json"], row["hydrated_at"], commit=False
+            )
             migrated += 1
     finally:
         ro.close()
