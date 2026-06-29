@@ -743,20 +743,70 @@ function openMediaFor(item, opts) {
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
   const img = imageUrl(item);
   if (img) return lightbox.openImage(img, opts);
-  /* Gallery without captured image URLs — show a clean placeholder, not a reddit iframe
-     (the 33 empty-gallery items have no local images to stack; the iframe was a bad
-     fallback — user preference 2026-06-22). */
+  /* Gallery without captured image URLs — hydrate one item on demand via the existing
+     OAuth/cached-thread backend, then fall back to the local thumbnail + Reddit link. */
   if (m.media_type === "gallery" || /\/gallery\//i.test(item.url || "")) {
-    const url = redditUrl(m.permalink || item.url);
-    return lightbox.openHtml(
-      url
-        ? '<p class="media-fallback">Gallery images unavailable (not archived).</p>' +
-            '<a class="media-fallback" href="' +
+    const fallbackHtml = (msg) => {
+      const url = redditUrl(m.permalink || item.url);
+      const preview = thumb(item, "card") || "";
+      const previewHtml = preview
+        ? '<div class="media-gallery"><img class="gallery-img gallery-preview-fallback" src="' +
+          esc(preview) +
+          '" alt=""></div>'
+        : "";
+      return (
+        previewHtml +
+        (url
+          ? '<p class="media-fallback">' +
+            esc(msg || "Full gallery images unavailable (not archived).") +
+            '</p><a class="media-fallback" href="' +
             esc(url) +
             '" target="_blank" rel="noopener">Open on Reddit ↗</a>'
-        : '<p class="media-fallback">Gallery images unavailable.</p>',
+          : '<p class="media-fallback">' +
+            esc(msg || "Full gallery images unavailable.") +
+            "</p>")
+      );
+    };
+    if (opts && opts.peek) return lightbox.openHtml(fallbackHtml(), opts);
+    lightbox.openHtml(
+      '<p class="media-fallback">Loading gallery from Reddit…</p>',
       opts,
     );
+    (async () => {
+      try {
+        const res = await api.postJSON(
+          "/reddit/items/" +
+            encodeURIComponent(item.fullname) +
+            "/hydrate-gallery",
+          {},
+        );
+        const gallery = (res && res.gallery) || [];
+        if (
+          (res.status === "hydrated" || res.status === "cached") &&
+          gallery.length
+        ) {
+          m.gallery = gallery;
+          m.gallery_preview = res.gallery_preview || [];
+          if (res.thumbnail) m.thumbnail = res.thumbnail;
+          if (res.media_url) m.media_url = res.media_url;
+          return lightbox.openGallery(
+            gallery.map((u) => localUrl(item, u)),
+            (m.gallery_preview || []).map((u) => localUrl(item, u)),
+            opts,
+          );
+        }
+        lightbox.openHtml(
+          fallbackHtml("Full gallery images unavailable."),
+          opts,
+        );
+      } catch (e) {
+        lightbox.openHtml(
+          fallbackHtml("Couldn’t load gallery from Reddit."),
+          opts,
+        );
+      }
+    })();
+    return;
   }
   /* Permalink-only item (no lightboxable media) — reddit text/post thread.
      Open the reader instead of the reddit iframe (user preference 2026-06-26). */

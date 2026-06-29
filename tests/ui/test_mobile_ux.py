@@ -640,6 +640,54 @@ def test_lightbox_swipe_does_not_scroll_feed(pixel6_page):
     )
 
 
+def test_lightbox_backdrop_drag_does_not_scroll_feed(pixel6_page):
+    """Dragging blank lightbox space must not scroll the feed behind it."""
+    page = pixel6_page
+    page.evaluate("window.scrollTo(0, 500)")
+    page.wait_for_timeout(500)
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
+    scroll_before = page.evaluate("Math.round(window.scrollY)")
+    coords = _thumb_center(page, fullname)
+    page.touchscreen.tap(coords["x"], coords["y"])
+    page.wait_for_timeout(500)
+    assert _media_modal_open(page), f"lightbox should open on {fullname}"
+
+    page.evaluate(
+        """() => new Promise((resolve) => {
+          const modal = document.querySelector('#media-modal');
+          if (!modal) { resolve(); return; }
+          const r = modal.getBoundingClientRect();
+          const x = Math.round(r.left + r.width * 0.2);
+          const y0 = Math.round(r.top + r.height * 0.2);
+          const dy = 200;
+          const fire = (type, yy) => modal.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 3, isPrimary: true,
+            clientX: x, clientY: yy,
+          }));
+          fire('pointerdown', y0);
+          const steps = 12, stepDy = dy / steps;
+          let i = 0, cy = y0;
+          const moveNext = () => {
+            i++; cy += stepDy;
+            fire('pointermove', Math.round(cy));
+            if (i < steps) setTimeout(moveNext, 16);
+            else { fire('pointerup', Math.round(y0 + dy)); resolve(); }
+          };
+          moveNext();
+        })"""
+    )
+    page.wait_for_timeout(500)
+
+    assert _media_modal_open(page), "backdrop drag should not close the lightbox"
+    scroll_after = page.evaluate("Math.round(window.scrollY)")
+    assert scroll_after == scroll_before, (
+        f"feed scroll position changed after backdrop drag: "
+        f"{scroll_before} -> {scroll_after} (should be unchanged)"
+    )
+
+
 # --------------------------------------------------------------------------- #
 # T3 sidebar-scroll-lock
 # --------------------------------------------------------------------------- #
