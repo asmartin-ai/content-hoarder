@@ -13,6 +13,8 @@ import {
   redditUrl,
   playableVideoSrc,
   localUrl,
+  canRecoverArchiveToday,
+  archiveTodayConfirmText,
   setArchivePref,
   thumb,
 } from "../core/media.js";
@@ -706,9 +708,28 @@ const lightbox = createLightbox({
     reblur(lastMediaFn);
   },
 });
+function archiveTodayPlaceholderHtml(item) {
+  const m = item.metadata || {};
+  const url = redditUrl(m.permalink || item.url);
+  let html =
+    '<p class="media-fallback">Deleted Reddit media is unavailable locally.</p>' +
+    '<button class="media-fallback archive-today-btn" data-archive-today-recover="' +
+    esc(item.fullname) +
+    '" type="button">Recover deleted media via archive.today</button>' +
+    '<p class="media-fallback media-note">Contacts archive.today with the original media URL. One item only.</p>';
+  if (url)
+    html +=
+      '<a class="media-fallback" href="' +
+      esc(url) +
+      '" target="_blank" rel="noopener">Open on Reddit ↗</a>';
+  return html;
+}
+
 function openMediaFor(item, opts) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
+  if (canRecoverArchiveToday(item))
+    return lightbox.openHtml(archiveTodayPlaceholderHtml(item), opts);
   if (Array.isArray(m.gallery) && m.gallery.length)
     // sized variants load first (Epic 13 P2); prefer locally-archived copies when present (Epic 4 P1)
     return lightbox.openGallery(
@@ -744,6 +765,52 @@ function openMediaFor(item, opts) {
   const url = item.url;
   if (url) window.open(url, "_blank", "noopener");
 }
+
+async function recoverArchiveTodayFromLightbox(fn, btn) {
+  if (!fn || !window.confirm(archiveTodayConfirmText)) return;
+  btn.disabled = true;
+  btn.textContent = "checking…";
+  try {
+    const res = await api.recoverArchiveToday(fn, "apply");
+    const media = res && res.archive_today;
+    if (media && media.bytes_archived) {
+      toast(
+        "Recovered " +
+          media.bytes_archived +
+          " image" +
+          (media.bytes_archived === 1 ? "" : "s") +
+          ".",
+      );
+      const updated = await api.fetchItem(fn);
+      const item = state.items.find((it) => it.fullname === fn);
+      if (item && updated) Object.assign(item, updated);
+      if (item && lastMediaFn === fn) openMediaFor(item);
+    } else {
+      btn.disabled = false;
+      btn.textContent =
+        media && media.result === "miss"
+          ? "no archive.today hit"
+          : "try archive.today later";
+      toast(
+        media && media.result === "miss"
+          ? "No archive.today snapshot found."
+          : "Archive.today did not recover media.",
+      );
+    }
+  } catch (_e) {
+    btn.disabled = false;
+    btn.textContent = "Recover deleted media via archive.today";
+    toast("Archive.today recovery failed.");
+  }
+}
+
+const mediaBody = $("#media-body");
+if (mediaBody)
+  mediaBody.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-archive-today-recover]");
+    if (!btn) return;
+    recoverArchiveTodayFromLightbox(btn.dataset.archiveTodayRecover, btn);
+  });
 
 /* ---- bulk select (locked: avatar shade select; overlay bar; bulk undo) ---- */
 const selected = new Set();

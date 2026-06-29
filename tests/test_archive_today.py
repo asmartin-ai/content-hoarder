@@ -36,9 +36,21 @@ def _fake_fetch_bytes(url, *, max_bytes=15728640):
     return (b"\x89PNG\r\n\x1a\nFAKEIMAGEBYTES", "image/png")
 
 
-# ---------------- Task 2: recover_one integration ----------------
+# ---------------- Task 2: explicit archive.today integration ----------------
 
-def test_recover_one_archives_bytes_when_media_gone(tmp_db):
+def test_recover_one_default_does_not_archive_media(tmp_db):
+    conn = db.connect(tmp_db)
+    _seed_gone(conn)
+
+    res = archival.recover_one(conn, "reddit:t3_gone", providers=[])
+    assert res["bytes_archived"] == 0
+    assert "archive_today" not in res
+    md = json.loads(db.get_item(conn, "reddit:t3_gone")["metadata"])
+    assert md.get("archived_media") in (None, {})
+    assert md["media_status"] == "gone"
+
+
+def test_recover_one_archives_bytes_when_media_gone_explicit(tmp_db):
     conn = db.connect(tmp_db)
     _seed_gone(conn)
 

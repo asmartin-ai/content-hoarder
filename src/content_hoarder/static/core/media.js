@@ -24,6 +24,22 @@ export const localUrl = (item, url) => {
   return vals.length === 1 ? "/media/" + vals[0] : url; // ≠ the archived key → use the lone blob
 };
 
+export const canRecoverArchiveToday = (item) => {
+  const m = (item && item.metadata) || {};
+  if (!item || item.source !== "reddit" || m.media_status !== "gone") return false;
+  if (m.archived_media && Object.keys(m.archived_media).length) return false;
+  const urls = [];
+  if (typeof m.media_url === "string" && /^https?:\/\//i.test(m.media_url)) urls.push(m.media_url);
+  if (Array.isArray(m.gallery)) urls.push(...m.gallery.filter((u) => typeof u === "string" && /^https?:\/\//i.test(u)));
+  return urls.length > 0;
+};
+
+export const archiveTodayConfirmText =
+  "This contacts archive.today with the original Reddit media URL for this one item.\n\n" +
+  "It may be slow or blocked by Cloudflare, and the hit rate is low. " +
+  "If bytes are found, content-hoarder will store them locally.\n\n" +
+  "Continue?";
+
 /* ---- thumbnails ---- */
 /* density: "card" gets the crisp maxres variant (onerror-falls back to mqdefault
    via ytFallback); everything else gets the light bar-free mqdefault (~10KB). */
