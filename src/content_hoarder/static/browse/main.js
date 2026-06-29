@@ -318,7 +318,8 @@ async function act(fullname, status, opts = {}) {
       try {
         await api.undoItem(fullname);
         bumpPulse(status === "inbox" ? 0 : -1);
-        if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
+        if (state.focus)
+          state.batchCleared = Math.max(0, state.batchCleared - 1);
         if (item) item.status = prevStatus;
       } catch (e) {
         toast("Undo failed.");
@@ -593,7 +594,7 @@ itemsEl.addEventListener("pointerdown", (e) => {
   peekPointerId = e.pointerId;
   holdTimer = setTimeout(() => {
     holdTimer = null;
-    _peekOpen = true;            // set BEFORE openMediaFor so the release listener sees it
+    _peekOpen = true; // set BEFORE openMediaFor so the release listener sees it
     peeking = true;
     const item = state.items.find((it) => it.fullname === fn);
     if (item) openMediaFor(item, { peek: true });
@@ -630,7 +631,7 @@ itemsEl.addEventListener("pointercancel", (e) => {
   }
   if (peeking) {
     peeking = false;
-    _peekOpen = false;   // pointercancel means no pointerup will fire; clear here too
+    _peekOpen = false; // pointercancel means no pointerup will fire; clear here too
   }
 });
 
@@ -701,7 +702,7 @@ const lightbox = createLightbox({
   body: "#media-body",
   lockScrollEl: itemsEl,
   onClose: () => {
-    _peekOpen = false;       // T3 peek-flicker: a peek close (release/cancel) re-arms the guard
+    _peekOpen = false; // T3 peek-flicker: a peek close (release/cancel) re-arms the guard
     reblur(lastMediaFn);
   },
 });
@@ -841,12 +842,11 @@ function paintPulse() {
     day: "numeric",
     month: "long",
   });
+  const freshLine = p.new_today
+    ? "<b>" + p.new_today + " fresh</b> today. "
+    : "<b>No fresh arrivals</b> today. ";
   $("#dateline").innerHTML =
-    esc(day) +
-    " — <b>" +
-    p.new_today +
-    " new</b> today. " +
-    '<em class="norush">No rush.</em>';
+    esc(day) + " — " + freshLine + '<em class="norush">No rush.</em>';
   $("#decayline").hidden = !p.swept_recent;
   $("#decay-n").textContent = p.swept_recent.toLocaleString();
   paintWins();
@@ -961,16 +961,29 @@ function cardHtml(c) {
         year: "numeric",
       })
     : "";
+  const count = Number(c.count) || 0;
+  const volume =
+    count <= 1 ? "One save" : count < 5 ? "A few saves" : "A small cluster";
+  const exact =
+    count +
+    " save" +
+    (count === 1 ? "" : "s") +
+    " in " +
+    (c.label || "this cluster");
   return (
     '<div class="amb-eyebrow">' +
-    (c.reactivated ? "YOU’RE BACK ON THIS?" : "REMEMBER?") +
+    (c.reactivated ? "THIS CAME BACK AROUND" : "WORTH A GLANCE?") +
     "</div>" +
-    "<h3>Still interested in <em>" +
+    "<h3>Want to revisit <em>" +
     esc(c.label) +
     "</em>?</h3>" +
-    '<div class="amb-body"><div class="amb-meta">' +
-    c.count +
-    " saves in <b>" +
+    '<div class="amb-body"><div class="amb-meta" title="' +
+    esc(exact) +
+    '" aria-label="' +
+    esc(exact) +
+    '">' +
+    volume +
+    " in <b>" +
     esc(c.label) +
     "</b>" +
     (added ? " · last added " + esc(added) : "") +
@@ -980,7 +993,7 @@ function cardHtml(c) {
     '<div class="amb-acts">' +
     '<button type="button" class="ambbtn primary" data-amb="show">Show me</button>' +
     '<button type="button" class="ambbtn" data-amb="later">Not now</button>' +
-    '<button type="button" class="ambbtn letgo" data-amb="letgo">Let it go</button></div>'
+    '<button type="button" class="ambbtn letgo" data-amb="letgo">Let it rest</button></div>'
   );
 }
 let ambientCard = null;
@@ -1085,10 +1098,10 @@ async function surprise() {
       metaLine(it) +
       "</span></div>" +
       '<div class="surp-acts">' +
-      '<button type="button" class="surp-act k" data-surprise="keep">Keep</button>' +
       '<button type="button" class="surp-act a" data-surprise="archived">Archive</button>' +
       '<button type="button" class="surp-act d" data-surprise="done">Done</button>' +
       '<button type="button" class="surp-act s" data-surprise="snooze">Snooze</button>' +
+      '<button type="button" class="surp-act k" data-surprise="keep">Keep</button>' +
       '<button type="button" class="surp-act surp-open" data-surprise="open">Open reader</button>' +
       "</div></div></article>";
     ambientCard = null;
@@ -1151,6 +1164,17 @@ ambient.addEventListener("click", (e) => {
 });
 
 /* ---- tabs / rail / chips (locked #2/#7) ---- */
+function isInboxHome() {
+  return (
+    state.status === "inbox" &&
+    !state.source &&
+    !state.category &&
+    !state.tags.length &&
+    !state.q &&
+    !state.exact
+  );
+}
+
 function paintTabs() {
   $$(".folder, .spill").forEach((t) => {
     t.setAttribute(
@@ -1158,6 +1182,8 @@ function paintTabs() {
       String((t.dataset.status ?? "") === state.status),
     );
   });
+  const home = $("#dock-inbox");
+  if (home) home.setAttribute("aria-pressed", String(isInboxHome()));
 }
 $$(".folder, .spill").forEach((t) =>
   t.addEventListener("click", () => {
@@ -1337,6 +1363,7 @@ function paintChips() {
     (chips.length > 1
       ? '<button type="button" class="fclear">clear all</button>'
       : "");
+  paintTabs();
 }
 $("#fchips").addEventListener("click", (e) => {
   const chip = e.target.closest(".fchip");
@@ -1369,9 +1396,22 @@ $("#peekswept").addEventListener("click", () => {
 
 /* ---- search + operator discovery (Epic 12: visible Gmail/Discord-style operators) ---- */
 const qInput = $("#q");
+function focusSearchBox() {
+  const head = $(".console");
+  if (head) head.classList.remove("compact");
+  window.scrollTo({ top: 0 });
+  requestAnimationFrame(() => {
+    try {
+      qInput.focus({ preventScroll: true });
+    } catch (e) {
+      qInput.focus();
+    }
+  });
+}
 const runSearch = debounce(() => {
   if (qInput.value.startsWith(">")) return; // command mode — palette.js owns the input
   state.q = qInput.value.trim();
+  paintTabs();
   loadItems(true);
 }, 300);
 qInput.addEventListener("input", runSearch);
@@ -1380,16 +1420,17 @@ initOperators(qInput, $("#oppop"), {
   getDyn: (which) => (which === "tags" ? facets.tags.map((t) => t.id) : []),
   onApply: () => {
     state.q = qInput.value.trim();
+    paintTabs();
     loadItems(true);
   },
 });
 $("#exact").addEventListener("change", (e) => {
   state.exact = e.target.checked;
+  paintTabs();
   loadItems(true);
 });
 $("#dock-search").addEventListener("click", () => {
-  qInput.focus();
-  window.scrollTo({ top: 0 });
+  focusSearchBox();
 });
 
 /* ---- sort ---- */
@@ -1406,6 +1447,28 @@ sortSel.addEventListener("change", () => {
   } catch (e) {} // remember per tab
   loadItems(true);
 });
+
+function goInboxHome() {
+  state.status = "inbox";
+  state.source = "";
+  state.category = "";
+  state.tags = [];
+  state.q = "";
+  state.exact = false;
+  qInput.value = "";
+  const exact = $("#exact");
+  if (exact) exact.checked = false;
+  state.sort = sortForTab(state.status);
+  sortSel.value = state.sort;
+  paintTabs();
+  paintChips();
+  refreshRail();
+  loadItems(true);
+  loadCounts();
+  window.scrollTo({ top: 0 });
+}
+const dockInbox = $("#dock-inbox");
+if (dockInbox) dockInbox.addEventListener("click", goInboxHome);
 
 /* ---- keyboard: the one-hand map (locked at Gate 1) ---- */
 let cursor = -1;
@@ -1444,7 +1507,7 @@ document.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (k === "/") {
     e.preventDefault();
-    qInput.focus();
+    focusSearchBox();
     return;
   }
   if (e.key === "?") {
@@ -1487,14 +1550,14 @@ document.addEventListener("keydown", (e) => {
 /* ---- sheets / settings panel ---- */
 const scrim = $("#scrim");
 let _browseLock = 0;
-let _browseLockSaved = 0;       // #items scroll
-let _browseBodyLockSaved = 0;   // body scroll
+let _browseLockSaved = 0; // #items scroll
+let _browseBodyLockSaved = 0; // body scroll
 
 function lockBrowseScroll() {
   if (_browseLock === 0) {
     _browseLockSaved = itemsEl.scrollTop;
     _browseBodyLockSaved = window.scrollY || document.documentElement.scrollTop;
-    document.body.style.overflow = "hidden";   // lock the body too
+    document.body.style.overflow = "hidden"; // lock the body too
   }
   _browseLock++;
   itemsEl.style.overflow = "hidden";
@@ -1505,7 +1568,7 @@ function unlockBrowseScroll() {
   _browseLock = Math.max(0, _browseLock - 1);
   if (_browseLock === 0) {
     itemsEl.style.overflow = "";
-    document.body.style.overflow = "";          // restore the body
+    document.body.style.overflow = ""; // restore the body
     if (_browseLockSaved) itemsEl.scrollTop = _browseLockSaved;
     if (_browseBodyLockSaved) {
       window.scrollTo(0, _browseBodyLockSaved); // restore body scroll position
@@ -1690,7 +1753,10 @@ function closeRelay() {
   if (relayRow) {
     relayRow.classList.remove("relay-open");
     const fg = relayRow.querySelector(".item-fg");
-    if (fg) { fg.style.transition = ""; fg.style.transform = ""; }
+    if (fg) {
+      fg.style.transition = "";
+      fg.style.transform = "";
+    }
     const strip = relayRow.querySelector(".relay-strip");
     if (strip) strip.remove();
   }
@@ -1809,7 +1875,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v94";
+const APP_VERSION = "v95";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
