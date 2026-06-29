@@ -11,13 +11,15 @@ Field availability (verified against the live APIs):
   comments : id, body, author, subreddit, created_utc, (permalink/link_id vary)
 PullPush comments omit ``permalink``; Arctic-Shift includes it — hence two providers.
 """
+
 import html
 import json
 import re
 import time
 import urllib.parse
 
-from content_hoarder.archival import _http
+from content_hoarder import _http as http_transport
+from content_hoarder.archival import _http as archival_http
 from content_hoarder.archival._http import ArchiveError
 
 # Reddit base36 ids are ASCII alphanumerics. Validate before putting ids in a URL so
@@ -74,7 +76,9 @@ def _gallery(rec: dict) -> list:
         return []
     mm = rec.get("media_metadata") or {}
     items = (rec.get("gallery_data") or {}).get("items") or []
-    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(mm.keys())
+    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(
+        mm.keys()
+    )
     urls = []
     for mid in order:
         s = (mm.get(mid) or {}).get("s") or {}
@@ -96,7 +100,9 @@ def _gallery_preview(rec: dict, target: int = 1080) -> list:
         return []
     mm = rec.get("media_metadata") or {}
     items = (rec.get("gallery_data") or {}).get("items") or []
-    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(mm.keys())
+    order = [it.get("media_id") for it in items if isinstance(it, dict)] or list(
+        mm.keys()
+    )
     out = []
     for mid in order:
         meta = mm.get(mid) or {}
@@ -104,13 +110,17 @@ def _gallery_preview(rec: dict, target: int = 1080) -> list:
         full = s.get("u") or s.get("gif") or s.get("mp4")
         if not full:
             continue  # mirror _gallery's skip so indexes line up
-        previews = [p for p in (meta.get("p") or [])
-                    if isinstance(p, dict) and p.get("u")]
+        previews = [
+            p for p in (meta.get("p") or []) if isinstance(p, dict) and p.get("u")
+        ]
         chosen = full
         if previews:
             le = [p for p in previews if (p.get("x") or 0) <= target]
-            pick = (max(le, key=lambda p: p.get("x") or 0) if le
-                    else min(previews, key=lambda p: p.get("x") or 0))
+            pick = (
+                max(le, key=lambda p: p.get("x") or 0)
+                if le
+                else min(previews, key=lambda p: p.get("x") or 0)
+            )
             chosen = pick.get("u") or full
         out.append(html.unescape(chosen))
     return out
@@ -126,8 +136,8 @@ def _media_type(rec: dict) -> str:
     hint = rec.get("post_hint")
     if hint == "image":
         return "image"
-    if hint == "hosted:video":   # reddit-hosted video; "rich:video" is an external embed
-        return "reddit_video"    # (YouTube, Streamable, …) → fall through so the URL heuristic wins
+    if hint == "hosted:video":  # reddit-hosted video; "rich:video" is an external embed
+        return "reddit_video"  # (YouTube, Streamable, …) → fall through so the URL heuristic wins
     if hint == "link":
         return "link"
     return ""
@@ -183,12 +193,19 @@ class ArchiveProvider:
     name = "base"
     max_batch = 100
 
-    def __init__(self, user_agent, *, min_interval: float = 0.0,
-                 sleep=time.sleep, get_json=None, max_retries: int = 3):
+    def __init__(
+        self,
+        user_agent,
+        *,
+        min_interval: float = 0.0,
+        sleep=time.sleep,
+        get_json=None,
+        max_retries: int = 3,
+    ):
         self.user_agent = user_agent
         self.min_interval = min_interval
         self._sleep = sleep
-        self._get_json = get_json or _http.get_json
+        self._get_json = get_json or archival_http.get_json
         self.max_retries = max_retries
         self._made_request = False
 
@@ -209,7 +226,7 @@ class ArchiveProvider:
                 self._made_request = True
                 _status, _headers, data = self._get_json(url, self.user_agent)
                 return data if isinstance(data, dict) else {"data": data}
-            except _http.ArchiveError as e:
+            except ArchiveError as e:
                 if e.status == 429 and attempt < self.max_retries:
                     # e.retry_after is now the shared parser's numeric value (float|None),
                     # gaining the HTTP-date/negative guard the old `float(e.retry_after)`
@@ -226,9 +243,9 @@ class ArchiveProvider:
         out = {}
         ids = [i for i in ids if _VALID_ID.match(i or "")]
         for i in range(0, len(ids), self.max_batch):
-            batch = ids[i:i + self.max_batch]
+            batch = ids[i : i + self.max_batch]
             data = self._request(self._ids_url(kind, batch))
-            for rec in (data.get("data") or []):
+            for rec in data.get("data") or []:
                 rid = rec.get("id")
                 if rid:
                     out[rid] = normalizer(rec)
@@ -291,6 +308,7 @@ class ArchiveTodayProvider:
     + metadata-only. ``recover_media`` returns only image URLs; the caller does the byte
     fetch via ``media_archive``'s injected fetcher + stores via ``media_store``.
     """
+
     name = "archive_today"
     NEWEST = "https://archive.ph/newest/{url}"
     # og:image meta (attribute-order agnostic) + inlined <img src>. archive.today stores
@@ -300,8 +318,15 @@ class ArchiveTodayProvider:
     _CONTENT = re.compile(r'content=["\']([^"\']+)["\']', re.I)
     _IMG_SRC = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.I)
 
-    def __init__(self, user_agent, *, min_interval: float = 2.0, sleep=time.sleep,
-                 fetch_html=None, max_retries: int = 2):
+    def __init__(
+        self,
+        user_agent,
+        *,
+        min_interval: float = 2.0,
+        sleep=time.sleep,
+        fetch_html=None,
+        max_retries: int = 2,
+    ):
         self.user_agent = user_agent
         self.min_interval = min_interval
         self._sleep = sleep
@@ -313,14 +338,18 @@ class ArchiveTodayProvider:
         """GET ``url`` → HTML text. Cloudflare challenge pages surface as 403/429 → ArchiveError.
         Reuses the shared transport (which already honors Retry-After on 429)."""
         try:
-            _status, _headers, raw = _http.request(
-                url, method="GET",
+            _status, _headers, raw = http_transport.request(
+                url,
+                method="GET",
                 headers={"User-Agent": self.user_agent, "Accept": "text/html"},
-                timeout=timeout, retries=self.max_retries, sleep=self._sleep,
+                timeout=timeout,
+                retries=self.max_retries,
+                sleep=self._sleep,
             )
-        except _http.HttpError as e:
-            raise ArchiveError(f"HTTP error for {url}: {e}", status=e.status,
-                               retry_after=e.retry_after) from e
+        except http_transport.HttpError as e:
+            raise ArchiveError(
+                f"HTTP error for {url}: {e}", status=e.status, retry_after=e.retry_after
+            ) from e
         return raw.decode("utf-8", errors="replace")
 
     def _snapshot_url(self, original_url: str) -> str:
@@ -371,8 +400,11 @@ class ArchiveTodayProvider:
         if u and u.startswith("http"):
             out.append(u)
         if want_gallery:
-            out += [g for g in (md.get("gallery") or [])
-                    if isinstance(g, str) and g.startswith("http")]
+            out += [
+                g
+                for g in (md.get("gallery") or [])
+                if isinstance(g, str) and g.startswith("http")
+            ]
         seen: set = set()
         return [x for x in out if not (x in seen or seen.add(x))]
 
@@ -408,12 +440,18 @@ class ArchiveTodayProvider:
         return uniq
 
 
-def default_providers(user_agent, *, throttle: bool = True, order=("pullpush", "arctic")):
+def default_providers(
+    user_agent, *, throttle: bool = True, order=("pullpush", "arctic")
+):
     """Build providers in priority order. ``throttle`` enables rate-limit spacing for
     bulk hydration; pass throttle=False for snappy single on-demand fetches."""
     factories = {
-        "pullpush": lambda: PullPushProvider(user_agent, min_interval=4.0 if throttle else 0.0),
-        "arctic": lambda: ArcticShiftProvider(user_agent, min_interval=0.4 if throttle else 0.0),
+        "pullpush": lambda: PullPushProvider(
+            user_agent, min_interval=4.0 if throttle else 0.0
+        ),
+        "arctic": lambda: ArcticShiftProvider(
+            user_agent, min_interval=0.4 if throttle else 0.0
+        ),
     }
     return [factories[name]() for name in order if name in factories]
 

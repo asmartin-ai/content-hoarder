@@ -4,8 +4,6 @@ Tests source tabs, focus mode, status nav, tag rail, pulse strip, and stats moda
 using the seeded synthetic DB at a Pixel-6 PWA viewport.
 """
 
-import re
-
 import pytest
 from playwright.sync_api import expect
 
@@ -50,7 +48,6 @@ def test_source_tabs_switch_list(pixel6_page):
 def test_focus_mode_toggle(pixel6_page):
     """Focus button toggles body.focus and shows the batchstrip."""
     page = pixel6_page
-    body = page.locator("body")
     toggle = page.locator("#dock-focus")
     expect(toggle).to_be_visible()
 

@@ -5,10 +5,11 @@ Tests: tag suggestion queue, folders, duplicate review, done-retention,
 unsave-by-tag preview.
 """
 
-import json
 import sqlite3
 import sys
 from pathlib import Path
+
+from content_hoarder import db, folders, tag_suggest
 
 # Use live DB path
 DB = Path(__file__).resolve().parents[1] / "data/app.db"
@@ -22,8 +23,6 @@ print()
 # Open read-only copy for safety
 ro = sqlite3.connect(f"file:{DB.as_posix()}?mode=ro", uri=True)
 ro.row_factory = sqlite3.Row
-
-from content_hoarder import db, folders, models, tag_suggest
 
 # --- 1. Tag suggestion queue (dry-run) ---
 print("=== 1. Tag suggestion: rule-based (dry-run on reddit) ===")
@@ -102,6 +101,7 @@ try:
 
     # Rename
     renamed = db.rename_folder(mem, f["id"], "smoke-renamed")
+    assert renamed is not None
     print(f"  Renamed: {renamed['name']}")
     assert db.get_folder_by_name(mem, "smoke-renamed") is not None
 
