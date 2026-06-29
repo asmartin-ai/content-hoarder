@@ -10,20 +10,21 @@ a second Reddit sync scheduler.
 """
 from __future__ import annotations
 
+import importlib.util
 import socket
 import threading
 import time
+from collections.abc import Generator
 
 import pytest
 
 # `playwright`/`browser` fixtures come from the pytest-playwright plugin.
 
 # Skip collecting the whole UI suite when Playwright isn't installed (CI installs only [dev]) - otherwise
-# test_smoke.py's `from playwright.sync_api import ...` would ImportError at COLLECTION, even though the
-# tests are deselected at run time. Locally: `pip install -e .[ui] && playwright install chromium`.
-try:
-    import playwright.sync_api  # noqa: F401
-except Exception:                # pragma: no cover
+# test modules would ImportError at COLLECTION, even though the tests are deselected at run time.
+# Locally: `pip install -e .[ui] && playwright install chromium`.
+if (importlib.util.find_spec("playwright") is None
+        or importlib.util.find_spec("playwright.sync_api") is None):  # pragma: no cover
     collect_ignore_glob = ["*"]
 
 # Pixel 6 is a built-in Playwright device descriptor (viewport 412x839, DSF 2.625, touch).
@@ -208,7 +209,7 @@ def _seed_ui_db(db_path: str) -> None:
 
 
 @pytest.fixture(scope="session")
-def app_base_url(tmp_path_factory) -> str:
+def app_base_url(tmp_path_factory) -> Generator[str, None, None]:
     """Serve the app on a free localhost port against a synthetic throwaway DB."""
     from werkzeug.serving import make_server
 
