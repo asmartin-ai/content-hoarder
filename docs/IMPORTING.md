@@ -103,17 +103,61 @@ python -m content_hoarder import "apps/io.github.hidroh.materialistic/db/Materia
 
 ---
 
-## Firefox tabs (Export Tabs URLs)  ✅ done
+## Firefox tabs (Export Tabs URLs / JSON snapshot)  ✅ done
 Install the **"Export Tabs URLs"** add-on, export in **Rich format** to a `.txt`, then:
 ```bash
 python -m content_hoarder import "path\to\tabs.txt"
 ```
 Each tab → a `firefox:<url-hash>` item (de-duped across overlapping daily exports).
 
+The connector also accepts a local JSON snapshot with schema `content-hoarder.firefox-tabs.v1`, intended
+for the first-party Firefox WebExtension / manual-export fallback:
+```json
+{
+  "schema": "content-hoarder.firefox-tabs.v1",
+  "source": "webextension",
+  "captured_at": 1770000000,
+  "snapshot_id": "optional-id",
+  "tabs": [
+    {
+      "url": "https://example.com/article",
+      "title": "Example article",
+      "favIconUrl": "https://example.com/favicon.ico",
+      "windowId": 17,
+      "index": 0,
+      "pinned": false,
+      "active": true,
+      "discarded": false,
+      "lastAccessed": 1770000000123,
+      "cookieStoreId": "firefox-default",
+      "groupId": -1,
+      "incognito": false
+    }
+  ]
+}
+```
+Import it the same way:
+```bash
+python -m content_hoarder import "path\to\firefox-tabs.json"
+```
+
+For direct local push from an extension, generate a local ingest token, copy the printed token into the
+extension once, then run the web app:
+```bash
+python -m content_hoarder firefox-token --generate
+python -m content_hoarder serve
+```
+The extension should `POST` the same JSON schema to `http://127.0.0.1:8788/import/firefox-tabs` with
+`Authorization: Bearer <token>` (or `X-Content-Hoarder-Token: <token>`). Only the token's SHA-256 hash
+is stored in the local DB; generating a new token rotates the old one.
+
+Private/incognito and non-HTTP(S) tabs are skipped. Imported open-tab rows get an `open_in_firefox`
+marker so the **"📑 Firefox tabs"** filter catches them.
+
 **YouTube tabs are promoted automatically.** A tab whose URL is a YouTube video (`watch?v=` /
-`youtu.be` / `/shorts/`) becomes a real `youtube:<vid>` item instead — cleaned title, thumbnail, and an
-`open_in_firefox` marker — so it merges with anything already in Watch Later and is enrichable. Browse
-the batch with the **"📑 Firefox tabs"** filter on the home page.
+`youtu.be` / `/shorts/`) becomes a real `youtube:<vid>` item instead — cleaned title, thumbnail,
+`firefox_original_url`, and an `open_in_firefox` marker — so it merges with anything already in Watch
+Later and is enrichable. Browse the batch with the **"📑 Firefox tabs"** filter on the home page.
 
 To migrate tabs imported *before* this behavior existed (one-time reconciliation):
 ```bash
