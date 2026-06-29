@@ -65,7 +65,7 @@ rediscovery** (invert the triage score to surface high-value buried items).
 ## B · Friction & feel — key takeaways (added 2026-06-14)
 
 **B5 (initiation)** is the highest-leverage band for an ADHD user — the whole game is the *first* action:
-- **Open to ONE card, not the inbox wall** — and let the parked **triage-score** pick it, so *zero decisions* precede the first swipe. The single biggest initiation fix; it also reinforces the A-band's "ship the triage-score."
+- **Open to ONE card, not the inbox wall** — and let the shipped **triage-score** pick it, so *zero decisions* precede the first swipe. The single biggest initiation fix; it also reinforces the A-band's "tune the triage-score."
 - **"5-card sprint" + resume state** — a tiny, closable batch and "pick up where you left off," not infinite scroll from a cold start.
 - *Honesty note:* choice-overload (the jam study) and decision-fatigue/willpower-depletion **failed replication** — so the case rests on the well-grounded **Hick's Law** (a 12k list is genuinely slower to act on) + **ADHD task-initiation** (Wall of Awful, now/not-now), not on shaky willpower science.
 

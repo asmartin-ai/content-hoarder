@@ -4,7 +4,7 @@
 
 ## The idea
 
-A reward you can perfectly predict stops being exciting. A reward that *might* arrive — but you don't know when — keeps you reaching for it. content-hoarder already has the right raw materials (Surprise card, Shuffle/Mix, decay-resurfacing, a parked triage score). The lever is to make *opening the app* feel like opening a small unpredictable gift — "what forgotten thing will surface today?" — so starting is intrinsically appealing, while deliberately capping the loop so it never becomes a doomscroll.
+A reward you can perfectly predict stops being exciting. A reward that *might* arrive — but you don't know when — keeps you reaching for it. content-hoarder already has the right raw materials (Surprise card, Shuffle/Mix, decay-resurfacing, a shipped triage score). The lever is to make *opening the app* feel like opening a small unpredictable gift — "what forgotten thing will surface today?" — so starting is intrinsically appealing, while deliberately capping the loop so it never becomes a doomscroll.
 
 ## The science
 
@@ -33,7 +33,7 @@ A reward you can perfectly predict stops being exciting. A reward that *might* a
 
 ## Takeaways for content-hoarder
 
-- **[P1 · S]** Make the **Surprise card** genuinely variable, not uniform-random — weight toward *old + once-valued + long-buried* items so each pull can be a "lost treasure." Maps to existing Surprise + the parked triage score (invert it: surface high-value-but-stale). *Risk:* if it surfaces junk, the reward dies — gate on a value signal.
+- **[P1 · S]** Make the **Surprise card** genuinely variable, not uniform-random — weight toward *old + once-valued + long-buried* items so each pull can be a "lost treasure." Maps to existing Surprise + the shipped triage score (invert it: surface high-value-but-stale). *Risk:* if it surfaces junk, the reward dies — gate on a value signal.
 - **[P1 · S]** Add a **"daily find"** on open — one resurfaced item from decay-limbo, framed as a small gift. Maps to decay-resurfacing + Surprise. *Risk:* keep it ONE; a feed reintroduces the ludic loop.
 - **[P1 · S]** **Variable, sincere completion moments** — vary the micro-acknowledgement after a triage action (rotate phrasing/intensity) so closure isn't perfectly predictable (Self reward) [3]. *Risk:* never tip into slot-machine animation — mechanics now, *needs the design pass* for visuals.
 - **[P2 · M]** Build on the shipped **triage score / smart-triage** (live on main via learn-triage) as a *Hunt* engine: "here's the one you're most likely to finish" — surfacing is the variable reward. *Risk:* a wrong guess feels like noise; let the user reshuffle freely.
