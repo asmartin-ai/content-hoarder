@@ -8,13 +8,20 @@ def mk(**kw):
     return models.new_item(**kw)
 
 
+def _item(conn, fullname):
+    item = db.get_item(conn, fullname)
+    assert item is not None
+    return item
+
+
 def _md(conn, fullname):
-    return json.loads(db.get_item(conn, fullname)["metadata"])
+    return json.loads(_item(conn, fullname)["metadata"])
 
 
 def test_add_stamps_manual_and_tags(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     tags = db.set_tags(conn, "r:1", add=["MyProject"])  # normalized to lowercase
+    assert tags is not None
     assert "myproject" in tags
     md = _md(conn, "r:1")
     assert "myproject" in md["tags"]  # in the displayed list
@@ -52,7 +59,7 @@ def test_manual_tag_survives_reimport_that_replaces_tags(conn):
 def test_added_tag_is_searchable(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x"))
     db.set_tags(conn, "r:1", add=["zzunique"])
-    assert "zzunique" in db.get_item(conn, "r:1")["search_text"]
+    assert "zzunique" in _item(conn, "r:1")["search_text"]
 
 
 def test_missing_item_returns_none(conn):
@@ -61,11 +68,9 @@ def test_missing_item_returns_none(conn):
 
 def test_no_op_does_not_reorder_feed(conn):
     db.merge_upsert(conn, mk(source="r", source_id="1", title="x", now=1000))
-    before = db.get_item(conn, "r:1")["last_seen_utc"]
+    before = _item(conn, "r:1")["last_seen_utc"]
     db.set_tags(conn, "r:1", add=["tagא"])  # add a tag (non-ASCII tolerated)
-    assert (
-        db.get_item(conn, "r:1")["last_seen_utc"] == before
-    )  # tag edit never bumps recency
+    assert _item(conn, "r:1")["last_seen_utc"] == before  # tag edit never bumps recency
 
 
 def test_set_auto_tags_stamps_auto_and_keeps_manual_separate(conn):
