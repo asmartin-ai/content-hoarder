@@ -1,5 +1,7 @@
 # Mobile fast-scroll handle — implementation spec
 
+> Snapshot as of 2026-06-29.
+
 **Epic:** 16 (Mobile UX) · **Priority:** P3 · **Tier:** T3 after spec
 
 ## What
