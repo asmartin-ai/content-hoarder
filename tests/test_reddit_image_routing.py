@@ -86,6 +86,48 @@ def test_media_url_video_still_wins_over_image_branch():
     assert out == "video"
 
 
+def test_unarchived_vreddit_video_uses_remote_hls_manifest():
+    # Reddit fallback MP4s are often video-only; unarchived v.redd.it should use HLS for audio.
+    out = _node_eval(
+        "import { playableVideoSrc } from './core/media.js';"
+        "const it = { url: 'https://www.reddit.com/r/x/comments/a/t/', metadata: {"
+        "  media_type: 'reddit_video',"
+        "  media_url: 'https://v.redd.it/abc123/DASH_720.mp4?source=fallback'"
+        "} };"
+        "console.log(playableVideoSrc(it));"
+    )
+    assert out == "https://v.redd.it/abc123/HLSPlaylist.m3u8"
+
+
+def test_archived_vreddit_video_prefers_local_muxed_mp4_when_enabled():
+    out = _node_eval(
+        "import { setArchivePref, playableVideoSrc } from './core/media.js';"
+        "const u = 'https://v.redd.it/abc123/DASH_720.mp4?source=fallback';"
+        "const it = { url: 'https://www.reddit.com/r/x/comments/a/t/', metadata: {"
+        "  media_type: 'reddit_video', media_url: u,"
+        "  archived_media: { [u]: 'sha.mp4', 'https://v.redd.it/abc123': 'sha.mp4' },"
+        "  archived_media_details: { 'https://v.redd.it/abc123': { kind: 'reddit_video' } }"
+        "} };"
+        "setArchivePref(true);"
+        "console.log(playableVideoSrc(it));"
+    )
+    assert out == "/media/sha.mp4"
+
+
+def test_archived_vreddit_canonical_only_still_resolves_local_when_enabled():
+    out = _node_eval(
+        "import { setArchivePref, playableVideoSrc } from './core/media.js';"
+        "const u = 'https://v.redd.it/abc123/DASH_720.mp4?source=fallback';"
+        "const it = { url: 'https://www.reddit.com/r/x/comments/a/t/', metadata: {"
+        "  media_type: 'reddit_video', media_url: u,"
+        "  archived_media: { 'https://v.redd.it/abc123': 'sha.mp4' }"
+        "} };"
+        "setArchivePref(true);"
+        "console.log(playableVideoSrc(it));"
+    )
+    assert out == "/media/sha.mp4"
+
+
 def test_gallery_metadata_classifies_as_gallery_before_image():
     out = _node_eval(
         "import { mediaType } from './core/media.js';"
