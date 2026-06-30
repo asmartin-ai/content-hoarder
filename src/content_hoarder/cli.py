@@ -8,7 +8,7 @@ import json
 import sys
 from typing import Any
 
-from content_hoarder import config
+from content_hoarder import __version__, config
 
 
 def _connect():
@@ -1514,6 +1514,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="content_hoarder", description="Local triage-first content manager."
     )
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init-db", help="Create the database + search tables.").set_defaults(

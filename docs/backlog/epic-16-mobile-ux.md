@@ -4,20 +4,22 @@ Absorbs "make the Reddit view more mobile-friendly".*
 
 ### Mobile real-device QA observations — 2026-06-29
 
-- [ ] **P1 — Lightbox blank-space drag must not scroll the inbox.** When the media preview lightbox is
-  open, sliding on blank/backdrop space can still move the underlying inbox. Treat the whole lightbox/backdrop
-  as a scroll-locked overlay: blank-space drags should either do nothing or close the lightbox via the existing
-  gesture, but never scroll `#items`/document behind it. Add a mobile UI regression around feed scroll staying
-  fixed while dragging blank lightbox space.
-- [ ] **P1 — Long-press row menu shifts scroll position / feels awkward.** Long-pressing an inbox item to
-  open the Relay strip can move the feed scroll position, making the item jump under the finger. Reproduce on
-  real mobile, then keep the row anchored during long-press activation (likely snapshot scrollY + item rect,
-  avoid layout-height changes, and prevent accidental drag/scroll during the activation window). Consider
-  whether long-press should be narrowed to a handle or replaced by a less awkward gesture.
-- [ ] **P1 — Hold-to-preview lightbox allows panning/zooming into empty space.** A long-press media preview
-  can zoom out or pan right even when there is only blank space. Clamp zoom scale to `>=1`, clamp pan bounds
-  to the image/video content box, reset transform on close/open, and disable pan while the preview is in
-  temporary “peek” mode unless zoomed in.
+- [x] ~~**P1 — Lightbox blank-space drag must not scroll the inbox.**~~ ✅ Shipped for 1.0.0
+  (`core/media.js`, `browse.css`, `tests/ui/test_mobile_ux.py`; SW v101). The browse scroll container and
+  document/body are locked while the lightbox is open, blank/backdrop drags are contained, and the original
+  feed scroll position is restored on close. Regression coverage: `test_lightbox_backdrop_drag_does_not_scroll_feed`
+  + `test_lightbox_swipe_does_not_scroll_feed`.
+- [x] ~~**P1 — Long-press row menu shifts scroll position / feels awkward.**~~ ✅ Shipped for 1.0.0
+  (`core/swipe.js`, `browse.css`, `tests/ui/test_mobile_ux.py`; SW v101). Long-press relay activation snapshots
+  the pressed row's top position and compensates accidental scroll during the hold window. The relay strip stays
+  clipped/in-flow over a dimmed row instead of making the row jump. Regression coverage:
+  `test_relay_long_press_keeps_row_anchored` + `test_relay_long_press_restores_accidental_scroll_during_activation`.
+- [x] ~~**P1 — Hold-to-preview lightbox allows panning/zooming into empty space.**~~ ✅ Shipped for 1.0.0
+  (`browse/main.js`, `core/media.js`, `browse.css`, `tests/ui/test_mobile_ux.py`; SW v101). Hold-to-preview opens
+  a temporary peek until pointer release, suppresses the trailing synthetic click, disables 1× pan in peek mode,
+  clamps zoom to `>=1`, expands zoomed media to full-viewport bounds when needed, clamps pan to the visible
+  viewport, and resets transforms between opens. Regression coverage: hold-to-preview open/release, 1× no-pan,
+  full-viewport zoom clamp, and transform reset tests.
 - [ ] **P2 — Revisit inbox swipe controls / inertia.** Rapid left swipes currently tend to hit the long-left
   Snooze action; in real use, a fast decisive swipe probably means **Done**, not Snooze. Re-tune gesture
   recognition so velocity and travel are considered separately (fast flick → primary action; deliberate long
@@ -99,9 +101,10 @@ Absorbs "make the Reddit view more mobile-friendly".*
 - [x] ~~**P2 — Relay-style long-press: pan the item aside + reveal an extended action menu.**~~ ✅ Shipped
   2026-06-27 (`main.js openRowMenu` + `.relay-strip` template + `browse.css`): long-press/right-click a row →
   `.item-fg` translates aside, a horizontal action strip (Source, Author, Tag, Share, Snooze) slides in.
-  Design decision B3: Copy Relay — horizontal row with icon-over-label, shows where the item was. Swipe-back
-  (`onRelayClose`) collapses the strip; swipe + relay states are mutually exclusive (`relayCloseMode` in
-  `core/swipe.js`). A transparent `.relay-scrim` captures outside taps / Escape.
+  Design decision B3: Copy Relay — horizontal row with icon-over-label, shows where the item was. 1.0.0 hardening
+    keeps the row anchored in-flow while the strip overlays a dimmed row; swipe-back (`onRelayClose`) collapses
+    the strip; swipe + relay states are mutually exclusive (`relayCloseMode` in `core/swipe.js`). A transparent
+    `.relay-scrim` captures outside taps / Escape.
 - [x] ~~**P3 — Relay strip visual polish (icon-only, no text labels).**~~ ✅ Shipped 2026-06-27
   (T2 delegation, merged through the mobile-polish integration branch and now on `main`): the `.relay-lbl` spans
   are now visually hidden (sr-only pattern: `position:absolute;width:1px;height:1px;clip:rect(0,0,0,0)`)
@@ -117,11 +120,11 @@ Absorbs "make the Reddit view more mobile-friendly".*
   (T2 delegation, merged through the mobile-polish integration branch and now on `main`): `pointerdown` on
   `[data-media]` starts a 250ms hold timer (10px slop cancels → swipe/scroll wins); when it fires,
   `openMediaFor(item, {peek:true})` opens the lightbox and `_attachPeekRelease()` in `createLightbox`
-  registers a `window`-level `pointerup`/`pointercancel` listener that calls `close()` on release
-  (window-level so release fires even if the finger drifts onto the lightbox content). A quick tap
-  (<250ms, no movement) cancels the timer and the existing `[data-media]` click handler opens the
-  lightbox persistently — a capture-phase click suppressor (`_suppressNextClick`) prevents the trailing
-  click from re-opening after a peek. All `openMediaFor` branches thread `{peek}` through
+  registers a `window`-level `pointerup` listener that calls `close()` on release (intentionally NOT
+  `pointercancel`, because Android/Chrome can cancel when the overlay appears). A quick tap (<250ms, no movement)
+  cancels the timer and the existing `[data-media]` click handler opens the lightbox persistently — a
+  capture-phase click suppressor prevents the trailing click from re-opening after a peek. All `openMediaFor`
+  branches thread `{peek}` through
   (`openImage`/`openGallery`/`openVideo`/`openMedia`/`openHtml` all gained an `opts_` arg). `close()`
   cleans up the release listener. `swipe.js`'s `[data-media]` long-press guard (450ms) already prevents
   the relay strip opening on a media hold, so the 250ms peek wins the race cleanly. SW v77 → v83.
@@ -147,9 +150,10 @@ Absorbs "make the Reddit view more mobile-friendly".*
 
 ### Mobile lightbox / media-viewer *(Epic 16)*
 
-- [x] ~~**P2 — Scroll-lock the browse list while the lightbox is open.**~~ ✅ Shipped 2026-06-27:
-  `createLightbox` accepts a `lockScrollEl` option; `openMediaFor` passes `#items` — scroll is saved, the
-  element gets `overflow:hidden`, and restored on close (`core/media.js:349-373`).
+- [x] ~~**P2 — Scroll-lock the browse list while the lightbox is open.**~~ ✅ Shipped 2026-06-27,
+  hardened for 1.0.0: `createLightbox` accepts a `lockScrollEl` option; `openMediaFor` passes `#items` — scroll is
+  saved, the element gets `overflow:hidden`, and restored on close. 1.0.0 also fixed-locks document/body scroll
+  during the overlay so blank-space drags cannot move the feed behind the lightbox.
 - [x] ~~**P2 — Pinch-zoom + mouse-wheel zoom in the lightbox.**~~ ✅ Shipped 2026-06-27
   (T2 delegation, merged through the mobile-polish integration branch and now on `main`): `createLightbox` gained
   zoom state (`zoomScale`, `zoomImg`) + `setZoom`/`resetZoom` helpers. `wheel` on the body drives
@@ -191,11 +195,10 @@ historical batch docs were folded into this section during delegation cleanup; r
   overlay, and the `horizontal` decision can fail on a diagonal swipe. Fix: `t3-relay-swipe-close`
   lowers the close threshold to 10px and bypasses the `horizontal` decision in `relayCloseMode`.
 - [x] **P1 — Hold-to-preview flickers (opens/closes repeatedly).** T2 regression (B4): the
-  window-level peek release listener can fire twice (`pointerup` + `pointercancel`), and
-  `swipe.js`'s 450ms long-press timer arms on `[data-media]` targets, racing the 250ms peek.
-  Fix: `t3-peek-flicker` adds an idempotency guard (`_peekOpen`), makes the release listener
-  fire-once across both event types, and moves the swipe.js `[data-media]` guard to skip the
-  lpTimer arming entirely.
+  window-level peek release listener could fire from `pointercancel` as the overlay appeared, then the
+  trailing click could reopen the media persistently. 1.0.0 fix: `browse/main.js` tracks `mediaPressStart` /
+  `mediaPeeking`, opens peek mode after the hold threshold, closes on `pointerup` only, and suppresses the
+  trailing synthetic click; `core/media.js` removes the `pointercancel` peek-close path.
 - [x] **P2 — Only 1 tag suggestion shown (D1 should show 3).** T2 regression: `tagedit.js options()`
   slices 2 categories + 1 tag, but `_recentCategories()` is empty unless the item has a
   `metadata.category` → 0 + 1 = 1. Fix: `t3-tag-suggest-three` backfills with recent tags to

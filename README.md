@@ -5,9 +5,7 @@ Built for an ADHD brain that over-saves everything: posts, videos, articles, and
 thesis is **process and reduce, not just aggregate** — this isn't a prettier hoarding machine; it's
 a dedicated workspace to sift through your backlog and actually deal with what you saved.
 
-Status: **Phase 2 (in active development)** — Phase 1 (import + search + a usable triage UI) is complete;
-Phase-2 items shipped include the v3 browse UI, LLM assist, Obsidian export, Reddit OAuth + sync, and the
-inline reader. The offline PWA already ships.
+Status: **1.0.0 local release** — content-hoarder now follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The v3 browse UI, offline PWA shell, Reddit OAuth/sync, inline reader, recovery tooling, media archiving, Obsidian export, and optional local-LLM assist are available. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
 ## Features
 - Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep,
@@ -45,6 +43,7 @@ python -m venv .venv
 # macOS/Linux:    source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
+python -m content_hoarder --version
 python -m content_hoarder init-db
 python -m content_hoarder import <path>     # a file or a directory (auto-detects the source)
 python -m content_hoarder serve             # then open http://127.0.0.1:8788
@@ -63,6 +62,7 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 ## CLI commands
 | Command | Description |
 |---------|-------------|
+| `--version` | Print the installed content-hoarder version. |
 | `init-db` | Create the local SQLite database + FTS5 search tables. |
 | `import <path> [--source ID]` | Import a file/dir; auto-detects the source (Reddit DB/CSV/JSON, YouTube yt-dlp JSON, HN DB/txt, Obsidian/Keep folders, Firefox "Export Tabs URLs" .txt, Twitter/X bookmark JSON/CSV), or force with `--source`. |
 | `categorize [--source youtube\|reddit\|firefox\|hackernews] [--topics] [--dry-run] [--all] [--limit N]` | Tag items by heuristics. `--source youtube` → processing areas *listenable* / *watch* / *wotagei* on `metadata.category`; `--topics` (youtube) / `--source reddit\|firefox\|hackernews` → multi-label topic tags (gaming/defense/investing/…) on `metadata.tags` (host + title keywords; `--dry-run` previews accuracy without writing). |

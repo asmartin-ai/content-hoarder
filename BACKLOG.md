@@ -136,9 +136,6 @@ monolithic file.
 - History: `docs/backlog/epic-16-mobile-ux.md`
 - Milestone: https://github.com/asmartin-ai/content-hoarder/milestone/16
 - Active issues:
-  - #35 — Lightbox blank-space drag must not scroll the inbox
-  - #36 — Long-press row menu shifts scroll position / feels awkward
-  - #37 — Hold-to-preview lightbox allows panning/zooming into empty space
   - #38 — Revisit inbox swipe controls / inertia
   - #39 — Text Reddit post rendered with a misleading preview play button
   - #40 — Reader should swipe up from bottom when opened via triage swipe-up

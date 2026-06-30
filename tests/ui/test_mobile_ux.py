@@ -1,15 +1,8 @@
-"""T3 mobile-polish UX regression tests (Playwright, Pixel-6 / PWA-standalone).
+"""Mobile/PWA UX regression tests (Playwright, Pixel-6 / PWA-standalone).
 
-Covers the 6 T3 fixes:
-  - relay-swipe-close (5 tests)
-  - hold-to-preview     (4 tests)
-  - tag-suggest-three   (3 tests)
-  - lightbox-swipe-scroll (3 tests)
-  - sidebar-scroll-lock (3 tests)
-  - drop-reader-dock    (4 tests)
-
-These tests are EXPECTED TO FAIL on the starting branch `staging/mobile-polish-t2`
-(the bugs are present). They PASS once the corresponding T3 fix branches merge.
+Covers the shipped mobile interaction contract: relay long-press, hold-to-preview,
+tag suggestions, lightbox scroll/zoom/pan behavior, sidebar scroll-lock, dock polish,
+and release-hardening regressions that should stay fixed for 1.0.0+.
 
 Gesture API notes
 -----------------
@@ -862,6 +855,46 @@ def test_lightbox_zoomed_pan_clamps_to_viewport(pixel6_page):
     assert vals["bodyHeight"] >= vals["viewportHeight"] - 1
     assert abs(vals["tx"]) <= vals["maxX"] + 1
     assert abs(vals["ty"]) <= vals["maxY"] + 1
+
+
+def test_gallery_hydrate_response_does_not_reopen_after_close(pixel6_page):
+    """Closing a loading gallery should invalidate the async hydrate response."""
+    page = pixel6_page
+    page.evaluate(
+        """() => {
+          const originalFetch = window.fetch.bind(window);
+          window.__resolveGalleryHydrate = null;
+          window.fetch = (input, init) => {
+            const url = String(input && input.url ? input.url : input);
+            if (url.includes('/reddit/items/reddit%3Aui_empty_gallery/hydrate-gallery')) {
+              return new Promise((resolve) => {
+                window.__resolveGalleryHydrate = () => resolve(new Response(JSON.stringify({
+                  status: 'hydrated',
+                  gallery: ['/static/icon-512.png'],
+                  gallery_preview: ['/static/icon-512.png'],
+                }), {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' },
+                }));
+              });
+            }
+            return originalFetch(input, init);
+          };
+        }"""
+    )
+    _scroll_into_view(page, "reddit:ui_empty_gallery")
+    coords = _thumb_center(page, "reddit:ui_empty_gallery")
+    page.touchscreen.tap(coords["x"], coords["y"])
+    page.wait_for_timeout(150)
+    assert _media_modal_open(page), "loading gallery placeholder should open"
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    assert not _media_modal_open(page), "Escape should close the loading gallery"
+    page.evaluate(
+        "() => window.__resolveGalleryHydrate && window.__resolveGalleryHydrate()"
+    )
+    page.wait_for_timeout(300)
+    assert not _media_modal_open(page), "late hydrate response must not reopen gallery"
 
 
 def test_lightbox_transform_resets_after_reopen(pixel6_page):
