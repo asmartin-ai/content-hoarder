@@ -4,10 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "content-hoarder"
-version = "0.1.0"
+version = "1.0.0"
 description = "A local-first, triage-first manager for saved content across many sources."
 requires-python = ">=3.12"
 dependencies = ["flask>=3.0,<4.0"]
+
+[project.scripts]
+content-hoarder = "content_hoarder.cli:main"
 
 [project.optional-dependencies]
 youtube = ["yt-dlp"]

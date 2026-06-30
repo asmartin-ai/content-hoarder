@@ -5,4 +5,4 @@ Obsidian, Google Keep, ...) into one local SQLite database, then helps you
 *process and reduce* the pile rather than merely hoard it.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

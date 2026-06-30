@@ -46,7 +46,7 @@ SCOPE = "read history identity save"
 _SERVICE = "reddit_oauth"
 _ACCESS_TTL = 3600    # Reddit access tokens live ~1h
 _REFRESH_SKEW = 300   # refresh this many seconds BEFORE expiry (clock-skew / latency margin)
-_APP_VERSION = "0.2"
+_APP_VERSION = "1.0.0"
 
 
 class RedditOAuthError(Exception):

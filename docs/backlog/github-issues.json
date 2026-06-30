@@ -459,7 +459,7 @@
   {
     "key": "epic-16-lightbox-blank-space-drag-must-not-scroll-the-inbox",
     "title": "Lightbox blank-space drag must not scroll the inbox",
-    "state": " ",
+    "state": "x",
     "epic_num": 16,
     "epic_title": "Mobile UX",
     "milestone": "Epic 16 — Mobile UX",
@@ -477,7 +477,7 @@
   {
     "key": "epic-16-long-press-row-menu-shifts-scroll-position-feels-awkward",
     "title": "Long-press row menu shifts scroll position / feels awkward",
-    "state": " ",
+    "state": "x",
     "epic_num": 16,
     "epic_title": "Mobile UX",
     "milestone": "Epic 16 — Mobile UX",
@@ -495,7 +495,7 @@
   {
     "key": "epic-16-hold-to-preview-lightbox-allows-panning-zooming-into-empty-space",
     "title": "Hold-to-preview lightbox allows panning/zooming into empty space",
-    "state": " ",
+    "state": "x",
     "epic_num": 16,
     "epic_title": "Mobile UX",
     "milestone": "Epic 16 — Mobile UX",

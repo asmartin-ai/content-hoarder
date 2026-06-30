@@ -705,11 +705,13 @@ function preloadNext(opened) {
 
 /* ---- media lightbox ---- */
 let lastMediaFn = null; // item whose media is open in the lightbox → re-blurred on close
+let mediaOpenSeq = 0; // invalidates async replacements when the lightbox closes/reopens
 const lightbox = createLightbox({
   modal: "#media-modal",
   body: "#media-body",
   lockScrollEl: itemsEl,
   onClose: () => {
+    mediaOpenSeq += 1;
     reblur(lastMediaFn);
   },
 });
@@ -773,10 +775,15 @@ function openMediaFor(item, opts) {
       );
     };
     if (opts && opts.peek) return lightbox.openHtml(fallbackHtml(), opts);
+    const openSeq = ++mediaOpenSeq;
     lightbox.openHtml(
       '<p class="media-fallback">Loading gallery from Reddit…</p>',
       opts,
     );
+    const stillActive = () =>
+      openSeq === mediaOpenSeq &&
+      lightbox.isOpen() &&
+      lastMediaFn === item.fullname;
     (async () => {
       try {
         const res = await api.postJSON(
@@ -785,6 +792,7 @@ function openMediaFor(item, opts) {
             "/hydrate-gallery",
           {},
         );
+        if (!stillActive()) return;
         const gallery = (res && res.gallery) || [];
         if (
           (res.status === "hydrated" || res.status === "cached") &&
@@ -805,6 +813,7 @@ function openMediaFor(item, opts) {
           opts,
         );
       } catch (e) {
+        if (!stillActive()) return;
         lightbox.openHtml(
           fallbackHtml("Couldn’t load gallery from Reddit."),
           opts,
@@ -2018,7 +2027,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v101";
+const APP_VERSION = "v102";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
