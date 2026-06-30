@@ -729,6 +729,9 @@ export function createLightbox(opts) {
 
   return {
     close,
+    isOpen() {
+      return !modal.hidden;
+    },
     /* Open arbitrary HTML in the lightbox (for caller-constructed content like a gallery
        placeholder). Registers with the overlay coordinator so OS-back closes it. */
     openHtml(html, opts_) {

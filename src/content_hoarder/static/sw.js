@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v101"; // v101: remove mobile Decide button
+const CACHE = "ch-shell-v102"; // v102: 1.0.0 mobile release hardening
 const SHELL = [
   "/",
   "/triage",
