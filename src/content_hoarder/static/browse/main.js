@@ -568,88 +568,91 @@ itemsEl.addEventListener("click", (e) => {
   }
 });
 
-/* ---- hold-to-preview (B4: Relay-style press-and-hold lightbox peek) ----
-   A press-and-hold on a media thumbnail (~250ms) opens the lightbox temporarily;
-   release closes it. A quick tap opens persistently (existing behavior).
-   The release listener is on `window` in createLightbox (core/media.js) so release
-   fires even if the finger drifts onto the lightbox content. */
-let holdTimer = null;
-let _peekOpen = false;
-let peeking = false;
-let peekPointerId = null;
-let peekStartX = 0;
-let peekStartY = 0;
-const HOLD_DELAY = 250;
-const HOLD_SLOP = 10;
-
-// Suppress the click that follows a peek-opening pointerup (otherwise the [data-media]
-// click handler would open the lightbox again, persistently, right after the peek closed).
-let _suppressNextClick = false;
-
+/* ---- hold-to-preview (Relay-style press-and-hold media peek) ----
+   Long-press opens a temporary lightbox while the pointer stays down. Release closes
+   it and swallows the trailing synthetic click so it does not reopen persistently. */
+let mediaPressStart = null;
+let mediaHoldTimer = null;
+let mediaPeeking = false;
+let suppressMediaClick = false;
+let suppressMediaClickTimer = null;
+const MEDIA_HOLD_DELAY = 250;
+const MEDIA_PRESS_SLOP = 10;
+function armMediaClickSuppress() {
+  suppressMediaClick = true;
+  clearTimeout(suppressMediaClickTimer);
+  suppressMediaClickTimer = setTimeout(() => {
+    suppressMediaClick = false;
+    suppressMediaClickTimer = null;
+  }, 700);
+}
+function clearMediaHold() {
+  if (mediaHoldTimer !== null) {
+    clearTimeout(mediaHoldTimer);
+    mediaHoldTimer = null;
+  }
+}
 itemsEl.addEventListener("pointerdown", (e) => {
   const media = e.target.closest("[data-media]");
   if (!media) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
   const fn = media.closest("[data-fullname]")?.dataset.fullname;
   if (!fn) return;
-  if (e.pointerType === "mouse" && e.button !== 0) return;
-  // bail if a peek is already in progress (e.g., a second finger lands on a different thumb)
-  if (_peekOpen) return;
-  peekStartX = e.clientX;
-  peekStartY = e.clientY;
-  peekPointerId = e.pointerId;
-  holdTimer = setTimeout(() => {
-    holdTimer = null;
-    _peekOpen = true; // set BEFORE openMediaFor so the release listener sees it
-    peeking = true;
+  mediaPressStart = {
+    id: e.pointerId,
+    x: e.clientX,
+    y: e.clientY,
+    t: performance.now(),
+    fn,
+  };
+  clearMediaHold();
+  mediaHoldTimer = setTimeout(() => {
+    mediaHoldTimer = null;
+    if (!mediaPressStart || mediaPressStart.id !== e.pointerId) return;
     const item = state.items.find((it) => it.fullname === fn);
-    if (item) openMediaFor(item, { peek: true });
-  }, HOLD_DELAY);
+    if (!item) return;
+    mediaPeeking = true;
+    armMediaClickSuppress();
+    openMediaFor(item, { peek: true });
+  }, MEDIA_HOLD_DELAY);
 });
-
 itemsEl.addEventListener("pointermove", (e) => {
-  if (holdTimer === null || e.pointerId !== peekPointerId) return;
-  if (Math.hypot(e.clientX - peekStartX, e.clientY - peekStartY) > HOLD_SLOP) {
-    clearTimeout(holdTimer);
-    holdTimer = null;
+  if (!mediaPressStart || e.pointerId !== mediaPressStart.id) return;
+  if (
+    Math.hypot(e.clientX - mediaPressStart.x, e.clientY - mediaPressStart.y) >
+    MEDIA_PRESS_SLOP
+  ) {
+    clearMediaHold();
+    mediaPressStart = null;
   }
 });
-
 itemsEl.addEventListener("pointerup", (e) => {
-  if (holdTimer !== null) {
-    clearTimeout(holdTimer);
-    holdTimer = null;
-    // tap (< 250ms, no movement) -> let the existing click handler open persistently
-    return;
-  }
-  if (peeking) {
-    peeking = false;
-    // schedule suppression of the trailing click (it arrives after pointerup)
-    _suppressNextClick = true;
-    // _peekOpen is cleared by the lightbox's close() onClose callback (see media.js).
+  if (!mediaPressStart || e.pointerId !== mediaPressStart.id) return;
+  const wasPeeking = mediaPeeking;
+  clearMediaHold();
+  mediaPressStart = null;
+  if (wasPeeking) {
+    mediaPeeking = false;
+    armMediaClickSuppress();
   }
 });
-
 itemsEl.addEventListener("pointercancel", (e) => {
-  if (holdTimer !== null) {
-    clearTimeout(holdTimer);
-    holdTimer = null;
+  if (mediaPressStart && e.pointerId === mediaPressStart.id) {
+    if (mediaPeeking) armMediaClickSuppress();
+    mediaPeeking = false;
+    mediaPressStart = null;
   }
-  if (peeking) {
-    peeking = false;
-    _peekOpen = false; // pointercancel means no pointerup will fire; clear here too
-  }
+  clearMediaHold();
 });
-
-// Capture-phase click suppressor: catches the synthetic click that follows a
-// peek-opening pointerup and stops it from re-opening the lightbox persistently.
 itemsEl.addEventListener(
   "click",
   (e) => {
-    if (_suppressNextClick) {
-      _suppressNextClick = false;
-      e.stopPropagation();
-      e.preventDefault();
-    }
+    if (!suppressMediaClick || !e.target.closest("[data-media]")) return;
+    suppressMediaClick = false;
+    clearTimeout(suppressMediaClickTimer);
+    suppressMediaClickTimer = null;
+    e.stopPropagation();
+    e.preventDefault();
   },
   true,
 );
@@ -707,7 +710,6 @@ const lightbox = createLightbox({
   body: "#media-body",
   lockScrollEl: itemsEl,
   onClose: () => {
-    _peekOpen = false; // T3 peek-flicker: a peek close (release/cancel) re-arms the guard
     reblur(lastMediaFn);
   },
 });
@@ -2016,7 +2018,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v97";
+const APP_VERSION = "v101";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
