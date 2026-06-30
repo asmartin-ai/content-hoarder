@@ -107,6 +107,21 @@ def _seed_ui_db(db_path: str) -> None:
             ),
             models.new_item(
                 source="reddit",
+                source_id="ui_text_thumb",
+                kind="post",
+                title="AskReddit synthetic text thumbnail",
+                body="Thread text preview body from a self post.",
+                url="https://www.reddit.com/r/AskReddit/comments/ui_text_thumb/title/",
+                created_utc=now - 90,
+                now=now - 90,
+                metadata={
+                    "subreddit": "AskReddit",
+                    "permalink": "/r/AskReddit/comments/ui_text_thumb/title/",
+                    "thumbnail": "https://b.thumbs.redditmedia.com/selfpost.jpg",
+                },
+            ),
+            models.new_item(
+                source="reddit",
                 source_id="ui_old_done",
                 kind="post",
                 title="UI old Done item",
