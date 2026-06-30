@@ -107,6 +107,9 @@ const urlDomainHtml = (item) => {
   return d ? '<span class="url-domain">' + esc(d) + "</span>" : "";
 };
 
+const isRedditTextPost = (item, mt) =>
+  item.source === "reddit" && mt.cls === "text";
+
 /* monitor: the fixed thumb slot. NSFW gets the box-constrained blur + veil. */
 const monitorHtml = (item, nsfwRevealed) => {
   const t = thumb(item, "list");
@@ -124,6 +127,8 @@ const monitorHtml = (item, nsfwRevealed) => {
       );
     return '<div class="monitor empty" aria-hidden="true"></div>';
   }
+  if (isRedditTextPost(item, mt))
+    return '<div class="monitor empty" aria-hidden="true"></div>';
   const m = item.metadata || {};
   const blur = isNsfw(item) && !nsfwRevealed;
   const dur =
@@ -266,7 +271,9 @@ export const pinCard = (item, opts) => {
   const mt = mediaType(item);
   const blur = isNsfw(item) && !o.nsfwRevealed;
   const domainHtml = urlDomainHtml(item);
-  const screen = t
+  const screen = isRedditTextPost(item, mt)
+    ? ""
+    : t
     ? '<button type="button" class="screen' +
       (blur ? " nsfw" : "") +
       '" data-media="1">' +
