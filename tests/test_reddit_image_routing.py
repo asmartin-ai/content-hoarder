@@ -63,6 +63,52 @@ def test_reddit_text_post_is_not_image():
     assert out == "text"
 
 
+def test_reddit_text_post_thumbnail_does_not_render_media_affordance():
+    out = _node_eval(
+        "import { logRow, pinCard } from './browse/render.js';"
+        "const it = { source:'reddit', fullname:'reddit:t3_ask', kind:'post',"
+        "  title:'AskReddit text post', body:'Thread text preview body.', status:'inbox',"
+        "  url:'https://www.reddit.com/r/AskReddit/comments/abc/title/',"
+        "  metadata:{ subreddit:'AskReddit',"
+        "    permalink:'/r/AskReddit/comments/abc/title/',"
+        "    thumbnail:'https://b.thumbs.redditmedia.com/selfpost.jpg' } };"
+        "const html = logRow(it, { view:'', nsfwRevealed:new Set() }) + pinCard(it, { view:'' });"
+        "console.log(JSON.stringify({"
+        "  media: html.includes('data-media'),"
+        "  emptySlot: html.includes('monitor empty'),"
+        "  snippet: html.includes('Thread text preview body.')"
+        "}));"
+    )
+    assert json.loads(out) == {
+        "media": False,
+        "emptySlot": True,
+        "snippet": True,
+    }
+
+
+def test_reddit_image_thumbnail_still_renders_media_affordance():
+    out = _node_eval(
+        "import { logRow, pinCard } from './browse/render.js';"
+        "const it = { source:'reddit', fullname:'reddit:t3_img', kind:'post',"
+        "  title:'Image post', body:'', status:'inbox',"
+        "  url:'https://www.reddit.com/r/pics/comments/abc/title/',"
+        "  metadata:{ subreddit:'pics', permalink:'/r/pics/comments/abc/title/',"
+        "    media_url:'https://i.redd.it/img.jpg', media_type:'reddit_media',"
+        "    thumbnail:'https://b.thumbs.redditmedia.com/img.jpg' } };"
+        "const html = logRow(it, { view:'', nsfwRevealed:new Set() }) + pinCard(it, { view:'' });"
+        "console.log(JSON.stringify({"
+        "  cls: html.includes('data-media'),"
+        "  monitor: html.includes('class=\"monitor'),"
+        "  screen: html.includes('class=\"screen')"
+        "}));"
+    )
+    assert json.loads(out) == {
+        "cls": True,
+        "monitor": True,
+        "screen": True,
+    }
+
+
 def test_image_detected_by_media_url_when_url_is_permalink():
     # Harvested from feat/reddit-media-v13: the ~25.8k catch-all posts whose item.url is
     # the permalink but whose image lives in metadata.media_url must classify as image

@@ -188,6 +188,23 @@ def _open_reader_on(page, fullname: str) -> None:
     expect(page.locator("#reader.show")).to_be_visible()
 
 
+def test_reddit_text_post_with_thumbnail_has_no_media_affordance(pixel6_page):
+    """A self/text Reddit post may have a Reddit thumbnail, but it is not media."""
+    page = pixel6_page
+    fullname = "reddit:ui_text_thumb"
+    _scroll_into_view(page, fullname)
+    row = page.locator(f'.row[data-fullname="{fullname}"]')
+    expect(row).to_be_visible()
+    expect(row.locator("[data-media]")).to_have_count(0)
+    expect(row.locator(".monitor.empty")).to_have_count(1)
+
+    row.locator(".title").click()
+    expect(page.locator("#reader.show")).to_be_visible()
+    expect(page.locator("#reader-post")).to_contain_text(
+        "Thread text preview body from a self post."
+    )
+
+
 def _open_relay_menu(page, fullname: str) -> None:
     """Open the relay strip via long-press, then return."""
     _scroll_into_view(page, fullname)
