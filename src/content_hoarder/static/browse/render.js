@@ -28,10 +28,8 @@ const glyph = (item) => {
 };
 
 /* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters.
-   Share is NOT here on desktop (use the right-click row menu). On touch, a visible
-   per-row Decide button opens the labeled tray; swipe/long-press stay accelerators. */
-const decideBtn =
-  '<button type="button" class="decidebtn" data-select="1" aria-label="Select this item for Keep, Archive, or Done actions">Decide</button>';
+   Share is NOT here on desktop (use the right-click row menu). Touch users select
+   through the source avatar; swipe/long-press stay accelerators. */
 const actsHtml = (status) =>
   '<div class="acts">' +
   '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' +
@@ -214,7 +212,6 @@ export const logRow = (item, opts) => {
     '<div class="trail">' +
     monitorHtml(item, o.nsfwRevealed) +
     actsHtml(o.view) +
-    decideBtn +
     "</div>" +
     "</div></div>"
   );
@@ -257,7 +254,6 @@ export const ledgerRow = (item, n, opts) => {
     '<div class="trail">' +
     play +
     actsHtml(o.view) +
-    decideBtn +
     "</div>" +
     "</div></div>"
   );

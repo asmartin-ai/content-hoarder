@@ -42,7 +42,7 @@ export function attachSwipe(el, opts) {
   fg.style.touchAction = HAS_VERTICAL ? "none" : "pan-y";
 
   function reset() {
-    fg.style.transition = "transform .25s cubic-bezier(.25,.9,.35,1.15)"; // soft spring settle
+    fg.style.transition = "transform .2s var(--ease)"; // restrained settle
     fg.style.transform = "";
     el.classList.remove(
       "swipe-arch",
@@ -102,6 +102,13 @@ export function attachSwipe(el, opts) {
     if (opts.onLongPress) {
       clearTimeout(lpTimer);
       const target = e.target;
+      const anchorTop = el.getBoundingClientRect().top;
+      const restoreAnchor = () => {
+        if (!el.isConnected) return;
+        const delta = el.getBoundingClientRect().top - anchorTop;
+        if (Math.abs(delta) > 1)
+          window.scrollTo(window.scrollX, window.scrollY + delta);
+      };
       lpTimer = setTimeout(() => {
         lpTimer = null;
         if (horizontal || vertical) return; // a decided swipe already cleared this; guard anyway
@@ -109,6 +116,7 @@ export function attachSwipe(el, opts) {
         suppressNextClick(); // swallow the click that follows finger-up
         if (HAPTICS && navigator.vibrate) navigator.vibrate(15);
         opts.onLongPress(el);
+        requestAnimationFrame(() => requestAnimationFrame(restoreAnchor));
       }, opts.longPressMs || 450);
     }
   });
