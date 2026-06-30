@@ -26,11 +26,18 @@ export const localUrl = (item, url) => {
 
 export const canRecoverArchiveToday = (item) => {
   const m = (item && item.metadata) || {};
-  if (!item || item.source !== "reddit" || m.media_status !== "gone") return false;
+  if (!item || item.source !== "reddit" || m.media_status !== "gone")
+    return false;
   if (m.archived_media && Object.keys(m.archived_media).length) return false;
   const urls = [];
-  if (typeof m.media_url === "string" && /^https?:\/\//i.test(m.media_url)) urls.push(m.media_url);
-  if (Array.isArray(m.gallery)) urls.push(...m.gallery.filter((u) => typeof u === "string" && /^https?:\/\//i.test(u)));
+  if (typeof m.media_url === "string" && /^https?:\/\//i.test(m.media_url))
+    urls.push(m.media_url);
+  if (Array.isArray(m.gallery))
+    urls.push(
+      ...m.gallery.filter(
+        (u) => typeof u === "string" && /^https?:\/\//i.test(u),
+      ),
+    );
   return urls.length > 0;
 };
 
@@ -382,6 +389,7 @@ export function createLightbox(opts) {
   let bodyLock = null;
 
   let videoTeardown = null; // teardown function for the open video's hls.js instance
+  let peekMode = false; // hold-to-preview: stable peek, not a draggable persistent viewer
 
   /* ---- pinch/mouse-wheel zoom (C2) ---- */
   let zoomScale = 1;
@@ -391,9 +399,15 @@ export function createLightbox(opts) {
 
   const setZoom = (img, s) => {
     zoomScale = Math.max(1, Math.min(4, s));
-    if (zoomScale <= 1.001) { panX = 0; panY = 0; }
+    const isZoomed = zoomScale > 1.001;
+    if (!isZoomed) {
+      panX = 0;
+      panY = 0;
+    }
+    modal.classList.toggle("is-zoomed", isZoomed);
+    body.classList.toggle("is-zoomed", isZoomed);
     applyTransform(img);
-    img.classList.toggle("zoomed", zoomScale > 1.001);
+    img.classList.toggle("zoomed", isZoomed);
   };
   const resetZoom = () => {
     if (zoomImg) {
@@ -466,17 +480,36 @@ export function createLightbox(opts) {
   );
 
   /* ---- C3: swipe-to-pan (zoomed) + swipe-far-to-close (1×) ---- */
-  let panX = 0, panY = 0;
+  let panX = 0,
+    panY = 0;
   let dragStart = null; // {x, y, origPanX, origPanY, moved, img, pointerId} or null
   const DRAG_CLOSE_THRESHOLD = 120;
   function applyTransform(img) {
+    if (!img) return;
     img.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+  }
+  function resetTransformState() {
+    if (zoomImg) {
+      zoomImg.classList.remove("zoomed", "zooming");
+      zoomImg.style.transform = "";
+      zoomImg.style.touchAction = "";
+    }
+    zoomScale = 1;
+    zoomImg = null;
+    panX = 0;
+    panY = 0;
+    dragStart = null;
+    modal.classList.remove("is-zoomed");
+    body.classList.remove("is-zoomed");
   }
 
   body.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const img = e.target.closest(".media-img, .gallery-img");
     if (!img) return;
+    // A hold-to-preview peek should stay visually anchored under the finger. Persistent
+    // lightboxes keep the 1× swipe-to-close gesture; peek only allows pan after zoom.
+    if (peekMode && zoomScale <= 1.001) return;
     // Stacked gallery images are inside a real scroller. At 1×, a vertical swipe should
     // scroll down the album, not drag-close the lightbox as if it were a single image.
     if (img.classList.contains("gallery-img") && zoomScale <= 1.001) return;
@@ -505,9 +538,17 @@ export function createLightbox(opts) {
     if (e.cancelable) e.preventDefault(); // stop the browser from scrolling
     const img = dragStart.img;
     if (zoomScale > 1.001) {
-      // PAN mode — clamp within zoomed bounds
-      const maxX = Math.max(0, (img.clientWidth * (zoomScale - 1)) / 2);
-      const maxY = Math.max(0, (img.clientHeight * (zoomScale - 1)) / 2);
+      // PAN mode — clamp to the visible lightbox viewport so zoomed content never
+      // slides into empty space when the rendered image is smaller than the shell.
+      const viewport = body.getBoundingClientRect();
+      const maxX = Math.max(
+        0,
+        (img.clientWidth * zoomScale - viewport.width) / 2,
+      );
+      const maxY = Math.max(
+        0,
+        (img.clientHeight * zoomScale - viewport.height) / 2,
+      );
       panX = Math.max(-maxX, Math.min(maxX, dragStart.origPanX + dx));
       panY = Math.max(-maxY, Math.min(maxY, dragStart.origPanY + dy));
       applyTransform(img);
@@ -554,11 +595,9 @@ export function createLightbox(opts) {
     if (zoomScale <= 1.001 && img) applyTransform(img);
   });
 
-  // B4: window-level release listener for peek mode (auto-closes on pointerup/pointercancel).
-  // T3 peek-flicker: use a shared `fired` flag so the listener fires EXACTLY once. pointerup
-  // and pointercancel can both fire for the same gesture (pointercancel then a synthetic
-  // pointerup); without the flag, the second event would call close() again -> settleTop()
-  // -> history.back() -> re-render -> flicker. Remove from BOTH events on first fire.
+  // Window-level release listener for peek mode. Close on pointerup only: some
+  // mobile browsers emit pointercancel when the overlay appears, which made the
+  // peek close immediately and the trailing click reopen it persistently.
   let _peekRelease = null;
   const _attachPeekRelease = () => {
     let fired = false;
@@ -566,13 +605,11 @@ export function createLightbox(opts) {
       if (fired) return;
       fired = true;
       window.removeEventListener("pointerup", release);
-      window.removeEventListener("pointercancel", release);
       _peekRelease = null;
       close();
     };
     _peekRelease = release;
     window.addEventListener("pointerup", release);
-    window.addEventListener("pointercancel", release);
   };
   const savedWindowScroll = () =>
     windowSaved || windowSavedDoc || windowSavedBody || 0;
@@ -634,9 +671,9 @@ export function createLightbox(opts) {
   // Visual teardown only — touches NO history. The overlay coordinator calls this on an OS-back.
   const closeVisual = () => {
     if (modal.hidden) return;
-    resetZoom();
-    panX = 0;
-    panY = 0;
+    resetTransformState();
+    peekMode = false;
+    body.classList.remove("is-gallery");
     if (videoTeardown) {
       videoTeardown();
       videoTeardown = null;
@@ -656,7 +693,6 @@ export function createLightbox(opts) {
   const close = () => {
     if (_peekRelease) {
       window.removeEventListener("pointerup", _peekRelease);
-      window.removeEventListener("pointercancel", _peekRelease);
       _peekRelease = null;
     }
     if (modal.hidden) return;
@@ -674,8 +710,11 @@ export function createLightbox(opts) {
 
   // Open over the page + register with the coordinator so the OS back-button closes the lightbox
   // (returns to the feed/inbox) instead of navigating away / exiting the PWA.
-  const open = (html) => {
+  const open = (html, opts_) => {
     const alreadyOpen = !modal.hidden;
+    resetTransformState();
+    peekMode = !!(opts_ && opts_.peek);
+    body.classList.remove("is-gallery");
     body.innerHTML = html;
     modal.hidden = false;
     if (alreadyOpen) return; // content replacement: don't push another history overlay
@@ -693,7 +732,7 @@ export function createLightbox(opts) {
     /* Open arbitrary HTML in the lightbox (for caller-constructed content like a gallery
        placeholder). Registers with the overlay coordinator so OS-back closes it. */
     openHtml(html, opts_) {
-      open(html);
+      open(html, opts_);
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Reddit permalink → redditmedia iframe (online-only; permalink is the fallback). */
@@ -707,14 +746,13 @@ export function createLightbox(opts) {
           '<a class="media-fallback" href="' +
           esc(url) +
           '" target="_blank" rel="noopener">Open on Reddit ↗</a>',
+        opts_,
       );
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Direct image → simple lightbox (reliable; no Reddit dependency). */
     openImage(url, opts_) {
       if (!safeUrl(url)) return;
-      panX = 0;
-      panY = 0;
       open(
         '<img class="media-img" src="' +
           esc(url) +
@@ -722,6 +760,7 @@ export function createLightbox(opts) {
           '<a class="media-fallback" href="' +
           esc(url) +
           '" target="_blank" rel="noopener">Open original ↗</a>',
+        opts_,
       );
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
@@ -731,8 +770,6 @@ export function createLightbox(opts) {
        (~1080px), NOT the multi-MB 5000px originals, with native loading=lazy; tapping an image
        swaps it up to the full original. */
     openGallery(urls, previews, opts_) {
-      panX = 0;
-      panY = 0;
       const full = (urls || []).filter(safeUrl);
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
@@ -753,7 +790,9 @@ export function createLightbox(opts) {
           '</div><p class="media-fallback">' +
           full.length +
           " images</p>",
+        opts_,
       );
+      body.classList.add("is-gallery");
       // tap an image → swap the sized preview up to the full original
       [...body.querySelectorAll(".gallery-img")].forEach((im) => {
         im.addEventListener("click", () => {
@@ -771,7 +810,7 @@ export function createLightbox(opts) {
        <video src>. See mountVideo for why hls.js wins over a canPlayType check. */
     openVideo(srcUrl, posterUrl, opts_) {
       if (!safeUrl(srcUrl)) return;
-      open(""); // clear first and show (open() sets modal.hidden = false)
+      open("", opts_); // clear first and show (open() sets modal.hidden = false)
       const { video, destroy } = mountVideo(body, srcUrl, posterUrl);
       if (!video) return;
       videoTeardown = destroy;

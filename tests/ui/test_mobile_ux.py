@@ -2,7 +2,7 @@
 
 Covers the 6 T3 fixes:
   - relay-swipe-close (5 tests)
-  - peek-flicker        (4 tests)
+  - hold-to-preview     (4 tests)
   - tag-suggest-three   (3 tests)
   - lightbox-swipe-scroll (3 tests)
   - sidebar-scroll-lock (3 tests)
@@ -19,7 +19,7 @@ Gesture API notes
   `down()/up()` for a hold). So relay gestures use a synthetic `PointerEvent` with
   `pointerType: "touch"` dispatched via `page.evaluate` (see `_touch_press` /
   `_touch_swipe`). This faithfully triggers the app's `pointerdown/move/up` handlers.
-- Hold-to-preview (B4): `browse/main.js`'s hold handler accepts ALL pointer types,
+- Hold-to-preview: `browse/main.js`'s hold handler accepts ALL pointer types,
   so `page.mouse` works for press-and-hold on a thumbnail.
 - Quick tap (persistent lightbox): the persistent-open path is a `click` listener,
   so `page.touchscreen.tap` (which synthesizes a click) is used.
@@ -70,9 +70,8 @@ def _scroll_into_view(page, fullname: str) -> None:
 def _row_title_center(page, fullname: str):
     """Return {x, y} at the center of a row's title text (NOT the thumbnail).
 
-    Aiming at the title keeps the press off the [data-media] thumbnail (which would
-    trigger hold-to-preview, not the relay) and inside the ~30px edge deadzone that
-    core/swipe.js rejects for back-gesture detection.
+    Aiming at the title keeps the press off the [data-media] thumbnail and inside
+    the ~30px edge deadzone that core/swipe.js rejects for back-gesture detection.
     """
     box = page.evaluate(
         """(fn) => {
@@ -325,19 +324,98 @@ def test_relay_scrim_tap_closes(pixel6_page):
     _open_relay_menu(page, "reddit:ui_scroll_4")
     scrim = page.locator("#relay-scrim.show")
     expect(scrim).to_be_visible()
-    scrim.click()
+    # Click a measured off-row coordinate. Locator center clicks can land on the
+    # relay-open row itself, which intentionally sits above the scrim so its strip works.
+    page.mouse.click(10, 10)
     page.wait_for_timeout(400)
     expect(page.locator(".relay-strip")).to_have_count(0)
     assert not _relay_open(page), "scrim tap should close the relay"
 
 
+def test_relay_long_press_keeps_row_anchored(pixel6_page):
+    """Opening the relay strip must not move the pressed row under the finger."""
+    page = pixel6_page
+    fullname = "reddit:ui_scroll_12"
+    _scroll_into_view(page, fullname)
+    before = page.evaluate(
+        """(fn) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const b = row.getBoundingClientRect();
+          return { top: Math.round(b.top), height: Math.round(b.height) };
+        }""",
+        fullname,
+    )
+
+    _touch_long_press(page, fullname, hold_ms=550)
+
+    after = page.evaluate(
+        """(fn) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const b = row.getBoundingClientRect();
+          return { top: Math.round(b.top), height: Math.round(b.height) };
+        }""",
+        fullname,
+    )
+    assert _relay_open(page)
+    assert abs(after["top"] - before["top"]) <= 2, (
+        f"relay long-press shifted row top: {before['top']} -> {after['top']}"
+    )
+    assert abs(after["height"] - before["height"]) <= 1
+
+
+def test_relay_long_press_restores_accidental_scroll_during_activation(pixel6_page):
+    """A tiny scroll nudge during the hold window is compensated when the relay opens."""
+    page = pixel6_page
+    fullname = "reddit:ui_scroll_14"
+    _scroll_into_view(page, fullname)
+    before = page.evaluate(
+        """(fn) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const b = row.getBoundingClientRect();
+          return { top: Math.round(b.top) };
+        }""",
+        fullname,
+    )
+    coords = _row_title_center(page, fullname)
+
+    page.evaluate(
+        """({fn, coords}) => new Promise((resolve) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const el = row.querySelector('h3.title, .title, .snippet') || row;
+          const fire = (type, x, y) => el.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 1, isPrimary: true,
+            clientX: x, clientY: y,
+          }));
+          fire('pointerdown', coords.x, coords.y);
+          setTimeout(() => window.scrollBy(0, 32), 200);
+          setTimeout(() => { fire('pointerup', coords.x, coords.y); resolve(); }, 550);
+        })""",
+        {"fn": fullname, "coords": coords},
+    )
+    page.wait_for_timeout(500)
+
+    after = page.evaluate(
+        """(fn) => {
+          const row = document.querySelector('.row[data-fullname="' + fn + '"]');
+          const b = row.getBoundingClientRect();
+          return { top: Math.round(b.top) };
+        }""",
+        fullname,
+    )
+    assert _relay_open(page)
+    assert abs(after["top"] - before["top"]) <= 2, (
+        f"relay anchor compensation failed: {before['top']} -> {after['top']}"
+    )
+
+
 # --------------------------------------------------------------------------- #
-# T3 peek-flicker
+# Hold-to-preview
 # --------------------------------------------------------------------------- #
 
 
 def _open_lightbox_via_hold(page, fullname: str, hold_ms: int = 300) -> None:
-    """Press-and-hold a thumbnail to open the lightbox in peek mode."""
+    """Press-and-hold a thumbnail to open the lightbox in temporary peek mode."""
     _scroll_into_view(page, fullname)
     coords = _thumb_center(page, fullname)
     page.mouse.move(coords["x"], coords["y"])
@@ -349,12 +427,34 @@ def _open_lightbox_via_hold(page, fullname: str, hold_ms: int = 300) -> None:
     )
 
 
-def test_hold_to_preview_opens_lightbox(pixel6_page):
-    """Press-and-hold a thumbnail (300ms) opens the lightbox in peek mode."""
+def test_hold_to_preview_opens_and_stays_until_release(pixel6_page):
+    """Hold preview opens once, stays while held, closes on release, and does not reopen."""
     page = pixel6_page
-    # twitter:1777... has a local /static/icon-192.png thumbnail with media_type=image.
-    _open_lightbox_via_hold(page, "twitter:1777777777777777777", hold_ms=300)
-    assert _media_modal_open(page)
+    fullname = "twitter:1777777777777777777"
+    _scroll_into_view(page, fullname)
+    coords = _thumb_center(page, fullname)
+    page.evaluate(
+        """() => {
+          window.__opens = 0;
+          const m = document.querySelector('#media-modal');
+          if (!m) return;
+          new MutationObserver(() => { if (!m.hasAttribute('hidden')) window.__opens++; })
+            .observe(m, { attributes: true, attributeFilter: ['hidden'] });
+        }"""
+    )
+    page.mouse.move(coords["x"], coords["y"])
+    page.mouse.down()
+    page.wait_for_timeout(900)
+    opens_while_holding = page.evaluate("window.__opens")
+    assert _media_modal_open(page), (
+        "hold preview should stay open while pointer is down"
+    )
+    assert opens_while_holding == 1, (
+        f"hold preview opened {opens_while_holding} times during one hold"
+    )
+    page.mouse.up()
+    page.wait_for_timeout(600)
+    assert not _media_modal_open(page), "hold preview should close once on release"
 
 
 # --------------------------------------------------------------------------- #
@@ -416,55 +516,8 @@ def test_pinboard_tag_button_is_touch_sized(pixel6_page):
     expect(page.locator("#tagpop")).to_be_visible()
 
 
-def test_hold_to_preview_no_flicker(pixel6_page):
-    """During a 2-second hold, the lightbox opens exactly once and stays open
-    — no open/close cycling. (Regression guard for the flicker bug.)"""
-    page = pixel6_page
-    fullname = "twitter:1777777777777777777"
-    _scroll_into_view(page, fullname)
-    coords = _thumb_center(page, fullname)
-    # Count how many times #media-modal loses its `hidden` attribute (each = one open).
-    page.evaluate(
-        """() => {
-          window.__opens = 0;
-          const m = document.querySelector('#media-modal');
-          if (!m) return;
-          new MutationObserver(() => { if (!m.hasAttribute('hidden')) window.__opens++; })
-            .observe(m, { attributes: true, attributeFilter: ['hidden'] });
-        }"""
-    )
-    page.mouse.move(coords["x"], coords["y"])
-    page.mouse.down()
-    page.wait_for_timeout(2000)
-    opens_while_holding = page.evaluate("window.__opens")
-    assert _media_modal_open(page), "lightbox should be open during the hold"
-    assert opens_while_holding == 1, (
-        f"lightbox flickered: opened {opens_while_holding} times during a single hold "
-        "(should open exactly once and stay open)"
-    )
-    page.mouse.up()
-
-
-def test_hold_to_preview_release_closes(pixel6_page):
-    """Releasing the hold closes the lightbox."""
-    page = pixel6_page
-    fullname = "twitter:1777777777777777777"
-    _scroll_into_view(page, fullname)
-    coords = _thumb_center(page, fullname)
-    page.mouse.move(coords["x"], coords["y"])
-    page.mouse.down()
-    page.wait_for_timeout(300)
-    assert _media_modal_open(page), "lightbox should be open after hold"
-    page.mouse.up()
-    page.wait_for_timeout(400)
-    assert not _media_modal_open(page), (
-        "lightbox should close after releasing the hold (peek mode)"
-    )
-
-
 def test_tap_thumbnail_opens_persistent(pixel6_page):
-    """A quick tap (<250ms) opens the lightbox persistently (the _suppressNextClick
-    guard doesn't swallow the tap's click)."""
+    """A quick tap (<250ms) opens the lightbox persistently."""
     page = pixel6_page
     fullname = "twitter:1777777777777777777"
     _scroll_into_view(page, fullname)
@@ -472,10 +525,49 @@ def test_tap_thumbnail_opens_persistent(pixel6_page):
     # touchscreen.tap synthesizes a real click (the persistent-open path is a click listener).
     page.touchscreen.tap(coords["x"], coords["y"])
     page.wait_for_timeout(500)
-    assert _media_modal_open(page), (
-        "quick tap should open the lightbox persistently "
-        "(_suppressNextClick should not swallow the tap's click)"
+    assert _media_modal_open(page), "quick tap should open the lightbox persistently"
+
+
+def test_mobile_rows_do_not_render_decide_button(pixel6_page):
+    """The old per-row Decide button is gone."""
+    page = pixel6_page
+    expect(page.locator(".row[data-fullname]").first).to_be_visible()
+    expect(page.get_by_role("button", name="Decide")).to_have_count(0)
+    expect(page.locator(".row .decidebtn")).to_have_count(0)
+
+
+def test_hold_to_preview_drag_does_not_pan_at_one_x(pixel6_page):
+    """Temporary hold preview should stay anchored under the finger at 1× scale."""
+    page = pixel6_page
+    fullname = "twitter:1777777777777777777"
+    _open_lightbox_via_hold(page, fullname, hold_ms=300)
+
+    page.evaluate(
+        """() => new Promise((resolve) => {
+          const im = document.querySelector('#media-body .media-img');
+          if (!im) { resolve(); return; }
+          const b = im.getBoundingClientRect();
+          const x = Math.round(b.left + b.width / 2);
+          const y = Math.round(b.top + b.height / 2);
+          const fire = (type, xx, yy) => im.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 7, isPrimary: true,
+            clientX: xx, clientY: yy,
+          }));
+          fire('pointerdown', x, y);
+          fire('pointermove', x + 140, y + 120);
+          requestAnimationFrame(resolve);
+        })"""
     )
+    transform = page.locator("#media-body .media-img").evaluate(
+        "el => getComputedStyle(el).transform"
+    )
+    assert transform in ("none", "matrix(1, 0, 0, 1, 0, 0)"), (
+        f"peek-mode image should stay anchored at 1×, transform={transform}"
+    )
+    page.mouse.up()
+    page.wait_for_timeout(600)
+    assert not _media_modal_open(page), "peek should close on release"
 
 
 # --------------------------------------------------------------------------- #
@@ -591,6 +683,36 @@ def _lightbox_touch_drag(page, dy: int) -> None:
     page.wait_for_timeout(500)
 
 
+def _lightbox_touch_pan(page, dx: int, dy: int) -> None:
+    """Drag an open lightbox image by dx/dy via synthetic touch PointerEvents."""
+    page.evaluate(
+        """({dx, dy}) => new Promise((resolve) => {
+          const im = document.querySelector('#media-body .media-img, #media-body .gallery-img');
+          if (!im) { resolve(); return; }
+          const b = im.getBoundingClientRect();
+          const x0 = Math.round(b.left + b.width / 2);
+          const y0 = Math.round(b.top + b.height / 2);
+          const fire = (type, xx, yy) => im.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 4, isPrimary: true,
+            clientX: xx, clientY: yy,
+          }));
+          fire('pointerdown', x0, y0);
+          const steps = 10, stepX = dx / steps, stepY = dy / steps;
+          let i = 0, cx = x0, cy = y0;
+          const moveNext = () => {
+            i++; cx += stepX; cy += stepY;
+            fire('pointermove', Math.round(cx), Math.round(cy));
+            if (i < steps) setTimeout(moveNext, 16);
+            else { fire('pointerup', Math.round(x0 + dx), Math.round(y0 + dy)); resolve(); }
+          };
+          moveNext();
+        })""",
+        {"dx": dx, "dy": dy},
+    )
+    page.wait_for_timeout(500)
+
+
 def test_lightbox_swipe_down_closes(pixel6_page):
     """Open the lightbox on a single image. Drag down 150px → lightbox closes.
     (Regression guard for the swipe-scrolls-page bug.)"""
@@ -652,6 +774,14 @@ def test_lightbox_backdrop_drag_does_not_scroll_feed(pixel6_page):
     page.touchscreen.tap(coords["x"], coords["y"])
     page.wait_for_timeout(500)
     assert _media_modal_open(page), f"lightbox should open on {fullname}"
+    lock = page.evaluate(
+        """() => ({
+          position: document.body.style.position,
+          top: document.body.style.top,
+        })"""
+    )
+    assert lock["position"] == "fixed"
+    assert lock["top"] == f"-{scroll_before}px"
 
     page.evaluate(
         """() => new Promise((resolve) => {
@@ -681,11 +811,86 @@ def test_lightbox_backdrop_drag_does_not_scroll_feed(pixel6_page):
     page.wait_for_timeout(500)
 
     assert _media_modal_open(page), "backdrop drag should not close the lightbox"
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
+    assert not _media_modal_open(page)
     scroll_after = page.evaluate("Math.round(window.scrollY)")
     assert scroll_after == scroll_before, (
         f"feed scroll position changed after backdrop drag: "
-        f"{scroll_before} -> {scroll_after} (should be unchanged)"
+        f"{scroll_before} -> {scroll_after} (should be unchanged after unlock)"
     )
+
+
+def test_lightbox_zoomed_pan_clamps_to_viewport(pixel6_page):
+    """Zoomed media can pan, but not beyond the visible content bounds into blank space."""
+    page = pixel6_page
+    _open_single_image_lightbox(page, "twitter:1777777777777777777")
+    page.evaluate(
+        """() => {
+          const im = document.querySelector('#media-body .media-img');
+          im.dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true, cancelable: true, deltaY: -1200,
+          }));
+        }"""
+    )
+    page.wait_for_timeout(200)
+    _lightbox_touch_pan(page, dx=1200, dy=1200)
+    vals = page.evaluate(
+        """() => {
+          const img = document.querySelector('#media-body .media-img');
+          const body = document.querySelector('#media-body');
+          const m = new DOMMatrixReadOnly(getComputedStyle(img).transform);
+          const scale = m.a || 1;
+          const br = body.getBoundingClientRect();
+          return {
+            tx: m.e,
+            ty: m.f,
+            scale,
+            bodyWidth: Math.round(br.width),
+            bodyHeight: Math.round(br.height),
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            maxX: Math.max(0, (img.clientWidth * scale - body.clientWidth) / 2),
+            maxY: Math.max(0, (img.clientHeight * scale - body.clientHeight) / 2),
+          };
+        }"""
+    )
+    assert vals["scale"] > 1.001, (
+        "wheel should zoom the image before pan clamp assertion"
+    )
+    assert vals["bodyWidth"] >= vals["viewportWidth"] - 1
+    assert vals["bodyHeight"] >= vals["viewportHeight"] - 1
+    assert abs(vals["tx"]) <= vals["maxX"] + 1
+    assert abs(vals["ty"]) <= vals["maxY"] + 1
+
+
+def test_lightbox_transform_resets_after_reopen(pixel6_page):
+    """Zoom/pan state must not leak into the next open."""
+    page = pixel6_page
+    fullname = "twitter:1777777777777777777"
+    _open_single_image_lightbox(page, fullname)
+    page.evaluate(
+        """() => {
+          const im = document.querySelector('#media-body .media-img');
+          im.dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true, cancelable: true, deltaY: -1200,
+          }));
+        }"""
+    )
+    page.wait_for_timeout(200)
+    _lightbox_touch_pan(page, dx=250, dy=250)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
+    assert not _media_modal_open(page)
+
+    _open_single_image_lightbox(page, fullname)
+    transform = page.locator("#media-body .media-img").evaluate(
+        "el => getComputedStyle(el).transform"
+    )
+    assert transform in ("none", "matrix(1, 0, 0, 1, 0, 0)"), (
+        f"lightbox transform leaked across reopen: {transform}"
+    )
+    assert page.locator("#media-body .media-img.zoomed").count() == 0
 
 
 # --------------------------------------------------------------------------- #
