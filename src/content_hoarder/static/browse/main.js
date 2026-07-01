@@ -20,6 +20,7 @@ import {
   mediaType,
 } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
+import { chIcon } from "../core/icons.js";
 import {
   wireTagExpanders,
   shareItem,
@@ -1278,10 +1279,14 @@ async function surprise() {
       : "";
     const src = CH_SOURCES[it.source] || {};
     const badge =
-      '<span class="surp-badge" style="--src:' +
+      '<span class="surp-badge" aria-hidden="true" style="--src:' +
       (src.token ? "var(" + src.token + ")" : "var(--accent)") +
       '">' +
       (src.glyph ? esc(src.glyph) : esc(it.source || "•")) +
+      "</span>";
+    const actionIcon = (name) =>
+      '<span class="surp-act-ico" aria-hidden="true">' +
+      (name === "snooze" ? "◷" : chIcon(name, { size: "1em" })) +
       "</span>";
     surpriseItem = it;
     ambient.innerHTML =
@@ -1296,16 +1301,24 @@ async function surprise() {
       esc(it.title || "(untitled)") +
       "</h3>" +
       '<div class="surp-meta">' +
-      badge +
       '<span class="surp-metabits">' +
+      badge +
       metaLine(it) +
       "</span></div>" +
       surprisePreviewHtml(it) +
       '<div class="surp-acts">' +
-      '<button type="button" class="surp-act a" data-surprise="archived">Archive</button>' +
-      '<button type="button" class="surp-act d" data-surprise="done">Done</button>' +
-      '<button type="button" class="surp-act s" data-surprise="snooze">Snooze</button>' +
-      '<button type="button" class="surp-act k" data-surprise="keep">Keep</button>' +
+      '<button type="button" class="surp-act a" data-surprise="archived">' +
+      actionIcon("archive") +
+      "<span>Archive</span></button>" +
+      '<button type="button" class="surp-act d" data-surprise="done">' +
+      actionIcon("done") +
+      "<span>Done</span></button>" +
+      '<button type="button" class="surp-act s" data-surprise="snooze">' +
+      actionIcon("snooze") +
+      "<span>Snooze</span></button>" +
+      '<button type="button" class="surp-act k" data-surprise="keep">' +
+      actionIcon("keep") +
+      "<span>Keep</span></button>" +
       '<button type="button" class="surp-act surp-open" data-surprise="open">Open reader</button>' +
       "</div></div></article>";
     ambientCard = null;

@@ -879,30 +879,29 @@ a:focus-visible {
     margin: 0 0 var(--sp-2);
 }
 .surp-meta {
-    display: flex;
-    align-items: center;
-    gap: 9px;
+    display: block;
     margin-bottom: var(--sp-3);
     font: var(--fw-regular) var(--fs-sm)/1.4 var(--font-sans);
     color: var(--text-muted);
-    flex-wrap: wrap;
 }
 .surp-badge {
-    flex: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 7px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    margin-right: 7px;
+    vertical-align: -0.18em;
     border-radius: var(--r-pill);
     background: var(--src, var(--accent));
     color: #fff;
-    font: var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
+    font: var(--fw-bold) 0.68rem/1 var(--font-mono);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .surp-metabits {
     min-width: 0;
+    display: block;
 }
 .surp-preview {
     margin: 0 0 var(--sp-3);
@@ -940,6 +939,12 @@ a:focus-visible {
     align-items: center;
 }
 .surp-act {
+    flex: 1 1 112px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 112px;
     font: var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
     letter-spacing: 0.025em;
     border: 1px solid var(--border-control);
@@ -947,8 +952,9 @@ a:focus-visible {
     color: var(--text-muted);
     border-radius: var(--r-pill);
     height: var(--touch-min);
-    padding: 0 15px;
+    padding: 0 14px;
     cursor: pointer;
+    white-space: nowrap;
     transition:
         color var(--dur) var(--ease),
         border-color var(--dur) var(--ease),
@@ -958,6 +964,15 @@ a:focus-visible {
 .surp-act:hover {
     color: var(--text-body);
     transform: translateY(-1px);
+}
+.surp-act-ico {
+    width: 1em;
+    height: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.96em;
+    line-height: 1;
 }
 .surp-act:active {
     transform: translateY(0);
@@ -986,7 +1001,9 @@ a:focus-visible {
     background: var(--accent-tint);
 }
 .surp-act.surp-open {
-    margin-left: auto;
+    flex: 1 1 140px;
+    min-width: 140px;
+    margin-left: 0;
     color: var(--accent-ink);
     background: var(--accent);
     border-color: var(--accent);
