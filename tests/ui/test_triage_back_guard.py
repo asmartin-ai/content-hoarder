@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -94,5 +95,48 @@ def test_reloading_direct_triage_entry_does_not_stack_guards(browser, app_base_u
 
         page.go_back(wait_until="domcontentloaded")
         _expect_browse(page, app_base_url)
+    finally:
+        ctx.close()
+
+
+def test_triage_card_uses_pin_shell_without_selfpost_media(browser, app_base_url):
+    item = {
+        "fullname": "reddit:ui_triage_pin",
+        "source": "reddit",
+        "source_id": "ui_triage_pin",
+        "kind": "post",
+        "title": "Triage pin card fixture",
+        "body": "This self post should render inside the pin-style triage body.",
+        "url": "https://www.reddit.com/r/test/comments/ui_triage_pin/title/",
+        "author": "op",
+        "created_utc": 1700000000,
+        "saved_utc": 1700000010,
+        "first_seen_utc": 1700000010,
+        "last_seen_utc": 1700000010,
+        "status": "inbox",
+        "metadata": {
+            "subreddit": "test",
+            "permalink": "/r/test/comments/ui_triage_pin/title/",
+            "thumbnail": "https://b.thumbs.redditmedia.com/selfpost.jpg",
+        },
+    }
+    ctx, page = _new_pixel6_page(browser)
+    try:
+        page.route(
+            "**/random?*",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"items": [item]}),
+            ),
+        )
+        page.goto(f"{app_base_url}/triage", wait_until="networkidle")
+
+        card = page.locator(".tcard.tcard-pin")
+        expect(card).to_be_visible()
+        expect(card.locator(".tcard-body")).to_be_visible()
+        expect(card.locator(".tcard-snippet")).to_contain_text("self post should render")
+        expect(card.locator(".tcard-media")).to_have_count(0)
+        expect(page.locator("#actions")).to_be_visible()
     finally:
         ctx.close()
