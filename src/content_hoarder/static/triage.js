@@ -364,6 +364,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   function mediaHtml(item) {
     var m = item.metadata || {};
     var mt = m.media_type;
+    var coreType = mediaType(item);
     // Reddit gallery with captured image URLs → inline images, tap opens the lightbox.
     // Inline thumbnails use the sized ~1080px gallery_preview variants when present (not
     // the multi-MB 5000px originals) — the Epic 13 P2 perf fix, now in triage too.
@@ -385,7 +386,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     // Recognized by media SHAPE via core mediaType (parity with browse), so the reddit_media
     // catch-all posts whose url is the permalink still surface their image instead of a
     // generic embed button. Galleries are handled above, so this only catches single images.
-    if (item.source === "reddit" && mediaType(item).cls === "image") {
+    if (item.source === "reddit" && coreType.cls === "image") {
       var iu = imageUrl(item) || m.thumbnail || "";
       if (safeUrl(iu)) {
         var insfw = m.over_18 ? " nsfw" : "";
@@ -427,6 +428,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       var yt = (item.url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/) || [])[1];
       if (yt) thumb = "https://i.ytimg.com/vi/" + yt + "/hqdefault.jpg";
     }
+    if (item.source === "reddit" && coreType.cls === "text") return "";
     if (thumb) {
       var nsfw = m.over_18 ? " nsfw" : "";
       return '<div class="tcard-media' + nsfw + '"><img loading="lazy" src="' + esc(thumb) +
@@ -475,25 +477,28 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     var snippet = (item.body || "").slice(0, 400);
     var m = item.metadata || {};
     var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
-    return '<article class="tcard" data-fullname="' + esc(item.fullname) + '">' +
+    return '<article class="tcard tcard-pin" data-fullname="' + esc(item.fullname) + '">' +
       '<span class="tcard-stamp stamp-arch">' + chIcon("archive") + ' Archive</span>' +
       '<span class="tcard-stamp stamp-done">Done ' + chIcon("done") + '</span>' +
       '<span class="tcard-stamp stamp-snooze">Snooze</span>' +
       '<span class="tcard-stamp stamp-open">Open</span>' +
       '<span class="tcard-stamp stamp-skip">Skip</span>' +
-      '<div class="tcard-head">' + badge(item) + "</div>" +
       mediaHtml(item) +
-      '<h2 class="tcard-title">' + titleHtml + "</h2>" +
-      '<div class="tcard-meta">' + metaLine(item) + "</div>" +
-      whyHtml(item) +
-      datesLine(item) +
-      companionsHtml(item) +
-      tagEditorHtml(item) +
-      catHtml(item) +
-      recoverHtml(item) +
-      (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
-      '<div class="tcard-ai">' + ai + "</div>" +
-      "</article>";
+      '<div class="tcard-body">' +
+        '<div class="tcard-head">' + badge(item) + "</div>" +
+        '<h2 class="tcard-title">' + titleHtml + "</h2>" +
+        '<div class="tcard-meta">' + metaLine(item) + "</div>" +
+        whyHtml(item) +
+        datesLine(item) +
+        companionsHtml(item) +
+        (snippet ? '<p class="tcard-snippet">' + esc(snippet) + "</p>" : "") +
+        '<div class="tcard-tools">' +
+          tagEditorHtml(item) +
+          catHtml(item) +
+          recoverHtml(item) +
+          '<div class="tcard-ai">' + ai + "</div>" +
+        "</div>" +
+      "</div></article>";
   }
 
   function aiHtml(llm) {

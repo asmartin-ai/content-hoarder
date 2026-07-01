@@ -759,6 +759,60 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
     transition: transform 0.25s var(--ease), border-color var(--dur) var(--ease), opacity 0.25s var(--ease);
 }
 
+.tcard-pin {
+    padding: 0;
+    background: var(--surface-card);
+}
+
+.tcard-pin .tcard-body {
+    padding: var(--sp-4);
+}
+
+.tcard-pin > .tcard-media {
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border-hairline);
+}
+
+.tcard-pin > .tcard-media img {
+    max-height: 38vh;
+}
+
+.tcard-pin > .tcard-gallery {
+    max-height: 42vh;
+    overflow-y: auto;
+    background: var(--surface-inset);
+}
+
+.tcard-pin > .tcard-gallery .tcard-gallery-img {
+    border-radius: 0;
+    max-height: 38vh;
+}
+
+.tcard-pin .tcard-head {
+    margin-bottom: var(--sp-2);
+}
+
+.tcard-pin .tcard-title {
+    margin: 0 0 var(--sp-2);
+}
+
+.tcard-pin .tcard-snippet {
+    margin: var(--sp-3) 0 0;
+    display: -webkit-box;
+    line-clamp: 4;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+}
+
+.tcard-tools {
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-2);
+    border-top: 1px solid var(--border-hairline);
+}
+
 .tcard-head {
     display: flex;
     justify-content: space-between;
