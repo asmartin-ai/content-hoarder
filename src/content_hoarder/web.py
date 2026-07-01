@@ -645,11 +645,26 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify(
                 {"error": "archive_today must be one of off, preview, apply"}
             ), 400
+        metadata = data.get("metadata", True) is not False
+        if not metadata and mode == "off":
+            return jsonify({"error": "recover request has no enabled recovery mode"}), 400
 
         with conn() as c:
-            res = archival.recover_one(c, fullname)
-            if res is None:
-                return jsonify({"error": "not a recoverable reddit item"}), 400
+            if metadata:
+                res = archival.recover_one(c, fullname)
+                if res is None:
+                    return jsonify({"error": "not a recoverable reddit item"}), 400
+            else:
+                res = {
+                    "recovered": False,
+                    "metadata_recovered": False,
+                    "metadata_result": "skipped",
+                    "metadata_reason": "disabled",
+                    "title": None,
+                    "body": None,
+                    "url": None,
+                    "bytes_archived": 0,
+                }
             if mode != "off":
                 if data.get("confirm_external_archive_today") is not True:
                     return jsonify(
@@ -681,6 +696,12 @@ def create_app(db_path: str | None = None) -> Flask:
                 res["recovered"] = (
                     bool(res.get("metadata_recovered")) or media.get("result") == "hit"
                 )
+                if not metadata:
+                    fresh = c.execute(
+                        "SELECT title, body, url FROM items WHERE fullname=?", (fullname,)
+                    ).fetchone()
+                    if fresh:
+                        res.update(dict(fresh))
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/body")

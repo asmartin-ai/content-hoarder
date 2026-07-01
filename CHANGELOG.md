@@ -7,10 +7,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 ### Added
 
 - Added inbox-only triage filtering by source, category, tags, and Smart/Newest/Random mode, with persisted filter state and stale-session clearing when filters change.
+- Added cached Hacker News thread rendering in the browse reader, including synthetic UI coverage for nested HN comments.
 
 ### Changed
 
 - Reworked the triage deck controls around the pinboard-style card shell, clearer edge hints, reader handoff affordances, and settings-menu theme controls.
+- Hardened archive.today media recovery so media-only retries can skip metadata archive providers, and broadened the PWA shell cache for `/reddit`, triage tokens, reddit assets, and HLS playback.
 
 ## 1.0.0 - 2026-06-29
 
