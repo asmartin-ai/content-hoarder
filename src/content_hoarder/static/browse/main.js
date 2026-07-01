@@ -2162,78 +2162,88 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v103";
+const APP_VERSION = "v111";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
   const head = $(".console");
   if (!head) return;
-  // Collapsing/expanding the (sticky) header changes its height, so the browser's scroll-anchoring
-  // nudges scrollY to keep content stable — near a threshold that nudge re-triggered the toggle =
-  // flicker (worst near the top, where expanding GROWS the bar). Three guards: (1) a WIDE dead zone
-  // (>110 collapse / <28 expand) bigger than the bar's height change, so the nudge lands inside it;
-  // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle;
-  // (3) defer near-top expansion until scroll settles, unless we are already effectively at y=0.
-  // Once near-top expansion happens, keep it expanded through scroll-anchoring's final nudge.
+  // Relay-style chrome tracks the near-top scroll position instead of waiting for
+  // an idle timeout and then flipping open. A 0..1 collapse amount lets repeated
+  // small swipes near the top smoothly scrub the search row between expanded and
+  // compact, while the .compact class remains only the fully-collapsed semantic state.
   const COLLAPSE_AT = 110;
-  const COLLAPSE_AFTER_TOP_AT = 260;
-  const EXPAND_AT = 28;
-  const SCROLL_SETTLE_MS = 120;
-  let locked = false;
-  let scrollIdle = true;
-  let settleTimer = 0;
-  let expandedNearTop = false;
-  const set = (compact) => {
-    if (compact === head.classList.contains("compact")) return; // already in this state
+  const COMPACT_AT = 0.96;
+  const UNCOMPACT_AT = 0.82;
+  const SMOOTHING = 0.38;
+  const OPEN_LOCK_AT = 0.25;
+  const OPEN_LOCK_RELEASE_AT = 0.9;
+  let targetCollapse = 0;
+  let currentCollapse = 0;
+  let openingTarget = null;
+  let headerFrame = 0;
+  let compact = false;
+  const pageScrollLocked = () => document.body.style.position === "fixed";
+  const clamp01 = (n) => Math.max(0, Math.min(1, n));
+  const collapseForScroll = () => clamp01((window.scrollY || 0) / COLLAPSE_AT);
+  function writeHeaderCollapse(amount) {
+    const collapse = clamp01(amount);
+    const open = 1 - collapse;
+    head.style.setProperty("--console-collapse", collapse.toFixed(3));
+    head.style.setProperty("--console-open", open.toFixed(3));
+    if (!compact && collapse >= COMPACT_AT) compact = true;
+    else if (compact && collapse <= UNCOMPACT_AT) compact = false;
     head.classList.toggle("compact", compact);
-    if (compact) expandedNearTop = false;
-    locked = true;
-    setTimeout(() => {
-      locked = false;
-      onScroll();
-    }, 320); // > the collapse transition
-  };
-  const expandNearTop = () => {
-    expandedNearTop = true;
-    set(false);
-  };
-  browseTopScroll.onStart(expandNearTop);
-  browseTopScroll.onEnd(onScroll);
-  function onScroll() {
-    const y = window.scrollY || 0;
-    if (browseTopScroll.active) {
-      if (y <= BROWSE_TOP_EPSILON) expandNearTop();
+  }
+  function animateHeaderCollapse() {
+    if (pageScrollLocked()) {
+      headerFrame = 0;
       return;
     }
-    if (locked) return;
-    if (y > COLLAPSE_AT) {
-      if (expandedNearTop && y < COLLAPSE_AFTER_TOP_AT) return;
-      set(true); // scrolled well down → shrink
-    } else if (y <= BROWSE_TOP_EPSILON)
-      expandNearTop(); // true top → expand immediately
-    else if (y < EXPAND_AT && scrollIdle) expandNearTop(); // near top → expand after momentum settles
-    // 28..110 = wide dead zone: keep the current state
+    const diff = targetCollapse - currentCollapse;
+    if (reducedMotion?.matches || Math.abs(diff) < 0.003) {
+      currentCollapse = targetCollapse;
+      writeHeaderCollapse(currentCollapse);
+      openingTarget = null;
+      headerFrame = 0;
+      return;
+    }
+    currentCollapse += diff * SMOOTHING;
+    writeHeaderCollapse(currentCollapse);
+    headerFrame = requestAnimationFrame(animateHeaderCollapse);
   }
-  function markScrollActive() {
-    scrollIdle = false;
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(markScrollIdle, SCROLL_SETTLE_MS);
-  }
-  function markScrollIdle() {
-    clearTimeout(settleTimer);
-    scrollIdle = true;
-    onScroll();
-  }
-  window.addEventListener(
-    "scroll",
-    () => {
-      markScrollActive();
-      onScroll();
-    },
-    { passive: true },
-  );
+  const scheduleHeaderCollapse = (amount = collapseForScroll()) => {
+    if (pageScrollLocked()) return;
+    const measured = clamp01(amount);
+    if (openingTarget != null) {
+      if (measured > OPEN_LOCK_RELEASE_AT) openingTarget = null;
+      else targetCollapse = openingTarget;
+    }
+    if (openingTarget == null) {
+      if (measured < OPEN_LOCK_AT && currentCollapse > measured)
+        openingTarget = measured;
+      targetCollapse = openingTarget ?? measured;
+    }
+    if (!headerFrame)
+      headerFrame = requestAnimationFrame(animateHeaderCollapse);
+  };
+  browseTopScroll.onStart(() => {
+    openingTarget = null;
+    targetCollapse = 0;
+    currentCollapse = 0;
+    writeHeaderCollapse(0);
+  });
+  browseTopScroll.onEnd(() => scheduleHeaderCollapse());
+  window.addEventListener("scroll", () => scheduleHeaderCollapse(), {
+    passive: true,
+  });
   if ("onscrollend" in window)
-    window.addEventListener("scrollend", markScrollIdle, { passive: true });
+    window.addEventListener("scrollend", () => scheduleHeaderCollapse(), {
+      passive: true,
+    });
+  targetCollapse = collapseForScroll();
+  currentCollapse = targetCollapse;
+  writeHeaderCollapse(currentCollapse);
 })();
 
 /* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----

@@ -3108,42 +3108,52 @@ kbd {
 
 /* ===================== phone layout ===================== */
 @media (max-width: 700px) {
+    .console {
+        --console-collapse: 0;
+        --console-open: 1;
+        overflow-anchor: none;
+    }
+    .items {
+        overflow-anchor: none;
+    }
     .con-row {
         flex-wrap: wrap;
         gap: var(--sp-2);
-        padding: 10px var(--sp-3);
+        padding: calc(6px + 4px * var(--console-open)) var(--sp-3);
     }
     .cmd {
         order: 5;
         width: 100%;
         flex: none;
-        max-height: 60px;
-        transition:
-            max-height 0.22s var(--ease),
-            opacity 0.18s var(--ease),
-            margin 0.2s var(--ease);
-    }
-    /* Relay-style shrink: scrolling down (main.js adds .compact) collapses the search row + TODAY
-     counter; at the top / scrolling up it expands again */
-    .console.compact .cmd {
-        max-height: 0;
-        opacity: 0;
-        margin-top: -6px;
-        padding-top: 0;
-        padding-bottom: 0;
-        border-color: transparent;
+        max-height: calc(60px * var(--console-open));
         overflow: hidden;
+        opacity: var(--console-open);
+        transform: translateY(calc(-8px * var(--console-collapse)));
+        transform-origin: top center;
+        margin-top: calc(-6px * var(--console-collapse));
+        transition: border-color 90ms var(--ease);
+        will-change: opacity, transform;
+    }
+    /* Relay-style shrink: scrolling down tracks a continuous collapse amount from main.js.
+     .compact is only the fully-collapsed semantic state for pointer behavior/tests. */
+    .console.compact .cmd {
+        border-color: transparent;
         pointer-events: none;
-    }
-    .console.compact .wins {
-        display: none;
-    }
-    .console.compact .con-row {
-        padding-top: 6px;
-        padding-bottom: 6px;
     }
     .wins {
         margin-left: auto;
+        opacity: max(0.35, var(--console-open));
+        transform: translateY(calc(-4px * var(--console-collapse)));
+    }
+    .console.compact .wins {
+        pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .con-row,
+        .cmd,
+        .wins {
+            transition-duration: 1ms !important;
+        }
     }
     .btn-triage {
         display: none;
