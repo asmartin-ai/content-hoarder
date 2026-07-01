@@ -2082,7 +2082,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v102";
+const APP_VERSION = "v103";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
@@ -2951,7 +2951,27 @@ async function openDeepLinkedReader() {
   if (!fn) return;
   try {
     const item = await api.fetchItem(fn);
-    readerUI.open(item, { from: qs.get("from") === "triage" ? "triage" : "" });
+    const fromTriage = qs.get("from") === "triage";
+    let triageEnter = false;
+    if (fromTriage) {
+      try {
+        triageEnter =
+          qs.get("enter") === "up" ||
+          sessionStorage.getItem("ch_triage_reader_enter") === fn;
+        sessionStorage.removeItem("ch_triage_reader_enter");
+      } catch (e) {
+        triageEnter = qs.get("enter") === "up";
+      }
+      if (qs.get("enter")) {
+        qs.delete("enter");
+        history.replaceState(
+          history.state,
+          "",
+          location.pathname + "?" + qs.toString() + location.hash,
+        );
+      }
+    }
+    readerUI.open(item, { from: fromTriage ? "triage" : "", triageEnter });
   } catch (e) {
     toast("Couldn't open that item.");
   }

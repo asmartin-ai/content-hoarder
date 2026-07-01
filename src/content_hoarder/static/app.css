@@ -731,7 +731,152 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 }
 
 .src-filter {
-    max-width: 150px;
+    width: 100%;
+    min-height: 38px;
+    max-width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--panel2);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-sm);
+}
+
+.filter-menu {
+    position: relative;
+}
+
+.triage-filter-btn {
+    min-height: 34px;
+    white-space: nowrap;
+}
+
+.filter-count {
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+}
+
+.filter-pop {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    width: min(360px, calc(100vw - 24px));
+    max-height: min(72vh, 560px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    z-index: 45;
+}
+
+.filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+
+.filter-label {
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+}
+
+.filter-chips {
+    max-height: 9rem;
+    overflow: auto;
+    padding-right: 2px;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.chip-count {
+    color: currentColor;
+    opacity: 0.68;
+    font-size: var(--fs-xs);
+}
+
+.seg-control {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--panel2);
+}
+
+.seg-control button {
+    min-height: 34px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--fs-sm);
+}
+
+.seg-control button.active,
+.seg-control button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: var(--fw-bold);
+}
+
+.filter-pop-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    padding-top: var(--sp-2);
+    border-top: 1px solid var(--border);
+}
+
+.filter-active-pop,
+.triage-active-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.filter-active-pop {
+    flex: 1 1 auto;
+}
+
+.triage-active-filters {
+    margin: 0 6px var(--sp-3);
+}
+
+.filter-clear {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.filter-empty {
+    color: var(--dim);
+    font-size: var(--fs-sm);
 }
 
 .triage-main {
@@ -762,6 +907,57 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
 .tcard-pin {
     padding: 0;
     background: var(--surface-card);
+}
+
+.tcard-edge-hints {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.edge-hint {
+    position: absolute;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+}
+
+.edge-done {
+    left: var(--sp-2);
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    color: var(--done);
+    border-color: color-mix(in srgb, var(--done) 42%, var(--border));
+}
+
+.edge-archive {
+    right: var(--sp-2);
+    top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+    color: var(--archive);
+    border-color: color-mix(in srgb, var(--archive) 42%, var(--border));
+}
+
+.edge-reader {
+    top: var(--sp-2);
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+.edge-skip {
+    bottom: var(--sp-2);
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .tcard-pin .tcard-body {
@@ -1126,6 +1322,36 @@ body[data-page="triage"] .toast { bottom: calc(8.5rem + env(safe-area-inset-bott
     #nav-toggle { display: inline-flex; }
     .brand { display: none; }
     .topbar { flex-wrap: wrap; }
+    .triage-bar {
+        align-items: flex-start;
+    }
+    .bar-right {
+        flex: 1 1 auto;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .filter-menu {
+        position: static;
+    }
+    .filter-pop {
+        position: fixed;
+        left: max(12px, env(safe-area-inset-left));
+        right: max(12px, env(safe-area-inset-right));
+        top: calc(env(safe-area-inset-top) + 58px);
+        width: auto;
+        max-height: calc(100vh - env(safe-area-inset-top) - 82px);
+    }
+    .triage-main {
+        padding-inline: 0;
+    }
+    .card-stack {
+        padding-left: max(calc(env(safe-area-inset-left) + 40px), 40px);
+        padding-right: max(calc(env(safe-area-inset-right) + 40px), 40px);
+    }
+    .triage-active-filters {
+        margin-inline: max(calc(env(safe-area-inset-left) + 40px), 40px)
+            max(calc(env(safe-area-inset-right) + 40px), 40px);
+    }
     .search {
         min-width: 0;
         max-width: none;

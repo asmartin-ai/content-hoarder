@@ -23,6 +23,15 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   var emptyEl = document.getElementById("triage-empty");
   var actionsEl = document.getElementById("actions");
   var srcFilter = document.getElementById("source-filter");
+  var filterBtn = document.getElementById("filter-btn");
+  var filterPop = document.getElementById("filter-pop");
+  var filterCount = document.getElementById("filter-count");
+  var categoryFilters = document.getElementById("category-filters");
+  var tagFilters = document.getElementById("tag-filters");
+  var modeFilter = document.getElementById("mode-filter");
+  var activeFilters = document.getElementById("filter-active");
+  var activeFiltersPop = document.getElementById("filter-active-pop");
+  var filterClearPop = document.getElementById("filter-clear-pop");
   var toastEl = document.getElementById("toast");
   var undoBtn = document.getElementById("undo-btn");
   var skipBtn = document.getElementById("skip-btn");
@@ -41,10 +50,90 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   var todayCleared = 0;      // today's manual clears, shared with browse via /pulse — wins, never debt
   var emptyStamped = false;  // guard so the "page cleared" milestone fires once per emptying
   var sources = {};
+  var categoryFacets = [];
+  var tagFacets = [];
   var lastAction = null;       // {fullname, status} for undo
   var toastTimer = null;
+  var FILTER_KEY = "ch_triage_filters_v1";
+  var DEFAULT_FILTERS = { source: "", category: "", tags: [], mode: "smart" };
+  var filters = loadFilters();
 
   // ---- helpers: esc/safeUrl/isTypingTarget/ago/fetchJSON imported from core (see top of file) ----
+
+  function uniqTags(list) {
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function (raw) {
+      var t = normTag(raw);
+      if (t && out.indexOf(t) === -1) out.push(t);
+    });
+    return out;
+  }
+
+  function normalizeFilters(raw) {
+    raw = raw || {};
+    var mode = String(raw.mode || DEFAULT_FILTERS.mode).toLowerCase();
+    if (["smart", "recent", "random"].indexOf(mode) === -1) mode = "smart";
+    return {
+      source: String(raw.source || "").trim(),
+      category: String(raw.category || "").trim().toLowerCase(),
+      tags: uniqTags(raw.tags),
+      mode: mode,
+    };
+  }
+
+  function loadFilters() {
+    try {
+      return normalizeFilters(JSON.parse(localStorage.getItem(FILTER_KEY) || "null"));
+    } catch (_e) {
+      return normalizeFilters(DEFAULT_FILTERS);
+    }
+  }
+
+  function saveFilters() {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch (_e) {}
+  }
+
+  function filterFingerprint() {
+    return JSON.stringify({
+      source: filters.source || "",
+      category: filters.category || "",
+      tags: filters.tags.slice().sort(),
+      mode: filters.mode || "smart",
+    });
+  }
+
+  function activeFilterCount() {
+    return (filters.source ? 1 : 0) +
+      (filters.category ? 1 : 0) +
+      filters.tags.length +
+      (filters.mode && filters.mode !== "smart" ? 1 : 0);
+  }
+
+  function filterLabel(kind, value) {
+    if (kind === "source") return (sources[value] || {}).label || value;
+    if (kind === "mode") return value === "recent" ? "Newest" : value.charAt(0).toUpperCase() + value.slice(1);
+    return value;
+  }
+
+  function clearSession() {
+    try { localStorage.removeItem(SESSION_KEY); } catch (_e) {}
+  }
+
+  function setFilters(next, opts) {
+    opts = opts || {};
+    var before = filterFingerprint();
+    filters = normalizeFilters(Object.assign({}, filters, next || {}));
+    var after = filterFingerprint();
+    saveFilters();
+    renderFilters();
+    if (after !== before) {
+      clearSession();
+      queue = [];
+      reviewed = 0;
+      emptyStamped = false;
+      if (!opts.deferLoad) loadBatch();
+    }
+  }
 
   function navigationType() {
     try {
@@ -478,6 +567,12 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     var m = item.metadata || {};
     var ai = m.llm ? aiHtml(m.llm) : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return '<article class="tcard tcard-pin" data-fullname="' + esc(item.fullname) + '">' +
+      '<div class="tcard-edge-hints" aria-hidden="true">' +
+        '<span class="edge-hint edge-done">Done</span>' +
+        '<span class="edge-hint edge-archive">Archive</span>' +
+        '<span class="edge-hint edge-reader">Reader</span>' +
+        '<span class="edge-hint edge-skip">Skip</span>' +
+      "</div>" +
       '<span class="tcard-stamp stamp-arch">' + chIcon("archive") + ' Archive</span>' +
       '<span class="tcard-stamp stamp-done">Done ' + chIcon("done") + '</span>' +
       '<span class="tcard-stamp stamp-snooze">Snooze</span>' +
@@ -507,6 +602,103 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     }).join("");
     return '<span class="ai-verdict ai-' + esc(llm.verdict) + '">AI: ' + esc(llm.verdict) + "</span> " +
       '<span class="ai-reason">' + esc(llm.reason || "") + "</span> " + tags;
+  }
+
+  function renderSourceOptions() {
+    if (!srcFilter) return;
+    srcFilter.innerHTML = '<option value="">all sources</option>';
+    Object.keys(sources).forEach(function (id) {
+      var s = sources[id];
+      if (!s || s.count <= 0) return;
+      var o = document.createElement("option");
+      o.value = id;
+      o.textContent = s.label + " (" + s.count + ")";
+      srcFilter.appendChild(o);
+    });
+    srcFilter.value = filters.source || "";
+  }
+
+  function chipButton(kind, id, label, count, active) {
+    return '<button class="chip filter-chip' + (active ? " active" : "") +
+      '" type="button" data-filter-kind="' + kind + '" data-filter-value="' + esc(id) +
+      '" aria-pressed="' + String(!!active) + '">' +
+      esc(label) + (Number.isFinite(count) ? ' <span class="chip-count">' + count + "</span>" : "") +
+      "</button>";
+  }
+
+  function renderFacetChips() {
+    if (categoryFilters) {
+      var cats = categoryFacets.filter(function (c) { return c.count > 0; });
+      categoryFilters.innerHTML = cats.length ? cats.map(function (c) {
+        return chipButton("category", c.id, c.id, c.count, filters.category === c.id);
+      }).join("") : '<span class="filter-empty">none</span>';
+    }
+    if (tagFilters) {
+      tagFilters.innerHTML = tagFacets.length ? tagFacets.map(function (t) {
+        return chipButton("tag", t.id, t.id, t.count, filters.tags.indexOf(t.id) !== -1);
+      }).join("") : '<span class="filter-empty">none</span>';
+    }
+  }
+
+  function renderModeControl() {
+    if (!modeFilter) return;
+    Array.prototype.forEach.call(modeFilter.querySelectorAll("[data-mode]"), function (btn) {
+      var on = btn.getAttribute("data-mode") === filters.mode;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-pressed", String(on));
+    });
+  }
+
+  function activeFilterHtml() {
+    var chips = [];
+    if (filters.source) chips.push(chipButton("clear-source", filters.source, filterLabel("source", filters.source), NaN, true));
+    if (filters.category) chips.push(chipButton("clear-category", filters.category, filters.category, NaN, true));
+    filters.tags.forEach(function (t) { chips.push(chipButton("clear-tag", t, t, NaN, true)); });
+    if (filters.mode && filters.mode !== "smart")
+      chips.push(chipButton("clear-mode", filters.mode, filterLabel("mode", filters.mode), NaN, true));
+    if (!chips.length) return "";
+    return chips.join("") + '<button class="chip filter-clear" type="button" data-filter-clear="1">Clear</button>';
+  }
+
+  function renderActiveFilters() {
+    var html = activeFilterHtml();
+    if (activeFilters) {
+      activeFilters.hidden = !html;
+      activeFilters.innerHTML = html;
+    }
+    if (activeFiltersPop) activeFiltersPop.innerHTML = html || '<span class="filter-empty">Smart inbox</span>';
+    if (filterClearPop) filterClearPop.disabled = !html;
+    var count = activeFilterCount();
+    if (filterCount) {
+      filterCount.hidden = !count;
+      filterCount.textContent = String(count);
+    }
+  }
+
+  function renderFilters() {
+    renderSourceOptions();
+    renderFacetChips();
+    renderModeControl();
+    renderActiveFilters();
+  }
+
+  function toggleTagFilter(tag) {
+    var tags = filters.tags.slice();
+    var idx = tags.indexOf(tag);
+    if (idx === -1) tags.push(tag);
+    else tags.splice(idx, 1);
+    setFilters({ tags: tags });
+  }
+
+  function clearOneFilter(kind, value) {
+    if (kind === "clear-source") setFilters({ source: "" });
+    else if (kind === "clear-category") setFilters({ category: "" });
+    else if (kind === "clear-mode") setFilters({ mode: "smart" });
+    else if (kind === "clear-tag") setFilters({ tags: filters.tags.filter(function (t) { return t !== value; }) });
+  }
+
+  function clearAllFilters() {
+    setFilters(DEFAULT_FILTERS);
   }
 
   // ---- rendering / flow ----
@@ -550,7 +742,8 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       if (queue.length) {
         localStorage.setItem(SESSION_KEY, JSON.stringify({
           queue: queue, reviewed: reviewed,
-          src: srcFilter ? srcFilter.value : "", savedAt: Date.now(),
+          filters: filterFingerprint(),
+          savedAt: Date.now(),
         }));
       } else {
         localStorage.removeItem(SESSION_KEY);   // finished the queue → nothing to resume
@@ -562,14 +755,21 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       var s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
       if (!s || !Array.isArray(s.queue) || !s.queue.length) return null;
       if (Date.now() - (s.savedAt || 0) > SESSION_TTL_MS) { localStorage.removeItem(SESSION_KEY); return null; }
+      if (s.filters !== filterFingerprint()) { localStorage.removeItem(SESSION_KEY); return null; }
       return s;
     } catch (_e) { return null; }
   }
   function loadBatch() {
-    var src = srcFilter ? srcFilter.value : "";
     // mode=smart ranks by the learned likely-to-process score (Epic 10); it falls back to
     // random server-side when no scores exist yet, so it's always safe as the default.
-    var url = "/random?n=" + BATCH + "&unprocessed=1&mode=smart" + (src ? "&source=" + encodeURIComponent(src) : "");
+    var params = new URLSearchParams();
+    params.set("n", String(BATCH));
+    params.set("unprocessed", "1");
+    params.set("mode", filters.mode || "smart");
+    if (filters.source) params.set("source", filters.source);
+    if (filters.category) params.set("category", filters.category);
+    filters.tags.forEach(function (t) { params.append("tag", t); });
+    var url = "/random?" + params.toString();
     return fetchJSON(url).then(function (data) {
       queue = data.items || [];
       reviewed = 0;
@@ -622,7 +822,8 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   function openCurrentInReader() {
     if (!queue.length) return;
     saveSession();
-    location.assign("/?open=" + encodeURIComponent(queue[0].fullname) + "&from=triage");
+    try { sessionStorage.setItem("ch_triage_reader_enter", queue[0].fullname); } catch (_e) {}
+    location.assign("/?open=" + encodeURIComponent(queue[0].fullname) + "&from=triage&enter=up");
   }
 
   function undo() {
@@ -905,6 +1106,16 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     if (b) commit(b.getAttribute("data-action"));
   });
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && filterPop && !filterPop.hidden) {
+      filterPop.hidden = true;
+      if (filterBtn) filterBtn.setAttribute("aria-expanded", "false");
+      return;
+    }
+    if (e.key === "Escape" && menuPop && !menuPop.hidden) {
+      menuPop.hidden = true;
+      if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+      return;
+    }
     if (e.key === "Escape" && shortcutModal && !shortcutModal.hidden) { closeShortcuts(); return; }
     if (isTypingTarget(e.target)) return;
     var k = e.key.toLowerCase();
@@ -918,7 +1129,38 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   });
   var nb = document.getElementById("next-batch");
   if (nb) nb.addEventListener("click", loadBatch);
-  if (srcFilter) srcFilter.addEventListener("change", loadBatch);
+  if (srcFilter) srcFilter.addEventListener("change", function () {
+    setFilters({ source: srcFilter.value || "" });
+  });
+  if (filterBtn && filterPop) filterBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var willOpen = filterPop.hidden;
+    filterPop.hidden = !willOpen;
+    filterBtn.setAttribute("aria-expanded", String(willOpen));
+  });
+  if (filterPop) filterPop.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var chip = e.target.closest("[data-filter-kind]");
+    if (chip) {
+      var kind = chip.getAttribute("data-filter-kind");
+      var value = chip.getAttribute("data-filter-value") || "";
+      if (kind === "category") setFilters({ category: filters.category === value ? "" : value });
+      else if (kind === "tag") toggleTagFilter(value);
+      else clearOneFilter(kind, value);
+      return;
+    }
+    if (e.target.closest("[data-filter-clear]")) clearAllFilters();
+  });
+  if (activeFilters) activeFilters.addEventListener("click", function (e) {
+    var chip = e.target.closest("[data-filter-kind]");
+    if (chip) clearOneFilter(chip.getAttribute("data-filter-kind"), chip.getAttribute("data-filter-value") || "");
+    else if (e.target.closest("[data-filter-clear]")) clearAllFilters();
+  });
+  if (filterClearPop) filterClearPop.addEventListener("click", clearAllFilters);
+  if (modeFilter) modeFilter.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-mode]");
+    if (btn) setFilters({ mode: btn.getAttribute("data-mode") || "smart" });
+  });
 
   function updateUndoBtn() { if (undoBtn) undoBtn.disabled = !lastAction; }
   if (undoBtn) undoBtn.addEventListener("click", undo);
@@ -937,7 +1179,6 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     menuBtn.setAttribute("aria-expanded", String(willOpen));
     if (willOpen) { setActiveChip(); ruRefreshPop(); }
   });
-
   // Reddit unsave: the button first previews the queued drain scope, then requires an
   // explicit second confirmation before contacting Reddit. Queueing is local/reversible;
   // this live drain is the external mutation.
@@ -1001,6 +1242,10 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     loadBatch();
   });
   document.addEventListener("click", function (e) {
+    if (filterPop && !filterPop.hidden && !e.target.closest(".filter-menu")) {
+      filterPop.hidden = true;
+      if (filterBtn) filterBtn.setAttribute("aria-expanded", "false");
+    }
     if (menuPop && !menuPop.hidden && !e.target.closest(".menu")) {
       menuPop.hidden = true;
       menuBtn.setAttribute("aria-expanded", "false");
@@ -1042,18 +1287,27 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
   fetchJSON("/tags").then(function (d) {
     if (d && d.tags && typeof d.tags === "object") knownTags = Object.keys(d.tags).sort();
   }).catch(function () {});
-  fetchJSON("/sources").then(function (data) {
-    (data.sources || []).forEach(function (s) {
-      sources[s.id] = s;
-      if (srcFilter && s.count > 0) {
-        var o = document.createElement("option");
-        o.value = s.id; o.textContent = s.label + " (" + s.count + ")";
-        srcFilter.appendChild(o);
-      }
+  Promise.all([
+    fetchJSON("/sources?status=inbox"),
+    fetchJSON("/categories?status=inbox"),
+    fetchJSON("/tags?status=inbox"),
+  ]).then(function (parts) {
+    var sourceData = parts[0] || {};
+    var categoryData = parts[1] || {};
+    var tagData = parts[2] || {};
+    (sourceData.sources || []).forEach(function (s) { sources[s.id] = s; });
+    categoryFacets = (categoryData.categories || []).map(function (c) {
+      return { id: c.id, label: c.label || c.id, count: c.count || 0 };
     });
-    // Honor ?source=<id> so the "Reddit"/"Triage" links land pre-filtered.
+    var tagCounts = tagData.tags || {};
+    tagFacets = Object.keys(tagCounts).map(function (id) {
+      return { id: id, count: tagCounts[id] || 0 };
+    }).sort(function (a, b) {
+      return (b.count - a.count) || a.id.localeCompare(b.id);
+    });
     var qsSource = new URLSearchParams(location.search).get("source");
-    if (qsSource && srcFilter) srcFilter.value = qsSource;
+    if (qsSource) setFilters({ source: qsSource }, { deferLoad: true });
+    else renderFilters();
   }).then(function () {
     // Resume where you left off — unless an explicit ?source means "deal a fresh filtered batch".
     var explicit = new URLSearchParams(location.search).get("source");
@@ -1061,7 +1315,6 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
     if (s) {
       queue = s.queue;
       reviewed = s.reviewed || 0;
-      if (srcFilter && s.src) srcFilter.value = s.src;
       renderCurrent();
       toast("Picked up where you left off", false);
     } else {
