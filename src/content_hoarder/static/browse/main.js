@@ -17,6 +17,7 @@ import {
   archiveTodayConfirmText,
   setArchivePref,
   thumb,
+  mediaType,
 } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
 import {
@@ -1147,6 +1148,57 @@ function cardHtml(c) {
 }
 let ambientCard = null;
 let surpriseItem = null;
+const SURPRISE_PREVIEW_CHARS = 260;
+
+function surprisePreviewText(item) {
+  const m = (item && item.metadata) || {};
+  const candidates = [
+    m.summary,
+    m.description,
+    m.selftext,
+    m.text,
+    item && item.body,
+    m.ocr_text,
+  ];
+  const raw = candidates.find((v) => typeof v === "string" && v.trim());
+  if (!raw) return "";
+  return String(raw)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, " ")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function surprisePreviewHtml(item) {
+  const text = surprisePreviewText(item);
+  if (!text)
+    return (
+      '<div class="surp-preview empty" aria-label="Preview"><p>' +
+      "No saved text preview." +
+      "</p></div>"
+    );
+  const clipped =
+    text.length > SURPRISE_PREVIEW_CHARS
+      ? text.slice(0, SURPRISE_PREVIEW_CHARS - 3).trimEnd() + "..."
+      : text;
+  return (
+    '<div class="surp-preview" aria-label="Preview"><p>' +
+    esc(clipped) +
+    "</p></div>"
+  );
+}
+
 async function loadAmbient() {
   try {
     const r = await fetch("/resurface");
@@ -1214,8 +1266,10 @@ async function surprise() {
       return;
     }
     const m = it.metadata || {};
+    const mt = mediaType(it);
+    const isRedditText = it.source === "reddit" && mt.cls === "text";
     // hero: prefer the crisp card-sized thumbnail (gallery aware), fall back to any image
-    const t = thumb(it, "card") || imageUrl(it) || "";
+    const t = isRedditText ? "" : thumb(it, "card") || imageUrl(it) || "";
     const hero = t
       ? '<button type="button" class="surp-hero" data-surprise="open" aria-label="Open in reader">' +
         '<img src="' +
@@ -1246,6 +1300,7 @@ async function surprise() {
       '<span class="surp-metabits">' +
       metaLine(it) +
       "</span></div>" +
+      surprisePreviewHtml(it) +
       '<div class="surp-acts">' +
       '<button type="button" class="surp-act a" data-surprise="archived">Archive</button>' +
       '<button type="button" class="surp-act d" data-surprise="done">Done</button>' +
