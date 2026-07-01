@@ -1,0 +1,7 @@
+{
+  "files": ["src/content_hoarder/templates/*.html"],
+  "exclude": ["src/content_hoarder/templates/manifest.webmanifest"],
+  "insertBefore": "</body>",
+  "commentSyntax": "html",
+  "cspChecked": true
+}
