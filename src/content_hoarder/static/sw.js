@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v104"; // v104: HN reader, recovery routing, and broader offline shell
+const CACHE = "ch-shell-v105"; // v105: triage filters, HN recovery, PWA shell, and scroll settling
 const SHELL = [
   "/",
   "/triage",
