@@ -2,6 +2,16 @@
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Added inbox-only triage filtering by source, category, tags, and Smart/Newest/Random mode, with persisted filter state and stale-session clearing when filters change.
+
+### Changed
+
+- Reworked the triage deck controls around the pinboard-style card shell, clearer edge hints, reader handoff affordances, and settings-menu theme controls.
+
 ## 1.0.0 - 2026-06-29
 
 ### Release posture
