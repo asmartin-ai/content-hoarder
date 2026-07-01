@@ -1124,6 +1124,54 @@ body[data-page="triage"] .toast {
     text-decoration: none;
 }
 
+/* triage pinboard v2: keep the proven card markup/gestures, but give the
+   decision surface a calmer pinned-note rhythm instead of the old edge-label shell. */
+.tcard-pinboard-v2 {
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--panel) 94%, var(--accent) 6%),
+            var(--panel) 46%
+        ),
+        var(--panel);
+    padding: var(--sp-4);
+    border-color: color-mix(in srgb, var(--border) 78%, var(--accent) 22%);
+}
+
+.tcard-pinboard-v2 .tcard-head {
+    margin-bottom: var(--sp-2);
+}
+
+.tcard-pinboard-v2 .tcard-media,
+.tcard-pinboard-v2 .tcard-gallery,
+.tcard-pinboard-v2 .tcard-embed {
+    margin: 0 0 var(--sp-3);
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    background: var(--panel2);
+}
+
+.tcard-pinboard-v2 .tcard-media img,
+.tcard-pinboard-v2 .tcard-video img,
+.tcard-pinboard-v2 .tcard-gallery .tcard-gallery-img {
+    max-height: min(34vh, 280px);
+}
+
+.tcard-pinboard-v2 .tcard-title {
+    margin: 0 0 var(--sp-2);
+    line-height: 1.22;
+    text-wrap: pretty;
+}
+
+.tcard-pinboard-v2 .tcard-snippet {
+    margin-top: var(--sp-3);
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--panel2) 82%, var(--panel));
+    opacity: 1;
+}
+
 .tcard-meta {
     color: var(--muted);
     font-size: var(--fs-sm);
@@ -1325,6 +1373,17 @@ body[data-page="triage"] .toast {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
+}
+.tcard-tags:not(.tags-expanded) .tag-extra {
+    display: none;
+}
+.tag-more {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    background: var(--accent-tint);
+}
+.tag-more:hover {
+    border-color: var(--accent);
 }
 .tag-x {
     font-size: 0.72rem;
