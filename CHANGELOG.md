@@ -16,7 +16,7 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Fixed
 
-- Stabilized the mobile browse floating up-button path so programmatic scroll-to-top expands the compact header immediately, keeps it expanded while scroll momentum settles, hides the up button at the top, and respects reduced-motion preferences.
+- Stabilized the mobile browse header around both finger-fling momentum and floating up-button scroll-to-top: near-top swipes now smoothly scrub the header between compact and expanded states without clipping the Today indicator, the up button finishes at the true top, and reduced-motion preferences remain respected.
 
 ## 1.0.0 - 2026-06-29
 
