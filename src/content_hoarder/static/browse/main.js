@@ -1291,7 +1291,7 @@ async function surprise() {
       '<button type="button" class="surp-x" data-surprise="dismiss" aria-label="Not today">✕</button>' +
       hero +
       '<div class="surp-body">' +
-      '<div class="surp-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
+      '<div class="surp-eyebrow">Random save · no strings</div>' +
       "<h3>" +
       esc(it.title || "(untitled)") +
       "</h3>" +
