@@ -952,7 +952,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js";   // OS back-butt
       fetchJSON("/items/" + encodeURIComponent(afn) + "/recover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archive_today: "apply", confirm_external_archive_today: true })
+        body: JSON.stringify({ metadata: false, archive_today: "apply", confirm_external_archive_today: true })
       })
         .then(function (d) {
           var media = d && d.archive_today;

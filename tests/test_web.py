@@ -597,6 +597,38 @@ def test_recover_route_archive_today_apply_opt_in(tmp_db, monkeypatch):
     assert seen["apply_bytes"] is True
 
 
+def test_recover_route_archive_today_can_skip_metadata_chain(tmp_db, monkeypatch):
+    import content_hoarder.archival.service as svc
+
+    seen = {}
+
+    def no_metadata_call(*_args, **_kwargs):
+        raise AssertionError("archive.today-only recovery must not call recover_one")
+
+    monkeypatch.setattr(svc, "recover_one", no_metadata_call)
+    monkeypatch.setattr(svc, "archive_today_media_eligibility",
+                        lambda item: (True, "eligible", {}, ["https://i.redd.it/x.jpg"]))
+
+    def fake_media(c, fn, **k):
+        seen.update(k)
+        return {"eligible": True, "attempted": True, "mode": "apply",
+                "bytes_archived": 1, "snapshot_candidates": 0,
+                "result": "hit", "errors": []}
+
+    monkeypatch.setattr(svc, "archive_today_recover_media", fake_media)
+    r = _client(tmp_db).post("/items/reddit:t3_a/recover", json={
+        "metadata": False,
+        "archive_today": "apply",
+        "confirm_external_archive_today": True,
+    })
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["metadata_result"] == "skipped"
+    assert data["bytes_archived"] == 1
+    assert data["recovered"] is True
+    assert seen["apply_bytes"] is True
+
+
 def test_recover_route_archive_today_non_eligible_400(tmp_db, monkeypatch):
     import content_hoarder.archival.service as svc
 
