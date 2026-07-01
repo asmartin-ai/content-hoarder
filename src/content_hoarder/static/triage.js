@@ -450,11 +450,15 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js"; // OS back-button
       item.metadata.tags = tags;
     }
   }
+  var TAG_VISIBLE_LIMIT = 5;
   function chipRowHtml(item) {
-    var chips = itemTags(item)
-      .map(function (t) {
+    var tags = itemTags(item);
+    var chips = tags
+      .map(function (t, idx) {
         return (
-          '<button class="chip tag-edit" type="button" data-rmtag="' +
+          '<button class="chip tag-edit' +
+          (idx >= TAG_VISIBLE_LIMIT ? " tag-extra" : "") +
+          '" type="button" data-rmtag="' +
           esc(t) +
           '">' +
           esc(t) +
@@ -462,6 +466,13 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js"; // OS back-button
         );
       })
       .join("");
+    if (tags.length > TAG_VISIBLE_LIMIT)
+      chips +=
+        '<button class="chip tag-more" type="button" data-tagmore="1" aria-expanded="false" data-label="… +' +
+        (tags.length - TAG_VISIBLE_LIMIT) +
+        '">… +' +
+        (tags.length - TAG_VISIBLE_LIMIT) +
+        "</button>";
     return (
       chips +
       '<button class="chip tag-add" type="button" data-tagadd="1">＋ tag</button>'
@@ -850,7 +861,7 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js"; // OS back-button
       ? aiHtml(m.llm)
       : '<button class="ai-btn" type="button">🤖 Ask AI</button>';
     return (
-      '<article class="tcard" data-fullname="' +
+      '<article class="tcard tcard-pinboard-v2" data-fullname="' +
       esc(item.fullname) +
       '">' +
       '<span class="tcard-stamp stamp-arch">' +
@@ -1499,6 +1510,21 @@ import { pushOverlay, settleTop } from "./core/overlaynav.js"; // OS back-button
       return;
     }
     // ---- manual tag editor (mirrors the cat-chip network pattern, POSTs to /tags) ----
+    // Expand/collapse overflowed tags in-place so high-tag items don't make the
+    // triage card too tall by default.
+    var tagMore = e.target.closest("[data-tagmore]");
+    if (tagMore) {
+      var tagsBox = tagMore.closest(".tcard-tags");
+      if (tagsBox) {
+        var expanded = !tagsBox.classList.contains("tags-expanded");
+        tagsBox.classList.toggle("tags-expanded", expanded);
+        tagMore.setAttribute("aria-expanded", expanded ? "true" : "false");
+        tagMore.textContent = expanded
+          ? "show fewer"
+          : tagMore.getAttribute("data-label");
+      }
+      return;
+    }
     // Remove an existing tag chip. The ✕ and the chip itself both carry the removal
     // (closest() walks up from either), so the whole pill is a tap target.
     var tagRm = e.target.closest("[data-rmtag]");
