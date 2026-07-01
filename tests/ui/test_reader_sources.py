@@ -35,6 +35,20 @@ def test_youtube_item_opens_in_reader_with_local_metadata(desktop_page):
     expect(page.locator("#reader iframe")).to_have_count(0)
 
 
+def test_hackernews_item_opens_cached_thread_in_reader(desktop_page):
+    page = desktop_page
+
+    _open_reader(page, "hackernews:424242")
+    expect(page.locator("#reader")).to_have_attribute("data-source", "hackernews")
+    expect(page.locator("#reader-post .rd-ttl")).to_contain_text("Cached HN Reader Story")
+    expect(page.locator("#reader-post")).to_contain_text("128 pts")
+    expect(page.locator("#reader-chip")).to_contain_text("loaded instantly")
+    expect(page.locator("#reader-comments .rd-cmt")).to_have_count(2)
+    expect(page.locator("#reader-comments")).to_contain_text("First cached HN comment.")
+    expect(page.locator("#reader-comments")).to_contain_text("Nested cached HN reply.")
+    expect(page.locator('#reader-comments a[href="https://news.ycombinator.com/user?id=dang"]')).to_have_count(1)
+
+
 def test_twitter_item_opens_in_reader_with_quote_outlink_and_media(desktop_page):
     page = desktop_page
 

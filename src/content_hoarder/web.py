@@ -352,13 +352,19 @@ def create_app(db_path: str | None = None) -> Flask:
     def random_batch():
         a = request.args
         n = min(max(_int(a.get("n"), 20), 1), 100)
+        mode = (a.get("mode") or "smart").strip().lower()
+        if mode not in {"smart", "recent", "random"}:
+            mode = "smart"
+        tags = [t.strip().lower() for t in a.getlist("tag") if t.strip()]
         with conn() as c:
             rows = db.get_random_batch(
                 c,
                 n,
                 source=a.get("source") or None,
+                category=(a.get("category") or "").strip().lower() or None,
+                tags=tags or None,
                 unprocessed=a.get("unprocessed", "1") != "0",
-                mode=a.get("mode") or "random",
+                mode=mode,
             )
         return jsonify({"items": rows})
 
@@ -639,11 +645,26 @@ def create_app(db_path: str | None = None) -> Flask:
             return jsonify(
                 {"error": "archive_today must be one of off, preview, apply"}
             ), 400
+        metadata = data.get("metadata", True) is not False
+        if not metadata and mode == "off":
+            return jsonify({"error": "recover request has no enabled recovery mode"}), 400
 
         with conn() as c:
-            res = archival.recover_one(c, fullname)
-            if res is None:
-                return jsonify({"error": "not a recoverable reddit item"}), 400
+            if metadata:
+                res = archival.recover_one(c, fullname)
+                if res is None:
+                    return jsonify({"error": "not a recoverable reddit item"}), 400
+            else:
+                res = {
+                    "recovered": False,
+                    "metadata_recovered": False,
+                    "metadata_result": "skipped",
+                    "metadata_reason": "disabled",
+                    "title": None,
+                    "body": None,
+                    "url": None,
+                    "bytes_archived": 0,
+                }
             if mode != "off":
                 if data.get("confirm_external_archive_today") is not True:
                     return jsonify(
@@ -675,6 +696,12 @@ def create_app(db_path: str | None = None) -> Flask:
                 res["recovered"] = (
                     bool(res.get("metadata_recovered")) or media.get("result") == "hit"
                 )
+                if not metadata:
+                    fresh = c.execute(
+                        "SELECT title, body, url FROM items WHERE fullname=?", (fullname,)
+                    ).fetchone()
+                    if fresh:
+                        res.update(dict(fresh))
         return jsonify(res)
 
     @app.post("/items/<path:fullname>/body")

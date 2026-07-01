@@ -1084,11 +1084,13 @@ def get_random_batch(
     n: int = 20,
     *,
     source: str | None = None,
+    category: str | None = None,
+    tags: list[str] | None = None,
     unprocessed: bool = True,
-    mode: str = "random",
+    mode: str = "smart",
     smart_mix: float = 0.5,
 ) -> list[dict]:
-    """Return up to ``n`` items — the triage batch (default: random inbox).
+    """Return up to ``n`` items — the triage batch (default: smart inbox).
 
     ``mode='smart'`` (Epic 10) interleaves likely-to-be-processed items with recent
     ones instead of a flat shuffle: ~``smart_mix`` of the batch is sampled from the
@@ -1111,10 +1113,35 @@ def get_random_batch(
     if source:
         filters.append("source = ?")
         params.append(source)
+    if category:
+        if category in PROCESSING_TAGS:
+            filters.append(
+                "("
+                "json_extract(metadata, '$.category') = ? OR "
+                "EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value = ?)"
+                ")"
+            )
+            params.extend([category, category])
+        else:
+            filters.append("json_extract(metadata, '$.category') = ?")
+            params.append(category)
+    if tags:
+        ph = ",".join("?" for _ in tags)
+        filters.append(
+            f"EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN ({ph}))"
+        )
+        params.extend(tags)
     where = (" WHERE " + " AND ".join(filters)) if filters else ""
 
-    if mode != "smart":
+    mode = (mode or "smart").strip().lower()
+    if mode not in {"smart", "recent", "random"}:
+        mode = "smart"
+    if mode == "random":
         sql = f"SELECT * FROM items{where} ORDER BY RANDOM() LIMIT ?"
+        rows = conn.execute(sql, params + [int(n)]).fetchall()
+        return [_row_to_public(r) for r in rows]
+    if mode == "recent":
+        sql = f"SELECT * FROM items{where} ORDER BY first_seen_utc DESC, rowid DESC LIMIT ?"
         rows = conn.execute(sql, params + [int(n)]).fetchall()
         return [_row_to_public(r) for r in rows]
 

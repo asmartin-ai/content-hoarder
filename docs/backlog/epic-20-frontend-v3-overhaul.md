@@ -121,3 +121,13 @@ kill exactly this duplication; the two non-module legacy pages (`/triage`, `/red
   `/triage` + `/reddit`) and `static/core/tokens.css` (v3 "Log Book" apricot, used by browse) — to prevent a
   future "looks duplicated, delete one" mistake. Both are live and intentional; unify only when the legacy pages
   are redesigned.
+
+### 2026-06-30 issue #57 close-out
+
+Triage visual rework + inbox-like filtering shipped on `feat/issue-57-triage-rework-filtering`.
+`/random` accepts inbox-focused `source`, `category`, repeated `tag`, and
+`mode=smart|recent|random` filters. `/triage` persists them as `ch_triage_filters_v1`, includes them
+in the session fingerprint, and clears stale queued cards when filters change. The triage deck keeps
+the pinboard shell with Done/Archive/Reader/Skip edge hints, bottom actions aligned with browse swipe
+actions, theme controls moved into the menu, and swipe-up reader entry preserving the triage return
+guard. Side-swipe tilt polish remains deferred.
