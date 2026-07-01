@@ -149,3 +149,9 @@
   round-tripping loses fidelity; and Obsidian's superset (`[[wikilinks]]`, `![[embeds]]`, callouts,
   frontmatter, Dataview) gets corrupted by a generic WYSIWYG. Reactivate only if raw-markdown editing proves
   insufficient — otherwise prefer deep-linking out to Obsidian for rich editing.
+### 2026-06-30 HN reader close-out
+
+Cached Hacker News discussion threads now render inside the browse reader via the existing
+`/hackernews/items/<fullname>/thread` backend contract. The reader loads any source with a configured
+thread path, uses cached/hydrated HN post titles when present, preserves HN user-profile author links,
+and has Playwright coverage seeded from a synthetic cached Algolia-shaped thread.

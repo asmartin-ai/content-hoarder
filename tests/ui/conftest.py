@@ -10,6 +10,7 @@ a second Reddit sync scheduler.
 """
 from __future__ import annotations
 
+import json
 import importlib.util
 import socket
 import threading
@@ -103,7 +104,26 @@ def _seed_ui_db(db_path: str) -> None:
                 url="https://www.reddit.com/r/test/comments/ui_seed/ui_seed/",
                 created_utc=now - 100,
                 now=now - 100,
-                metadata={"subreddit": "test", "permalink": "/r/test/comments/ui_seed/ui_seed/"},
+                metadata={
+                    "subreddit": "test",
+                    "permalink": "/r/test/comments/ui_seed/ui_seed/",
+                    "tags": ["coding"],
+                },
+            ),
+            models.new_item(
+                source="reddit",
+                source_id="ui_text_thumb",
+                kind="post",
+                title="AskReddit synthetic text thumbnail",
+                body="Thread text preview body from a self post.",
+                url="https://www.reddit.com/r/AskReddit/comments/ui_text_thumb/title/",
+                created_utc=now - 90,
+                now=now - 90,
+                metadata={
+                    "subreddit": "AskReddit",
+                    "permalink": "/r/AskReddit/comments/ui_text_thumb/title/",
+                    "thumbnail": "https://b.thumbs.redditmedia.com/selfpost.jpg",
+                },
             ),
             models.new_item(
                 source="reddit",
@@ -138,6 +158,8 @@ def _seed_ui_db(db_path: str) -> None:
                     "availability": "public",
                     "view_count": 12345,
                     "yt_categories": ["Education", "Technology"],
+                    "category": "listenable",
+                    "tags": ["listenable", "coding"],
                     "description": "Stored local description for the reader.",
                     "thumbnail": "https://i.ytimg.com/vi/ReaderVid01/hqdefault.jpg",
                     "companions": [
@@ -145,6 +167,16 @@ def _seed_ui_db(db_path: str) -> None:
                     ],
                 },
                 now=now - 400,
+            ),
+            models.new_item(
+                source="hackernews",
+                source_id="424242",
+                kind="story",
+                title="Sparse imported HN title",
+                url="https://news.ycombinator.com/item?id=424242",
+                author="pg",
+                metadata={"tags": ["coding"], "category": "reading"},
+                now=now - 399,
             ),
             models.new_item(
                 source="twitter",
@@ -195,6 +227,44 @@ def _seed_ui_db(db_path: str) -> None:
         )
         for item in rows:
             db.merge_upsert(c, item)
+        db.set_reddit_thread(
+            c,
+            "hackernews:424242",
+            json.dumps(
+                {
+                    "id": 424242,
+                    "title": "Cached HN Reader Story",
+                    "url": "https://example.test/hn-reader-story",
+                    "author": "pg",
+                    "points": 128,
+                    "text": "<p>Cached story text.</p>",
+                    "created_at_i": now - 500,
+                    "type": "story",
+                    "children": [
+                        {
+                            "id": 424243,
+                            "author": "dang",
+                            "text": "<p>First cached HN comment.</p>",
+                            "points": 42,
+                            "created_at_i": now - 450,
+                            "type": "comment",
+                            "children": [
+                                {
+                                    "id": 424244,
+                                    "author": "hnreply",
+                                    "text": "<p>Nested cached HN reply.</p>",
+                                    "points": 7,
+                                    "created_at_i": now - 430,
+                                    "type": "comment",
+                                    "children": [],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ),
+            commit=False,
+        )
         c.execute(
             "UPDATE items SET status='done', processed_utc=? WHERE fullname='reddit:ui_old_done'",
             (now - 45 * 86400,),

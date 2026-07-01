@@ -2,11 +2,13 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v102"; // v102: 1.0.0 mobile release hardening
+const CACHE = "ch-shell-v111"; // v111: damped moving mobile header chrome
 const SHELL = [
   "/",
   "/triage",
+  "/reddit",
   // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
+  "/static/tokens.css",
   "/static/theme.js",
   "/static/haptics.js",
   "/static/core/tokens.css",
@@ -30,6 +32,9 @@ const SHELL = [
   // /triage now loads triage.js as an ES module (imports core/util, core/api, core/icons)
   "/static/app.css",
   "/static/triage.js",
+  "/static/reddit.css",
+  "/static/reddit.js",
+  "/static/vendor/hls.min.js",
   "/static/icon.svg",
   "/static/icon-192.png",
   "/static/icon-512.png",
@@ -67,7 +72,7 @@ self.addEventListener("fetch", (e) => {
   const isStatic =
     url.pathname.startsWith("/static/") ||
     url.pathname === "/manifest.webmanifest";
-  const isPage = url.pathname === "/" || url.pathname === "/triage";
+  const isPage = req.mode === "navigate";
 
   if (isStatic) {
     e.respondWith(

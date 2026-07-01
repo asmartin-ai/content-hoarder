@@ -20,6 +20,7 @@ Gesture API notes
   so `page.mouse` is used for the vertical drag.
 """
 
+import json
 import re
 
 import pytest
@@ -186,6 +187,65 @@ def _open_reader_on(page, fullname: str) -> None:
     title.click()
     page.wait_for_timeout(500)
     expect(page.locator("#reader.show")).to_be_visible()
+
+
+def test_reddit_text_post_with_thumbnail_has_no_media_affordance(pixel6_page):
+    """A self/text Reddit post may have a Reddit thumbnail, but it is not media."""
+    page = pixel6_page
+    fullname = "reddit:ui_text_thumb"
+    _scroll_into_view(page, fullname)
+    row = page.locator(f'.row[data-fullname="{fullname}"]')
+    expect(row).to_be_visible()
+    expect(row.locator("[data-media]")).to_have_count(0)
+    expect(row.locator(".monitor.empty")).to_have_count(1)
+
+    row.locator(".title").click()
+    expect(page.locator("#reader.show")).to_be_visible()
+    expect(page.locator("#reader-post")).to_contain_text(
+        "Thread text preview body from a self post."
+    )
+
+
+def test_surprise_card_includes_preview_blurb(pixel6_page):
+    """The random deal should show enough saved text to decide before opening."""
+    page = pixel6_page
+    item = {
+        "fullname": "reddit:ui_surprise_preview",
+        "source": "reddit",
+        "source_id": "ui_surprise_preview",
+        "kind": "post",
+        "title": "Surprise preview fixture",
+        "body": "A concise saved body that explains why this old thread might still be worth a look.",
+        "url": "https://www.reddit.com/r/test/comments/ui_surprise_preview/title/",
+        "author": "op",
+        "created_utc": 1_700_000_000,
+        "saved_utc": 1_700_000_010,
+        "first_seen_utc": 1_700_000_010,
+        "last_seen_utc": 1_700_000_010,
+        "status": "inbox",
+        "metadata": {
+            "subreddit": "test",
+            "permalink": "/r/test/comments/ui_surprise_preview/title/",
+            "thumbnail": "https://b.thumbs.redditmedia.com/selfpost.jpg",
+        },
+    }
+    page.route(
+        "**/random?n=1",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"items": [item]}),
+        ),
+    )
+
+    page.locator("#dice").click()
+    card = page.locator(".surp-card")
+    expect(card).to_be_visible()
+    expect(card.locator(".surp-preview")).to_contain_text(
+        "A concise saved body that explains why this old thread"
+    )
+    expect(card.locator(".surp-hero")).to_have_count(0)
+    expect(card.locator(".surp-acts")).to_be_visible()
 
 
 def _open_relay_menu(page, fullname: str) -> None:

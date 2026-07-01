@@ -17,8 +17,10 @@ import {
   archiveTodayConfirmText,
   setArchivePref,
   thumb,
+  mediaType,
 } from "../core/media.js";
 import { attachSwipe } from "../core/swipe.js";
+import { chIcon } from "../core/icons.js";
 import {
   wireTagExpanders,
   shareItem,
@@ -1072,23 +1074,94 @@ new IntersectionObserver(
 const gotop = $("#gotop");
 const GOTOP_AT = 700; // px scrolled before the affordance appears
 const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+const BROWSE_TOP_EPSILON = 1;
+const BROWSE_SCROLL_SETTLE_MS = 140;
+const PROGRAMMATIC_TOP_MAX_MS = 1800;
+const browseTopScroll = (() => {
+  let active = false;
+  let settleTimer = 0;
+  let hardTimer = 0;
+  const startCallbacks = new Set();
+  const endCallbacks = new Set();
+  const atTop = () => (window.scrollY || 0) <= BROWSE_TOP_EPSILON;
+  const clearSettle = () => {
+    clearTimeout(settleTimer);
+    settleTimer = 0;
+  };
+  const finish = () => {
+    if (!active) return;
+    active = false;
+    clearSettle();
+    clearTimeout(hardTimer);
+    hardTimer = 0;
+    endCallbacks.forEach((cb) => cb());
+  };
+  const finishIfTop = () => {
+    if (atTop()) finish();
+  };
+  const scheduleTopSettle = () => {
+    clearSettle();
+    settleTimer = setTimeout(finishIfTop, BROWSE_SCROLL_SETTLE_MS);
+  };
+  return {
+    get active() {
+      return active;
+    },
+    onStart(cb) {
+      startCallbacks.add(cb);
+    },
+    onEnd(cb) {
+      endCallbacks.add(cb);
+    },
+    begin() {
+      active = true;
+      clearSettle();
+      clearTimeout(hardTimer);
+      startCallbacks.forEach((cb) => cb());
+      hardTimer = setTimeout(
+        finish,
+        reducedMotion?.matches ? 300 : PROGRAMMATIC_TOP_MAX_MS,
+      );
+    },
+    noteScroll() {
+      if (!active) return;
+      if (atTop()) scheduleTopSettle();
+      else clearSettle();
+    },
+    settleIfTop() {
+      finishIfTop();
+    },
+  };
+})();
 let gotopTick = false;
 function syncGotop() {
   gotopTick = false;
-  gotop.classList.toggle("show", window.scrollY > GOTOP_AT);
+  const y = window.scrollY || 0;
+  gotop.classList.toggle(
+    "show",
+    browseTopScroll.active ? y > BROWSE_TOP_EPSILON : y > GOTOP_AT,
+  );
 }
 function scrollToBrowseTop() {
+  browseTopScroll.begin();
   window.scrollTo({
     top: 0,
     left: 0,
     behavior: reducedMotion?.matches ? "auto" : "smooth",
   });
-  if (reducedMotion?.matches) requestAnimationFrame(syncGotop);
+  if (reducedMotion?.matches) {
+    requestAnimationFrame(() => {
+      browseTopScroll.noteScroll();
+      browseTopScroll.settleIfTop();
+      syncGotop();
+    });
+  }
 }
 window.addEventListener(
   "scroll",
   () => {
     // rAF-throttled (60fps lane)
+    browseTopScroll.noteScroll();
     if (!gotopTick) {
       gotopTick = true;
       requestAnimationFrame(syncGotop);
@@ -1096,6 +1169,15 @@ window.addEventListener(
   },
   { passive: true },
 );
+if ("onscrollend" in window)
+  window.addEventListener(
+    "scrollend",
+    () => {
+      browseTopScroll.noteScroll();
+      browseTopScroll.settleIfTop();
+    },
+    { passive: true },
+  );
 gotop.addEventListener("click", scrollToBrowseTop);
 
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
@@ -1147,6 +1229,57 @@ function cardHtml(c) {
 }
 let ambientCard = null;
 let surpriseItem = null;
+const SURPRISE_PREVIEW_CHARS = 260;
+
+function surprisePreviewText(item) {
+  const m = (item && item.metadata) || {};
+  const candidates = [
+    m.summary,
+    m.description,
+    m.selftext,
+    m.text,
+    item && item.body,
+    m.ocr_text,
+  ];
+  const raw = candidates.find((v) => typeof v === "string" && v.trim());
+  if (!raw) return "";
+  return String(raw)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, " ")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function surprisePreviewHtml(item) {
+  const text = surprisePreviewText(item);
+  if (!text)
+    return (
+      '<div class="surp-preview empty" aria-label="Preview"><p>' +
+      "No saved text preview." +
+      "</p></div>"
+    );
+  const clipped =
+    text.length > SURPRISE_PREVIEW_CHARS
+      ? text.slice(0, SURPRISE_PREVIEW_CHARS - 3).trimEnd() + "..."
+      : text;
+  return (
+    '<div class="surp-preview" aria-label="Preview"><p>' +
+    esc(clipped) +
+    "</p></div>"
+  );
+}
+
 async function loadAmbient() {
   try {
     const r = await fetch("/resurface");
@@ -1214,8 +1347,10 @@ async function surprise() {
       return;
     }
     const m = it.metadata || {};
+    const mt = mediaType(it);
+    const isRedditText = it.source === "reddit" && mt.cls === "text";
     // hero: prefer the crisp card-sized thumbnail (gallery aware), fall back to any image
-    const t = thumb(it, "card") || imageUrl(it) || "";
+    const t = isRedditText ? "" : thumb(it, "card") || imageUrl(it) || "";
     const hero = t
       ? '<button type="button" class="surp-hero" data-surprise="open" aria-label="Open in reader">' +
         '<img src="' +
@@ -1224,10 +1359,14 @@ async function surprise() {
       : "";
     const src = CH_SOURCES[it.source] || {};
     const badge =
-      '<span class="surp-badge" style="--src:' +
+      '<span class="surp-badge" aria-hidden="true" style="--src:' +
       (src.token ? "var(" + src.token + ")" : "var(--accent)") +
       '">' +
       (src.glyph ? esc(src.glyph) : esc(it.source || "•")) +
+      "</span>";
+    const actionIcon = (name) =>
+      '<span class="surp-act-ico" aria-hidden="true">' +
+      (name === "snooze" ? "◷" : chIcon(name, { size: "1em" })) +
       "</span>";
     surpriseItem = it;
     ambient.innerHTML =
@@ -1237,20 +1376,29 @@ async function surprise() {
       '<button type="button" class="surp-x" data-surprise="dismiss" aria-label="Not today">✕</button>' +
       hero +
       '<div class="surp-body">' +
-      '<div class="surp-eyebrow">DEALT AT RANDOM — NO STRINGS</div>' +
+      '<div class="surp-eyebrow">Random save · no strings</div>' +
       "<h3>" +
       esc(it.title || "(untitled)") +
       "</h3>" +
       '<div class="surp-meta">' +
-      badge +
       '<span class="surp-metabits">' +
+      badge +
       metaLine(it) +
       "</span></div>" +
+      surprisePreviewHtml(it) +
       '<div class="surp-acts">' +
-      '<button type="button" class="surp-act a" data-surprise="archived">Archive</button>' +
-      '<button type="button" class="surp-act d" data-surprise="done">Done</button>' +
-      '<button type="button" class="surp-act s" data-surprise="snooze">Snooze</button>' +
-      '<button type="button" class="surp-act k" data-surprise="keep">Keep</button>' +
+      '<button type="button" class="surp-act a" data-surprise="archived">' +
+      actionIcon("archive") +
+      "<span>Archive</span></button>" +
+      '<button type="button" class="surp-act d" data-surprise="done">' +
+      actionIcon("done") +
+      "<span>Done</span></button>" +
+      '<button type="button" class="surp-act s" data-surprise="snooze">' +
+      actionIcon("snooze") +
+      "<span>Snooze</span></button>" +
+      '<button type="button" class="surp-act k" data-surprise="keep">' +
+      actionIcon("keep") +
+      "<span>Keep</span></button>" +
       '<button type="button" class="surp-act surp-open" data-surprise="open">Open reader</button>' +
       "</div></div></article>";
     ambientCard = null;
@@ -2027,64 +2175,88 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v102";
+const APP_VERSION = "v111";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
   const head = $(".console");
   if (!head) return;
-  // Collapsing/expanding the (sticky) header changes its height, so the browser's scroll-anchoring
-  // nudges scrollY to keep content stable — near a threshold that nudge re-triggered the toggle =
-  // flicker (worst near the top, where expanding GROWS the bar). Three guards: (1) a WIDE dead zone
-  // (>110 collapse / <28 expand) bigger than the bar's height change, so the nudge lands inside it;
-  // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle;
-  // (3) defer near-top expansion until scroll settles, unless we are already effectively at y=0.
+  // Relay-style chrome tracks the near-top scroll position instead of waiting for
+  // an idle timeout and then flipping open. A 0..1 collapse amount lets repeated
+  // small swipes near the top smoothly scrub the search row between expanded and
+  // compact, while the .compact class remains only the fully-collapsed semantic state.
   const COLLAPSE_AT = 110;
-  const EXPAND_AT = 28;
-  const TOP_EPSILON = 1;
-  const SCROLL_SETTLE_MS = 120;
-  let locked = false;
-  let scrollIdle = true;
-  let settleTimer = 0;
-  const set = (compact) => {
-    if (compact === head.classList.contains("compact")) return; // already in this state
+  const COMPACT_AT = 0.96;
+  const UNCOMPACT_AT = 0.82;
+  const SMOOTHING = 0.38;
+  const OPEN_LOCK_AT = 0.25;
+  const OPEN_LOCK_RELEASE_AT = 0.9;
+  let targetCollapse = 0;
+  let currentCollapse = 0;
+  let openingTarget = null;
+  let headerFrame = 0;
+  let compact = false;
+  const pageScrollLocked = () => document.body.style.position === "fixed";
+  const clamp01 = (n) => Math.max(0, Math.min(1, n));
+  const collapseForScroll = () => clamp01((window.scrollY || 0) / COLLAPSE_AT);
+  function writeHeaderCollapse(amount) {
+    const collapse = clamp01(amount);
+    const open = 1 - collapse;
+    head.style.setProperty("--console-collapse", collapse.toFixed(3));
+    head.style.setProperty("--console-open", open.toFixed(3));
+    if (!compact && collapse >= COMPACT_AT) compact = true;
+    else if (compact && collapse <= UNCOMPACT_AT) compact = false;
     head.classList.toggle("compact", compact);
-    locked = true;
-    setTimeout(() => {
-      locked = false;
-      onScroll();
-    }, 320); // > the collapse transition
+  }
+  function animateHeaderCollapse() {
+    if (pageScrollLocked()) {
+      headerFrame = 0;
+      return;
+    }
+    const diff = targetCollapse - currentCollapse;
+    if (reducedMotion?.matches || Math.abs(diff) < 0.003) {
+      currentCollapse = targetCollapse;
+      writeHeaderCollapse(currentCollapse);
+      openingTarget = null;
+      headerFrame = 0;
+      return;
+    }
+    currentCollapse += diff * SMOOTHING;
+    writeHeaderCollapse(currentCollapse);
+    headerFrame = requestAnimationFrame(animateHeaderCollapse);
+  }
+  const scheduleHeaderCollapse = (amount = collapseForScroll()) => {
+    if (pageScrollLocked()) return;
+    const measured = clamp01(amount);
+    if (openingTarget != null) {
+      if (measured > OPEN_LOCK_RELEASE_AT) openingTarget = null;
+      else targetCollapse = openingTarget;
+    }
+    if (openingTarget == null) {
+      if (measured < OPEN_LOCK_AT && currentCollapse > measured)
+        openingTarget = measured;
+      targetCollapse = openingTarget ?? measured;
+    }
+    if (!headerFrame)
+      headerFrame = requestAnimationFrame(animateHeaderCollapse);
   };
-  function onScroll() {
-    if (locked) return;
-    const y = window.scrollY || 0;
-    if (y > COLLAPSE_AT)
-      set(true); // scrolled well down → shrink
-    else if (y <= TOP_EPSILON)
-      set(false); // true top → expand immediately
-    else if (y < EXPAND_AT && scrollIdle) set(false); // near top → expand after momentum settles
-    // 28..110 = wide dead zone: keep the current state
-  }
-  function markScrollActive() {
-    scrollIdle = false;
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(markScrollIdle, SCROLL_SETTLE_MS);
-  }
-  function markScrollIdle() {
-    clearTimeout(settleTimer);
-    scrollIdle = true;
-    onScroll();
-  }
-  window.addEventListener(
-    "scroll",
-    () => {
-      markScrollActive();
-      onScroll();
-    },
-    { passive: true },
-  );
+  browseTopScroll.onStart(() => {
+    openingTarget = null;
+    targetCollapse = 0;
+    currentCollapse = 0;
+    writeHeaderCollapse(0);
+  });
+  browseTopScroll.onEnd(() => scheduleHeaderCollapse());
+  window.addEventListener("scroll", () => scheduleHeaderCollapse(), {
+    passive: true,
+  });
   if ("onscrollend" in window)
-    window.addEventListener("scrollend", markScrollIdle, { passive: true });
+    window.addEventListener("scrollend", () => scheduleHeaderCollapse(), {
+      passive: true,
+    });
+  targetCollapse = collapseForScroll();
+  currentCollapse = targetCollapse;
+  writeHeaderCollapse(currentCollapse);
 })();
 
 /* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
@@ -2896,7 +3068,27 @@ async function openDeepLinkedReader() {
   if (!fn) return;
   try {
     const item = await api.fetchItem(fn);
-    readerUI.open(item, { from: qs.get("from") === "triage" ? "triage" : "" });
+    const fromTriage = qs.get("from") === "triage";
+    let triageEnter = false;
+    if (fromTriage) {
+      try {
+        triageEnter =
+          qs.get("enter") === "up" ||
+          sessionStorage.getItem("ch_triage_reader_enter") === fn;
+        sessionStorage.removeItem("ch_triage_reader_enter");
+      } catch (e) {
+        triageEnter = qs.get("enter") === "up";
+      }
+      if (qs.get("enter")) {
+        qs.delete("enter");
+        history.replaceState(
+          history.state,
+          "",
+          location.pathname + "?" + qs.toString() + location.hash,
+        );
+      }
+    }
+    readerUI.open(item, { from: fromTriage ? "triage" : "", triageEnter });
   } catch (e) {
     toast("Couldn't open that item.");
   }
