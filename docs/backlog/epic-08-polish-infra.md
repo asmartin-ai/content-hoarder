@@ -12,6 +12,16 @@
   `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.
 - [ ] **P3 — 60fps UI.** Audit list/scroll/swipe for jank (avoid layout thrash, prefer transforms /
   `will-change`, throttle handlers); target smooth 60fps on the Pixel-6 target.
+- [ ] **P3 — CSS platform feature audit.** Review the UI code for places where newer CSS can simplify
+  bespoke layout/animation/theme logic, but only adopt features after checking browser support for the
+  Pixel-6/PWA target and adding regressions where behavior changes. Candidates:
+  - `align-content` for block-axis centering without forcing flex/grid wrappers.
+  - `@property` typed custom properties for safer/smoother animated CSS variables.
+  - `@starting-style` for first-render transitions on popovers/dialogs currently hidden with `display:none`.
+  - CSS math functions (`round()`, `rem()`, `mod()`) where JS or duplicated calc logic can be removed.
+  - `light-dark()` for adjacent light/dark token definitions where it does not fight explicit app themes.
+  - `:user-valid` / `:user-invalid` for form validation states that should wait until user interaction.
+  - `interpolate-size` for intrinsic-size dropdown/tag/filter transitions that currently need max-height hacks.
 - [x] ~~**P3 — README mobile quickstart.**~~ Shipped (overnight 2026-06-10): step-by-step
   Tailscale quickstart in README "Mobile access"; CLI table updated with decay / delete /
   export / learn-triage.
