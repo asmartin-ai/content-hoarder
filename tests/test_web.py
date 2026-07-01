@@ -200,6 +200,127 @@ def test_random(tmp_db):
     assert len(_client(tmp_db).get("/random?n=10").get_json()["items"]) == 2
 
 
+def _random_filter_client(dbp):
+    conn = db.connect(dbp)
+    rows = [
+        models.new_item(
+            source="reddit",
+            source_id="rf_code",
+            kind="post",
+            title="Reddit coding watch",
+            now=1000,
+            metadata={"category": "watch", "tags": ["coding"]},
+        ),
+        models.new_item(
+            source="reddit",
+            source_id="rf_memes",
+            kind="post",
+            title="Reddit memes",
+            now=2000,
+            metadata={"tags": ["memes"]},
+        ),
+        models.new_item(
+            source="youtube",
+            source_id="rf_listen",
+            kind="video",
+            title="YouTube listenable coding",
+            now=3000,
+            metadata={"category": "listenable", "tags": ["coding"]},
+        ),
+        models.new_item(
+            source="youtube",
+            source_id="rf_keep",
+            kind="video",
+            title="YouTube kept memes",
+            now=4000,
+            metadata={"category": "watch", "tags": ["memes"]},
+        ),
+        models.new_item(
+            source="hackernews",
+            source_id="rf_ai",
+            kind="story",
+            title="HN AI",
+            now=5000,
+            metadata={"tags": ["ai_ml"]},
+        ),
+    ]
+    for row in rows:
+        db.merge_upsert(conn, row)
+    conn.execute(
+        "UPDATE items SET status='keep', processed_utc=4100, status_prev='inbox' "
+        "WHERE fullname='youtube:rf_keep'"
+    )
+    conn.commit()
+    conn.close()
+    return create_app(dbp).test_client()
+
+
+def _random_ids(response):
+    return {i["fullname"] for i in response.get_json()["items"]}
+
+
+def test_random_source_filter(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert _random_ids(cl.get("/random?n=20&source=reddit")) == {
+        "reddit:rf_code",
+        "reddit:rf_memes",
+    }
+
+
+def test_random_category_filter(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert _random_ids(cl.get("/random?n=20&category=watch")) == {"reddit:rf_code"}
+
+
+def test_random_repeated_tag_filter_is_or(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert _random_ids(cl.get("/random?n=20&tag=coding&tag=ai_ml")) == {
+        "reddit:rf_code",
+        "youtube:rf_listen",
+        "hackernews:rf_ai",
+    }
+
+
+def test_random_combined_filters(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert _random_ids(
+        cl.get("/random?n=20&source=youtube&category=listenable&tag=coding")
+    ) == {"youtube:rf_listen"}
+
+
+def test_random_unprocessed_prevents_non_inbox_leakage(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert _random_ids(cl.get("/random?n=20&tag=memes&unprocessed=1")) == {
+        "reddit:rf_memes"
+    }
+
+
+def test_random_recent_mode_orders_by_first_seen(tmp_db):
+    cl = _random_filter_client(tmp_db)
+    assert [
+        i["fullname"] for i in cl.get("/random?n=2&mode=recent").get_json()["items"]
+    ] == ["hackernews:rf_ai", "youtube:rf_listen"]
+
+
+def test_random_modes_default_unknown_to_smart(tmp_db, monkeypatch):
+    seen = []
+
+    def fake_batch(conn, n, **kwargs):
+        seen.append(kwargs["mode"])
+        return []
+
+    monkeypatch.setattr(db, "get_random_batch", fake_batch)
+    cl = create_app(tmp_db).test_client()
+
+    cl.get("/random")
+    cl.get("/random?mode=smart")
+    cl.get("/random?mode=recent")
+    cl.get("/random?mode=random")
+    cl.get("/random?mode=wat")
+
+    assert seen == ["smart", "smart", "recent", "random", "smart"]
+
+
 def test_invalid_status(tmp_db):
     assert _client(tmp_db).post("/items/reddit:t3_a/status", json={"status": "bogus"}).status_code == 400
 

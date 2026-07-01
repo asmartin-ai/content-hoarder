@@ -17,16 +17,48 @@
     <a class="btn ghost" href="/reddit">Reddit</a>
     <span id="progress" class="progress"></span>
     <div class="bar-right">
-      <button type="button" class="icon-btn theme-toggle" data-theme-toggle
-              aria-label="Switch to light theme" title="Switch to light theme">&#9790;</button>
       <button id="undo-btn" class="btn ghost" type="button" disabled>&#8630;&nbsp;Undo</button>
-      <select id="source-filter" class="src-filter" title="Limit to source">
-        <option value="">all sources</option>
-      </select>
+      <div class="filter-menu">
+        <button id="filter-btn" class="btn ghost triage-filter-btn" type="button"
+                aria-haspopup="true" aria-expanded="false">
+          Filters <span id="filter-count" class="filter-count" hidden></span>
+        </button>
+        <div id="filter-pop" class="filter-pop" hidden>
+          <label class="filter-field">
+            <span class="filter-label">Source</span>
+            <select id="source-filter" class="src-filter" title="Limit to source">
+              <option value="">all sources</option>
+            </select>
+          </label>
+          <div class="filter-field">
+            <span class="filter-label">Mode</span>
+            <div id="mode-filter" class="seg-control" role="group" aria-label="Batch mode">
+              <button type="button" data-mode="smart">Smart</button>
+              <button type="button" data-mode="recent">Newest</button>
+              <button type="button" data-mode="random">Random</button>
+            </div>
+          </div>
+          <div class="filter-field">
+            <span class="filter-label">Category</span>
+            <div id="category-filters" class="chip-row filter-chips"></div>
+          </div>
+          <div class="filter-field">
+            <span class="filter-label">Tags</span>
+            <div id="tag-filters" class="chip-row filter-chips"></div>
+          </div>
+          <div class="filter-pop-foot">
+            <div id="filter-active-pop" class="filter-active-pop"></div>
+            <button id="filter-clear-pop" class="btn ghost" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
       <div class="menu">
         <button id="menu-btn" class="icon-btn" type="button" aria-label="Settings"
                 aria-haspopup="true" aria-expanded="false">&#8943;</button>
         <div id="menu-pop" class="menu-pop" hidden role="menu">
+          <button type="button" class="menu-row theme-toggle" data-theme-toggle>
+            <span aria-hidden="true">&#9790;</span><span>Theme</span>
+          </button>
           <span class="menu-label">Items per batch</span>
           <div class="chip-row" id="batch-chips">
             <button class="chip" data-batch="10" type="button">10</button>
@@ -46,6 +78,7 @@
   </header>
 
   <main id="triage-main" class="triage-main">
+    <div id="filter-active" class="triage-active-filters" hidden></div>
     <div id="card-stack" class="card-stack"><!-- current card injected here --></div>
     <div id="triage-empty" class="triage-empty" hidden>
       <div class="triage-empty-icon" aria-hidden="true">&#10003;</div>
