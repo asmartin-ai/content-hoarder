@@ -103,7 +103,11 @@ def _seed_ui_db(db_path: str) -> None:
                 url="https://www.reddit.com/r/test/comments/ui_seed/ui_seed/",
                 created_utc=now - 100,
                 now=now - 100,
-                metadata={"subreddit": "test", "permalink": "/r/test/comments/ui_seed/ui_seed/"},
+                metadata={
+                    "subreddit": "test",
+                    "permalink": "/r/test/comments/ui_seed/ui_seed/",
+                    "tags": ["coding"],
+                },
             ),
             models.new_item(
                 source="reddit",
@@ -153,6 +157,8 @@ def _seed_ui_db(db_path: str) -> None:
                     "availability": "public",
                     "view_count": 12345,
                     "yt_categories": ["Education", "Technology"],
+                    "category": "listenable",
+                    "tags": ["listenable", "coding"],
                     "description": "Stored local description for the reader.",
                     "thumbnail": "https://i.ytimg.com/vi/ReaderVid01/hqdefault.jpg",
                     "companions": [
