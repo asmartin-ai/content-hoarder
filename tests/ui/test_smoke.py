@@ -137,6 +137,10 @@ def test_gotop_scrolls_to_top_and_expands_topbar(pixel6_page):
     page.wait_for_function("Math.round(window.scrollY) === 0")
     expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
     expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))
+    page.wait_for_timeout(450)
+    assert round(page.evaluate("window.scrollY")) == 0
+    expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
+    expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))
     toggles = page.evaluate("window.__t")
     assert toggles <= 4, f"↑ caused top-bar flicker: {toggles} class mutations"
 
@@ -152,6 +156,10 @@ def test_gotop_respects_reduced_motion(pixel6_page):
 
     page.locator("#gotop").click()
     page.evaluate("() => new Promise(requestAnimationFrame)")
+    assert round(page.evaluate("window.scrollY")) == 0
+    expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
+    expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))
+    page.wait_for_timeout(220)
     assert round(page.evaluate("window.scrollY")) == 0
     expect(page.locator(".console")).not_to_have_class(re.compile("(^| )compact( |$)"))
     expect(page.locator("#gotop")).not_to_have_class(re.compile("(^| )show( |$)"))

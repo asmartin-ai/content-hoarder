@@ -14,6 +14,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 - Reworked the triage deck controls around the pinboard-style card shell, clearer edge hints, reader handoff affordances, and settings-menu theme controls.
 - Hardened archive.today media recovery so media-only retries can skip metadata archive providers, and broadened the PWA shell cache for `/reddit`, triage tokens, reddit assets, and HLS playback.
 
+### Fixed
+
+- Stabilized the mobile browse floating up-button path so programmatic scroll-to-top expands the compact header immediately, keeps it expanded while scroll momentum settles, hides the up button at the top, and respects reduced-motion preferences.
+
 ## 1.0.0 - 2026-06-29
 
 ### Release posture
