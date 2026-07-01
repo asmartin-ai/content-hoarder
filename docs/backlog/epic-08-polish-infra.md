@@ -46,3 +46,9 @@
   before trusting it broadly; and 5.2 launched with thin official benchmark tables, so trust our own bakeoff
   results over the marketing. Good first real targets: the screenshot-driven items (Epic 15 inline-media,
   the mobile-nav redesign). Relates to Epic 23 (design-language) + the `frontend-design` skill.
+### 2026-06-30 PWA shell hardening
+
+Service worker cache `ch-shell-v104` includes the `/reddit` navigation shell, legacy triage
+`/static/tokens.css`, reddit assets, and `vendor/hls.min.js` for archived/v.redd.it playback paths.
+Same-origin page fallback now uses `request.mode === "navigate"` while POST and data/API requests stay
+network-only.

@@ -2,8 +2,18 @@
    All wrappers reject on !r.ok (reddit.js's raw fetch().json() chains lacked this).
    UI reactions (toasts, count bumps, reloads) stay page-side. */
 
+const rejectResponse = (r) =>
+  r
+    .clone()
+    .json()
+    .catch(() => null)
+    .then((data) => {
+      r.data = data;
+      throw r;
+    });
+
 export const getJSON = (url, opts) =>
-  fetch(url, opts).then((r) => (r.ok ? r.json() : Promise.reject(r)));
+  fetch(url, opts).then((r) => (r.ok ? r.json() : rejectResponse(r)));
 
 export const postJSON = (url, body) =>
   getJSON(url, body === undefined
@@ -31,6 +41,7 @@ export const recoverItem = (fullname, body) =>
 
 export const recoverArchiveToday = (fullname, mode = "apply") =>
   recoverItem(fullname, {
+    metadata: false,
     archive_today: mode,
     confirm_external_archive_today: true,
   });
