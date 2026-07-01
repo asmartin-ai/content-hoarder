@@ -352,13 +352,19 @@ def create_app(db_path: str | None = None) -> Flask:
     def random_batch():
         a = request.args
         n = min(max(_int(a.get("n"), 20), 1), 100)
+        mode = (a.get("mode") or "smart").strip().lower()
+        if mode not in {"smart", "recent", "random"}:
+            mode = "smart"
+        tags = [t.strip().lower() for t in a.getlist("tag") if t.strip()]
         with conn() as c:
             rows = db.get_random_batch(
                 c,
                 n,
                 source=a.get("source") or None,
+                category=(a.get("category") or "").strip().lower() or None,
+                tags=tags or None,
                 unprocessed=a.get("unprocessed", "1") != "0",
-                mode=a.get("mode") or "random",
+                mode=mode,
             )
         return jsonify({"items": rows})
 

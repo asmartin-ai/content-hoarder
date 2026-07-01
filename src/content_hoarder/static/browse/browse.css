@@ -3362,7 +3362,7 @@ html.reader-lock {
         visibility 0s var(--dur-slow);
     will-change: transform;
 }
-.reader.from-triage {
+.reader.triage-enter {
     transform: translateY(100%);
 }
 .reader.show {
