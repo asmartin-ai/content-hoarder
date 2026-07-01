@@ -85,3 +85,9 @@
   building a provider. High upside for memes / popular images; nil for one-off personal uploads. Relates to
   Epic 4 (recovery) + Epic 6 (dedup already hashes). Refs:
   [RedditRepostSleuth (GitHub)](https://github.com/barrycarey/RedditRepostSleuth).
+### 2026-06-30 archive.today route hardening
+
+Archive.today media recovery can now run as a media-only path from the UI by sending
+`metadata:false` with `archive_today:"apply"`. That keeps explicit archive.today retries from also
+contacting PullPush/Arctic metadata providers, while preserving the existing confirmation gate and
+local eligibility reasons for non-eligible items.

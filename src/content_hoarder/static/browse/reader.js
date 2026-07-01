@@ -1158,7 +1158,10 @@ export function initReader({
             : null;
     const created = (post && post.created_utc) || item.created_utc || 0;
     const body = (post && (post.selftext || post.text)) || item.body || "";
-    let h = '<h1 class="rd-ttl">' + esc(item.title || "(untitled)") + "</h1>";
+    let h =
+      '<h1 class="rd-ttl">' +
+      esc((post && post.title) || item.title || "(untitled)") +
+      "</h1>";
     h += '<div class="rd-by">';
     if (author) h += sm.author(author);
     if (scoreRaw != null)
@@ -1381,7 +1384,7 @@ export function initReader({
     // Register with the shared overlay coordinator: OS-back closes the reader (or, if a lightbox is
     // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
     pushOverlay(() => closeReader(true));
-    if (it.source === "reddit") load();
+    if (sm.threadPath) load();
     else if (isNoteVideoMode(currentBody(null)))
       renderNoteBodyRegion(currentBody(null), null);
     else cmtsEl.innerHTML = "";
