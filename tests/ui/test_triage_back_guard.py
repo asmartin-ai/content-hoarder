@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -223,5 +224,62 @@ def test_triage_swipe_up_reader_entry_keeps_back_guard(browser, app_base_url):
 
         page.go_back(wait_until="domcontentloaded")
         _expect_triage(page, app_base_url)
+    finally:
+        ctx.close()
+
+
+def test_triage_pinboard_v2_keeps_plain_shell(browser, app_base_url):
+    item = {
+        "fullname": "reddit:ui_triage_pin_v2",
+        "source": "reddit",
+        "source_id": "ui_triage_pin_v2",
+        "kind": "post",
+        "title": "Triage pinboard v2 fixture",
+        "body": "This self post should render in the calmer v2 pinboard shell.",
+        "url": "https://www.reddit.com/r/test/comments/ui_triage_pin_v2/title/",
+        "author": "op",
+        "created_utc": 1700000000,
+        "saved_utc": 1700000010,
+        "first_seen_utc": 1700000010,
+        "last_seen_utc": 1700000010,
+        "status": "inbox",
+        "metadata": {
+            "subreddit": "test",
+            "tags": [
+                "music",
+                "video",
+                "analysis",
+                "comedy",
+                "live",
+                "longform",
+                "watch-later",
+                "collab",
+            ],
+        },
+    }
+    ctx, page = _new_pixel6_page(browser)
+    try:
+        page.add_init_script(_clear_triage_state_script())
+        page.route(
+            "**/random?*",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"items": [item]}),
+            ),
+        )
+        page.goto(f"{app_base_url}/triage", wait_until="networkidle")
+
+        card = page.locator(".tcard.tcard-pinboard-v2")
+        expect(card).to_be_visible()
+        expect(card.locator(".edge-hint, .tcard-edge-hints")).to_have_count(0)
+        expect(card.locator(".tcard-snippet")).to_contain_text("calmer v2 pinboard")
+        expect(card.locator(".tcard-media")).to_have_count(0)
+        expect(card.locator(".tag-extra").first).to_be_hidden()
+        more = card.locator(".tag-more")
+        expect(more).to_have_text("… +3")
+        more.click()
+        expect(card.locator(".tag-extra").first).to_be_visible()
+        expect(more).to_have_text("show fewer")
     finally:
         ctx.close()
