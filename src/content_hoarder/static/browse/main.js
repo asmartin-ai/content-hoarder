@@ -1073,23 +1073,94 @@ new IntersectionObserver(
 const gotop = $("#gotop");
 const GOTOP_AT = 700; // px scrolled before the affordance appears
 const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+const BROWSE_TOP_EPSILON = 1;
+const BROWSE_SCROLL_SETTLE_MS = 140;
+const PROGRAMMATIC_TOP_MAX_MS = 1800;
+const browseTopScroll = (() => {
+  let active = false;
+  let settleTimer = 0;
+  let hardTimer = 0;
+  const startCallbacks = new Set();
+  const endCallbacks = new Set();
+  const atTop = () => (window.scrollY || 0) <= BROWSE_TOP_EPSILON;
+  const clearSettle = () => {
+    clearTimeout(settleTimer);
+    settleTimer = 0;
+  };
+  const finish = () => {
+    if (!active) return;
+    active = false;
+    clearSettle();
+    clearTimeout(hardTimer);
+    hardTimer = 0;
+    endCallbacks.forEach((cb) => cb());
+  };
+  const finishIfTop = () => {
+    if (atTop()) finish();
+  };
+  const scheduleTopSettle = () => {
+    clearSettle();
+    settleTimer = setTimeout(finishIfTop, BROWSE_SCROLL_SETTLE_MS);
+  };
+  return {
+    get active() {
+      return active;
+    },
+    onStart(cb) {
+      startCallbacks.add(cb);
+    },
+    onEnd(cb) {
+      endCallbacks.add(cb);
+    },
+    begin() {
+      active = true;
+      clearSettle();
+      clearTimeout(hardTimer);
+      startCallbacks.forEach((cb) => cb());
+      hardTimer = setTimeout(
+        finish,
+        reducedMotion?.matches ? 300 : PROGRAMMATIC_TOP_MAX_MS,
+      );
+    },
+    noteScroll() {
+      if (!active) return;
+      if (atTop()) scheduleTopSettle();
+      else clearSettle();
+    },
+    settleIfTop() {
+      finishIfTop();
+    },
+  };
+})();
 let gotopTick = false;
 function syncGotop() {
   gotopTick = false;
-  gotop.classList.toggle("show", window.scrollY > GOTOP_AT);
+  const y = window.scrollY || 0;
+  gotop.classList.toggle(
+    "show",
+    browseTopScroll.active ? y > BROWSE_TOP_EPSILON : y > GOTOP_AT,
+  );
 }
 function scrollToBrowseTop() {
+  browseTopScroll.begin();
   window.scrollTo({
     top: 0,
     left: 0,
     behavior: reducedMotion?.matches ? "auto" : "smooth",
   });
-  if (reducedMotion?.matches) requestAnimationFrame(syncGotop);
+  if (reducedMotion?.matches) {
+    requestAnimationFrame(() => {
+      browseTopScroll.noteScroll();
+      browseTopScroll.settleIfTop();
+      syncGotop();
+    });
+  }
 }
 window.addEventListener(
   "scroll",
   () => {
     // rAF-throttled (60fps lane)
+    browseTopScroll.noteScroll();
     if (!gotopTick) {
       gotopTick = true;
       requestAnimationFrame(syncGotop);
@@ -1097,6 +1168,15 @@ window.addEventListener(
   },
   { passive: true },
 );
+if ("onscrollend" in window)
+  window.addEventListener(
+    "scrollend",
+    () => {
+      browseTopScroll.noteScroll();
+      browseTopScroll.settleIfTop();
+    },
+    { passive: true },
+  );
 gotop.addEventListener("click", scrollToBrowseTop);
 
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
@@ -2094,30 +2174,44 @@ const APP_VERSION = "v103";
   // (>110 collapse / <28 expand) bigger than the bar's height change, so the nudge lands inside it;
   // (2) a short LOCK after each toggle that ignores scroll while the reflow + .22s transition settle;
   // (3) defer near-top expansion until scroll settles, unless we are already effectively at y=0.
+  // Once near-top expansion happens, keep it expanded through scroll-anchoring's final nudge.
   const COLLAPSE_AT = 110;
+  const COLLAPSE_AFTER_TOP_AT = 260;
   const EXPAND_AT = 28;
-  const TOP_EPSILON = 1;
   const SCROLL_SETTLE_MS = 120;
   let locked = false;
   let scrollIdle = true;
   let settleTimer = 0;
+  let expandedNearTop = false;
   const set = (compact) => {
     if (compact === head.classList.contains("compact")) return; // already in this state
     head.classList.toggle("compact", compact);
+    if (compact) expandedNearTop = false;
     locked = true;
     setTimeout(() => {
       locked = false;
       onScroll();
     }, 320); // > the collapse transition
   };
+  const expandNearTop = () => {
+    expandedNearTop = true;
+    set(false);
+  };
+  browseTopScroll.onStart(expandNearTop);
+  browseTopScroll.onEnd(onScroll);
   function onScroll() {
-    if (locked) return;
     const y = window.scrollY || 0;
-    if (y > COLLAPSE_AT)
+    if (browseTopScroll.active) {
+      if (y <= BROWSE_TOP_EPSILON) expandNearTop();
+      return;
+    }
+    if (locked) return;
+    if (y > COLLAPSE_AT) {
+      if (expandedNearTop && y < COLLAPSE_AFTER_TOP_AT) return;
       set(true); // scrolled well down → shrink
-    else if (y <= TOP_EPSILON)
-      set(false); // true top → expand immediately
-    else if (y < EXPAND_AT && scrollIdle) set(false); // near top → expand after momentum settles
+    } else if (y <= BROWSE_TOP_EPSILON)
+      expandNearTop(); // true top → expand immediately
+    else if (y < EXPAND_AT && scrollIdle) expandNearTop(); // near top → expand after momentum settles
     // 28..110 = wide dead zone: keep the current state
   }
   function markScrollActive() {
