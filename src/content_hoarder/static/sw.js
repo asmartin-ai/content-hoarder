@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v111"; // v111: damped moving mobile header chrome
+const CACHE = "ch-shell-v112"; // v112: precache core/markdown.js, add static+nav fetch fallbacks
 const SHELL = [
   "/",
   "/triage",
@@ -21,6 +21,7 @@ const SHELL = [
   "/static/core/icons.js",
   "/static/core/tags.js",
   "/static/core/overlaynav.js",
+  "/static/core/markdown.js", // reader dependency (browse/reader.js:20) — was missing, broke offline reader
   "/static/browse/browse.css",
   "/static/browse/main.js",
   "/static/browse/render.js",
@@ -79,13 +80,17 @@ self.addEventListener("fetch", (e) => {
       caches.match(req).then(
         (cached) =>
           cached ||
-          fetch(req).then((res) => {
-            if (res && res.ok) {
-              const copy = res.clone();
-              caches.open(CACHE).then((c) => c.put(req, copy));
-            }
-            return res;
-          }),
+          fetch(req)
+            .then((res) => {
+              if (res && res.ok) {
+                const copy = res.clone();
+                caches.open(CACHE).then((c) => c.put(req, copy));
+              }
+              return res;
+            })
+            // Uncached + offline: reject → raw browser error. Return 504 so the
+            // caller sees a controlled failure instead of an unhandled rejection.
+            .catch(() => new Response("", { status: 504, statusText: "Gateway Offline" })),
       ),
     );
     return;
@@ -99,7 +104,9 @@ self.addEventListener("fetch", (e) => {
           caches.open(CACHE).then((c) => c.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req)),
+        // Cache miss + offline: fall back to the cached app shell so the user
+        // sees the PWA instead of the browser's raw network-error page.
+        .catch(() => caches.match(req).then((m) => m || caches.match("/"))),
     );
     return;
   }
