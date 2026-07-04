@@ -7,6 +7,8 @@ No third-party dependency (no python-dotenv). The shell environment always wins;
 from __future__ import annotations
 
 import os
+import sys
+import warnings
 from pathlib import Path
 
 _DEFAULTS = {
@@ -81,3 +83,43 @@ def port() -> int:
         return int(get("CONTENT_HOARDER_PORT"))
     except (TypeError, ValueError):
         return 8788
+
+
+# Security-relevant vars that are dangerous to leave at their built-in default.
+# Each entry: (env_var, default_value_that_is_insecure, why_message).
+# Audit Low 2026-07-02 (Pass 5): config fell back silently to insecure defaults;
+# boot-time warning preserves the zero-config LAN posture while closing the trap
+# if the app is ever exposed beyond Tailscale or gains Flask sessions.
+_INSECURE_DEFAULTS: tuple[tuple[str, str, str], ...] = (
+    (
+        "FLASK_SECRET_KEY",
+        "dev-insecure-change-me",
+        "FLASK_SECRET_KEY is at its insecure built-in default. Sessions (if/when "
+        "introduced) would be forgeable. Set a random value in .env before exposing "
+        "the app beyond Tailscale or adding Flask session use.",
+    ),
+)
+
+
+def validate(*, stream=None, warn: bool = True) -> list[str]:
+    """Warn on stderr when security-relevant env vars sit at insecure defaults.
+
+    Returns the list of warning messages (empty when clean). Never raises, never
+    blocks startup — the deliberate posture is fail-late/zero-config for the LAN
+    single-user case (see AGENTS.md). ``stream`` defaults to ``sys.stderr``;
+    pass a custom stream in tests. ``warn=False`` silences the stderr write but
+    still returns the messages so callers can surface them differently.
+    """
+    messages: list[str] = []
+    for env_var, bad_default, why in _INSECURE_DEFAULTS:
+        if get(env_var) == bad_default:
+            messages.append(why)
+    if messages and warn:
+        out = stream or sys.stderr
+        for m in messages:
+            try:
+                print(f"warning: {m}", file=out)
+            except Exception:
+                # stderr write must never kill startup; fall back to warnings.warn.
+                warnings.warn(m)
+    return messages
