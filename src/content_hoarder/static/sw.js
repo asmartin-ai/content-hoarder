@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v114"; // v114: reddit unsave in v3 row menu + bulk tray
+const CACHE = "ch-shell-v115"; // v115: deck mode (?deck=1) — one-card triage surface
 const SHELL = [
   "/",
   "/triage",
@@ -24,6 +24,7 @@ const SHELL = [
   "/static/core/markdown.js", // reader dependency (browse/reader.js:20) — was missing, broke offline reader
   "/static/browse/browse.css",
   "/static/browse/main.js",
+  "/static/browse/deck.js",
   "/static/browse/render.js",
   "/static/browse/reader.js",
   "/static/browse/tagedit.js",
