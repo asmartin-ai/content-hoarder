@@ -17,9 +17,17 @@ def _shell_urls() -> list[str]:
 
 def test_service_worker_shell_urls_are_local_and_served(tmp_db):
     urls = _shell_urls()
-    assert "/static/tokens.css" in urls
+    assert "/static/core/tokens.css" in urls
     assert "/static/vendor/hls.min.js" in urls
-    assert "/reddit" in urls
+    # P3.5: /triage + /reddit page routes retired — only "/" is in the shell now
+    assert "/" in urls
+    assert "/triage" not in urls and "/reddit" not in urls
+    # legacy v2 assets pruned in P3.5
+    for gone in ("/static/tokens.css", "/static/app.css",
+                 "/static/triage.js", "/static/reddit.js", "/static/reddit.css"):
+        assert gone not in urls, gone
+    # haptics.js is kept — deck mode uses it
+    assert "/static/haptics.js" in urls
     assert not any(u.startswith(("/items", "/stats", "/media")) for u in urls)
 
     client = create_app(tmp_db).test_client()
