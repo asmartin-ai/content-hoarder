@@ -4380,3 +4380,132 @@ a.rd-au:hover {
         max-width: 1500px;
     }
 }
+
+/* ---- Deck mode (?deck=1) ----
+   One card at a time, /random-driven. The host sits beside #items; main.js
+   toggles itemsEl.hidden + deckHost.hidden so only one is visible at a time. */
+.deck-host {
+    padding: var(--sp-3);
+    max-width: 720px;
+    margin: 0 auto;
+}
+.deck-host[hidden] { display: none; }
+
+.deck-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+    flex-wrap: wrap;
+}
+.deck-back {
+    background: transparent;
+    border: 1px solid var(--line, #ccc);
+    border-radius: 999px;
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    color: var(--ink, inherit);
+}
+.deck-back:hover { background: var(--hover, rgba(0,0,0,0.05)); }
+.deck-seg {
+    display: inline-flex;
+    border: 1px solid var(--line, #ccc);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.deck-seg button {
+    background: transparent;
+    border: none;
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    color: var(--ink, inherit);
+    font-size: 0.85rem;
+}
+.deck-seg button[aria-pressed="true"] {
+    background: var(--accent, #333);
+    color: var(--on-accent, #fff);
+}
+
+.deck-stage {
+    display: flex;
+    justify-content: center;
+}
+.deck-card {
+    width: 100%;
+    background: var(--surface, #fff);
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: 14px;
+    padding: var(--sp-4);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    transition: transform 160ms ease, opacity 160ms ease;
+    will-change: transform, opacity;
+    touch-action: pan-y;
+}
+.deck-card.leaving {
+    opacity: 0;
+}
+.deck-card.lv-archived { transform: translateX(140%); }
+.deck-card.lv-done { transform: translateX(-140%); }
+.deck-card.lv-keep { transform: translateY(-30%) scale(0.95); }
+.deck-card.lv-inbox { transform: translateY(30%) scale(0.95); }
+
+.deck-src {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--mute, #777);
+    font-size: 0.85rem;
+    margin-bottom: var(--sp-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.deck-glyph {
+    display: inline-block;
+    width: 1.4em;
+    text-align: center;
+}
+.deck-sub {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--mute, #777);
+}
+.deck-title {
+    margin: 0 0 var(--sp-2);
+    font-size: 1.4rem;
+    line-height: 1.25;
+}
+.deck-meta {
+    color: var(--mute, #777);
+    font-size: 0.9rem;
+    margin-bottom: var(--sp-3);
+}
+.deck-body {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink, #222);
+    max-height: 40vh;
+    overflow: hidden;
+    margin-bottom: var(--sp-3);
+}
+.deck-hint {
+    color: var(--mute, #999);
+    font-size: 0.8rem;
+    text-align: center;
+    border-top: 1px dashed var(--line, #eee);
+    padding-top: var(--sp-2);
+}
+.deck-empty {
+    text-align: center;
+    padding: var(--sp-5);
+    color: var(--mute, #777);
+}
+.deck-draw {
+    margin-top: var(--sp-3);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--accent, #333);
+    color: var(--on-accent, #fff);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 1rem;
+}
