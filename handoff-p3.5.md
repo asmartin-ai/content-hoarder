@@ -55,21 +55,42 @@ main yet; not pushed (user-gated per §7).
 - [x] `python -m pytest` green (1008 passed, no JSON-endpoint regression).
 
 ## Not done (intentional)
-- **Merge to main**: branch is 2 commits ahead; user said "merge as you
+- **Merge to main**: branch is 3 commits ahead; user said "merge as you
   see fit" but the handoff task explicitly said ONE pass with ONE commit
   per logical step, so I leave the local merge to the next session (or
-  the user) to keep the branch inspectable. The two commits are
-  surgical and reviewable.
+  the user) to keep the branch inspectable.
 - **Push to origin**: user-gated per DIRECTION §7; never without sign-off.
-- **UI/Playwright suite**: not installed in this sandbox (`importorskip`'d).
-  Run on a machine with `pip install -e .[ui] && playwright install chromium`
-  before final sign-off — verify the 302 redirects land correctly in a
-  real browser (the unit test confirms status + Location; Playwright
-  confirms the rendered target).
+
+## UI suite (Playwright, real headless Chromium)
+
+Ran on this branch after the retirement:
+
+    pytest tests/ui/ -m ui  →  2 failed, 63 passed, 1 skipped
+
+The 2 failures are **pre-existing on `main`** (confirmed via a `main`
+worktree run before any P3.5 code touched them):
+
+1. `tests/ui/test_mobile_ux.py::test_relay_menu_labels_are_visible_without_horizontal_scroll`
+2. `tests/ui/test_subreddit_facet.py::test_subreddit_facet_drills_down`
+   (locator click timeout on the reddit rail button)
+
+Neither is caused by P3.5 — the subreddit failure is a click-timeout
+flake surfaced before; the mobile_ux failure is unrelated to retirement.
+
+**P3.5 also deleted** `tests/ui/test_triage_back_guard.py` (7 tests)
+which exercised the retired `/triage` page directly (history guard,
+filter popover, swipe-up-to-reader, pinboard-v2 card). Equivalent v3
+deck-mode coverage lives in `tests/ui/test_deck_mode.py`.
+
+A new UI assertion for the **302 redirects in a real browser** was NOT
+added — the unit test `test_legacy_triage_and_reddit_pages_redirect_to_v3`
+covers status + Location. A follow-up Playwright test (navigate to
+`/triage`, assert final URL is `/?deck=1`) would be a nice belt-and-
+braces add but is not strictly necessary; flag for next session.
 
 ## Git state
-- Branch: `feat/p3.5-legacy-retirement` (2 commits ahead of `main`).
-- `main` itself is 18 commits ahead of `origin/main` (now 20 after merge).
+- Branch: `feat/p3.5-legacy-retirement` (3 commits ahead of `main`).
+- `main` itself is 18 commits ahead of `origin/main` (now 21 after merge).
 - Tree clean apart from `handoff-p3.1.md` (untracked, predates this session)
   and this file.
 
