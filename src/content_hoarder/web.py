@@ -396,7 +396,16 @@ def create_app(db_path: str | None = None) -> Flask:
         body = request.get_json(silent=True) or {}
         now = int(time.time())
         window_days = _int(body.get("window_days"), 7) or 7
+        if window_days < 1:
+            return jsonify({"error": "window_days must be >= 1"}), 400
         until_utc = _int(body.get("until_utc"), 0) or now + window_days * 86400
+        # Clamp to a sane future window: not in the past, not absurdly far out
+        # (10 years ≈ permanent; beyond that is almost certainly a client bug).
+        if until_utc < now:
+            return jsonify({"error": "until_utc must be in the future"}), 400
+        _SNOOZE_MAX_FUTURE = now + 10 * 365 * 86400
+        if until_utc > _SNOOZE_MAX_FUTURE:
+            until_utc = _SNOOZE_MAX_FUTURE
         escalate_after = _int(body.get("escalate_after"), 3) or 3
         try:
             with conn() as c:
@@ -607,7 +616,11 @@ def create_app(db_path: str | None = None) -> Flask:
         folder_id = data.get("folder_id")
         with conn() as c:
             if folder_id:
-                res = fmod.evaluate_folder(c, int(folder_id))
+                try:
+                    fid = int(folder_id)
+                except (TypeError, ValueError):
+                    return jsonify({"error": "folder_id must be an integer"}), 400
+                res = fmod.evaluate_folder(c, fid)
                 results = [res] if isinstance(res, dict) else res
             else:
                 results = fmod.evaluate_all_folders(c)

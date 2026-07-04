@@ -775,6 +775,7 @@ export function initReader({
     bodyDraft = "",
     bodySaving = false;
   let noteVideoActive = "";
+  let loadCtl = null; // AbortController for the in-flight thread load (load() aborts prior, closeReader aborts current)
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
   let videoTeardown = null; // teardown function for inline video (stops HLS buffering)
@@ -1293,12 +1294,21 @@ export function initReader({
   }
   async function load() {
     const fn = fullname;
+    // Abort any in-flight reader load (a previous open that was closed/switched
+    // before completing). Mirrors the _preloadCtl pattern in main.js so rapid
+    // open/close/open cycles don't leave orphaned requests running to completion.
+    if (loadCtl) {
+      try { loadCtl.abort(); } catch (e) { /* already aborted */ }
+    }
+    loadCtl = new AbortController();
+    const signal = loadCtl.signal;
     cmtsEl.innerHTML = '<div class="rd-cmtstate">loading thread…</div>';
     const sm = sourceMeta(item);
     let res;
     try {
-      res = await api.getJSON(sm.threadPath(fn, threadSort));
+      res = await api.getJSON(sm.threadPath(fn, threadSort), { signal });
     } catch (e) {
+      if (e && e.name === "AbortError") return; // superseded by a newer open
       if (fullname === fn) failState();
       return;
     }
@@ -1321,8 +1331,9 @@ export function initReader({
     } // 401 no-auth, 502 network, …
     if (fullname !== fn) return;
     try {
-      res = await api.getJSON(sm.threadPath(fn, threadSort));
+      res = await api.getJSON(sm.threadPath(fn, threadSort), { signal });
     } catch (e) {
+      if (e && e.name === "AbortError") return;
       if (fullname === fn) failState();
       return;
     }
@@ -1406,6 +1417,11 @@ export function initReader({
   function closeReader(fromPop) {
     if (!isOpen) return;
     isOpen = false;
+    // Abort any in-flight thread load so it doesn't keep running after close.
+    if (loadCtl) {
+      try { loadCtl.abort(); } catch (e) { /* already aborted */ }
+      loadCtl = null;
+    }
     const dest = returnTo;
     returnTo = "";
     saveReaderScroll();
