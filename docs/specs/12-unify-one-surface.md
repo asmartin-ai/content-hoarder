@@ -43,7 +43,7 @@ reused. Triage's `static/triage.js`, `templates/triage.html`, `static/app.css`
 | Reddit capability | Disposition | Notes |
 |---|---|---|
 | **Subreddit rail** (`/reddit/subreddits` → `reddit_subreddit_counts`) | **Builds as a v3 facet** | The v3 source rail (`facets.sources`) has no subreddit dimension today. Add a `subreddit` facet exposed only when `source=reddit`. New endpoint or extend `/items` facets. See P3.3. |
-| **Table vs grid view** toggle | **Builds as density** | v3 `state.density` exists but has **no UI toggle**. Build the toggle (table=compact, grid=comfortable) — small lift, generic. P3.2. |
+| **Table vs grid view** toggle | ~~**Builds as density**~~ **Already shipped — no work** | > Corrected 2026-07-04: v3 already ships `#set-density` (Ledger/Log/Pinboard = compact/comfortable/card) at `templates/index.html:344` and `static/browse/main.js:2848`. The P3.2 packet is therefore **moot**; mark P3.2 as "no work" in §3. |
 | **Thread viewer** with comment sort (best/top/new) | **Maps** to `browse/reader.js` | Reader already opens a reddit-thread view with sort; the reddit page's dedicated detail panel is redundant. **Confirm** reader.js covers all sort options before retiring (TODO in P3.4). |
 | **Inline unsave** + **queue-unsaves-by-tag** | **Maps** | `/reddit/unsave/*` routes are source-agnostic enough; surface the by-tag enqueue in the v3 bulk-select overlay. |
 | **Stats modal** (`/reddit/stats`) | **Dropped, because** | v3's rail + pulse + `stats` route already cover the same ground; the modal was a reddit-only affordance. The stats ROUTE stays (used by scripts). |
@@ -101,11 +101,10 @@ NEXT-DELEGATION): never two agents in `browse/main.js`/`core/media.js`/
 - Do NOT change default landing (`/` stays the list); deck is opt-in via
   querystring / a "Deck" toggle in the rail.
 
-**P3.2 — Density toggle (T2, small, generic).**
-- Build the UI control for `state.density` (already persisted): a
-  compact/comfortable toggle in the rail header.
-- Maps reddit's table view onto compact density. No new state.
-- One UI test for the toggle persisting across reload.
+**P3.2 — Density toggle — NO WORK (superseded 2026-07-04).**
+- v3 already ships `#set-density` (Ledger/Log/Pinboard) at
+  `templates/index.html:344` + `static/browse/main.js:2848`. Packet is moot.
+- See the correction note on the reddit capability table above.
 
 **P3.3 — Subreddit facet (T2).**
 - Extend `/items` facets (or add `/items/subreddits`) to return
