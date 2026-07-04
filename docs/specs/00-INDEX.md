@@ -71,3 +71,13 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   `migrate-note-youtube` CLI + `note_youtube.py` + 5 tests). **Tasks C (note-body edit
   backend) + D (HN favorites auto-sync) ✅ SHIPPED 2026-06-25** and merged locally to
   `main` (`b1a7694`: `db.set_body` + body route; `hn_sync.py` + `hn-sync` CLI + tests).
+
+## W1 (Epic 4 — hoard the bytes) report-only specs, added 2026-07-03
+
+- [10](10-media-backup.md) — `data/media/` backup strategy. **PROPOSED.**
+  Recommends robocopy mirror to a second local drive; SHA-256 verify is free
+  (content-addressed). Open: which drive, manual vs scheduled, tailnet peer.
+- [11](11-video-archive-smoke.md) — First live `archive-media --videos` smoke
+  plan. **PROPOSED**, user-gated. Pre-flight (yt-dlp/ffmpeg/auth), DB-copy
+  mandatory, single-item `--limit 1`, expected artifacts, abort criteria.
+
