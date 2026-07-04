@@ -121,7 +121,7 @@ NEXT-DELEGATION): never two agents in `browse/main.js`/`core/media.js`/
   confirm parity (best/top/new all wired). If gaps, fix in this packet.
 - No retirement yet.
 
-**P3.5 — Legacy retirement (T2, one deliberate pass).**
+**P3.5 — Legacy retirement (T2, one deliberate pass).** ✅ DONE 2026-07-04.
 - Execute the §2 checklist: delete templates + assets, remove `/triage` +
   `/reddit` page routes (keep JSON), strip SHELL entries, bump
   CACHE + APP_VERSION.
@@ -129,6 +129,12 @@ NEXT-DELEGATION): never two agents in `browse/main.js`/`core/media.js`/
   for existing bookmarks (302, in web.py).
 - Full suite + UI suite green; manual QA that no legacy asset 404s in the
   console (offline + online).
+
+> Landed on `feat/p3.5-legacy-retirement` (2 commits): `dbe3c1c` (routes
+> → 302 + redirect test), `77438e1` (asset deletion + sw.js/main.js
+> v116→v117 + test refresh). Suite **1008 passed** (net 0: +1 redirect
+> test, −1 page-render test). Branch unmerged at handoff; not pushed
+> (§7). See `handoff-p3.5.md`.
 
 ---
 
