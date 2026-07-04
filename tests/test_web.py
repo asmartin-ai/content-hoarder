@@ -891,3 +891,17 @@ def test_reddit_sync_auto_runs_when_enabled(tmp_db):
     assert r.get("skipped") is None
     assert r["mode"] in ("incremental", "reconcile")
     assert r["result"]["auth_error"] is True
+
+
+def test_folders_evaluate_malformed_folder_id_returns_400(tmp_db):
+    """Audit Medium (2026-07-02): int(folder_id) on bad client input gave 500, not 400."""
+    _seed(tmp_db)
+    cl = _client(tmp_db)
+    # String that isn't an int
+    resp = cl.post("/folders/evaluate", json={"folder_id": "abc"})
+    assert resp.status_code == 400
+    assert "folder_id" in resp.get_json()["error"]
+    # List — also a TypeError on int()
+    resp = cl.post("/folders/evaluate", json={"folder_id": [1, 2]})
+    assert resp.status_code == 400
+
