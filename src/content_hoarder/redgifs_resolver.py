@@ -17,6 +17,7 @@ import urllib.parse
 import urllib.request
 
 from content_hoarder import config
+from content_hoarder._http import safe_fetch_url
 from content_hoarder.media_store import is_valid_id, media_dir, path_for, store
 from content_hoarder.models import parse_metadata
 
@@ -114,6 +115,10 @@ def resolve_gfycat(url: str) -> dict | None:
     redgifs_url = f"https://redgifs.com/watch/{rg_id}"
 
     if not media_url:
+        return None
+
+    # Reject any media/poster URL that points to a blocked host (SSRF guard).
+    if not all(safe_fetch_url(u)[0] for u in (media_url, poster_url) if u):
         return None
 
     return {
