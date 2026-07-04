@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v112"; // v112: precache core/markdown.js, add static+nav fetch fallbacks
+const CACHE = "ch-shell-v113"; // v113: reader AbortController, silent-catch staleness signal
 const SHELL = [
   "/",
   "/triage",
