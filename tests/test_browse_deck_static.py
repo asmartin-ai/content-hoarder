@@ -34,15 +34,25 @@ def test_sw_js_cache_bumped_to_v115_and_deck_in_shell(tmp_db):
     r = _client(tmp_db).get("/static/sw.js")
     assert r.status_code == 200
     src = r.data.decode("utf-8")
-    assert 'ch-shell-v115' in src, "CACHE not bumped to v115"
+    # P3.1 introduced v115; later packets (P3.3 -> v116) bump it further.
+    # Pin the floor (>= v115) + the deck.js SHELL entry (the P3.1 deliverable).
+    import re
+
+    m = re.search(r'ch-shell-v(\d+)', src)
+    assert m, "CACHE name not found"
+    assert int(m.group(1)) >= 115, "CACHE must be at least v115 (P3.1 floor)"
     assert "/static/browse/deck.js" in src, "deck.js not in SHELL array"
 
 
-def test_main_js_app_version_bumped_to_v115(tmp_db):
+def test_main_js_app_version_at_least_v115(tmp_db):
     r = _client(tmp_db).get("/static/browse/main.js")
     assert r.status_code == 200
     src = r.data.decode("utf-8")
-    assert 'APP_VERSION = "v115"' in src, "APP_VERSION not v115"
+    import re
+
+    m = re.search(r'APP_VERSION = "v(\d+)"', src)
+    assert m, "APP_VERSION not found"
+    assert int(m.group(1)) >= 115, "APP_VERSION must be at least v115 (P3.1 floor)"
     # The keydown handler must gate deck keys behind state.deck.
     assert "state.deck && deck.key" in src or "deck.key(e, state)" in src, (
         "deck keymap not wired into keydown handler"

@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v115"; // v115: deck mode (?deck=1) — one-card triage surface
+const CACHE = "ch-shell-v116"; // v116: subreddit facet (second-tier rail under reddit)
 const SHELL = [
   "/",
   "/triage",
