@@ -13,6 +13,7 @@ so it must not sit under ``archival/``.
 
 from __future__ import annotations
 
+import ipaddress
 import random
 import time
 import urllib.error
@@ -25,6 +26,77 @@ _RETRY_JITTER_CAP = 60.0  # seconds; full-jitter backoff never waits longer than
 # tiny throttle. ~0.6s ≈ Reddit's authenticated 100 QPM budget; the real defaults (drain 1.0s,
 # hydrate 2.0s) sit far above it, so this only guards against misconfiguration.
 MIN_THROTTLE = 0.6
+
+# Hosts that are safe to fetch from (public DNS names pass through; IP literals
+# are checked against this blocklist).  localhost/loopback/private/link-local/
+# multicast/reserved are always rejected — there is no tailnet carve-out.
+_LOCALHOST_NAMES = frozenset({"localhost", "localhost.localdomain"})
+_IPV6_LINKLOCAL_PREFIX = ipaddress.ip_network("fe80::/10", strict=False)
+
+
+def safe_fetch_url(url: str) -> tuple[bool, str]:
+    """Validate ``url`` is a safe HTTP/HTTPS fetch target (no SSRF/local-file-read).
+
+    Returns ``(True, "ok")`` when the URL is allowed.  Returns ``(False, reason)``
+    when it must not be fetched:
+
+    =======  ================================================================
+    reason   meaning
+    =======  ================================================================
+    ``bad_scheme``  scheme is not http/https (e.g. file://, gopher://, ftp://)
+    ``bad_url``     URL could not be parsed at all
+    ``no_host``     host is absent / empty
+    ``blocked_host`` host is a blocked IP literal or a ``localhost`` name
+    =======  ================================================================
+
+    This function does NOT make any network call.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:                                   # malformed URL — soft-fail
+        return False, "bad_url"
+
+    scheme = parsed.scheme
+    # `parsed.hostname` already strips port, userinfo, and IPv6 brackets — never
+    # use `parsed.netloc` (which contains them and would let "127.0.0.1:80" /
+    # "user@127.0.0.1" slip past the IP-range check).
+    host = parsed.hostname
+
+    if scheme.lower() not in ("http", "https"):
+        return False, "bad_scheme"
+    if not host:
+        return False, "no_host"
+
+    host_clean = host.lower()
+
+    # Reject explicit localhost names (defence-in-depth; they're DNS names so
+    # ipaddress.is_private would pass them through).
+    if host_clean in _LOCALHOST_NAMES or host_clean.endswith(".localhost"):
+        return False, "blocked_host"
+
+    # Try to parse as an IP literal.  If it fails the host is a DNS name → allowed.
+    try:
+        ip = ipaddress.ip_address(host_clean)
+    except ValueError:
+        return True, "ok"
+
+    # IP literal: reject anything in a blocked range.
+    if ip.is_loopback or ip.is_reserved or ip.is_unspecified:
+        return False, "blocked_host"
+    if ip.is_private:
+        return False, "blocked_host"
+    # Link-local 169.254.0.0/16 (includes 169.254.169.254 cloud-metadata) and
+    # IPv6 fe80::/10.
+    if isinstance(ip, ipaddress.IPv4Address) and ip in ipaddress.ip_network(
+        "169.254.0.0/16", strict=False
+    ):
+        return False, "blocked_host"
+    if ip in _IPV6_LINKLOCAL_PREFIX:
+        return False, "blocked_host"
+    if ip.is_multicast:
+        return False, "blocked_host"
+
+    return True, "ok"
 
 
 class HttpError(Exception):
