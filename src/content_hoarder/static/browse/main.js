@@ -40,9 +40,30 @@ import {
   createFirstPageCache,
   createFirstPagePrefetcher,
 } from "./prefetch.js";
+import { initDeck, setHost as setDeckHost } from "./deck.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
+
+/* v3 deck mode (?deck=1) — one card at a time, /random-driven, with swipe
+   + decision keys + Undo. Body in ./deck.js. Wired further down. */
+const deck = initDeck({
+  api,
+  toast,
+  snackbar,
+  attachSwipe,
+  COPY: { get keep() { return COPY.keep; }, get archived() { return COPY.archived; }, get done() { return COPY.done; }, get inbox() { return COPY.inbox; } },
+  glyph: (it) => it.source ? (it.source[0] || "·") : "·",
+  metaLine,
+  snooze: (fn) => snooze(fn),
+  openReader: (it) => {
+    if (canOpenInReader(it)) readerUI.open(it);
+    else if (it.url) window.open(it.url, "_blank", "noopener");
+  },
+  bumpPulse,
+  toggleDeck: (on) => toggleDeck(on),
+});
+
 
 /* ---- state ---- */
 const state = {
@@ -70,6 +91,7 @@ const state = {
   stamped: false, // Focus: celebration shown for this batch
   curated: new Set(),
   pulse: { new_today: 0, cleared_today: 0, swept_recent: 0 },
+  deck: new URLSearchParams(location.search).get("deck") === "1",
 };
 const FOCUS_BATCH = 25;
 /* Per-tab sort memory (Epic 10 / item 412): each status tab remembers its own sort, and the
@@ -89,6 +111,8 @@ function sortForTab(status) {
 setArchivePref(state.archiveMedia); // tell core/media.js whether to prefer local /media copies
 const nsfwRevealed = new Set();
 const itemsEl = $("#items");
+const deckHostEl = $("#deck-host");
+if (deckHostEl) setDeckHost(deckHostEl);
 const doneRetention = {
   loaded: false,
   loading: false,
@@ -236,6 +260,17 @@ async function loadItems(reset) {
 }
 
 function render() {
+  // Deck mode: hide the list, show the deck host. Deck owns its own render.
+  const deckHost = document.getElementById("deck-host");
+  if (state.deck) {
+    if (deckHost) deckHost.hidden = false;
+    itemsEl.hidden = true;
+    deck.render(state);
+    paintBulk();
+    return;
+  }
+  if (deckHost) deckHost.hidden = true;
+  itemsEl.hidden = false;
   itemsEl.className = "items density-" + state.density;
   syncSelectionToVisibleItems();
   paintBulk();
@@ -1846,6 +1881,9 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (isTypingTarget(e.target)) return;
+  /* Deck-mode keymap (s/e/y/u/z/space) — only when state.deck is active.
+     List-mode s/e/y are unchanged because deckKey returns false then. */
+  if (state.deck && deck.key(e, state)) return;
   if (e.ctrlKey || e.metaKey) {
     // undo/redo chords; other modifier combos pass through to the browser
     const c = e.key.toLowerCase();
@@ -2259,7 +2297,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v114";
+const APP_VERSION = "v115";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
@@ -2949,6 +2987,53 @@ $$("#set-archive button").forEach((b) =>
     render(); // re-render with the new media-source preference
   }),
 );
+
+/* ---- deck mode (?deck=1) toggle ----
+   URL-driven: entering pushState's ?deck=1, leaving strips it. Toggling does
+   NOT refetch or reset filters — same state machine, different renderer. */
+function pushDeckUrl(on) {
+  const url = new URL(location.href);
+  if (on) url.searchParams.set("deck", "1");
+  else url.searchParams.delete("deck");
+  history.pushState({}, "", url);
+}
+function syncDeckToggles() {
+  const on = !!state.deck;
+  const dock = $("#dock-deck");
+  if (dock) dock.setAttribute("aria-pressed", String(on));
+  const enter = $("#set-deck-enter");
+  if (enter) enter.setAttribute("aria-pressed", String(on));
+}
+async function toggleDeck(on) {
+  if (!!state.deck === on) return;
+  state.deck = on;
+  pushDeckUrl(on);
+  syncDeckToggles();
+  if (on) {
+    await deck.open(state);
+  } else {
+    deck.close(state);
+    render();
+  }
+}
+$("#dock-deck")?.addEventListener("click", () => toggleDeck(!state.deck));
+$("#set-deck-enter")?.addEventListener("click", () => toggleDeck(true));
+window.addEventListener("popstate", () => {
+  const next = new URLSearchParams(location.search).get("deck") === "1";
+  if (!!state.deck === next) return;
+  state.deck = next;
+  syncDeckToggles();
+  if (next) deck.open(state);
+  else {
+    deck.close(state);
+    render();
+  }
+});
+/* On initial load, if ?deck=1 is set, open the deck. */
+if (state.deck) {
+  syncDeckToggles();
+  deck.open(state);
+}
 $("#done-retention-confirm").addEventListener("change", paintDoneRetention);
 $$("#set-done-retention button").forEach((b) =>
   b.addEventListener("click", async () => {
