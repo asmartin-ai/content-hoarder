@@ -240,6 +240,7 @@
                 </div>
 
                 <div class="items density-comfortable" id="items"></div>
+                <section id="deck-host" class="deck-host" hidden></section>
                 <div id="sentinel" aria-hidden="true"></div>
 
                 <div class="decayline" id="decayline" hidden>
@@ -295,6 +296,15 @@
             </button>
             <button type="button" aria-pressed="false" id="dock-focus">
                 <span class="g">&#9678;</span>FOCUS
+            </button>
+            <button
+                type="button"
+                aria-pressed="false"
+                id="dock-deck"
+                aria-label="Toggle deck mode"
+                title="Deck mode (one card at a time)"
+            >
+                <span class="g">&#127137;</span>DECK
             </button>
             <a class="fab" href="/triage">TRIAGE &rarr;</a>
             <button type="button" aria-pressed="false" id="dock-search">
@@ -362,6 +372,18 @@
                     </button>
                     <button type="button" data-d="card" aria-pressed="false">
                         Pinboard
+                    </button>
+                </div>
+            </div>
+            <div class="set-group">
+                <div class="lab">DECK</div>
+                <div class="seg" id="set-deck">
+                    <button
+                        type="button"
+                        id="set-deck-enter"
+                        aria-pressed="false"
+                    >
+                        Enter deck mode
                     </button>
                 </div>
             </div>
