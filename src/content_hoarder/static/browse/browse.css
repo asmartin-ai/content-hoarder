@@ -4509,3 +4509,22 @@ a.rd-au:hover {
     cursor: pointer;
     font-size: 1rem;
 }
+
+/* ---- P3.3: subreddit facet (second-tier rail under reddit source) ---- */
+.rail-sub {
+    margin-top: var(--sp-1);
+    border-left: 2px solid var(--line, #eee);
+    margin-left: 6px;
+    padding-left: 6px;
+}
+.rail-sub-head {
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    color: var(--mute, #999);
+    padding: var(--sp-1) var(--sp-2);
+    text-transform: uppercase;
+}
+.rnav-sub {
+    font-size: 0.85rem;
+    padding-left: var(--sp-2);
+}
