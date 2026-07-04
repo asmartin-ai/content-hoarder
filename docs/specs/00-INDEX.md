@@ -81,3 +81,10 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   plan. **PROPOSED**, user-gated. Pre-flight (yt-dlp/ffmpeg/auth), DB-copy
   mandatory, single-item `--limit 1`, expected artifacts, abort criteria.
 
+## W3 (Epic 17 — unify one surface) design gate, added 2026-07-03
+
+- [12](12-unify-one-surface.md) — Design-first migration of `/triage` +
+  `/reddit` into v3 browse. **PROPOSED**, no code. Cuts P3.1-P3.5
+  implementation packets (deck mode, density toggle, subreddit facet, unsave
+  wiring, legacy retirement). Surfaces 4 user decisions before code starts.
+
