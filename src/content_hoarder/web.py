@@ -67,6 +67,7 @@ def _local_host(host: str) -> bool:
 
 def create_app(db_path: str | None = None) -> Flask:
     config.load_env()
+    config.validate()
     # Windows reads MIME types from the registry, which can map .js to text/plain —
     # that hard-fails <script type="module">. Pin the correct type before any static
     # file is served (v3 pages load ES modules from /static/core and /static/browse).
