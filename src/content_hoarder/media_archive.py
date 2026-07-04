@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from content_hoarder import media_store
+from content_hoarder._http import safe_fetch_url
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 DEFAULT_MAX_BYTES = 15 * 1024 * 1024  # 15 MB/media cap — skip pathological originals
@@ -87,7 +88,14 @@ def canonical_vreddit_url(url: str) -> str | None:
 def default_fetch(
     url: str, *, max_bytes: int = DEFAULT_MAX_BYTES
 ) -> tuple[bytes | None, str]:
-    """GET the URL → ``(bytes, mime)`` or ``(None, reason)``. Injectable for tests."""
+    """GET the URL → ``(bytes, mime)`` or ``(None, reason)``. Injectable for tests.
+
+    SSRF gate: URLs resolving to loopback/private/link-local hosts are rejected
+    before any network call is made.
+    """
+    allowed, reason = safe_fetch_url(url)
+    if not allowed:
+        return None, "blocked_" + reason
     req = urllib.request.Request(url, headers={"User-Agent": UA}, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
