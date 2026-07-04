@@ -33,3 +33,15 @@ def test_load_env_existing_env_wins(monkeypatch, tmp_path):
     p.write_text("FOO_WINS_TEST=other\n")
     config.load_env(p)
     assert os.environ["FOO_WINS_TEST"] == "keep"
+
+
+def test_validate_warns_on_default_secret_key(monkeypatch):
+    # unset env -> get() returns the insecure built-in default -> one message
+    monkeypatch.delenv("FLASK_SECRET_KEY", raising=False)
+    msgs = config.validate(warn=False)
+    assert any("FLASK_SECRET_KEY" in m for m in msgs)
+
+
+def test_validate_silent_when_secret_key_overridden(monkeypatch):
+    monkeypatch.setenv("FLASK_SECRET_KEY", "a-real-random-value")
+    assert config.validate(warn=False) == []
