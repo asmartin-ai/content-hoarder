@@ -999,9 +999,32 @@ async function refreshPulse() {
   try {
     state.pulse = await api.getJSON("/pulse");
     paintPulse();
+    _facetStaleReset();
   } catch (e) {
-    /* ambient */
+    /* ambient — but count toward the staleness signal so a persistent failure
+       (which also freezes the "cleared today" pebbles) isn't silent. */
+    _facetStaleBump(e);
   }
+}
+
+/* ---- Staleness signal (audit High 2026-07-02): repeated consecutive failures of
+   the ambient rail/pulse fetches surface one subtle toast + a console log, so a
+   dead server is distinguishable from "nothing to show". One signal per stall,
+   not per failure; resets on the first success. ---- */
+let _staleFailCount = 0;
+let _staleSignaled = false;
+const _STALE_FAIL_THRESHOLD = 3;
+function _facetStaleBump(e) {
+  _staleFailCount++;
+  console.warn("refreshRail/refreshPulse failed (", _staleFailCount, "):", e);
+  if (_staleFailCount >= _STALE_FAIL_THRESHOLD && !_staleSignaled) {
+    _staleSignaled = true;
+    try { toast("Couldn’t reach the server — showing cached state."); } catch (t) { /* toast opt */ }
+  }
+}
+function _facetStaleReset() {
+  _staleFailCount = 0;
+  _staleSignaled = false;
 }
 
 /* ---- Focus batches + stamp (locked #10) ---- */
@@ -1589,6 +1612,7 @@ async function refreshRail() {
       api.getJSON("/categories?" + qs),
       api.getJSON("/tags?" + qs),
     ]);
+    _facetStaleReset();
     // one fetch fills BOTH the desktop rail and the mobile drawer (shared facet data)
     facets.sources = src.sources || [];
     facets.categories = cats.categories || [];
@@ -1605,7 +1629,10 @@ async function refreshRail() {
     renderDrawer();
     if (!state.loading) warmItemFirstPages();
   } catch (e) {
-    /* rail is navigation sugar */
+    /* rail is navigation sugar — keep quiet on a one-off failure, but surface a
+       subtle staleness signal after repeated consecutive failures so a dead
+       server isn't indistinguishable from an empty inbox. Audit High 2026-07-02. */
+    _facetStaleBump(e);
   }
 }
 document.addEventListener("click", (e) => {
@@ -2175,7 +2202,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v111";
+const APP_VERSION = "v113";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;

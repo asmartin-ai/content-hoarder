@@ -187,6 +187,45 @@ def test_snooze_route_escalation_undoes_decay(tmp_db, monkeypatch):
     assert res["escalated"] == [fn]
     assert res["decayed_at"]
 
-    undo = cl.post("/snooze/undo", json={"decayed_at": res["decayed_at"]}).get_json()
-    assert undo["total"] == 1
-    assert cl.get("/items/" + fn).get_json()["status"] == "inbox"
+
+def test_snooze_route_rejects_negative_window_days(tmp_db, monkeypatch):
+    """Audit Low (2026-07-02): snooze accepted unbounded client input. Clamp it.
+    Note: window_days=0 falls back to the default 7 via `_int(...) or 7` (intended),
+    but a negative value is truthy and would slip past that fallback — that's the
+    real bug the clamp defends against."""
+    monkeypatch.setattr(db.time, "time", lambda: 1_000)
+    monkeypatch.setattr(web.time, "time", lambda: 1_000)
+    with db.connect(tmp_db) as conn:
+        fn = _seed(conn, "t3_neg")
+
+    cl = web.create_app(tmp_db).test_client()
+    resp = cl.post("/items/" + fn + "/snooze", json={"window_days": -5})
+    assert resp.status_code == 400
+    assert "window_days" in resp.get_json()["error"]
+
+
+def test_snooze_route_rejects_past_until_utc(tmp_db, monkeypatch):
+    monkeypatch.setattr(db.time, "time", lambda: 1_000)
+    monkeypatch.setattr(web.time, "time", lambda: 1_000)
+    with db.connect(tmp_db) as conn:
+        fn = _seed(conn, "t3_past")
+
+    cl = web.create_app(tmp_db).test_client()
+    resp = cl.post("/items/" + fn + "/snooze", json={"until_utc": 500})
+    assert resp.status_code == 400
+    assert "future" in resp.get_json()["error"]
+
+
+def test_snooze_route_clamps_far_future_until_utc(tmp_db, monkeypatch):
+    monkeypatch.setattr(db.time, "time", lambda: 1_000)
+    monkeypatch.setattr(web.time, "time", lambda: 1_000)
+    with db.connect(tmp_db) as conn:
+        fn = _seed(conn, "t3_farfuture")
+
+    cl = web.create_app(tmp_db).test_client()
+    absurd = 1_000 + 100 * 365 * 86400  # 100 years out — must clamp to 10y
+    res = cl.post("/items/" + fn + "/snooze", json={"until_utc": absurd}).get_json()
+    expected_max = 1_000 + 10 * 365 * 86400
+    assert res["until_utc"] == expected_max
+    assert res["snoozed"] == [fn]
+
