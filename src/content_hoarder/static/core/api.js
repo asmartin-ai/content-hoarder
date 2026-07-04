@@ -83,3 +83,20 @@ export const fetchStats = (params) =>
 export const unsaveStatus = () => getJSON("/reddit/unsave/status");
 export const unsaveDrain = (body) =>
   postJSON("/reddit/unsave/drain", body || { dry_run: true });
+
+/* Queue one reddit item for unsave (no Reddit contact until /drain runs).
+   Optimistically flips is_saved=0; the row stays until drain. */
+export const unsaveItem = (fullname) =>
+  postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/unsave");
+
+/* Cancel a still-pending per-item unsave (no Reddit call). */
+export const undoRedditUnsave = (fullname) =>
+  postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/undo");
+
+/* Bulk enqueue unsaves for every reddit saved item under a tag (preview
+   when apply=false; commits the local queue when apply=true). Reddit is
+   not contacted until /drain runs. */
+export const unsaveByTag = (tag, { apply = false } = {}) =>
+  postJSON("/reddit/unsave/enqueue-by-tag", apply
+    ? { tag, apply: true, yes: true }
+    : { tag });

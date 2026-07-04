@@ -31,3 +31,28 @@ def test_vendored_fonts_served(tmp_db):
         r = cl.get(f"/static/fonts/{f}")
         assert r.status_code == 200, f
         assert r.data[:4] == b"wOF2", f  # real woff2, not an HTML error page
+
+
+def test_api_js_exports_unsave_wrappers(tmp_db):
+    """api.js must export the v3 unsave wrappers (per-item, undo, by-tag, drain).
+    A missing export would break browse/main.js at module load."""
+    r = _client(tmp_db).get("/static/core/api.js")
+    assert r.status_code == 200
+    src = r.data.decode("utf-8")
+    for needle in (
+        "export const unsaveItem",
+        "export const undoRedditUnsave",
+        "export const unsaveByTag",
+        "export const unsaveDrain",
+    ):
+        assert needle in src, needle
+
+
+def test_index_html_has_relay_unsave_button_and_bulk_unsave(tmp_db):
+    """The v3 row menu must include the reddit Unsave relay button, and the bulk
+    tray must include an UNSAVE action. Regression guard for P3.4."""
+    r = _client(tmp_db).get("/")
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    assert 'data-relay="unsave"' in html
+    assert 'data-bulk="unsave"' in html
