@@ -918,6 +918,37 @@ $$("#bulktray [data-bulk]").forEach((b) =>
       status = b.dataset.bulk;
     if (!fns.length) return;
     if (window.chHaptic) window.chHaptic(status);
+    // Bulk "Unsave" is reddit-only and queues locally; it does not change triage
+    // status, so it bypasses the bulkStatus path entirely. Only reddit items with
+    // is_saved !== 0 are queued; others are silently skipped (with a toast count).
+    if (status === "unsave") {
+      const targets = state.items.filter(
+        (it) => fns.includes(it.fullname) && it.source === "reddit" && it.is_saved !== 0,
+      );
+      clearSelection();
+      if (!targets.length) {
+        toast("No queueable reddit items selected.");
+        return;
+      }
+      try {
+        await Promise.all(targets.map((it) => api.unsaveItem(it.fullname)));
+        const byFn = new Map(targets.map((it) => [it.fullname, it]));
+        state.items.forEach((it) => {
+          if (byFn.has(it.fullname)) it.is_saved = 0;
+        });
+        render();
+        snackbar(
+          targets.length + " queued for unsave. Drain contacts Reddit.",
+          () =>
+            api.unsaveDrain({ dry_run: true }).then((d) =>
+              toast(d && d.scope ? "Drain preview: " + d.scope : "Drain preview ready"),
+            ),
+        );
+      } catch (e) {
+        toast("Bulk unsave failed partway.");
+      }
+      return;
+    }
     clearSelection();
     try {
       await api.bulkStatus(fns, status);
@@ -2132,6 +2163,12 @@ function openRowMenu(fn) {
   } else {
     auBtn.hidden = true;
   }
+  // Reddit-only "Unsave" — only meaningful when still in the user's Saved list.
+  const unsaveBtn = frag.querySelector('[data-relay="unsave"]');
+  if (unsaveBtn) {
+    const show = it.source === "reddit" && it.is_saved !== 0;
+    unsaveBtn.hidden = !show;
+  }
 
   row.appendChild(frag);
   relayFn = fn;
@@ -2164,12 +2201,32 @@ itemsEl.addEventListener("click", (e) => {
   else if (action === "share")
     shareItem(state.items.find((i) => i.fullname === fn));
   else if (action === "snooze") snooze(fn);
+  else if (action === "unsave") unsaveRow(fn);
 });
 if (relayScrim) relayScrim.addEventListener("click", closeRelay);
 // Escape closes an open relay strip (the global keydown below also routes here)
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && relayFn) closeRelay();
 });
+/* Queue one reddit item for unsave from the row menu. Local-only until
+   /reddit/unsave/drain runs; surface that as a follow-up snackbar action. */
+async function unsaveRow(fn) {
+  const it = state.items.find((i) => i.fullname === fn);
+  if (!it) return;
+  try {
+    await api.unsaveItem(fn);
+    it.is_saved = 0;
+    const r = rowEl(fn);
+    if (r) r.dataset.saved = "0";
+    snackbar("Queued for unsave. Drain contacts Reddit.", () =>
+      api.unsaveDrain({ dry_run: true }).then((d) =>
+        toast(d && d.scope ? "Drain preview: " + d.scope : "Drain preview ready"),
+      ),
+    );
+  } catch (e) {
+    toast("Unsave failed.");
+  }
+}
 // desktop has no long-press → right-click a row opens the same menu
 itemsEl.addEventListener("contextmenu", (e) => {
   // Keep the native browser menu on real links so users can copy/open URLs.
@@ -2202,7 +2259,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v113";
+const APP_VERSION = "v114";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
