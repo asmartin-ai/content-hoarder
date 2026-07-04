@@ -2465,6 +2465,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     config.load_env()
+    config.validate()
     args = build_parser().parse_args(argv)
     return args.func(args)
 
