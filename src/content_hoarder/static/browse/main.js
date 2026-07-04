@@ -70,6 +70,7 @@ const state = {
   status: "inbox",
   source: "",
   category: "",
+  subreddit: "",
   tags: [],
   q: "",
   exact: false,
@@ -159,6 +160,7 @@ function params(extra) {
   if (state.status) p.status = state.status;
   if (state.source) p.source = state.source;
   if (state.category) p.category = state.category;
+  if (state.subreddit) p.subreddit = state.subreddit;
   if (state.q) p.q = state.q;
   if (state.exact) p.exact = "1";
   if (state.safe) p.safe = "1";
@@ -1603,9 +1605,15 @@ async function loadCounts() {
 
 function railBtn(label, value, count, kind, color) {
   const on =
-    kind === "source" ? state.source === value : state.tags.includes(value);
+    kind === "source"
+      ? state.source === value
+      : kind === "subreddit"
+        ? state.subreddit === value
+        : state.tags.includes(value);
   return (
-    '<button type="button" class="rnav" data-' +
+    '<button type="button" class="rnav' +
+    (kind === "subreddit" ? " rnav-sub" : "") +
+    '" data-' +
     kind +
     '="' +
     esc(value) +
@@ -1691,6 +1699,36 @@ async function refreshRail() {
     $("#rail-sources").innerHTML = facets.sources
       .map((s) => railBtn(s.label, s.id, s.count, "source", s.badge_color))
       .join("");
+    /* P3.3: second-tier subreddit facet — only when source=reddit is the
+       active filter. Fetches from /reddit/subreddits (status-scoped). */
+    if (state.source === "reddit") {
+      try {
+        const srQs = new URLSearchParams();
+        if (state.status) srQs.set("status", state.status);
+        const sr = await api.getJSON("/reddit/subreddits?" + srQs.toString());
+        const subs = (sr.subreddits || []).slice(0, 25);
+        const subHtml = subs.length
+          ? '<div class="rail-sub-head">SUBREDDITS</div>' +
+            subs
+              .map((s) =>
+                railBtn(
+                  "r/" + s.subreddit,
+                  s.subreddit,
+                  s.count,
+                  "subreddit",
+                ),
+              )
+              .join("")
+          : "";
+        const slot = document.createElement("div");
+        slot.id = "rail-subreddits";
+        slot.className = "rail-sub";
+        slot.innerHTML = subHtml;
+        $("#rail-sources").appendChild(slot);
+      } catch (_e) {
+        /* subreddit facet is sugar — never block the rail on it */
+      }
+    }
     $("#rail-tags").innerHTML = railTagsHtml();
     renderDrawer();
     if (!state.loading) warmItemFirstPages();
@@ -1719,10 +1757,17 @@ document.addEventListener("click", (e) => {
     loadItems(true);
     return;
   }
-  const r = e.target.closest("[data-source], [data-tag]");
+  const r = e.target.closest("[data-source], [data-tag], [data-subreddit]");
   if (!r) return;
   if (r.dataset.source !== undefined) {
     state.source = state.source === r.dataset.source ? "" : r.dataset.source;
+    /* Subreddit is a reddit-only facet — clear it when leaving reddit. */
+    if (state.source !== "reddit") state.subreddit = "";
+    /* Leaving or entering reddit re-renders the subreddit facet via refreshRail. */
+  } else if (r.dataset.subreddit !== undefined) {
+    state.subreddit =
+      state.subreddit === r.dataset.subreddit ? "" : r.dataset.subreddit;
+    closeSheets();
   } else if (r.dataset.tag !== undefined) {
     const t = r.dataset.tag,
       i = state.tags.indexOf(t);
@@ -1738,6 +1783,7 @@ function paintChips() {
   const chips = [];
   if (state.source) chips.push("source:" + state.source);
   if (state.category) chips.push("category:" + state.category);
+  if (state.subreddit) chips.push("subreddit:" + state.subreddit);
   state.tags.forEach((t) => chips.push("tag:" + t));
   $("#fchips").innerHTML =
     chips
@@ -1761,6 +1807,7 @@ $("#fchips").addEventListener("click", (e) => {
     const v = chip.dataset.chip;
     if (v.startsWith("source:")) state.source = "";
     else if (v.startsWith("category:")) state.category = "";
+    else if (v.startsWith("subreddit:")) state.subreddit = "";
     else {
       const t = v.slice(4);
       const i = state.tags.indexOf(t);
@@ -1769,6 +1816,7 @@ $("#fchips").addEventListener("click", (e) => {
   } else if (e.target.closest(".fclear")) {
     state.source = "";
     state.category = "";
+    state.subreddit = "";
     state.tags = [];
   } else return;
   paintChips();
@@ -2297,7 +2345,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v115";
+const APP_VERSION = "v116";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
