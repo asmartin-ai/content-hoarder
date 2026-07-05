@@ -221,6 +221,7 @@ def run_arm(
     for line in git_status.splitlines():
         if not line:
             continue
+        print(f"[debug-raw] line={line!r} len={len(line)}", file=sys.stderr)
         # Strip the 2-char status prefix + space, take the rest as path.
         path = line[3:].strip()
         # Handle renames: "R  old -> new" -> take new
@@ -228,6 +229,10 @@ def run_arm(
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
