@@ -228,34 +228,6 @@ def run_arm(
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} scope_clean={scope_clean}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
-    print(
-        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
-        file=sys.stderr,
-    )
 
     # 3. Oracle hash unchanged.
     oracle_hashes_after = {str(p): file_hash(p) for p in oracle_paths}
