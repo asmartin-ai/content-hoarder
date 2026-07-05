@@ -218,22 +218,29 @@ def run_arm(
     # 2. git status scope — only in-scope files dirty.
     git_status = git("status", "--porcelain", check=False).strip()
     print(f"[debug-status] git_status={git_status!r}", file=sys.stderr)
-    # Format: "XY <path>" where XY is 2 status chars. Path starts at index 3.
-    # But staged files have format "M  path" (M-space-space) so index 3 is correct.
-    # For unstaged: " M path" (space-M-space) also index 3. For both: "MM path" index 3.
-    # Use split(maxsplit=1) for robustness against renames (which have ' -> ').
+    # Format: "XY <path>" where XY is 2 status chars + 1 space. But the exact
+    # spacing varies (staged: 'M  path', unstaged: ' M path', both: 'MM path'),
+    # and Windows CRLF can add chars. Robust parse: drop the first 3 chars (the
+    # 'XY ' prefix), then strip any remaining leading whitespace.
     dirty_files: set[str] = set()
     for line in git_status.splitlines():
         if not line:
             continue
-        print(f"[debug-raw] line={line!r} len={len(line)}", file=sys.stderr)
-        # Strip the 2-char status prefix + space, take the rest as path.
+        print(
+            f"[debug-raw] line={line!r} len={len(line)} chars={[c for c in line[:5]]}",
+            file=sys.stderr,
+        )
+        # Drop the 2-char status prefix + the single separating space.
         path = line[3:].strip()
         # Handle renames: "R  old -> new" -> take new
         if " -> " in path:
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
