@@ -136,10 +136,22 @@ def run_arm(
         # We expect to be on main; if not, that's a bug. Reset to main.
         raise RuntimeError(f"unexpected starting branch {starting_branch!r}; aborting")
 
-    # Sanity: clean tree before run
-    status = git("status", "--porcelain").strip()
-    if status:
-        raise RuntimeError(f"working tree not clean before run:\n{status}")
+    # Sanity: clean tree before run. Tolerate the bakeoff's own bookkeeping
+    # files (results.csv is appended to by this driver; batch.log/.out/.pid are
+    # the batch runner's own files). These are not executor output.
+    TOLERATED_DIRTY = {
+        "bakeoff/results.csv",
+        "bakeoff/batch.log",
+        "bakeoff/batch.out",
+        "bakeoff/batch.pid",
+    }
+    status_raw = git("status", "--porcelain")
+    status_lines = [l for l in status_raw.splitlines() if l.strip()]
+    non_tolerated = [l for l in status_lines if l[3:].strip() not in TOLERATED_DIRTY]
+    if non_tolerated:
+        raise RuntimeError(
+            f"working tree not clean before run:\n" + "\n".join(non_tolerated)
+        )
 
     # Build the aider-delegate command. The wrapper auto-creates a
     # delegated/run-<id> branch off HEAD and leaves us on it.
@@ -227,7 +239,11 @@ def run_arm(
         if " -> " in path:
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
-    scope_clean = dirty_files.issubset(set(task["editable"]))
+    # Exclude the bakeoff's own bookkeeping files (results.csv is appended to
+    # by this driver; batch.* are the batch runner's files). They are not
+    # executor output and must not trip the scope check.
+    executor_dirty = dirty_files - TOLERATED_DIRTY
+    scope_clean = executor_dirty.issubset(set(task["editable"]))
 
     # 3. Oracle hash unchanged.
     oracle_hashes_after = {str(p): file_hash(p) for p in oracle_paths}
