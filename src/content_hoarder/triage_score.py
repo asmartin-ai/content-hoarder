@@ -113,6 +113,42 @@ def fit(conn, *, min_support: int = 20, alpha: float = 50.0) -> dict:
             "features": features}
 
 
+def high_skip_buckets(model: dict, *, min_skip_rate: float = 0.9,
+                      min_support: int = 2) -> list[dict]:
+    """Return the feature buckets of a fitted triage model whose skip-rate is
+    at or above ``min_skip_rate`` and whose support ``n`` is at least
+    ``min_support``.
+
+    The stored rate is the smoothed processed-rate (k/n), so
+    ``skip_rate = 1 - processed_rate``. The threshold is inclusive: a bucket
+    with ``skip_rate == min_skip_rate`` IS included. Returned dicts contain
+    ``feature``, ``n``, ``k``, ``processed_rate``, and ``skip_rate``, sorted by
+    feature name for determinism.
+    """
+    features = (model or {}).get("features") or {}
+    out: list[dict] = []
+    for feature, entry in features.items():
+        try:
+            n = int(entry[0])
+            k = int(entry[1])
+            processed_rate = float(entry[2])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if n < min_support:
+            continue
+        skip_rate = 1.0 - processed_rate
+        if skip_rate >= min_skip_rate:
+            out.append({
+                "feature": feature,
+                "n": n,
+                "k": k,
+                "processed_rate": processed_rate,
+                "skip_rate": skip_rate,
+            })
+    out.sort(key=lambda b: b["feature"])
+    return out
+
+
 def _feature_rate(entry) -> float:
     try:
         return float(entry[2])
