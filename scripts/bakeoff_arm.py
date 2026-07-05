@@ -104,10 +104,13 @@ def file_hash(p: Path) -> str:
 def parse_tokens_from_stdout(stdout: str) -> tuple[int, int] | None:
     """Extract (tokens_in, tokens_out) from aider's stdout.
 
-    Aider prints cost lines like '5.2k sent / 2.6k received' or
-    '15000 sent / 6300 received'. Accept either form and normalize to int tokens.
+    Aider prints cost lines like 'Tokens: 5.2k sent, 384 cache hit, 2.6k received.'
+    or '5.2k sent / 2.6k received'. Accept either form and normalize to int tokens.
     """
-    m = re.search(r"([\d.]+)\s*(k?)\s*sent\s*/\s*([\d.]+)\s*(k?)\s*received", stdout)
+    m = re.search(
+        r"([\d.]+)\s*(k?)\s*sent[, ].*?([\d.]+)\s*(k?)\s*received",
+        stdout,
+    )
     if not m:
         return None
     tin = float(m.group(1)) * (1000 if m.group(2) == "k" else 1)
