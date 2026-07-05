@@ -206,6 +206,10 @@ def run_arm(
     # 4-check verification. We're now on `run_branch` with uncommitted edits.
     # 1. Applied-edit count > 0 (git diff --stat per M13).
     diff_stat = git("diff", "--stat", "HEAD", check=False).strip()
+    print(
+        f"[debug-pre-status] branch={current_branch()} HEAD={git('rev-parse', 'HEAD')[:8]} status={git('status', '--porcelain')!r} log={git('log', '--oneline', '-3')!r}",
+        file=sys.stderr,
+    )
     diff_files = [
         line.split("|", 1)[0].strip() for line in diff_stat.splitlines() if "|" in line
     ]
