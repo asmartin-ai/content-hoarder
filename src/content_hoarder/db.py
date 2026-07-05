@@ -842,6 +842,7 @@ def search_items(
     exact: list[str] | None = None,
     exclude: list[str] | None = None,
     open_in_firefox: bool = False,
+    ocr: bool = False,
     include_consolidated: bool = False,
     fuzzy: bool = False,
     sort: str = "last_seen_utc",
@@ -956,6 +957,15 @@ def search_items(
             # deleted (is:deleted): media probed gone (scan-deleted-media). media_status is the
             # durable SSOT — the mirrored `deleted` tag is wiped by a categorize retag.
             filters.append(f"json_extract({a}metadata, '$.media_status') = 'gone'")
+        if ocr:
+            # ocr (is:ocr): items carrying non-empty metadata.ocr_text. Matches by truthy
+            # non-empty string (SQLite's `json_extract` returns NULL for missing keys, so a
+            # plain `<> ''` filter would match every row with no ocr_text key — the explicit
+            # IS NOT NULL gate keeps ocr-less rows out of the result).
+            filters.append(
+                f"json_extract({a}metadata, '$.ocr_text') IS NOT NULL "
+                f"AND CAST(json_extract({a}metadata, '$.ocr_text') AS TEXT) <> ''"
+            )
         if subreddit:
             if isinstance(subreddit, list):
                 ph = ",".join("?" for _ in subreddit)
