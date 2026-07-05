@@ -206,8 +206,6 @@ def run_arm(
     # 4-check verification. We're now on `run_branch` with uncommitted edits.
     # 1. Applied-edit count > 0 (git diff --stat per M13).
     diff_stat = git("diff", "--stat", "HEAD", check=False).strip()
-    print(
-        f"[debug-pre-status] branch={current_branch()} HEAD={git('rev-parse', 'HEAD')[:8]} status={git('status', '--porcelain')!r} log={git('log', '--oneline', '-3')!r}",
         file=sys.stderr,
     )
     diff_files = [
@@ -216,27 +214,27 @@ def run_arm(
     applied = bool(diff_files)
 
     # 2. git status scope — only in-scope files dirty.
-    git_status = git("status", "--porcelain", check=False).strip()
-    print(f"[debug-status] git_status={git_status!r}", file=sys.stderr)
-    # Format: "XY <path>" where XY is 2 status chars + 1 space. But the exact
-    # spacing varies (staged: 'M  path', unstaged: ' M path', both: 'MM path'),
-    # and Windows CRLF can add chars. Robust parse: drop the first 3 chars (the
-    # 'XY ' prefix), then strip any remaining leading whitespace.
+    # NOTE: do NOT .strip() the full output — that strips the leading space of
+    # the first line (the 'XY ' prefix starts with a space when X=' '), which
+    # corrupts the per-line parse. Only strip trailing whitespace/newline.
+    git_status_raw = git("status", "--porcelain", check=False)
+    git_status = git_status_raw.rstrip("\r\n")
+    # Format: "XY <path>" where XY is 2 status chars + 1 space. Path starts at index 3.
     dirty_files: set[str] = set()
     for line in git_status.splitlines():
         if not line:
             continue
-        print(
-            f"[debug-raw] line={line!r} len={len(line)} chars={[c for c in line[:5]]}",
-            file=sys.stderr,
-        )
-        # Drop the 2-char status prefix + the single separating space.
         path = line[3:].strip()
         # Handle renames: "R  old -> new" -> take new
         if " -> " in path:
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(f"[debug] dirty_files={sorted(dirty_files)} scope_clean={scope_clean}", file=sys.stderr)
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
