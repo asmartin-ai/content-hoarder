@@ -216,11 +216,17 @@ def run_arm(
     )
 
     # 4-check verification. We're now on `run_branch` with uncommitted edits.
-    # 1. Applied-edit count > 0 (git diff --stat per M13).
-    diff_stat = git("diff", "--stat", "HEAD", check=False).strip()
-    diff_files = [
-        line.split("|", 1)[0].strip() for line in diff_stat.splitlines() if "|" in line
-    ]
+    # 1. Applied-edit count > 0 (git diff --stat per M13). Filter out tolerated
+    #    bookkeeping files (results.csv etc.) — they're not executor output.
+    diff_stat_raw = git("diff", "--stat", "HEAD", check=False).strip()
+    diff_files: list[str] = []
+    for line in diff_stat_raw.splitlines():
+        if "|" not in line:
+            continue
+        path = line.split("|", 1)[0].strip()
+        if path not in TOLERATED_DIRTY:
+            diff_files.append(path)
+    diff_stat = diff_stat_raw  # keep full for notes
     applied = bool(diff_files)
 
     # 2. git status scope — only in-scope files dirty.
@@ -316,8 +322,20 @@ def run_arm(
             print(f"[warn] commit failed: {e}", file=sys.stderr)
     # Always return to main so the next run starts clean.
     if branch_now != "main":
-        # Discard any uncommitted leftovers before checkout.
-        git("checkout", "--", ".", check=False)
+        # Discard any uncommitted leftovers on the run branch before checkout.
+        # Only revert source files (not bakeoff/results.csv, which is the
+        # driver's own bookkeeping and may have been appended to).
+        for ef in task["editable"]:
+            git("checkout", "--", ef, check=False)
+        # Revert any other dirty source files (defensive — a confused executor
+        # might touch out-of-scope files; we discard those edits).
+        for line in git("status", "--porcelain", check=False).splitlines():
+            if not line:
+                continue
+            p = line[3:].strip()
+            if p in TOLERATED_DIRTY:
+                continue
+            git("checkout", "--", p, check=False)
         # Remove any untracked .aider litter (defensive; wrapper should have done it)
         git("clean", "-fd", "--", ".aider*", check=False)
         git("checkout", "main", check=False)

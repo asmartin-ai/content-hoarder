@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -128,6 +129,26 @@ def main() -> int:
                             timeout=args.timeout,
                         )
                         append_row(row)
+                        # Commit results.csv so it persists across runs and
+                        # doesn't trip the next run's clean-tree check.
+                        subprocess.run(
+                            ["git", "add", "bakeoff/results.csv"],
+                            cwd=REPO,
+                            capture_output=True,
+                            text=True,
+                        )
+                        subprocess.run(
+                            [
+                                "git",
+                                "commit",
+                                "-q",
+                                "-m",
+                                f"bakeoff: {rid} {row['gate_pass']}",
+                            ],
+                            cwd=REPO,
+                            capture_output=True,
+                            text=True,
+                        )
                         elapsed = int(time.time() - t0)
                         gp = row["gate_pass"]
                         if gp == "pass":
