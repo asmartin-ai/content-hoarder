@@ -215,6 +215,10 @@ def run_arm(
     git_status = git("status", "--porcelain", check=False).strip()
     dirty_files = {line[3:].strip() for line in git_status.splitlines() if line}
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
 
     # 3. Oracle hash unchanged.
     oracle_hashes_after = {str(p): file_hash(p) for p in oracle_paths}
