@@ -43,6 +43,7 @@ BAKEOFF = REPO / "bakeoff"
 SPECS = BAKEOFF / "specs"
 RESULTS_CSV = BAKEOFF / "results.csv"
 VENV_PY = REPO / ".venv" / "Scripts" / "python.exe"
+AIDER_DELEGATE = r"K:/Projects/aider-delegate/.venv/Scripts/aider-delegate.exe"
 
 # task_id -> spec + editable files + oracle tests
 TASKS: dict[str, dict] = {
@@ -140,7 +141,7 @@ def run_arm(
     # Build the aider-delegate command. The wrapper auto-creates a
     # delegated/run-<id> branch off HEAD and leaves us on it.
     cmd = [
-        "aider-delegate",
+        AIDER_DELEGATE,
         "--repo-path",
         str(REPO),
         "--message",
