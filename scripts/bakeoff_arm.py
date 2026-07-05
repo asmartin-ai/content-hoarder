@@ -219,8 +219,16 @@ def run_arm(
         oracle_hashes_before[k] != oracle_hashes_after[k] for k in oracle_hashes_before
     )
 
-    # 4. Full suite green (oracle + the 1008 baseline). Run on the run branch
-    # with the uncommitted edits in place.
+    # 4. Full suite green — but other bakeoff oracles (CH-B*) remain RED on
+    # the baseline (they're separate tasks). The regression floor is:
+    #   - this task's oracle: green
+    #   - the other CH-B* oracles: still RED (expected, they're not in scope)
+    #   - the 1008 pre-existing tests: still green
+    # So we run the full suite and assert: the ONLY failures are in other
+    # tasks' oracle files (test_bakeoff_ch_<id>_*.py where id != this task).
+    other_oracle_files = {
+        Path(o).name for tid, t in TASKS.items() if tid != task_id for o in t["oracle"]
+    }
     print(f"[verify] branch={branch_now} running full pytest suite...", file=sys.stderr)
     try:
         pytest_proc = subprocess.run(
@@ -232,10 +240,26 @@ def run_arm(
         )
         suite_lines = pytest_proc.stdout.strip().splitlines()
         suite_summary = suite_lines[-1] if suite_lines else "(no output)"
-        suite_green = pytest_proc.returncode == 0
+        # Collect the failed test file paths from the summary.
+        failed_files: set[str] = set()
+        for line in suite_lines:
+            m = re.match(r"FAILED\s+(tests/[^:]+):", line)
+            if m:
+                failed_files.add(Path(m.group(1)).name)
+        # Suite is "green for this task" = no failures outside the other oracles.
+        unexpected_failures = failed_files - other_oracle_files
+        suite_green = pytest_proc.returncode == 0 or (
+            not unexpected_failures
+            and all(
+                # This task's own oracle must be green (not in failed_files).
+                Path(o).name not in failed_files
+                for o in task["oracle"]
+            )
+        )
     except subprocess.TimeoutExpired:
         suite_summary = "TIMEOUT"
         suite_green = False
+        unexpected_failures = {"(timeout)"}
 
     gate_pass = (
         "pass"
@@ -292,6 +316,7 @@ def run_arm(
         "retries": 0,
         "notes": (
             f"branch={run_branch}; diff={diff_stat!r}; suite={suite_summary!r}; "
+            f"unexpected_failures={sorted(unexpected_failures)!r}; "
             f"oracle_changed={oracle_changed}; scope_clean={scope_clean}; "
             f"applied={applied}; committed={committed}; "
             f"end_branch={end_branch}; end_clean={not end_status}"
