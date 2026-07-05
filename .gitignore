@@ -57,3 +57,8 @@ design-ref/
 # Allow only the tiny curated synthetic test fixtures
 !fixtures/
 !fixtures/**
+
+# Bakeoff batch bookkeeping (live run logs/pids — not source; results.csv IS committed)
+bakeoff/batch.log
+bakeoff/batch.out
+bakeoff/batch.pid
