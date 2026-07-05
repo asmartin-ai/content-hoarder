@@ -42,6 +42,7 @@ class ParsedQuery:
     open_in_firefox: bool = False  # is:firefox-tab — metadata.open_in_firefox (incl. promoted YT tabs)
     deleted: bool = False  # is:deleted — metadata.media_status='gone' (durable SSOT; the `deleted` tag is fragile)
     has: str | list[str] | None = None  # has:video|image|gallery — metadata.media_type facet
+    ocr: bool = False  # is:ocr — items carrying non-empty metadata.ocr_text
 
     before: int | None = None  # unix seconds (UTC)
     after: int | None = None
@@ -163,6 +164,7 @@ def parse(q: str) -> ParsedQuery:
     decayed = swept = snoozed = False
     open_in_firefox = False
     deleted = False
+    ocr = False
     has_groups: list[list[str]] = []
     before = after = None
     score_min = score_max = None
@@ -260,6 +262,9 @@ def parse(q: str) -> ParsedQuery:
             if v == "deleted":
                 deleted = True
                 continue
+            if v == "ocr":
+                ocr = True
+                continue
             text_terms.append(t)
             continue
 
@@ -352,6 +357,7 @@ def parse(q: str) -> ParsedQuery:
         snoozed=snoozed,
         open_in_firefox=open_in_firefox,
         deleted=deleted,
+        ocr=ocr,
         has=has,
         before=before,
         after=after,
