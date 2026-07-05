@@ -213,8 +213,25 @@ def run_arm(
 
     # 2. git status scope — only in-scope files dirty.
     git_status = git("status", "--porcelain", check=False).strip()
-    dirty_files = {line[3:].strip() for line in git_status.splitlines() if line}
+    # Format: "XY <path>" where XY is 2 status chars. Path starts at index 3.
+    # But staged files have format "M  path" (M-space-space) so index 3 is correct.
+    # For unstaged: " M path" (space-M-space) also index 3. For both: "MM path" index 3.
+    # Use split(maxsplit=1) for robustness against renames (which have ' -> ').
+    dirty_files: set[str] = set()
+    for line in git_status.splitlines():
+        if not line:
+            continue
+        # Strip the 2-char status prefix + space, take the rest as path.
+        path = line[3:].strip()
+        # Handle renames: "R  old -> new" -> take new
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1].strip()
+        dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
