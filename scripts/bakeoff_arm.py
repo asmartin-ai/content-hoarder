@@ -206,8 +206,6 @@ def run_arm(
     # 4-check verification. We're now on `run_branch` with uncommitted edits.
     # 1. Applied-edit count > 0 (git diff --stat per M13).
     diff_stat = git("diff", "--stat", "HEAD", check=False).strip()
-        file=sys.stderr,
-    )
     diff_files = [
         line.split("|", 1)[0].strip() for line in diff_stat.splitlines() if "|" in line
     ]
@@ -230,7 +228,10 @@ def run_arm(
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
-    print(f"[debug] dirty_files={sorted(dirty_files)} scope_clean={scope_clean}", file=sys.stderr)
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} scope_clean={scope_clean}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
