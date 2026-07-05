@@ -2559,6 +2559,68 @@ def folder_counts(conn: sqlite3.Connection) -> dict[str, int]:
     return {r["folder"]: r["c"] for r in rows}
 
 
+def rename_user_tag(
+    conn: sqlite3.Connection, old: str, new: str
+) -> int:
+    """Rename a user-entered tag across every item that carries it in
+    ``metadata.tags_manual`` (CH-B4).
+
+    The HUMAN stamp (``tags_manual``) and the displayed UNION (``tags``) are
+    rewritten; the PROGRAMMATIC stamp (``tags_auto``) is left untouched so the
+    rename can never bleed into the heuristic path. After the writes,
+    ``search_text`` is rebuilt per row and the external-content trigram FTS
+    index is fully rebuilt (``INSERT INTO items_trgm(items_trgm) VALUES('rebuild')`` —
+    SQLite's canonical FTS5 external-content rebuild command; ``INSERT ...
+    SELECT`` is the documented gotcha to avoid). Returns the count of items
+    whose ``tags_manual`` actually contained ``old`` (0 = no-op + no FTS rebuild).
+    Caller commits."""
+    old_tag = _norm_user_tag(old)
+    new_tag = _norm_user_tag(new)
+    if not old_tag or not new_tag or old_tag == new_tag:
+        return 0
+
+    rows = conn.execute(
+        "SELECT fullname, metadata FROM items WHERE EXISTS "
+        "(SELECT 1 FROM json_each(metadata, '$.tags_manual') WHERE value = ?)",
+        (old_tag,),
+    ).fetchall()
+    if not rows:
+        return 0
+
+    for r in rows:
+        item = dict(r)
+        md = parse_metadata(item.get("metadata"))
+        manual = [
+            (new_tag if t == old_tag else t)
+            for t in _tag_list(md.get("tags_manual"))
+        ]
+        # Rebuild the displayed UNION from the manual stamp (renamed) + the auto
+        # stamp (preserved verbatim) so the auto-stamped ``old`` (which never
+        # appears in tags_manual for that item) survives untouched in `tags`.
+        auto = _tag_list(md.get("tags_auto"))
+        union: list[str] = []
+        for t in manual + auto:
+            if t not in union:
+                union.append(t)
+        md["tags_manual"] = manual
+        if union:
+            md["tags"] = union
+        else:
+            md.pop("tags", None)
+        item["metadata"] = json.dumps(md, ensure_ascii=False)
+        item["search_text"] = build_search_text(item, md)
+        conn.execute(
+            "UPDATE items SET metadata=?, search_text=? WHERE fullname=?",
+            (item["metadata"], item["search_text"], item["fullname"]),
+        )
+
+    # Rebuild the external-content trigram FTS over search_text so a search for
+    # ``new_tag`` surfaces the renamed items. ``'rebuild'`` is SQLite's canonical
+    # FTS5 command for external-content tables (INSERT … SELECT is the gotcha).
+    conn.execute("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')")
+    return len(rows)
+
+
 def user_tag_vocab(conn: sqlite3.Connection) -> list[str]:
     """The user-tag registry: distinct tags the user applied by hand, derived from the
     ``metadata.tags_manual`` stamps that :func:`set_tags` writes (Epic 26).
