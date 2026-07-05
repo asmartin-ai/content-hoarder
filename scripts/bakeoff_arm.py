@@ -213,6 +213,7 @@ def run_arm(
 
     # 2. git status scope — only in-scope files dirty.
     git_status = git("status", "--porcelain", check=False).strip()
+    print(f"[debug-status] git_status={git_status!r}", file=sys.stderr)
     # Format: "XY <path>" where XY is 2 status chars. Path starts at index 3.
     # But staged files have format "M  path" (M-space-space) so index 3 is correct.
     # For unstaged: " M path" (space-M-space) also index 3. For both: "MM path" index 3.
@@ -229,6 +230,10 @@ def run_arm(
             path = path.split(" -> ", 1)[1].strip()
         dirty_files.add(path)
     scope_clean = dirty_files.issubset(set(task["editable"]))
+    print(
+        f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
+        file=sys.stderr,
+    )
     print(
         f"[debug] dirty_files={sorted(dirty_files)} editable={task['editable']}",
         file=sys.stderr,
