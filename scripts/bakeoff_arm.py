@@ -77,6 +77,7 @@ TASKS: dict[str, dict] = {
 TIER_RATES: dict[str, tuple[float, float]] = {
     "T3_flash": (0.14, 0.28),  # in, out per 1M
     "T12_pro": (0.435, 0.87),
+    "local": (0.0, 0.0),  # LM Studio local models are free
 }
 
 PROTECTED = {"main", "master"}
@@ -119,7 +120,14 @@ def parse_tokens_from_stdout(stdout: str) -> tuple[int, int] | None:
 
 
 def run_arm(
-    task_id: str, model_id: str, run_n: int, *, provider: str, tier: str, timeout: int
+    task_id: str,
+    model_id: str,
+    run_n: int,
+    *,
+    provider: str,
+    tier: str,
+    timeout: int,
+    local: bool = False,
 ) -> dict:
     task = TASKS[task_id]
     spec_path = SPECS / task["spec"]
@@ -155,32 +163,61 @@ def run_arm(
 
     # Build the aider-delegate command. The wrapper auto-creates a
     # delegated/run-<id> branch off HEAD and leaves us on it.
-    cmd = [
-        AIDER_DELEGATE,
-        "--repo-path",
-        str(REPO),
-        "--message",
-        spec_text,
-        "--editable-files",
-        *task["editable"],
-        "--read-files",
-        *task["oracle"],
-        "--provider",
-        provider,
-        "--api-key-env",
-        "ZENMUX_PAYG_API_KEY",
-        "--api-format",
-        "anthropic",
-        "--model",
-        model_id,
-        "--edit-format",
-        "diff",
-        "--test-cmd",
-        test_cmd,
-        "--timeout-seconds",
-        str(timeout),
-        "--pretty",
-    ]
+    if local:
+        # Raw --api-base mode for LM Studio local models (free, $0).
+        cmd = [
+            AIDER_DELEGATE,
+            "--repo-path",
+            str(REPO),
+            "--message",
+            spec_text,
+            "--editable-files",
+            *task["editable"],
+            "--read-files",
+            *task["oracle"],
+            "--api-base",
+            "http://127.0.0.1:1234/v1",
+            "--api-key-env",
+            "LMSTUDIO_API_KEY",
+            "--api-format",
+            "openai",
+            "--model",
+            model_id,
+            "--edit-format",
+            "diff",
+            "--test-cmd",
+            test_cmd,
+            "--timeout-seconds",
+            str(timeout),
+            "--pretty",
+        ]
+    else:
+        cmd = [
+            AIDER_DELEGATE,
+            "--repo-path",
+            str(REPO),
+            "--message",
+            spec_text,
+            "--editable-files",
+            *task["editable"],
+            "--read-files",
+            *task["oracle"],
+            "--provider",
+            provider,
+            "--api-key-env",
+            "ZENMUX_PAYG_API_KEY",
+            "--api-format",
+            "anthropic",
+            "--model",
+            model_id,
+            "--edit-format",
+            "diff",
+            "--test-cmd",
+            test_cmd,
+            "--timeout-seconds",
+            str(timeout),
+            "--pretty",
+        ]
     t0 = time.time()
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 90)
     wallclock_s = int(time.time() - t0)
@@ -208,12 +245,16 @@ def run_arm(
     tok_match = parse_tokens_from_stdout(raw_stdout)
     if tok_match:
         tokens_in, tokens_out = tok_match
-    rate_in, rate_out = TIER_RATES[tier]
-    exec_usd = (
-        round((tokens_in * rate_in + tokens_out * rate_out) / 1_000_000, 6)
-        if tokens_in is not None and tokens_out is not None
-        else None
-    )
+    if local:
+        # Local models are free ($0). Tokens still logged for the record.
+        exec_usd = 0.0
+    else:
+        rate_in, rate_out = TIER_RATES[tier]
+        exec_usd = (
+            round((tokens_in * rate_in + tokens_out * rate_out) / 1_000_000, 6)
+            if tokens_in is not None and tokens_out is not None
+            else None
+        )
 
     # 4-check verification. We're now on `run_branch` with uncommitted edits.
     # 1. Applied-edit count > 0 (git diff --stat per M13). Filter out tolerated
@@ -412,6 +453,11 @@ def main() -> int:
     ap.add_argument("--provider", default="zenmux")
     ap.add_argument("--tier", choices=list(TIER_RATES), default="T3_flash")
     ap.add_argument("--timeout", type=int, default=900)
+    ap.add_argument(
+        "--local",
+        action="store_true",
+        help="Use LM Studio local endpoint (raw --api-base, $0 cost)",
+    )
     args = ap.parse_args()
 
     row = run_arm(
@@ -421,6 +467,7 @@ def main() -> int:
         provider=args.provider,
         tier=args.tier,
         timeout=args.timeout,
+        local=args.local,
     )
     append_row(row)
     print(json.dumps(row, indent=2))
