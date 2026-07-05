@@ -35,7 +35,7 @@ def _model(features):
         "prior": 0.5,
         "alpha": 50.0,
         "min_support": 2,
-        "features": {k: [n, k, rate] for k, (n, k, rate) in features.items()},
+        "features": {key: [n, k, rate] for key, (n, k, rate) in features.items()},
     }
 
 
