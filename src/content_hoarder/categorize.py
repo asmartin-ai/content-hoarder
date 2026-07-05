@@ -463,7 +463,9 @@ _SUBREDDIT_TAGS.update(
         "engineeringporn": ["science"],
         # coding / computing
         "learnpython": ["coding"],
-        "learnmachinelearning": ["coding"],
+        "learnmachinelearning": ["ai_ml"],
+        "machinelearning": ["ai_ml"],
+        "datascience": ["ai_ml"],
         "linux": ["coding"],
         "hacking": ["coding"],
         "howtohack": ["coding"],
@@ -489,6 +491,15 @@ _KEYWORD_TAGS = [
             r"\b(?<!dead )giveaway\b|\d+\s*%\s*off\b|\bsale\s+ends\b|\blast\s+chance\b"
             r"|\blimited[- ]time\b|\bfree\s+until\b|\bfree\s+weekend\b|\bfree\s+to\s+keep\b"
             r"|\bhumble\s+bundle\b|\bpromo\s+code\b|\bcoupon\b|\bexpires\b|\bflash\s+sale\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "ai_ml",
+        re.compile(
+            r"\bllm\b|\bgpt[- ]?\d+\b|\bchatgpt\b|\bclaude\s+(?:\d|ai|model|sonnet|opus|haiku)\b"
+            r"|\btransformer\b|\bembedding\b|\bneural network\b|\bmachine learning\b"
+            r"|\bdeep learning\b|\bartificial intelligence\b",
             re.IGNORECASE,
         ),
     ),
