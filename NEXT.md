@@ -1,6 +1,6 @@
 # NEXT.md — content-hoarder session focus
 
-`main` is 137 commits ahead of `origin/main`. Not pushed (user-gated per §7).
+`main` is ahead of `origin/main`. Not pushed (user-gated per §7).
 Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RED on main by design — they're turned green on per-run `delegated/run-*` branches).
 
 ## Just done (2026-07-05 session, content-hoarder bakeoff)
@@ -24,23 +24,46 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   idempotent, commits results.csv after each row). Per-task delegation specs
   in `bakeoff/specs/`. Run branches preserved under `delegated/run-*` for review.
 
+## Just done (2026-07-04 session, P3.5 legacy retirement)
+- **P3.5 MERGED into main** (spec 12 §2 — final packet of the W3 unify-one-surface
+  cycle). The `/triage` and `/reddit` **page** routes are retired:
+  - Both now return **302** redirects (`/triage` → `/?deck=1`, `/reddit` →
+    `/?source=reddit`) so existing bookmarks survive.
+  - JSON endpoints (`/reddit/items*`, `/reddit/subreddits`, `/reddit/stats`,
+    `/reddit/unsave/*`) are untouched — they are first-class v3 APIs.
+  - Deleted: `templates/{triage,reddit}.html`, `static/{triage,reddit}.js`,
+    `static/{reddit,app,tokens}.css`, and the obsolete
+    `scripts/wp2_t29_css_audit.py` (one-off app.css audit).
+  - KEPT `static/haptics.js` (deck mode uses it) and `static/core/tokens.css`
+    (what `index.html` actually loads).
+  - `sw.js CACHE` `ch-shell-v116` → `ch-shell-v117` (SHELL pruned of the
+    deleted entries + the `/triage` and `/reddit` nav URLs).
+  - `browse/main.js APP_VERSION` v116 → v117 in lockstep.
+  - `index.html` TRIAGE buttons now point straight at `/?deck=1`.
+  - Tests: +`test_legacy_triage_and_reddit_pages_redirect_to_v3`,
+    −`test_reddit_page_renders`, sw.js expectations refreshed. Net 0 →
+    1008 still green.
+
 ## Next 1-3 actions (in order)
 1. **Review the bakeoff run branches** for the winning models — spot-check
    minimax-m3's CH-B4 fix (the highest-quality diff I saw; correctly uses
    the canonical FTS5 rebuild + preserves `tags_auto`) and deepseek-v4-flash's
    CH-B1 fix. Cherry-pick any that should land on `main`.
-2. **P3.5 legacy retirement** — still pending from prior session. Execute
-   spec 12 §2 checklist: delete `/triage` + `/reddit` page routes (keep JSON),
-   strip SHELL entries, delete `static/{triage.js,reddit.js,reddit.css,app.css,
-   tokens.css (verify)}`, add 302 redirects. KEEP `/static/haptics.js`.
-3. **Push 137 local commits** to `origin/main`? (user-gated per §7)
+2. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
+   (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
+   lands on the right v3 surface). Playwright UI suite is current; run it
+   on a machine with `pip install -e .[ui] && playwright install chromium`
+   before sign-off.
+3. **Push to a PRIVATE repo** (user requested). Currently `origin` =
+   `asmartin-ai/content-hoarder` is PUBLIC. Plan: create a private remote,
+   push there; clean up public/private split per the cleanup plan.
 
 ## Open decisions (need user)
-- Push the 137 local commits to `origin/main`? (user-gated per §7)
+- Pick the private remote target + scope (full history vs. source-only orphan).
 - Pick `<DEST>` drive for media mirror (spec 10).
 - Pick representative item + auth posture for video smoke (spec 11).
 - Real-device Pixel-6 QA pass for the mobile changes (issues #35-#48) +
-  P3.1 deck gestures + P3.3 subreddit facet.
+  P3.1 deck gestures, P3.3 subreddit facet, and P3.5 redirects.
 - Adopt the bakeoff winner (`minimax/minimax-m3` for cost, `deepseek-v4-flash`
   for reliability) as the default `aider-delegate` lane for future delegations?
 
@@ -51,3 +74,13 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
 - Live media/archive/unsave runs — all user-gated (§7).
 - PKMS cross-substrate bakeoff check — run the same model comparison on the
   PKMS substrate to confirm the routing table (per bakeoff plan §3).
+- **iPhone installability (planned feature).** Make the app installable by a
+  friend on **iOS Safari** (not just Android Chrome). iOS caveats: no
+  `beforeinstallprompt`, no custom Install button (our `index.html` Install
+  flow is Chrome/Android-specific), and standalone PWA support is partial
+  (viewport/hide-safari-UI works via manifest, but no install prompt). Likely
+  path: (a) ensure manifest + `apple-mobile-web-app-*` meta + same-origin
+  served for offline; (b) document the "Add to Home Screen" flow; (c) evaluate
+  a lightweight hosted instance vs. local LAN (Tailscale) since iOS needs a
+  reachable URL — iOS cannot install from `localhost`/`127.0.0.1`. Scoping
+  deferred until after P3.5 QA + the private-repo cleanup.

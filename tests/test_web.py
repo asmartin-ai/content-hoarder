@@ -893,6 +893,19 @@ def test_reddit_sync_auto_runs_when_enabled(tmp_db):
     assert r["result"]["auth_error"] is True
 
 
+def test_legacy_triage_and_reddit_pages_redirect_to_v3(tmp_db):
+    """P3.5: /triage and /reddit page routes are retired. Bookmarks must land
+    on the equivalent v3 surface via 302 (not 301 — these may move again)."""
+    cl = _client(tmp_db)
+    rt = cl.get("/triage", follow_redirects=False)
+    assert rt.status_code == 302
+    assert rt.headers["Location"].endswith("/?deck=1")
+
+    rr = cl.get("/reddit", follow_redirects=False)
+    assert rr.status_code == 302
+    assert rr.headers["Location"].endswith("/?source=reddit")
+
+
 def test_folders_evaluate_malformed_folder_id_returns_400(tmp_db):
     """Audit Medium (2026-07-02): int(folder_id) on bad client input gave 500, not 400."""
     _seed(tmp_db)
