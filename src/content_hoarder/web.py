@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
 
 from content_hoarder import (
     config,
@@ -160,7 +160,9 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.get("/triage")
     def triage():
-        return render_template("triage.html")
+        # P3.5: legacy /triage page retired; redirect to v3 deck mode so
+        # existing bookmarks land on the equivalent one-card triage surface.
+        return redirect("/?deck=1", code=302)
 
     @app.get("/manifest.webmanifest")
     def manifest():
@@ -1057,7 +1059,9 @@ def create_app(db_path: str | None = None) -> Flask:
 
     @app.get("/reddit")
     def reddit_page():
-        return render_template("reddit.html")
+        # P3.5: legacy /reddit page retired; redirect to the v3 reddit facet
+        # so existing bookmarks survive.
+        return redirect("/?source=reddit", code=302)
 
     @app.get("/reddit/items")
     def reddit_items():
