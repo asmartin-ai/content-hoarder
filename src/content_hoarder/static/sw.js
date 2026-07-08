@@ -2,13 +2,10 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v116"; // v116: subreddit facet (second-tier rail under reddit)
+const CACHE = "ch-shell-v117"; // v117: P3.5 legacy retirement — /triage + /reddit pages gone
 const SHELL = [
   "/",
-  "/triage",
-  "/reddit",
-  // v3 browse shell (what "/" actually loads) — was stale, still listed the v2 app.js
-  "/static/tokens.css",
+  // v3 browse shell (what "/" actually loads)
   "/static/theme.js",
   "/static/haptics.js",
   "/static/core/tokens.css",
@@ -21,7 +18,7 @@ const SHELL = [
   "/static/core/icons.js",
   "/static/core/tags.js",
   "/static/core/overlaynav.js",
-  "/static/core/markdown.js", // reader dependency (browse/reader.js:20) — was missing, broke offline reader
+  "/static/core/markdown.js", // reader dependency (browse/reader.js:20)
   "/static/browse/browse.css",
   "/static/browse/main.js",
   "/static/browse/deck.js",
@@ -31,11 +28,6 @@ const SHELL = [
   "/static/browse/prefetch.js",
   "/static/browse/palette.js",
   "/static/browse/operators.js",
-  // /triage now loads triage.js as an ES module (imports core/util, core/api, core/icons)
-  "/static/app.css",
-  "/static/triage.js",
-  "/static/reddit.css",
-  "/static/reddit.js",
   "/static/vendor/hls.min.js",
   "/static/icon.svg",
   "/static/icon-192.png",
