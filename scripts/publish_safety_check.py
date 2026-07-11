@@ -93,6 +93,10 @@ def scan_content(paths: list[str]) -> list[tuple[str, str, int]]:
     """Scan file contents for SECRET patterns. Returns (path, kind, line) hits."""
     hits: list[tuple[str, str, int]] = []
     for p in paths:
+        # Test fixtures deliberately contain real-secret shapes to verify
+        # the detector — exclude test files from content scanning.
+        if p.startswith("tests/"):
+            continue
         full = REPO / p
         if not full.is_file():
             continue
