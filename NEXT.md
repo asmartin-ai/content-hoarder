@@ -56,6 +56,22 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   public + private. No allowlist/sanitization step needed (sensitive material
   is path-level gitignored, never scrubbed).
 
+## Just done (2026-07-11 session, fix 2 RED UI tests)
+- **Both pre-existing RED UI tests fixed + merged to main** (`5534fa0`),
+  pushed to both remotes. Branch `feat/fix-ui-preregression` merged via
+  `--no-ff`.
+  - `test_subreddit_facet_drills_down`: the `.rail` is `display:none`
+    below 700px (mobile uses `.navdrawer`). Test was written against
+    desktop markup but ran on the mobile fixture → switched to
+    `desktop_page`.
+  - `test_relay_menu_labels_…`: 6 relay buttons at 64px `min-width`
+    overflowed the 412px Pixel-6 viewport by 62px. Raised the compact
+    breakpoint from 360px→480px, tightened gap (8→4px) + padding
+    (24→16px). Now fits with room to spare.
+  - Bumped sw.js CACHE + APP_VERSION v117→v118.
+- **Suite: 1029 unit + 65 UI all green.** Playwright installed on this
+  machine (`pip install -e .[ui] && playwright install chromium`).
+
 ## Just done (2026-07-07 session, wrap-up hygiene)
 - **Bakeoff WIP archived off main.** The three uncommitted files
   (`NEXT.md`, `bakeoff/STATUS-REPORT.md`, `scripts/bakeoff_arm.py`) were parked
@@ -69,18 +85,13 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Fix the 2 pre-existing RED UI tests** on main (`test_subreddit_facet_drills_down`,
-   `test_relay_menu_labels_…`). These were confirmed pre-existing before P3.5 and
-   deliberately kept out of that packet. A `feat/fix-ui-preregression` branch was
-   earmarked. Run the Playwright UI suite (`pytest -m ui`) to reproduce, then fix.
-2. **Cherry-pick bakeoff winners to `main`** — spot-check minimax-m3's CH-B4 fix
+1. **Cherry-pick bakeoff winners to `main`** — spot-check minimax-m3's CH-B4 fix
    (canonical FTS5 rebuild + preserves `tags_auto`) and deepseek-v4-flash's CH-B1
    fix from the `delegated/run-*` branches. Cherry-pick the ones worth landing.
-3. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
+2. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
    (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
-   lands on the right v3 surface). Playwright UI suite is current; run it
-   on a machine with `pip install -e .[ui] && playwright install chromium`
-   before sign-off.
+   lands on the right v3 surface).
+3. **Decide on bakeoff-winner adoption** for the default `aider-delegate` lane.
 
 ## Open decisions (need user)
 - Pick `<DEST>` drive for media mirror (spec 10).
