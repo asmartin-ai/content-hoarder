@@ -40,3 +40,27 @@ def test_service_worker_uses_navigation_fallback_for_pages_only():
     text = SW.read_text(encoding="utf-8")
     assert 'const isPage = req.mode === "navigate";' in text
     assert 'if (req.method !== "GET") return;' in text
+
+
+# --- Spec 13: root-scope SW route + cache bump + apple-touch-icon in shell ---
+
+
+def test_sw_js_route_served_with_root_scope_header(tmp_db):
+    """The SW must be reachable at /sw.js with Service-Worker-Allowed: / so it
+    can claim the root scope and intercept navigations to "/" (offline
+    fallback). The physical file stays at /static/sw.js."""
+    client = create_app(tmp_db).test_client()
+    resp = client.get("/sw.js")
+    assert resp.status_code == 200
+    assert resp.headers.get("Service-Worker-Allowed") == "/"
+    assert "javascript" in resp.headers.get("Content-Type", "").lower()
+
+
+def test_sw_cache_version_bumped_to_v119():
+    text = SW.read_text(encoding="utf-8")
+    assert "ch-shell-v119" in text, "sw.js CACHE not bumped to v119"
+
+
+def test_apple_touch_icon_in_shell_precache():
+    urls = _shell_urls()
+    assert "/static/apple-touch-icon.png" in urls
