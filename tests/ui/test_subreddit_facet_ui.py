@@ -4,6 +4,9 @@ Asserts that clicking the reddit source in the rail surfaces the subreddit
 sub-facet, and clicking a subreddit chip filters the items list. The
 subreddit endpoint is served from the real (synthetic-seeded) UI DB, so no
 page.route mocking is needed.
+
+Uses the desktop fixture: the subreddit sub-facet lives in ``#rail-sources``
+which is ``display:none`` below 700px (mobile uses the ``.navdrawer``).
 """
 
 import pytest
@@ -13,8 +16,8 @@ expect = pytest.importorskip("playwright.sync_api").expect
 pytestmark = pytest.mark.ui
 
 
-def test_subreddit_facet_drills_down(pixel6_page):
-    page = pixel6_page
+def test_subreddit_facet_drills_down(desktop_page):
+    page = desktop_page
 
     # Click the reddit source in the rail to scope to source=reddit.
     reddit_btn = page.locator("#rail-sources [data-source='reddit']").first
