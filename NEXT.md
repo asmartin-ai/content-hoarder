@@ -44,22 +44,45 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
     −`test_reddit_page_renders`, sw.js expectations refreshed. Net 0 →
     1008 still green.
 
+## Just done (2026-07-11 session, public/private mirror)
+- **Both remotes now in sync** at `47d23e9`. Private (`content-hoarder-private`)
+  was already current; public (`origin` = `content-hoarder`) caught up 135
+  commits. Going forward: **both remotes mirror the same history**; the
+  `publish_safety_check.py` scan is the gate before every push.
+- **Scanner false-positive fixed:** `publish_safety_check.py` was flagging its
+  own test fixtures (real-shaped AWS key + PEM in `test_publish_safety.py`).
+  Added a `tests/` exclusion to `scan_content`. Tree + `--history` both clean.
+- **PUBLISH-SAFETY.md posture updated:** single shared history, mirrored to
+  public + private. No allowlist/sanitization step needed (sensitive material
+  is path-level gitignored, never scrubbed).
+
+## Just done (2026-07-07 session, wrap-up hygiene)
+- **Bakeoff WIP archived off main.** The three uncommitted files
+  (`NEXT.md`, `bakeoff/STATUS-REPORT.md`, `scripts/bakeoff_arm.py`) were parked
+  on `archive/bakeoff-arm-wip`; main reverted to a clean tree ahead of the
+  P3.5 merge. Nothing pushed.
+- **Pre-existing UI failures kept out of P3.5.** The 2 Playwright failures
+  (`test_subreddit_facet_drills_down`, `test_relay_menu_labels_…`) are
+  confirmed pre-existing on main — they get a dedicated `feat/fix-ui-preregression`
+  branch, not folded into the retirement packet.
+- **Deferred by user:** private-repo push, Pixel-6 QA pass, and the fix branch.
+  P3.5 is merged locally; nothing pushed.
+
 ## Next 1-3 actions (in order)
-1. **Review the bakeoff run branches** for the winning models — spot-check
-   minimax-m3's CH-B4 fix (the highest-quality diff I saw; correctly uses
-   the canonical FTS5 rebuild + preserves `tags_auto`) and deepseek-v4-flash's
-   CH-B1 fix. Cherry-pick any that should land on `main`.
-2. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
+1. **Fix the 2 pre-existing RED UI tests** on main (`test_subreddit_facet_drills_down`,
+   `test_relay_menu_labels_…`). These were confirmed pre-existing before P3.5 and
+   deliberately kept out of that packet. A `feat/fix-ui-preregression` branch was
+   earmarked. Run the Playwright UI suite (`pytest -m ui`) to reproduce, then fix.
+2. **Cherry-pick bakeoff winners to `main`** — spot-check minimax-m3's CH-B4 fix
+   (canonical FTS5 rebuild + preserves `tags_auto`) and deepseek-v4-flash's CH-B1
+   fix from the `delegated/run-*` branches. Cherry-pick the ones worth landing.
+3. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
    (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
    lands on the right v3 surface). Playwright UI suite is current; run it
    on a machine with `pip install -e .[ui] && playwright install chromium`
    before sign-off.
-3. **Push to a PRIVATE repo** (user requested). Currently `origin` =
-   `asmartin-ai/content-hoarder` is PUBLIC. Plan: create a private remote,
-   push there; clean up public/private split per the cleanup plan.
 
 ## Open decisions (need user)
-- Pick the private remote target + scope (full history vs. source-only orphan).
 - Pick `<DEST>` drive for media mirror (spec 10).
 - Pick representative item + auth posture for video smoke (spec 11).
 - Real-device Pixel-6 QA pass for the mobile changes (issues #35-#48) +
