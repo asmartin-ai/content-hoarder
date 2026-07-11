@@ -85,13 +85,14 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
+1. **Implement iPhone PWA installability** — spec is approved + fully written
+   at `docs/specs/13-ios-pwa-installability.md`. Branch `feat/ios-pwa` is
+   created and ready. 9-step implementation order is at the bottom of the
+   spec. **First step:** edit `templates/index.html` head to add the 5 Apple
+   meta tags + fix the theme-color mismatch (`#101216` → `#0f1115`).
+2. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
    (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
    lands on the right v3 surface). Needs user hardware.
-2. **Pick the next feature to build.** The housekeeping is done: both
-   remotes mirrored, UI tests green, bakeoff features landed. Open work
-   is either an Icebox item (iPhone installability, media mirror, video
-   archive smoke) or a new direction the user chooses.
 3. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
    lane (`minimax/minimax-m3` for cost, `deepseek-v4-flash` for reliability).
 
@@ -117,13 +118,5 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
 - Live media/archive/unsave runs — all user-gated (§7).
 - PKMS cross-substrate bakeoff check — run the same model comparison on the
   PKMS substrate to confirm the routing table (per bakeoff plan §3).
-- **iPhone installability (planned feature).** Make the app installable by a
-  friend on **iOS Safari** (not just Android Chrome). iOS caveats: no
-  `beforeinstallprompt`, no custom Install button (our `index.html` Install
-  flow is Chrome/Android-specific), and standalone PWA support is partial
-  (viewport/hide-safari-UI works via manifest, but no install prompt). Likely
-  path: (a) ensure manifest + `apple-mobile-web-app-*` meta + same-origin
-  served for offline; (b) document the "Add to Home Screen" flow; (c) evaluate
-  a lightweight hosted instance vs. local LAN (Tailscale) since iOS needs a
-  reachable URL — iOS cannot install from `localhost`/`127.0.0.1`. Scoping
-  deferred until after P3.5 QA + the private-repo cleanup.
+- iOS splash screen images (`apple-touch-startup-image`) — deferred until
+  after initial iPhone PWA testing (spec 13); cosmetic only.
