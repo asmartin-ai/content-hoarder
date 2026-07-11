@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v117"; // v117: P3.5 legacy retirement — /triage + /reddit pages gone
+const CACHE = "ch-shell-v118"; // v118: relay-strip overflow fix (480px breakpoint)
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)
