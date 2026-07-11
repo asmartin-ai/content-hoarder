@@ -85,13 +85,22 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Cherry-pick bakeoff winners to `main`** — spot-check minimax-m3's CH-B4 fix
-   (canonical FTS5 rebuild + preserves `tags_auto`) and deepseek-v4-flash's CH-B1
-   fix from the `delegated/run-*` branches. Cherry-pick the ones worth landing.
-2. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
+1. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
    (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
-   lands on the right v3 surface).
-3. **Decide on bakeoff-winner adoption** for the default `aider-delegate` lane.
+   lands on the right v3 surface). Needs user hardware.
+2. **Pick the next feature to build.** The housekeeping is done: both
+   remotes mirrored, UI tests green, bakeoff features landed. Open work
+   is either an Icebox item (iPhone installability, media mirror, video
+   archive smoke) or a new direction the user chooses.
+3. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
+   lane (`minimax/minimax-m3` for cost, `deepseek-v4-flash` for reliability).
+
+## Cherry-pick audit (2026-07-11) — no-op, already landed
+- The 4 bakeoff oracle features were committed **directly to main** during
+  the bakeoff session (commits `dcccc2c`, `248be11`, etc.), not left on
+  run branches. All 21 oracle tests pass on main. Nothing to cherry-pick.
+- Cleaned up 7 stale `delegated/run-*` local branches (all from a later
+  LM-Studio qwen3-coder experiment, not the cloud bakeoff winners).
 
 ## Open decisions (need user)
 - Pick `<DEST>` drive for media mirror (spec 10).
