@@ -45,6 +45,6 @@ def test_main_js_wires_subreddit_facet(tmp_db):
     assert 'data-subreddit' in src
     assert "rail-sub" in src, "second-tier rail class missing"
     assert "/reddit/subreddits" in src, "facet doesn't fetch from the endpoint"
-    assert 'APP_VERSION = "v117"' in src, "APP_VERSION not v117"
+    assert 'APP_VERSION = "v118"' in src, "APP_VERSION not v118"
     sw = cl.get("/static/sw.js").data.decode("utf-8")
-    assert "ch-shell-v117" in sw, "CACHE not bumped to v117"
+    assert "ch-shell-v118" in sw, "CACHE not bumped to v118"
