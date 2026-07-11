@@ -1940,7 +1940,11 @@ body.focus .batchstrip {
     }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 480px) {
+    .relay-strip {
+        gap: var(--sp-1);
+        padding: 0 var(--sp-2);
+    }
     .relay-btn {
         min-width: 56px;
         min-height: 68px;
