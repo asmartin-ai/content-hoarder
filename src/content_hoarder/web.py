@@ -172,6 +172,16 @@ def create_app(db_path: str | None = None) -> Flask:
             mimetype="application/manifest+json",
         )
 
+    @app.get("/sw.js")
+    def service_worker():
+        resp = send_from_directory(
+            app.static_folder or os.path.join(app.root_path, "static"),
+            "sw.js",
+            mimetype="text/javascript",
+        )
+        resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
+
     # -- data --------------------------------------------------------------
 
     @app.get("/export")

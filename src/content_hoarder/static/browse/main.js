@@ -2345,7 +2345,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v118";
+const APP_VERSION = "v119";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
@@ -3323,7 +3323,7 @@ loadItems(true);
 openDeepLinkedReader();
 
 if ("serviceWorker" in navigator)
-  navigator.serviceWorker.register("/static/sw.js").catch((err) => {
+  navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
     // Service workers (and therefore PWA install) only work in a secure context:
     // HTTPS, or localhost/127.0.0.1. Plain HTTP over a LAN or Tailscale IP fails
     // here silently — surface it so the cause is visible. See docs/MOBILE_TAILSCALE.md.

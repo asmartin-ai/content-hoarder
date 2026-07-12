@@ -1,7 +1,28 @@
 # NEXT.md — content-hoarder session focus
 
 `main` is ahead of `origin/main`. Not pushed (user-gated per §7).
-Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RED on main by design — they're turned green on per-run `delegated/run-*` branches).
+Suite: **1036 unit + 65 UI = 1101 passing.** (2026-07-12)
+
+## Just done (2026-07-12 session, iOS PWA installability)
+- **Spec 13 IMPLEMENTED** on `feat/ios-pwa` branch. 7 files changed:
+  - `templates/index.html`: 5 Apple/mobile meta tags (`apple-mobile-web-app-capable`,
+    `status-bar-style=black-translucent`, `apple-mobile-web-app-title=Hoarder`,
+    `apple-touch-icon` link) + theme-color fix (`#101216` → `#0f1115`).
+  - `static/apple-touch-icon.png`: 180×180 icon generated from `icon.svg`.
+  - `web.py`: new `/sw.js` route with `Service-Worker-Allowed: /` header (fixes
+    the root-scope SW bug that prevented offline nav fallback on ALL platforms).
+  - `static/browse/main.js`: SW registration moved to `/sw.js` with
+    `{scope: "/"}`; APP_VERSION v118 → v119.
+  - `static/sw.js`: CACHE v118 → v119; `apple-touch-icon.png` added to SHELL.
+  - `cli.py` + `config.py`: `--tls` flag + `CONTENT_HOARDER_TLS` env var for
+    mkcert-backed HTTPS serving (required for iOS PWA install).
+  - `tests/test_pwa_meta.py` (+79 lines, new), `tests/test_service_worker.py`
+    (+3 tests), `tests/test_subreddit_facet.py` (version bump fix).
+  9 spec-13 oracle tests all green. Full suite: 1036 unit + 65 UI passing.
+- **iPhone setup:** `mkcert -install && mkcert -cert-file cert.pem -key-file key.pem
+  0.0.0.0 localhost <tailscale-ip> <tailscale-hostname>`, then
+  `python -m content_hoarder serve --host 0.0.0.0 --tls`. Install mkcert CA on
+  iPhone, navigate to `https://<tailscale-hostname>:8788`, Share → Add to Home Screen.
 
 ## Just done (2026-07-05 session, content-hoarder bakeoff)
 - **Phase 0 + Phase 1 + Phase 2 bakeoff COMPLETE.** 80 runs across 4 hard-oracle
@@ -85,13 +106,9 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Real-device Pixel-6 QA** of deck mode + subreddit facet + the redirects
-   (visit `/triage` and `/reddit` from an old bookmark to confirm the 302
-   lands on the right v3 surface). Needs user hardware.
-2. **Pick the next feature to build.** The housekeeping is done: both
-   remotes mirrored, UI tests green, bakeoff features landed. Open work
-   is either an Icebox item (iPhone installability, media mirror, video
-   archive smoke) or a new direction the user chooses.
+1. **Merge `feat/ios-pwa` → main** and push both remotes (publish-safety check first).
+2. **Real-device QA**: iPhone (install via HTTPS + Add to Home Screen, offline launch)
+   + Pixel-6 (deck mode + subreddit facet + redirects). Needs user hardware.
 3. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
    lane (`minimax/minimax-m3` for cost, `deepseek-v4-flash` for reliability).
 
@@ -117,13 +134,5 @@ Suite: **1008 passing** (baseline unchanged; the 4 CH-B* bakeoff oracles stay RE
 - Live media/archive/unsave runs — all user-gated (§7).
 - PKMS cross-substrate bakeoff check — run the same model comparison on the
   PKMS substrate to confirm the routing table (per bakeoff plan §3).
-- **iPhone installability (planned feature).** Make the app installable by a
-  friend on **iOS Safari** (not just Android Chrome). iOS caveats: no
-  `beforeinstallprompt`, no custom Install button (our `index.html` Install
-  flow is Chrome/Android-specific), and standalone PWA support is partial
-  (viewport/hide-safari-UI works via manifest, but no install prompt). Likely
-  path: (a) ensure manifest + `apple-mobile-web-app-*` meta + same-origin
-  served for offline; (b) document the "Add to Home Screen" flow; (c) evaluate
-  a lightweight hosted instance vs. local LAN (Tailscale) since iOS needs a
-  reachable URL — iOS cannot install from `localhost`/`127.0.0.1`. Scoping
-  deferred until after P3.5 QA + the private-repo cleanup.
+- iOS splash screen images (`apple-touch-startup-image`) — deferred until
+  after initial iPhone PWA testing; cosmetic only.
