@@ -1,7 +1,6 @@
 # NEXT.md — content-hoarder session focus
 
-`main` is ahead of `origin/main`. Not pushed (user-gated per §7).
-Suite: **1036 unit + 65 UI = 1101 passing.** (2026-07-12)
+`main` pushed to both remotes. Suite: **1036 unit + 65 UI = 1101 passing.** (2026-07-12)
 
 ## Just done (2026-07-12 session, iOS PWA installability)
 - **Spec 13 IMPLEMENTED** on `feat/ios-pwa` branch. 7 files changed:
@@ -106,11 +105,13 @@ Suite: **1036 unit + 65 UI = 1101 passing.** (2026-07-12)
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Merge `feat/ios-pwa` → main** and push both remotes (publish-safety check first).
-2. **Real-device QA**: iPhone (install via HTTPS + Add to Home Screen, offline launch)
+1. **Real-device QA**: iPhone (install via HTTPS + Add to Home Screen, offline launch)
    + Pixel-6 (deck mode + subreddit facet + redirects). Needs user hardware.
-3. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
+2. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
    lane (`minimax/minimax-m3` for cost, `deepseek-v4-flash` for reliability).
+3. **Pick the next feature to build.** Housekeeping is done, iOS PWA shipped.
+   Open specs: media mirror (spec 10), video archive smoke (spec 11). Or a new
+   direction the user chooses.
 
 ## Cherry-pick audit (2026-07-11) — no-op, already landed
 - The 4 bakeoff oracle features were committed **directly to main** during
