@@ -105,13 +105,14 @@
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **Real-device QA**: iPhone (install via HTTPS + Add to Home Screen, offline launch)
-   + Pixel-6 (deck mode + subreddit facet + redirects). Needs user hardware.
-2. **Decide on bakeoff-winner adoption** for the default `aider-delegate`
-   lane (`minimax/minimax-m3` for cost, `deepseek-v4-flash` for reliability).
-3. **Pick the next feature to build.** Housekeeping is done, iOS PWA shipped.
-   Open specs: media mirror (spec 10), video archive smoke (spec 11). Or a new
-   direction the user chooses.
+1. **iOS splash screens** (`apple-touch-startup-image` for each iPhone/iPad size).
+   Purely cosmetic but makes the PWA launch feel native. No blockers — can start
+   anytime. ~S effort.
+2. **Real-device Pixel-6 QA**: deck mode + subreddit facet + redirects. Needs user
+   hardware. (iPhone PWA test deferred — user will test when ready.)
+3. **Update `aider-headless-delegate` skill** with the user's chosen delegation
+   lanes: `minimax/minimax-m3` + `deepseek-v4-flash` combination. System config
+   outside this repo.
 
 ## Cherry-pick audit (2026-07-11) — no-op, already landed
 - The 4 bakeoff oracle features were committed **directly to main** during
@@ -121,12 +122,24 @@
   LM-Studio qwen3-coder experiment, not the cloud bakeoff winners).
 
 ## Open decisions (need user)
-- Pick `<DEST>` drive for media mirror (spec 10).
-- Pick representative item + auth posture for video smoke (spec 11).
-- Real-device Pixel-6 QA pass for the mobile changes (issues #35-#48) +
-  P3.1 deck gestures, P3.3 subreddit facet, and P3.5 redirects.
-- Adopt the bakeoff winner (`minimax/minimax-m3` for cost, `deepseek-v4-flash`
-  for reliability) as the default `aider-delegate` lane for future delegations?
+
+### Spec 10 — Media mirror
+- **Pick `<DEST>` drive.** The spec recommends a second physical drive (e.g. `D:\`
+  or `E:\` if primary is `K:\`), or an external USB-C SSD. Once chosen, the
+  implementation is a single `robocopy` command → `scripts/mirror-media.bat`.
+- Manual-after-archive vs scheduled-weekly? (Recommended: manual.)
+- Second mirror to a tailnet peer? (Default: no.)
+
+### Spec 11 — Video archive smoke
+- **OAuth or cookies?** Reddit video needs auth. Is `REDDIT_OAUTH_CLIENT_ID`
+  configured or should we use a `cookies.txt`?
+- **Pick a representative candidate.** Run the `LIMIT 5` query from the spec to
+  find a `v.redd.it` item that's recent enough to still be served.
+- yt-dlp + ffmpeg installed? Run the pre-flight check first.
+
+### Ongoing
+- Real-device Pixel-6 QA for mobile changes (deck gestures, subreddit facet,
+  redirects).
 
 ## Icebox
 - #72 Life-OS fixtures — real T1, needs Life-OS contract work; defer.
@@ -135,5 +148,6 @@
 - Live media/archive/unsave runs — all user-gated (§7).
 - PKMS cross-substrate bakeoff check — run the same model comparison on the
   PKMS substrate to confirm the routing table (per bakeoff plan §3).
-- iOS splash screen images (`apple-touch-startup-image`) — deferred until
-  after initial iPhone PWA testing; cosmetic only.
+- iPhone PWA real-device test — deferred; user will test when ready.
+- iOS splash screen images (`apple-touch-startup-image`) — deferred cosmetic;
+  moved up to Next #1 for next session.
