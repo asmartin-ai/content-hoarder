@@ -78,6 +78,7 @@ TIER_RATES: dict[str, tuple[float, float]] = {
     "T3_flash": (0.14, 0.28),  # in, out per 1M
     "T12_pro": (0.435, 0.87),
     "local": (0.0, 0.0),  # LM Studio local models are free
+    "trial_flat": (0.0, 0.0),  # subscription/trial lanes (e.g. SuperGrok via CLIProxyAPI)
 }
 
 PROTECTED = {"main", "master"}
@@ -128,6 +129,8 @@ def run_arm(
     tier: str,
     timeout: int,
     local: bool = False,
+    api_base: str | None = None,
+    api_key_env: str | None = None,
 ) -> dict:
     task = TASKS[task_id]
     spec_path = SPECS / task["spec"]
@@ -163,8 +166,10 @@ def run_arm(
 
     # Build the aider-delegate command. The wrapper auto-creates a
     # delegated/run-<id> branch off HEAD and leaves us on it.
-    if local:
-        # Raw --api-base mode for LM Studio local models (free, $0).
+    if local or api_base:
+        # Raw --api-base mode: LM Studio local models (default) or any
+        # OpenAI-compatible endpoint via --api-base/--api-key-env override
+        # (e.g. CLIProxyAPI on 8317 for the SuperGrok trial).
         cmd = [
             AIDER_DELEGATE,
             "--repo-path",
@@ -176,9 +181,9 @@ def run_arm(
             "--read-files",
             *task["oracle"],
             "--api-base",
-            "http://127.0.0.1:1234/v1",
+            api_base or "http://127.0.0.1:1234/v1",
             "--api-key-env",
-            "LMSTUDIO_API_KEY",
+            api_key_env or "LMSTUDIO_API_KEY",
             "--api-format",
             "openai",
             "--model",
@@ -458,6 +463,16 @@ def main() -> int:
         action="store_true",
         help="Use LM Studio local endpoint (raw --api-base, $0 cost)",
     )
+    ap.add_argument(
+        "--api-base",
+        default=None,
+        help="Raw OpenAI-compatible endpoint override (e.g. http://127.0.0.1:8317/v1)",
+    )
+    ap.add_argument(
+        "--api-key-env",
+        default=None,
+        help="Env var holding the API key for --api-base (e.g. CLIPROXY_API_KEY)",
+    )
     args = ap.parse_args()
 
     row = run_arm(
@@ -468,6 +483,8 @@ def main() -> int:
         tier=args.tier,
         timeout=args.timeout,
         local=args.local,
+        api_base=args.api_base,
+        api_key_env=args.api_key_env,
     )
     append_row(row)
     print(json.dumps(row, indent=2))
