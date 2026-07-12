@@ -1,7 +1,6 @@
 # Spec 13 — iPhone PWA Installability
 
-**Status: APPROVED 2026-07-11, not yet implemented.**
-**Branch:** `feat/ios-pwa` (off `main`).
+**Status: IMPLEMENTED 2026-07-12** (merged to `main` via `feat/ios-pwa`).
 
 ## Problem
 iOS Safari has no `beforeinstallprompt` event, so the Android-centric PWA flow
