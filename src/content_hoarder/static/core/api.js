@@ -79,7 +79,8 @@ export const fetchSources = (status) =>
 export const fetchStats = (params) =>
   getJSON("/stats" + (params ? "?" + new URLSearchParams(params) : ""));
 
-/* ---- reddit unsave queue ---- */
+/* ---- reddit sync + unsave queue ---- */
+export const redditSync = (body) => postJSON("/reddit/sync", body || {});
 export const unsaveStatus = () => getJSON("/reddit/unsave/status");
 export const unsaveDrain = (body) =>
   postJSON("/reddit/unsave/drain", body || { dry_run: true });

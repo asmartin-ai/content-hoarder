@@ -72,10 +72,10 @@ monolithic file.
 - Milestone: https://github.com/asmartin-ai/content-hoarder/milestone/8
 - Active issues:
   - #18 — Optional Karakeep bridge
-  - #19 — Redesign the app icon
   - #20 — 60fps UI
   - #21 — Data-saving mode + mobile performance pass
   - #22 — Trial GLM-5.2 as a design bakeoff arm (gated by the frontend-design skill + visual review)
+  - ~~#19 — Redesign the app icon~~ — **cancelled** 2026-07-12 (user: not wanted)
 
 ## Epic 9 — Reddit merge follow-ups
 

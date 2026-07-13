@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v119"; // v119: iOS PWA meta tags + apple-touch-icon + root-scope SW
+const CACHE = "ch-shell-v120"; // v120: iOS splash screens + header Sync newest + reddit image→thread
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)
@@ -33,6 +33,8 @@ const SHELL = [
   "/static/apple-touch-icon.png",
   "/static/icon-192.png",
   "/static/icon-512.png",
+  "/static/splashes/splash-iphone-14-pro.png",
+  "/static/splashes/splash-iphone-14-pro-max.png",
   "/manifest.webmanifest",
 ];
 
