@@ -261,3 +261,28 @@ CONTENT_HOARDER_DB=data/app.ocr-smoke-….db python -m content_hoarder ocr --lim
 Result: **ocr_ok=8, empty=2, failed=0**. Live `data/app.db` mtime unchanged.
 Sample recovered text includes meme/screenshot captions (e.g. ADHD meme, 4chan-style, Twitter screenshots).
 Empty cases were photo-heavy posts with little glyph text (expected).
+
+
+## Accuracy table (DB-copy smoke, 2026-07-12)
+
+Real Tesseract **5.4.0** on 10 recently-seen items with local `archived_media` images.
+DB: `data/app.ocr-smoke-20260712-190837.db` (copy of live; live untouched).
+Command: `ocr --limit 10 --apply`.
+
+| # | fullname | title | blobs | chars | mean conf | usable? | notes / preview |
+|---|---|---|---:|---:|---:|---|---|
+| 1 | `reddit:t3_1tz749o` | COME HERE OFTEN? | 10 | 1209 | 90.3 | **Y** | Multi-panel story text; clean |
+| 2 | `reddit:t3_1tz09wz` | Yes, this is newsworthy | 1 | 60 | 96.0 | **Y** | Meme caption |
+| 3 | `reddit:t3_1tyvbme` | Movie recommendations | 1 | 0 | 31.7 | **N** | Photo/poster; below conf / empty (expected) |
+| 4 | `reddit:t3_1tyjdkb` | Get a hobby, get a life | 1 | 586 | 94.4 | **Y** | Screenshot / social post |
+| 5 | `reddit:t3_1tyh78x` | The unfortunate distribution of effort | 1 | 414 | 89.9 | **Y** | ADHD meme text |
+| 6 | `reddit:t3_1tyt4bn` | Is it just me? | 1 | 259 | 89.1 | **Y** | Meme text |
+| 7 | `reddit:t3_1tylrib` | I'm starting a new life | 1 | 300 | 89.7 | **Y** | 4chan-style screenshot |
+| 8 | `reddit:t3_1tyilf2` | AoE2 mentioned | 1 | 188 | 89.3 | **Y** | Twitter screenshot |
+| 9 | `reddit:t3_1tyj1qo` | Vacation Trip: USAF Museum | 19 | 0 | 95.0 | **N** | Gallery of photos; high conf on empty frames? stamped empty |
+| 10 | `reddit:t3_1tyj3mw` | Chester, England has two-story sidewalks | 7 | 22 | 89.1 | **N** | Mostly photo; noise fragments |
+
+**Summary:** usable **7/10** (70%). Failures are photo-heavy posts (correct empty) + one noisy short fragment.
+Screenshot/meme text is the win case for FTS. Fixture `fixtures/ocr/hello.png` → exact `CONTENTHOARDER` @ conf 69.
+
+**Recommendation:** ship write path as-is; default min-confidence 40 is fine; consider skipping pure-photo galleries later (no text signal) as a quality filter, not a blocker.

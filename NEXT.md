@@ -1,6 +1,6 @@
 # NEXT.md — content-hoarder session focus
 
-Branch tip work is on **`feat/ocr-tesseract-experimental`** (uncommitted + this session's ready-to-code packet). Suite: **unit green** after OCR + splash + frontend static guards (2026-07-12).
+Branch **`feat/ocr-tesseract-experimental`** pushed (`bd84c0f`+). Suite green. Docs follow-ups: OCR accuracy table, README `ocr` row, #74 diagnosis, design side plan.
 
 ## Just done (2026-07-12 — ready-to-code sweep)
 
@@ -18,14 +18,17 @@ Branch tip work is on **`feat/ocr-tesseract-experimental`** (uncommitted + this 
 - Cache bump **v119 → v120** (`sw.js` + `APP_VERSION`).
 
 ## Next 1-3 actions
-1. **Review + commit** this branch (or split ops/docs vs OCR vs frontend if preferred).
-2. **OCR real-engine spike** on 10 live archived images (`ocr --limit 10 --apply` on a DB copy) — record accuracy in spec 14.
+1. **Review + merge PR** for `feat/ocr-tesseract-experimental` when ready.
+2. **#74 fix P0** — honest reader empty/auth states (`docs/bugs/74-reddit-comments-empty-reader.md`).
 3. **Full live `archive-media --videos`** only if you gate it (smoke already passed).
 
 ## Open / user-gated
 - Unlimited live video archive.
 - Pixel-6 / iPhone real-device QA.
 - Merge experimental OCR branch after spike.
+
+## Design side-track
+See `docs/design/SIDE-DESIGN-PLAN.md` — weekly 45‑min decision slots; no design thrash on ship branches.
 
 ## Explicitly out
 - App icon redesign (#19) — cancelled.
