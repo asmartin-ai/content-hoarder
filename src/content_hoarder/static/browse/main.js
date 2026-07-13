@@ -41,6 +41,7 @@ import {
   createFirstPagePrefetcher,
 } from "./prefetch.js";
 import { initDeck, setHost as setDeckHost } from "./deck.js";
+import { installFastScroll } from "./fastscroll.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -1271,6 +1272,9 @@ if ("onscrollend" in window)
   );
 gotop.addEventListener("click", scrollToBrowseTop);
 
+/* ---- #46 mobile fast-scroll handle (right-edge scrub) ---- */
+installFastScroll(itemsEl);
+
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
 const ambient = $("#ambient");
 function cardHtml(c) {
@@ -2345,7 +2349,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v119";
+const APP_VERSION = "v120";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
