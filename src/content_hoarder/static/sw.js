@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v124"; // v124: iOS splash screens (apple-touch-startup-image, 11 sizes)
+const CACHE = "ch-shell-v125"; // v125: lightbox caption + text blurbs + #39 playpill guard
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)
