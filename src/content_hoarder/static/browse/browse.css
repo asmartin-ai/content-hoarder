@@ -1391,6 +1391,11 @@ body.focus .batchstrip {
     padding: 8px 12px;
     cursor: pointer;
 }
+.playpill.textish {
+    cursor: default;
+    color: var(--text-dim);
+    background: var(--surface-2, rgba(255,255,255,0.06));
+}
 
 /* action icons — always visible on pointer devices; chIcon glyphs via currentColor */
 .acts {
@@ -2813,7 +2818,26 @@ kbd {
 #media-body .gallery-img.zoomed:active {
     cursor: grabbing;
 }
+#media-body .media-caption {
+    max-width: min(720px, 92vw);
+    margin: 10px auto 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    color: var(--text, #e8eaed);
+    font: var(--fw-regular) var(--fs-sm)/1.45 var(--font-sans, system-ui, sans-serif);
+    text-align: left;
+    word-break: break-word;
+}
+#media-body .media-caption-text { white-space: pre-wrap; }
+#media-body .media-caption-more {
+    margin-top: 8px; border: none; background: transparent;
+    color: var(--accent, #2dd4bf);
+    font: var(--fw-semibold) var(--fs-xs)/1 var(--font-mono);
+    cursor: pointer; padding: 0;
+}
 #media-body .media-fallback {
+
     display: inline-block;
     margin-top: 10px;
     color: var(--accent);
