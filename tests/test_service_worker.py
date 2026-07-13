@@ -56,9 +56,9 @@ def test_sw_js_route_served_with_root_scope_header(tmp_db):
     assert "javascript" in resp.headers.get("Content-Type", "").lower()
 
 
-def test_sw_cache_version_bumped_to_v119():
+def test_sw_cache_version_bumped_to_v120():
     text = SW.read_text(encoding="utf-8")
-    assert "ch-shell-v119" in text, "sw.js CACHE not bumped to v119"
+    assert "ch-shell-v120" in text, "sw.js CACHE not bumped to v120"
 
 
 def test_apple_touch_icon_in_shell_precache():

@@ -18,6 +18,62 @@
             rel="apple-touch-icon"
             href="/static/apple-touch-icon.png"
         />
+        <!-- iOS splash screens (apple-touch-startup-image). Portrait only; #0f1115 bg + centered icon. -->
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-se.png"
+            media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-8.png"
+            media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-x.png"
+            media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-12-13.png"
+            media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-14-pro.png"
+            media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-xr.png"
+            media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-xs-max.png"
+            media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-iphone-14-pro-max.png"
+            media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-ipad-air.png"
+            media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-ipad-pro-11.png"
+            media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
+        <link
+            rel="apple-touch-startup-image"
+            href="/static/splashes/splash-ipad-pro-12.png"
+            media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        />
         <title>content-hoarder</title>
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
@@ -86,6 +142,15 @@
                     aria-label="Surprise me"
                 >
                     &#9860;
+                </button>
+                <button
+                    type="button"
+                    class="icon-btn"
+                    id="btn-sync-newest"
+                    title="Sync newest saved from Reddit"
+                    aria-label="Sync newest"
+                >
+                    &#8635;
                 </button>
                 <span
                     class="app-ver"

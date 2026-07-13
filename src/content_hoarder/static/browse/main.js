@@ -788,7 +788,11 @@ function openMediaFor(item, opts) {
   const vsrc = playableVideoSrc(item); // shared playability test (same as the reader's inline player)
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
   const img = imageUrl(item);
-  if (img) return lightbox.openImage(img, opts);
+  // Spec 05: reddit image posts open the comments thread (reader), not the bare
+  // image. Non-reddit images and reddit images without a permalink still open
+  // the image. Raw image remains reachable via the reader / Open on Reddit.
+  if (img && !(item.source === "reddit" && m.permalink))
+    return lightbox.openImage(img, opts);
   /* Gallery without captured image URLs — hydrate one item on demand via the existing
      OAuth/cached-thread backend, then fall back to the local thumbnail + Reddit link. */
   if (m.media_type === "gallery" || /\/gallery\//i.test(item.url || "")) {
@@ -2345,7 +2349,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v119";
+const APP_VERSION = "v120";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
@@ -3158,41 +3162,45 @@ $("#done-retention-purge").addEventListener("click", async () => {
   }
 });
 
-/* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9) ---- */
-const syncBtn = $("#open-sync");
-if (syncBtn)
-  syncBtn.addEventListener("click", async () => {
-    if (syncBtn.disabled) return;
-    const label = syncBtn.textContent;
-    syncBtn.disabled = true;
-    syncBtn.textContent = "Syncing newest…";
-    try {
-      const data = await api.postJSON("/reddit/sync", {});
-      if (data.auth_error)
-        toast("Sync needs a reddit_session cookie — set it up first.");
-      else if (data.error) toast("Sync error: " + data.error);
-      else {
-        toast(
-          "+" +
-            data.new +
-            " new (" +
-            data.fetched +
-            " fetched · " +
-            data.stopped +
-            ").",
-        );
-        clearItemFirstPageCache();
-        loadItems(true);
-        loadCounts();
-        refreshRail();
-        refreshPulse();
-      }
-    } catch (e) {
-      toast("Sync failed — network error.");
+/* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9 / spec 06) ---- */
+async function runSyncNewest(btn) {
+  if (!btn || btn.disabled) return;
+  const label = btn.textContent;
+  const isIcon = btn.classList.contains("icon-btn");
+  btn.disabled = true;
+  if (!isIcon) btn.textContent = "Syncing newest…";
+  try {
+    const data = await api.postJSON("/reddit/sync", {});
+    if (data.auth_error)
+      toast("Sync needs a reddit_session cookie — set it up first.");
+    else if (data.error) toast("Sync error: " + data.error);
+    else {
+      toast(
+        "+" +
+          data.new +
+          " new (" +
+          data.fetched +
+          " fetched · " +
+          data.stopped +
+          ").",
+      );
+      clearItemFirstPageCache();
+      loadItems(true);
+      loadCounts();
+      refreshRail();
+      refreshPulse();
     }
-    syncBtn.textContent = label;
-    syncBtn.disabled = false;
-  });
+  } catch (e) {
+    toast("Sync failed — network error.");
+  }
+  if (!isIcon) btn.textContent = label;
+  btn.disabled = false;
+}
+const syncBtn = $("#open-sync");
+if (syncBtn) syncBtn.addEventListener("click", () => runSyncNewest(syncBtn));
+const syncHeaderBtn = $("#btn-sync-newest");
+if (syncHeaderBtn)
+  syncHeaderBtn.addEventListener("click", () => runSyncNewest(syncHeaderBtn));
 
 /* reflect persisted settings into the panel */
 $$("#set-density button").forEach((b) =>

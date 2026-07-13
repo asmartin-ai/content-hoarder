@@ -19,6 +19,8 @@ dev = ["pytest"]
 # `playwright install chromium`, run with `pytest -m ui`. Kept out of `dev` so the unit
 # suite + CI don't need a browser.
 ui = ["pytest-playwright"]
+# OCR enrich (Spec 14 / #26): also needs the Tesseract binary on PATH.
+ocr = ["pytesseract", "Pillow"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
