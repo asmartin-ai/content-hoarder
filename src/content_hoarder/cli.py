@@ -1014,6 +1014,39 @@ def cmd_archive_media(args) -> int:
     return 0
 
 
+def cmd_ocr(args) -> int:
+    """OCR local archived images into metadata.ocr_text (Spec 14 / #26). Dry-run default;
+    --apply writes + rebuilds search_text. Needs optional ``pip install -e '.[ocr]'`` +
+    Tesseract on PATH. Offline-testable via injectable engine in content_hoarder.ocr."""
+    from content_hoarder import ocr as ocr_mod
+
+    with _connect() as conn:
+        res = ocr_mod.ocr_all(
+            conn,
+            limit=args.limit,
+            apply=args.apply,
+            force=args.force,
+            lang=args.lang,
+            min_confidence=args.min_confidence,
+            throttle=args.throttle,
+            progress=lambda m: print(m, file=sys.stderr),
+        )
+    print(json.dumps(res, indent=2))
+    if not args.apply:
+        print(
+            f"(dry run — {res['items']} item(s) with local images would be OCR'd; "
+            f"re-run with --apply)",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"ocr ok={res['ocr_ok']} empty={res['empty']} skipped={res['skipped']} "
+            f"failed={res['failed']}",
+            file=sys.stderr,
+        )
+    return 0 if res.get("failed", 0) == 0 else 1
+
+
 def cmd_export(args) -> int:
     from pathlib import Path
 
@@ -2125,6 +2158,46 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply", action="store_true", help="Fetch + write (default: dry run)."
     )
     pam.set_defaults(func=cmd_archive_media)
+
+    pocr = sub.add_parser(
+        "ocr",
+        help="OCR local archived images into metadata.ocr_text (Spec 14); "
+        "dry-run default, --apply writes. Needs Tesseract + pip install -e '.[ocr]'.",
+    )
+    pocr.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Cap items with work this run (resumable).",
+    )
+    pocr.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write ocr_text + rebuild search_text (default: dry run).",
+    )
+    pocr.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-OCR even when ocr_at is already set.",
+    )
+    pocr.add_argument(
+        "--lang",
+        default="eng",
+        help="Tesseract language pack (default eng).",
+    )
+    pocr.add_argument(
+        "--min-confidence",
+        type=float,
+        default=40.0,
+        help="Drop results below this mean confidence (default 40).",
+    )
+    pocr.add_argument(
+        "--throttle",
+        type=float,
+        default=0.0,
+        help="Seconds between items when applying (default 0).",
+    )
+    pocr.set_defaults(func=cmd_ocr)
 
     pex = sub.add_parser(
         "export",
