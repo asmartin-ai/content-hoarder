@@ -156,7 +156,7 @@
   {
     "key": "epic-08-redesign-the-app-icon",
     "title": "Redesign the app icon",
-    "state": " ",
+    "state": "closed",
     "epic_num": 8,
     "epic_title": "Polish & infra",
     "milestone": "Epic 8 — Polish & infra",
@@ -170,7 +170,8 @@
     "body": "Migrated from `BACKLOG.md`.\n\n## Summary\n\nP2 — Redesign the app icon. New mark: a backwards \"E\" forming an \"H\" (hoarder). Replace `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.\n\n## Local context for agents\n\n- Epic: 8 — Polish & infra\n- Full local history/spec: `docs/backlog/epic-08-polish-infra.md`\n- Project guardrails: see `AGENTS.md`.\n\n## Acceptance criteria\n\n- [ ] Confirm current behavior / repro where applicable.\n- [ ] Implement the smallest safe change that satisfies the issue.\n- [ ] Add or update focused offline tests where practical.\n- [ ] For mobile/UI work, run or update targeted Playwright coverage; use real-device validation when tagged `needs:real-device`.\n- [ ] Update the GitHub issue and local backlog history if scope/status changes.\n\n## Privacy note\n\nThis repository is public. Keep private data, live DB contents, credentials, and personal exports out of issue comments and fixtures.",
     "local_history": "docs/backlog/epic-08-polish-infra.md",
     "number": 19,
-    "url": "https://github.com/asmartin-ai/content-hoarder/issues/19"
+    "url": "https://github.com/asmartin-ai/content-hoarder/issues/19",
+    "closed_reason": "not planned — cancelled 2026-07-12 (user: no icon redesign)"
   },
   {
     "key": "epic-08-60fps-ui",
