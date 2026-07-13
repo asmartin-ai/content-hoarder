@@ -2339,6 +2339,37 @@ body.focus .batchstrip {
     letter-spacing: 0.05em;
 }
 
+/* #46 mobile fast-scroll handle — thin right-edge scrub pill (see fastscroll.js).
+   Visual only (pointer-events:none); hit zone is the 24px edge strip in JS. */
+.fastscroll-handle {
+  position: fixed;
+  right: max(6px, env(safe-area-inset-right, 6px));
+  top: 0;
+  width: 4px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--text-dim);
+  opacity: 0;
+  transform: translateY(var(--fastscroll-y, 0px));
+  transition: opacity 0.3s var(--ease);
+  pointer-events: none;
+  z-index: 50;
+}
+.fastscroll-handle.active {
+  opacity: 0.4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fastscroll-handle {
+    transition: none;
+  }
+}
+/* Desktop keeps native scrollbar — hide the pill affordance entirely. */
+@media (hover: hover) and (pointer: fine) {
+  .fastscroll-handle {
+    display: none;
+  }
+}
+
 /* mobile floating scroll-to-top (Epic 13) — sits just above the dock on the right,
    matches the dock's glass/border language, clears the dock height + safe-area inset.
    Appears (.show, toggled by main.js) only after the feed is scrolled down. */
