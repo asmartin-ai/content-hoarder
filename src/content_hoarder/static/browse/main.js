@@ -10,6 +10,7 @@ import {
   createLightbox,
   imageUrl,
   imageUrls,
+  itemCaptionHtml,
   redditUrl,
   playableVideoSrc,
   localUrl,
@@ -775,6 +776,15 @@ function archiveTodayPlaceholderHtml(item) {
 function openMediaFor(item, opts) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
+  // #32: caption under image/gallery lightbox (skip for hold-to-peek)
+  const withCap = (base) => {
+    const o = Object.assign({}, base || opts || {});
+    if (!(opts && opts.peek)) {
+      const cap = itemCaptionHtml(item);
+      if (cap) o.captionHtml = cap;
+    }
+    return o;
+  };
   if (canRecoverArchiveToday(item))
     return lightbox.openHtml(archiveTodayPlaceholderHtml(item), opts);
   if (Array.isArray(m.gallery) && m.gallery.length)
@@ -782,14 +792,14 @@ function openMediaFor(item, opts) {
     return lightbox.openGallery(
       m.gallery.map((u) => localUrl(item, u)),
       (m.gallery_preview || []).map((u) => localUrl(item, u)),
-      opts,
+      withCap(opts),
     );
   const imgs = imageUrls(item);
-  if (imgs.length > 1) return lightbox.openGallery(imgs, imgs, opts);
+  if (imgs.length > 1) return lightbox.openGallery(imgs, imgs, withCap(opts));
   const vsrc = playableVideoSrc(item); // shared playability test (same as the reader's inline player)
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
   const img = imageUrl(item);
-  if (img) return lightbox.openImage(img, opts);
+  if (img) return lightbox.openImage(img, withCap(opts));
   /* Gallery without captured image URLs — hydrate one item on demand via the existing
      OAuth/cached-thread backend, then fall back to the local thumbnail + Reddit link. */
   if (m.media_type === "gallery" || /\/gallery\//i.test(item.url || "")) {
@@ -2358,7 +2368,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v124";
+const APP_VERSION = "v125";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;

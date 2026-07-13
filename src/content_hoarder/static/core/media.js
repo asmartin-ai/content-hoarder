@@ -225,6 +225,108 @@ export const playableVideoSrc = (item) => {
   return hls || (VIDEO_EXT.test(src) ? src : "");
 };
 
+/* ---- #32 caption under media lightbox + #31 text blurbs ----
+   Pure helpers (node-testable). Selftext lives on item.body for reddit posts. */
+
+/** Plain caption text from an item, or "". Skips whitespace-only bodies. */
+export const itemCaptionText = (item, maxChars) => {
+  const max = maxChars == null ? 1200 : maxChars;
+  const body = String((item && item.body) || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!body) return "";
+  if (body.length <= max) return body;
+  return body.slice(0, max).replace(/\s+\S*$/, "") + "…";
+};
+
+/**
+ * HTML block for under-image caption. Collapses long text behind "Show more".
+ * Returns "" when no body. Safe for injection into lightbox (escapes text).
+ */
+export const itemCaptionHtml = (item, opts) => {
+  const o = opts || {};
+  const collapseAt = o.collapseAt == null ? 220 : o.collapseAt;
+  const text = itemCaptionText(item, o.maxChars);
+  if (!text) return "";
+  const long = text.length > collapseAt;
+  const shown = long ? text.slice(0, collapseAt).replace(/\s+\S*$/, "") + "…" : text;
+  return (
+    '<div class="media-caption' +
+    (long ? " is-collapsible" : "") +
+    '" data-full="' +
+    esc(text) +
+    '">' +
+    '<div class="media-caption-text">' +
+    esc(shown) +
+    "</div>" +
+    (long
+      ? '<button type="button" class="media-caption-more" data-caption-more="1">Show more</button>'
+      : "") +
+    "</div>"
+  );
+};
+
+/** Wire Show more / Show less on a caption root (lightbox body). */
+export const wireCaptionToggle = (root) => {
+  if (!root) return;
+  root.querySelectorAll("[data-caption-more]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const box = btn.closest(".media-caption");
+      if (!box) return;
+      const full = box.getAttribute("data-full") || "";
+      const textEl = box.querySelector(".media-caption-text");
+      if (!textEl) return;
+      const expanded = box.classList.toggle("is-expanded");
+      if (expanded) {
+        textEl.textContent = full;
+        btn.textContent = "Show less";
+      } else {
+        const short =
+          full.length > 220
+            ? full.slice(0, 220).replace(/\s+\S*$/, "") + "…"
+            : full;
+        textEl.textContent = short;
+        btn.textContent = "Show more";
+      }
+    });
+  });
+};
+
+/**
+ * #31 non-AI preview blurb for list/card rows (plain text, not HTML).
+ * Comments → body; text/self posts → body or a short label; else "".
+ */
+export const itemPreviewBlurb = (item, maxChars) => {
+  const max = maxChars == null ? 140 : maxChars;
+  if (!item) return "";
+  if (item.kind === "comment") {
+    const b = String(item.body || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!b) return "";
+    return b.length <= max ? b : b.slice(0, max).replace(/\s+\S*$/, "") + "…";
+  }
+  const mt = mediaType(item);
+  if (mt.cls === "text" || mt.cls === "link") {
+    const b = String(item.body || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (b)
+      return b.length <= max ? b : b.slice(0, max).replace(/\s+\S*$/, "") + "…";
+    if (mt.cls === "text") return "Text post — open for discussion";
+  }
+  // Image/gallery/video with selftext: short caption teaser in the row
+  if (mt.cls === "image" || mt.cls === "gallery") {
+    const b = String(item.body || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (b)
+      return b.length <= max ? b : b.slice(0, max).replace(/\s+\S*$/, "") + "…";
+  }
+  return "";
+};
+
 /* mountVideo(container, srcUrl, posterUrl, opts) — mount a <video> player into container.
    Handles v.redd.it HLS (hls.js preferred; native HLS as the iOS-Safari fallback) and
    plain direct video files. opts.autoplay: start playback as soon as THIS path's source is
@@ -753,18 +855,22 @@ export function createLightbox(opts) {
       );
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
-    /* Direct image → simple lightbox (reliable; no Reddit dependency). */
+    /* Direct image → simple lightbox (reliable; no Reddit dependency).
+       opts_.captionHtml: optional caption block under the image (#32 selftext). */
     openImage(url, opts_) {
       if (!safeUrl(url)) return;
+      const cap = (opts_ && opts_.captionHtml) || "";
       open(
         '<img class="media-img" src="' +
           esc(url) +
           '" alt="">' +
           '<a class="media-fallback" href="' +
           esc(url) +
-          '" target="_blank" rel="noopener">Open original ↗</a>',
+          '" target="_blank" rel="noopener">Open original ↗</a>' +
+          cap,
         opts_,
       );
+      if (cap) wireCaptionToggle(body);
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Gallery → plain STACKED lightbox (restored 2026-06-22 per user pref — reverts the
@@ -777,6 +883,7 @@ export function createLightbox(opts) {
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
       const srcs = sized.length === full.length ? sized : full; // prefer the smaller sized variants
+      const cap = (opts_ && opts_.captionHtml) || "";
       open(
         '<div class="media-gallery">' +
           srcs
@@ -792,7 +899,8 @@ export function createLightbox(opts) {
             .join("") +
           '</div><p class="media-fallback">' +
           full.length +
-          " images</p>",
+          " images</p>" +
+          cap,
         opts_,
       );
       body.classList.add("is-gallery");
@@ -805,6 +913,7 @@ export function createLightbox(opts) {
           }
         });
       });
+      if (cap) wireCaptionToggle(body);
       if (opts_ && opts_.peek) _attachPeekRelease();
     },
     /* Reddit/archived video → native <video> (Epic 13:344). For v.redd.it the stored url
