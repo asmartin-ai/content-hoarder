@@ -116,6 +116,9 @@ inbox; `status_prev` enables one-step undo.
    Both are loud-fail tolerant: a provider raising/403ing is a soft miss, never a crash. Fetcher +
    byte-fetcher are injectable → `tests/test_archive_today.py` is fully offline. Per-item only
    (archive.today is Cloudflare-gated, ~2s throttle, no bulk API) — never wire it into a bulk pass.
+8. **Reddit video metadata is `media_type` + `media_url` (often `v.redd.it/...`), not `metadata.reddit_video.fallback_url`.** Spec 11-era docs assumed a nested `reddit_video` blob; live rows frequently only have `media_type=reddit_video` and a bare `media_url`. `media_archive._video_evidence_urls` already accepts both shapes.
+9. **Reddit thread cache keys are per-item fullname.** Posts land under `reddit:t3_<id>`; hydrating a saved comment stores under `reddit:t1_<id>` unless dual-written. Comment opens must fall back to the submission `t3_` key from `metadata.permalink` (see #74 / `reddit_hydrate.submission_fullname`).
+
 
 ## Connector authoring checklist
 1. Subclass `BaseConnector`; set `id` (== `items.source`), `label`, `badge_color`.
