@@ -1,6 +1,7 @@
 # Fastscroll scrub → cascade of `/items` page loads
 
-**Status: NOTED 2026-07-14 — not fixing in #46.** Follow-up to #46 / mobile fast-scroll.
+**Status: FIXED 2026-07-15** on `feat/46-mobile-fastscroll` (`e43854f`).
+Plan: `docs/specs/46-fastscroll-scrub-loads-plan.md`. Shell v121→v122.
 
 ## Symptom (device)
 
@@ -21,14 +22,18 @@ page fetches.
 
 So the flood is not “fastscroll doing N requests itself” — it is **document scrub + eager infinite scroll** cooperating. Same risk exists for any jump-to-end gesture (e.g. long fling) once enough rows are loaded; scrub makes it obvious.
 
-## Desired direction (icebox / next slice)
+## Fix (option 1 from plan — shipped)
 
-Batch / lazy-load policy for **scrub / jump**, not a full redesign of infinite scroll:
+1. `fastscroll.js` owns `isFastScrollScrubbing()` — true from `pointerdown` until
+   `SETTLE_MS` (250 ms) after drag end; dispatches `fastscroll:settle` on clear.
+2. Sentinel `IntersectionObserver` in `main.js` skips `loadItems` while scrubbing.
+3. On `fastscroll:settle`, if the sentinel is still in the 600 px zone and
+   `hasMore && !focus && !loading`, call `loadItems(false)` **once** (observer
+   only fires on intersection *changes*, so a mid-drag suppress needs a re-check).
+4. Normal finger scroll untouched (flag is only set by bar pointer events).
 
-1. **While fastscroll is dragging** (or for a short settle window after scrub): do not call `loadItems` from the sentinel observer (or pause the observer). Resume after `pointerup` + idle.
-2. Optional: **coalesce** append loads — if scrub lands deep, one request for a larger window / target offset rather than walking 50-row pages through intermediate offsets (bigger product decision; needs API support or client “fill until offset”).
-3. Optional: reduce `rootMargin` during non-idle scroll, or require sentinel **stable** for N ms before fetch.
-4. Do **not** gate normal finger-scroll near the bottom the same way — keep progressive load for reading through the list.
+Still icebox / non-goals: coalesced offset loads (option 2), rootMargin tuning
+(option 3), visual jitter polish (Fable 5).
 
 ## Out of scope here
 

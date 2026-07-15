@@ -21,6 +21,10 @@
   `delegation-async-friction`.
 - **Next for #46:** open the PR to main (order: #76→#77→#75, then #46);
   reviewer may re-bump the shell version relative to main's tip.
+- **Scrub → `/items` cascade FIXED** (`e43854f`, shell v122): pause infinite
+  scroll while scrubbing + one catch-up load on `fastscroll:settle`. Plan
+  `docs/specs/46-fastscroll-scrub-loads-plan.md`. UI tests: 7/7 green.
+  Device check still on user (network panel). Jitter polish stays **Fable 5**.
 - **CLIProxyAPI :8317 left running** (user-confirmed; SuperGrok trial to Jul 18).
 
 ## Just done (2026-07-12 session, iOS PWA installability)
