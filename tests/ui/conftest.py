@@ -223,7 +223,7 @@ def _seed_ui_db(db_path: str) -> None:
                 now=now - 1000 - i,
                 metadata={"subreddit": "test", "permalink": f"/r/test/comments/ui_scroll_{i}/"},
             )
-            for i in range(30)
+            for i in range(80)  # >50 so /items paginates (fastscroll scrub test)
         )
         for item in rows:
             db.merge_upsert(c, item)
