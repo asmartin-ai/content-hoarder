@@ -2339,33 +2339,57 @@ body.focus .batchstrip {
     letter-spacing: 0.05em;
 }
 
-/* #46 mobile fast-scroll handle — thin right-edge scrub pill (see fastscroll.js).
-   Visual only (pointer-events:none); hit zone is the 24px edge strip in JS. */
-.fastscroll-handle {
+/* #46 mobile fast-scroll bar — Nova Launcher–style track + proportional handle
+   (see fastscroll.js). Always visible while the list scrolls; fades shortly
+   after scroll stops. Desktop keeps the native scrollbar. */
+.fastscroll-bar {
   position: fixed;
-  right: max(6px, env(safe-area-inset-right, 6px));
+  right: max(2px, env(safe-area-inset-right, 2px));
   top: 0;
-  width: 4px;
-  height: 36px;
-  border-radius: 4px;
-  background: var(--text-dim);
-  opacity: 0;
-  transform: translateY(var(--fastscroll-y, 0px));
-  transition: opacity 0.3s var(--ease);
-  pointer-events: none;
+  height: 100vh;
+  width: 22px; /* touch target; visuals are the thin track/handle inside */
   z-index: 50;
+  display: flex;
+  justify-content: center;
+  opacity: 0.32;
+  transition: opacity 0.25s var(--ease);
+  touch-action: none;
+  --fastscroll-track-top: 120px;
+  --fastscroll-track-bottom: 140px;
 }
-.fastscroll-handle.active {
-  opacity: 0.4;
+.fastscroll-bar.active {
+  opacity: 0.85;
+}
+.fastscroll-track {
+  position: absolute;
+  top: var(--fastscroll-track-top);
+  bottom: var(--fastscroll-track-bottom);
+  width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-dim) 22%, transparent);
+  pointer-events: none;
+}
+.fastscroll-handle {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 14px;
+  border-radius: 7px;
+  background: var(--text-dim);
+  pointer-events: none;
+  will-change: transform, height;
+}
+.fastscroll-bar.active .fastscroll-handle {
+  background: var(--accent);
 }
 @media (prefers-reduced-motion: reduce) {
-  .fastscroll-handle {
+  .fastscroll-bar {
     transition: none;
   }
 }
-/* Desktop keeps native scrollbar — hide the pill affordance entirely. */
+/* Desktop keeps native scrollbar — hide the bar entirely. */
 @media (hover: hover) and (pointer: fine) {
-  .fastscroll-handle {
+  .fastscroll-bar {
     display: none;
   }
 }
