@@ -18,6 +18,17 @@
 // .fastscroll-track/.fastscroll-handle the visuals.
 const MIN_HANDLE_H = 24; // never smaller than this even for enormous lists
 const FADE_IDLE_MS = 900; // hide shortly after scroll stops (Nova hides too)
+const SETTLE_MS = 250; // scrub is "over" this long after drag end
+
+// Scrub state, exposed so infinite scroll can pause page loads mid-drag
+// (docs/specs/46-fastscroll-scrub-loads-plan.md). True from pointerdown until
+// SETTLE_MS after drag end; "fastscroll:settle" fires on window when it clears.
+let scrubbing = false;
+let settleTimer = 0;
+
+export function isFastScrollScrubbing() {
+  return scrubbing;
+}
 
 function isDesktopPointer() {
   try {
@@ -141,6 +152,8 @@ export function installFastScroll(_listEl) {
       dragOffsetY = mt.handleH / 2;
     }
     dragging = true;
+    clearTimeout(settleTimer);
+    scrubbing = true;
     activePointerId = e.pointerId;
     try {
       bar.setPointerCapture?.(e.pointerId);
@@ -180,6 +193,11 @@ export function installFastScroll(_listEl) {
       /* ignore */
     }
     scheduleIdleHide();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      scrubbing = false;
+      window.dispatchEvent(new Event("fastscroll:settle"));
+    }, SETTLE_MS);
   }
 
   // --- keep the handle in sync with native scroll ---
@@ -220,6 +238,8 @@ export function installFastScroll(_listEl) {
 
   return () => {
     clearTimeout(idleTimer);
+    clearTimeout(settleTimer);
+    scrubbing = false;
     if (moveRaf) cancelAnimationFrame(moveRaf);
     if (layoutRaf) cancelAnimationFrame(layoutRaf);
     bar.removeEventListener("pointerdown", onPointerDown);
