@@ -173,6 +173,61 @@ def test_fastscroll_track_tap_maps_full_range(pixel6_page):
     assert res["atTop"] <= 2, f"track-top tap should reach scrollTop 0: {res}"
 
 
+def test_fastscroll_scrub_pauses_infinite_scroll(pixel6_page):
+    """Regression (docs/bugs/46-fastscroll-scrub-loads.md): scrubbing deep used
+    to fire a cascade of /items?offset=… page loads mid-drag. Loads must be
+    paused while dragging; at most one may fire after the settle window."""
+    page = pixel6_page
+    _wait_rows(page)
+
+    offset_loads: list[str] = []
+    page.on(
+        "request",
+        lambda r: offset_loads.append(r.url)
+        if "/items" in r.url and "offset=" in r.url and "offset=0" not in r.url
+        else None,
+    )
+
+    # Drag the handle from its current spot to the track bottom (deep scrub).
+    page.evaluate(
+        """() => new Promise((resolve) => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const track = document.querySelector('.fastscroll-track');
+          const handle = document.querySelector('.fastscroll-handle');
+          const hRect = handle.getBoundingClientRect();
+          const tRect = track.getBoundingClientRect();
+          const x = hRect.left + hRect.width / 2;
+          const y0 = hRect.top + hRect.height / 2;
+          const y1 = tRect.bottom - 2;
+          const fire = (type, cx, cy) => bar.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 21, isPrimary: true,
+            clientX: cx, clientY: cy,
+          }));
+          fire('pointerdown', x, y0);
+          const steps = 16, dy = (y1 - y0) / steps;
+          let i = 0;
+          const step = () => {
+            i++;
+            fire('pointermove', x, Math.round(y0 + dy * i));
+            if (i < steps) requestAnimationFrame(step);
+            else { fire('pointerup', x, Math.round(y1)); resolve(true); }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+    # Mid-drag / pre-settle: no offset page loads at all.
+    mid_drag = list(offset_loads)
+    assert not mid_drag, f"no /items offset loads may fire mid-scrub: {mid_drag}"
+
+    # After the settle window exactly one catch-up load fires (sentinel
+    # re-check) — the fixture seeds >50 inbox rows so a second page exists.
+    page.wait_for_timeout(600)
+    assert len(offset_loads) == 1, (
+        f"expected exactly one catch-up load after settle, got {offset_loads}"
+    )
+
+
 def test_fastscroll_hidden_on_desktop(desktop_page):
     page = desktop_page
     page.wait_for_selector(".row[data-fullname]", timeout=15000)
