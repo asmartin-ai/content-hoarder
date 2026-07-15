@@ -1,9 +1,7 @@
-"""#46 mobile fast-scroll handle (right-edge scrub).
+"""#46 mobile fast-scroll bar (Nova Launcher style).
 
-Browse scrolls the document; the handle hit-tests near the right edge of
-#items and maps finger Y → document.scrollingElement.scrollTop.
-
-`pixel6_page` already navigates to the app base URL.
+A thin track + proportional handle at the right edge. Dragging the handle
+scrubs; the handle follows native scroll when not dragging.
 """
 
 from __future__ import annotations
@@ -19,109 +17,171 @@ def _wait_rows(page) -> None:
     page.wait_for_selector(".row[data-fullname]", timeout=15000)
 
 
-def _edge_drag(page, *, from_y_ratio: float, to_y_ratio: float, from_left: bool = False) -> None:
-    """Synthetic touch pointer scrub on #items near the right (or left) edge."""
-    page.evaluate(
-        """({fromYRatio, toYRatio, fromLeft}) => new Promise((resolve) => {
-          const list = document.getElementById('items');
-          if (!list) return resolve(false);
-          const w = window.innerWidth;
-          const h = window.innerHeight;
-          const x = fromLeft ? 20 : (w - 8);
-          const y0 = Math.round(h * fromYRatio);
-          const y1 = Math.round(h * toYRatio);
-          const fire = (type, x, y, target) => target.dispatchEvent(new PointerEvent(type, {
-            bubbles: true, cancelable: true, composed: true,
-            pointerType: 'touch', pointerId: 7, isPrimary: true,
-            clientX: x, clientY: y,
-          }));
-          fire('pointerdown', x, y0, list);
-          const steps = 12;
-          let i = 0;
-          const step = () => {
-            i++;
-            const t = i / steps;
-            const y = Math.round(y0 + (y1 - y0) * t);
-            fire('pointermove', x, y, window);
-            if (i < steps) requestAnimationFrame(step);
-            else {
-              fire('pointerup', x, y1, window);
-              resolve(true);
-            }
-          };
-          requestAnimationFrame(step);
-        })""",
-        {
-            "fromYRatio": from_y_ratio,
-            "toYRatio": to_y_ratio,
-            "fromLeft": from_left,
-        },
-    )
-    page.wait_for_timeout(200)
-
-
-def test_fastscroll_right_edge_scrubs_document(pixel6_page):
+def test_fastscroll_bar_visible_when_list_scrollable(pixel6_page):
     page = pixel6_page
     _wait_rows(page)
 
-    metrics_before = page.evaluate(
+    state = page.evaluate(
         """() => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const handle = document.querySelector('.fastscroll-handle');
           const se = document.scrollingElement;
           return {
-            scrollTop: se.scrollTop,
+            barExists: !!bar,
+            barDisplay: bar ? getComputedStyle(bar).display : 'none',
+            handleExists: !!handle,
+            handleH: handle ? handle.offsetHeight : 0,
             max: Math.max(0, se.scrollHeight - window.innerHeight),
           };
         }"""
     )
-    assert metrics_before["max"] > 200, "fixture list should make the page scrollable"
+    assert state["barExists"], "fastscroll-bar node should exist"
+    assert state["handleExists"], "fastscroll-handle node should exist"
+    assert state["max"] > 200, "fixture list should make the page scrollable"
+    assert state["barDisplay"] != "none", "bar should be visible when list is scrollable"
+    assert state["handleH"] > 0, "handle should have height"
 
-    _edge_drag(page, from_y_ratio=0.15, to_y_ratio=0.85)
 
-    after = page.evaluate(
+def test_fastscroll_handle_proportional_and_follows_scroll(pixel6_page):
+    page = pixel6_page
+    _wait_rows(page)
+
+    info = page.evaluate(
         """() => {
           const se = document.scrollingElement;
-          const h = document.querySelector('.fastscroll-handle');
-          return {
-            scrollTop: se.scrollTop,
-            handleExists: !!h,
-          };
+          const max = Math.max(0, se.scrollHeight - window.innerHeight);
+          const handle = document.querySelector('.fastscroll-handle');
+          return { max, viewH: window.innerHeight, scrollH: se.scrollHeight,
+                   handleH: handle ? handle.offsetHeight : 0 };
         }"""
     )
-    assert after["handleExists"], "fastscroll handle node should be created on first edge drag"
-    assert after["scrollTop"] > metrics_before["scrollTop"] + 80, (
-        f"expected document scroll to move substantially, got {after['scrollTop']}"
+    # Handle should be smaller than the viewport for a long list.
+    assert info["handleH"] < info["viewH"], (
+        f"handle ({info['handleH']}px) should be < viewport ({info['viewH']}px) for a long list"
+    )
+
+    # Scroll the document natively; the handle should move.
+    page.evaluate("() => { document.scrollingElement.scrollTop = 600; }")
+    page.wait_for_timeout(200)
+    top_after = page.evaluate(
+        "() => { const h = document.querySelector('.fastscroll-handle');"
+        "  const t = h.style.transform || '';"
+        "  const m = /translateY\\(([\\d.]+)px\\)/.exec(t);"
+        "  return m ? parseFloat(m[1]) : -1; }"
+    )
+    assert top_after > 0, f"handle should have moved down after scroll; transform top={top_after}"
+
+
+def test_fastscroll_dragging_handle_scrubs_document(pixel6_page):
+    page = pixel6_page
+    _wait_rows(page)
+
+    before = page.evaluate("() => document.scrollingElement.scrollTop")
+    # Press the handle near the top, drag down to 80% of viewport.
+    page.evaluate(
+        """() => new Promise((resolve) => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const handle = document.querySelector('.fastscroll-handle');
+          if (!bar || !handle) return resolve(false);
+          const hRect = handle.getBoundingClientRect();
+          const x = hRect.left + hRect.width / 2;
+          const y0 = hRect.top + hRect.height / 2;
+          const y1 = window.innerHeight * 0.8;
+          const fire = (type, cx, cy) => bar.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 9, isPrimary: true,
+            clientX: cx, clientY: cy,
+          }));
+          fire('pointerdown', x, y0);
+          const steps = 12, dy = (y1 - y0) / steps;
+          let i = 0;
+          const step = () => {
+            i++;
+            fire('pointermove', x, Math.round(y0 + dy * i));
+            if (i < steps) requestAnimationFrame(step);
+            else { fire('pointerup', x, Math.round(y1)); resolve(true); }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+    page.wait_for_timeout(250)
+    after = page.evaluate("() => document.scrollingElement.scrollTop")
+    assert after > before + 100, (
+        f"dragging handle down should scrub document down; before={before} after={after}"
     )
 
 
-def test_fastscroll_left_edge_does_not_create_handle(pixel6_page):
+def test_fastscroll_handle_stays_inside_track(pixel6_page):
+    """Regression: JS read --fastscroll-track-top/-bottom from :root (where
+    they aren't defined) instead of the bar, so handle math used a full-viewport
+    track and drifted ~120px below the visual track, overflowing its bottom."""
     page = pixel6_page
     _wait_rows(page)
 
     page.evaluate(
+        "() => { const se = document.scrollingElement;"
+        "  se.scrollTop = se.scrollHeight; }"
+    )
+    page.wait_for_timeout(250)
+    rects = page.evaluate(
         """() => {
-          document.querySelectorAll('.fastscroll-handle').forEach((n) => n.remove());
-          document.scrollingElement.scrollTop = 0;
+          const t = document.querySelector('.fastscroll-track').getBoundingClientRect();
+          const h = document.querySelector('.fastscroll-handle').getBoundingClientRect();
+          return { trackTop: t.top, trackBottom: t.bottom,
+                   handleTop: h.top, handleBottom: h.bottom };
         }"""
     )
-
-    before_top = page.evaluate("() => document.scrollingElement.scrollTop")
-    _edge_drag(page, from_y_ratio=0.2, to_y_ratio=0.8, from_left=True)
-    after = page.evaluate(
-        """() => ({
-          scrollTop: document.scrollingElement.scrollTop,
-          handleExists: !!document.querySelector('.fastscroll-handle'),
-        })"""
+    assert rects["handleBottom"] <= rects["trackBottom"] + 1, (
+        f"handle must not overflow track bottom at max scroll: {rects}"
     )
-    assert not after["handleExists"], "left-edge press must not arm the fastscroll handle"
-    assert abs(after["scrollTop"] - before_top) < 120
+    assert rects["handleTop"] >= rects["trackTop"] - 1, (
+        f"handle must not overflow track top: {rects}"
+    )
 
 
-def test_fastscroll_handle_fades_after_release(pixel6_page):
+def test_fastscroll_track_tap_maps_full_range(pixel6_page):
+    """Regression: with the misread track offsets, a tap at the visual track
+    top could never reach scrollTop 0 (and bottom never reached max)."""
     page = pixel6_page
     _wait_rows(page)
-    _edge_drag(page, from_y_ratio=0.2, to_y_ratio=0.6)
-    page.wait_for_timeout(450)  # FADE_MS = 300
-    active = page.evaluate(
-        "() => !!document.querySelector('.fastscroll-handle.active')"
+
+    res = page.evaluate(
+        """() => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const track = document.querySelector('.fastscroll-track');
+          const se = document.scrollingElement;
+          const r = track.getBoundingClientRect();
+          const x = r.left + r.width / 2;
+          const fire = (type, cy, pid) => bar.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: pid, isPrimary: true,
+            clientX: x, clientY: cy,
+          }));
+          const max = Math.max(0, se.scrollHeight - window.innerHeight);
+          fire('pointerdown', r.bottom - 1, 11);
+          fire('pointerup', r.bottom - 1, 11);
+          const atBottom = se.scrollTop;
+          fire('pointerdown', r.top + 1, 12);
+          fire('pointerup', r.top + 1, 12);
+          const atTop = se.scrollTop;
+          return { max, atBottom, atTop };
+        }"""
     )
-    assert not active, "handle should drop .active after fade timeout"
+    assert res["atBottom"] >= res["max"] - 2, (
+        f"track-bottom tap should reach max scroll: {res}"
+    )
+    assert res["atTop"] <= 2, f"track-top tap should reach scrollTop 0: {res}"
+
+
+def test_fastscroll_hidden_on_desktop(desktop_page):
+    page = desktop_page
+    page.wait_for_selector(".row[data-fullname]", timeout=15000)
+    # On desktop the install is a no-op (isDesktopPointer bails), so the node
+    # is absent entirely — which is the correct desktop behavior.
+    display = page.evaluate(
+        "() => { const b = document.querySelector('.fastscroll-bar');"
+        "  return b ? getComputedStyle(b).display : 'absent'; }"
+    )
+    assert display in ("none", "absent"), (
+        f"fastscroll bar must be hidden or absent on desktop, got display={display}"
+    )
