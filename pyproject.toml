@@ -14,7 +14,12 @@ content-hoarder = "content_hoarder.cli:main"
 
 [project.optional-dependencies]
 youtube = ["yt-dlp"]
-dev = ["pytest"]
+# Pillow is for the static-asset guard in tests/test_pwa_meta.py that
+# reads the on-disk splash PNGs and asserts they match the manifest's
+# background_color. Also pulled in by scripts/gen_splash_screens.py
+# (dev-time generator, not imported by the package). Pillow is not
+# required at runtime by any import in src/content_hoarder/.
+dev = ["pytest", "Pillow"]
 # UI/e2e: real-browser tests (Pixel-6 + PWA emulation). `pip install -e .[ui]` then
 # `playwright install chromium`, run with `pytest -m ui`. Kept out of `dev` so the unit
 # suite + CI don't need a browser.
