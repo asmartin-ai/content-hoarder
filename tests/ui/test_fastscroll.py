@@ -240,3 +240,114 @@ def test_fastscroll_hidden_on_desktop(desktop_page):
     assert display in ("none", "absent"), (
         f"fastscroll bar must be hidden or absent on desktop, got display={display}"
     )
+
+def test_fastscroll_dragging_class_toggles(pixel6_page):
+    page = pixel6_page
+    _wait_rows(page)
+
+    # Press the handle and check that the "dragging" class lands.
+    page.evaluate(
+        """() => new Promise((resolve) => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const handle = document.querySelector('.fastscroll-handle');
+          if (!bar || !handle) return resolve(false);
+          const hRect = handle.getBoundingClientRect();
+          const x = hRect.left + hRect.width / 2;
+          const y = hRect.top + hRect.height / 2;
+          const fire = (type, cx, cy) => bar.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 9, isPrimary: true,
+            clientX: cx, clientY: cy,
+          }));
+          fire('pointerdown', x, y);
+          resolve(true);
+        })"""
+    )
+    page.wait_for_timeout(50)
+    has_dragging = page.evaluate(
+        "() => document.querySelector('.fastscroll-bar').classList.contains('dragging')"
+    )
+    assert has_dragging, "fastscroll-bar should have 'dragging' class after pointerdown"
+
+    # Release and check it clears.
+    page.evaluate(
+        """() => {
+          const bar = document.querySelector('.fastscroll-bar');
+          if (!bar) return;
+          bar.dispatchEvent(new PointerEvent('pointerup', {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 9, isPrimary: true,
+          }));
+        }"""
+    )
+    page.wait_for_timeout(100)
+    has_dragging = page.evaluate(
+        "() => document.querySelector('.fastscroll-bar').classList.contains('dragging')"
+    )
+    assert not has_dragging, "fastscroll-bar should not have 'dragging' class after pointerup"
+
+
+def test_fastscroll_mid_drag_mutation_does_not_move_handle(pixel6_page):
+    page = pixel6_page
+    _wait_rows(page)
+
+    # Press the handle near the top, drag a bit, then hold.
+    result = page.evaluate(
+        """() => new Promise((resolve) => {
+          const bar = document.querySelector('.fastscroll-bar');
+          const handle = document.querySelector('.fastscroll-handle');
+          if (!bar || !handle) return resolve(false);
+          const hRect = handle.getBoundingClientRect();
+          const x = hRect.left + hRect.width / 2;
+          const y0 = hRect.top + hRect.height / 2;
+          const yMid = window.innerHeight * 0.5;
+          const fire = (type, cx, cy) => bar.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 9, isPrimary: true,
+            clientX: cx, clientY: cy,
+          }));
+          fire('pointerdown', x, y0);
+          fire('pointermove', x, yMid);
+          // Record handle position after the move, before any mutation.
+          requestAnimationFrame(() => {
+            const rect = handle.getBoundingClientRect();
+            resolve({ top: rect.top, left: rect.left });
+          });
+        })"""
+    )
+    assert result, "drag setup returned false"
+    handleTopBefore = result["top"]
+
+    # While still dragging, inject a large DOM mutation below.
+    page.evaluate(
+        """() => {
+          const items = document.querySelector('#items');
+          if (!items) return false;
+          const d = document.createElement('div');
+          d.style.height = '3000px';
+          d.textContent = 'mutation-test';
+          items.appendChild(d);
+          return true;
+        }"""
+    )
+    page.wait_for_timeout(200)  # 2+ animation frames for any pending layout
+
+    handleTopAfter = page.evaluate(
+        "() => document.querySelector('.fastscroll-handle').getBoundingClientRect().top"
+    )
+    assert handleTopAfter == handleTopBefore, (
+        f"handle should not move during a DOM mutation while dragging: "
+        f"before={handleTopBefore} after={handleTopAfter}"
+    )
+
+    # Clean up: release the drag.
+    page.evaluate(
+        """() => {
+          const bar = document.querySelector('.fastscroll-bar');
+          if (!bar) return;
+          bar.dispatchEvent(new PointerEvent('pointerup', {
+            bubbles: true, cancelable: true, composed: true,
+            pointerType: 'touch', pointerId: 9, isPrimary: true,
+          }));
+        }"""
+    )
