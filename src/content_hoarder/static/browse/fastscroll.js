@@ -78,6 +78,8 @@ export function installFastScroll(_listEl) {
   let idleTimer = 0;
   let activePointerId = null;
   let lastMax = -1;
+  let dragMt = null; // frozen metrics snapshot during drag (avoids per-frame reflow)
+  let layoutPending = false; // deferred layout after drag ends
 
   function metrics() {
     const { se, viewH, max, scrollHeight } = scrollMetrics();
@@ -100,6 +102,7 @@ export function installFastScroll(_listEl) {
   }
 
   function layout() {
+    if (dragging) { layoutPending = true; return; }
     const mt = metrics();
     if (mt.max <= 0) {
       bar.style.display = "none";
@@ -113,7 +116,7 @@ export function installFastScroll(_listEl) {
   }
 
   function scrubToTrackY(clientY) {
-    const mt = metrics();
+    const mt = dragMt || metrics();
     if (mt.max <= 0) return;
     const rel = clientY - mt.trackTop; // y within the track
     const targetTop = clamp(rel - dragOffsetY, 0, mt.handleMaxTop);
@@ -152,6 +155,8 @@ export function installFastScroll(_listEl) {
       dragOffsetY = mt.handleH / 2;
     }
     dragging = true;
+    dragMt = mt;
+    bar.classList.add("dragging");
     clearTimeout(settleTimer);
     scrubbing = true;
     activePointerId = e.pointerId;
@@ -182,6 +187,9 @@ export function installFastScroll(_listEl) {
     if (!dragging) return;
     if (e && activePointerId != null && e.pointerId !== activePointerId) return;
     dragging = false;
+    dragMt = null;
+    bar.classList.remove("dragging");
+    if (layoutPending) { layoutPending = false; layout(); }
     activePointerId = null;
     if (moveRaf) {
       cancelAnimationFrame(moveRaf);
@@ -223,18 +231,24 @@ export function installFastScroll(_listEl) {
   window.addEventListener("resize", onResize, { passive: true });
 
   // Initial layout + observation for dynamic content height changes.
-  // Coalesce mutation bursts (list hydration) into one layout per frame —
+  // Coalesce mutation/ResizeObserver bursts into one layout per frame —
   // layout() forces reflow (scrollHeight + getComputedStyle).
   layout();
   let layoutRaf = 0;
-  const mo = new MutationObserver(() => {
+  function scheduleLayout() {
     if (layoutRaf) return;
     layoutRaf = requestAnimationFrame(() => {
       layoutRaf = 0;
       layout();
     });
-  });
+  }
+  const mo = new MutationObserver(() => scheduleLayout());
   mo.observe(document.body, { childList: true, subtree: true, attributes: false });
+  let ro = null;
+  if (typeof ResizeObserver !== "undefined") {
+    ro = new ResizeObserver(() => scheduleLayout());
+    ro.observe(document.body);
+  }
 
   return () => {
     clearTimeout(idleTimer);
@@ -249,6 +263,7 @@ export function installFastScroll(_listEl) {
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener("resize", onResize);
     mo.disconnect();
+    if (ro) ro.disconnect();
     bar.remove();
   };
 }
