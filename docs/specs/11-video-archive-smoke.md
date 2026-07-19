@@ -116,8 +116,28 @@ deliberate decision.
 ## Open user decisions
 
 1. Pick the representative item (the `LIMIT 5` query above is the menu).
-2. Confirm OAuth OR cookie posture is the one to use.
-3. Time window — the run is network-bound; pick a window where the LAN/host
+2. ✅ **Use OAuth** (CHOSEN 2026-07-19). `REDDIT_OAUTH_CLIENT_ID` is configured
+   (RedReader public installed-app id, `redreader://rr_oauth_redir`). Run
+   `python -m content_hoarder reddit-oauth --login` once to mint the refresh
+   token. Thereafter `reddit_hydrate` + `reddit_sync` automatically use OAuth
+   (`oauth.reddit.com`, 100 QPM) instead of the cookie path. For
+   `archive-media --videos`, `yt-dlp` itself talks to `v.redd.it` — pass
+   `--cookies-from-browser chrome` so yt-dlp picks up the existing browser
+   session. Public `v.redd.it` URLs don't require auth at all; only the
+   saved-list pull (which we don't do in the media-archive path) needs
+   the OAuth token.
+3. **Rate-limit posture (CHOSEN 2026-07-19):** keep the existing throttle
+   contract; do NOT add a new flag. The two existing knobs cover this:
+   - `archive-media --throttle N` (default 0.3s) — image/gallery fetches.
+     For a video run, bump to `2.0` to stay well under Reddit's
+     authenticated 100 QPM budget (one yt-dlp download = many sub-requests;
+     2s between items leaves headroom for the yt-dlp-internal bursts).
+   - `youtube-recover --throttle N` (default 1.0s) — the deletion-recovery
+     path. Already respects the global `MIN_THROTTLE=0.6s` cap.
+   The 0.3s default for `archive-media` is calibrated for *images* (one HTTP
+   round-trip per URL). Videos are a different shape — the right fix is
+   "operator passes `--throttle 2.0` for `--videos`", not a new flag.
+4. Time window — the run is network-bound; pick a window where the LAN/host
    isn't doing other heavy work.
 
 ## Next concrete action (literal first step)

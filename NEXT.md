@@ -1,7 +1,75 @@
 # NEXT.md — content-hoarder session focus
 
-`main` pushed to both remotes. Suite: **1038 unit + 65 UI all green.** (2026-07-19)
+`feat/ios-splash-screens` branch, ready to merge. Suite: **1038 unit + 4 new PWA splash tests green.** (2026-07-19)
 
+## Just done (2026-07-19 session, iOS splash screens + media mirror + Spec 10/11)
+- **iOS splash screens IMPLEMENTED** on `feat/ios-splash-screens`:
+  - `scripts/gen_splash_screens.py` (new, ~95 lines): reads
+    `manifest.webmanifest::background_color` (#0f1115) and emits 11 solid-color
+    `apple-touch-startup-image-<WxH>.png` files for every shipping iPhone + iPad.
+    Total ~133 KB (solid color compresses extremely well).
+  - `templates/index.html`: 11 `<link rel=apple-touch-startup-image>` tags, each
+    with a `media="(device-width: Npx) and (device-height: Npx) and
+    (-webkit-device-pixel-ratio: N)"` query so iOS picks the right one per device.
+  - `static/sw.js`: SHELL gains 11 splash URLs; CACHE v123→v124 in lockstep.
+  - `static/browse/main.js`: APP_VERSION v123→v124.
+  - `tests/test_pwa_meta.py`: 4 new regression tests — splash link tags present
+    for every shipped size, every media query has `-webkit-device-pixel-ratio`,
+    every image served at the declared pixel dimensions (PNG IHDR decode), and
+    every image matches the manifest's `background_color` corner+center.
+  - `tests/test_service_worker.py` + `tests/test_subreddit_facet.py`:
+    version-bump guards updated to v124.
+  - **Test suite: 1038 unit + 4 new PWA tests = 1038 + 4 (within PWA test file) all green.**
+  - `pyproject.toml` does NOT need a new dep — `Pillow` was already a transitive
+    dev dep; the generator script is committed under `scripts/` for re-runs.
+  - Generator emits RGB PNG (not RGBA) — solid color + no alpha channel is
+    smaller and matches what iOS expects.
+  - iOS launch image policy: solid color matching `background_color` is the
+    spec-correct pattern (Apple renders the icon itself on top of the launch
+    image, so the image does NOT need a logo).
+- **Media mirror SET UP** (Spec 10 implementation, per user direction):
+  - `K:\MediaMirror\` created on the K: drive root.
+  - `scripts/mirror-media.bat` (robocopy /MIR /MT:16 /R:2 /W:5, append log)
+    mirrors `K:\Projects\content-hoarder\data\media\` →
+    `K:\MediaMirror\content-hoarder\media\`.
+  - `scripts/verify-mirror-media.bat` re-hashes every dest file and compares
+    to its filename (the source is content-addressed, so the filename IS the
+    expected sha256 — free integrity check).
+  - `docs/specs/10-media-backup.md`: ✅ CHOSEN `<DEST>` = `K:\MediaMirror\content-hoarder\media\`.
+    Tradeoff accepted: same-drive mirror does NOT protect against K: drive
+    failure (tier-2 of the spec's "Target drive/host" section remains an open
+    escalation if the threat model widens).
+  - Threat model per user: "accidental deletion / corruption", LAN-only,
+    single-user. Not "the K: drive dies".
+  - Scheduling: manual-after-archive (lowest risk, matches the "every action
+    gated" posture). Scheduled task is a future option.
+- **Spec 11 OAuth + rate-limit decisions** (per user direction):
+  - ✅ OAuth for any user-list-driven ops (saved-list sync, hydrate-batch).
+    `REDDIT_OAUTH_CLIENT_ID` is configured (RedReader public installed-app id);
+    run `python -m content_hoarder reddit-oauth --login` once to mint the
+    refresh token.
+  - For the `archive-media --videos` path, yt-dlp + browser cookies are
+    sufficient (public `v.redd.it` URLs don't need auth). Pass
+    `--cookies-from-browser chrome` to yt-dlp.
+  - **No new `--video-throttle` flag** — operator passes
+    `archive-media --throttle 2.0` for video runs (1s+ is plenty for
+    yt-dlp's sub-request burst, vs the default 0.3s which is for images).
+    Two flags that mean almost the same thing is a UX regression; keep
+    the existing `--throttle` knob.
+  - `docs/specs/11-video-archive-smoke.md`: open user decisions #2 (auth
+    posture) and #3 (rate-limit) marked CHOSEN with the rationale.
+- **Bakeoff routing table** (per user direction "note in LLM-dev"):
+  - `C:/Users/Kenja/Documents/LLM-dev/bakeoffs/Content-Hoarder-Bakeoff-Routing-2026-07-19.md`
+    written: TL;DR routing table for the `aider-headless-delegate` skill,
+    discriminator task (CH-B3: 3-file wiring), caveats (ZenMux promo
+    liveness, 2-run variance), and verdict verbatim.
+  - **The skill itself is already up to date** (inspected
+    `~/.claude/skills/aider-headless-delegate/SKILL.md` line 22-23, 462-473,
+    M19) — all four "action item" checkboxes in the LLM-dev file are
+    marked DONE. NEXT #3 was obsolete. The LLM-dev file is now the
+    audit trail / decision rationale; the skill has the operational defaults.
+  - Cross-substrate (vs PKMS) verdict still pending — flagged as the
+    open item in the LLM-dev file.
 ## Just done (2026-07-19 session, #46 fastscroll merged)
 - **#46 merged to main** (`90cc660`, `--no-ff`), pushed to both remotes,
   feature branch deleted, issue closed.
@@ -169,14 +237,25 @@
   P3.5 is merged locally; nothing pushed.
 
 ## Next 1-3 actions (in order)
-1. **iOS splash screens** (`apple-touch-startup-image` for each iPhone/iPad size).
-   Purely cosmetic but makes the PWA launch feel native. No blockers — can start
-   anytime. ~S effort.
+1. **Merge `feat/ios-splash-screens` to main** (this session's work, ready).
 2. **Real-device Pixel-6 QA**: deck mode + subreddit facet + redirects. Needs user
    hardware. (iPhone PWA test deferred — user will test when ready.)
-3. **Update `aider-headless-delegate` skill** with the user's chosen delegation
-   lanes: `minimax/minimax-m3` + `deepseek-v4-flash` combination. System config
-   outside this repo.
+3. **Run first media mirror** (the new `scripts/mirror-media.bat` against
+   `K:\MediaMirror\`, then `verify-mirror-media.bat`). User-gated (the user
+   triggers each archive-media pass).
+4. **Spec 11 video-archive smoke**: pick a representative v.redd.it item
+   (the `LIMIT 5` query in `docs/specs/11-video-archive-smoke.md`), then
+   `python -m content_hoarder archive-media --videos --limit 1 --apply --yes`
+   against a DB copy. User-gated (first live run).
+
+## Recently obsoleted
+- **Item 3 from previous Next (update `aider-headless-delegate` skill with
+  the user's chosen delegation lanes)** — skill at
+  `~/.claude/skills/aider-headless-delegate/SKILL.md` is already up to date
+  (verified 2026-07-19; lines 22-23, 462-473, M19). The LLM-dev routing-table
+  note `C:/Users/Kenja/Documents/LLM-dev/bakeoffs/Content-Hoarder-Bakeoff-Routing-2026-07-19.md`
+  is the audit trail / decision rationale; the skill has the operational
+  defaults.
 
 ## Cherry-pick audit (2026-07-11) — no-op, already landed
 - The 4 bakeoff oracle features were committed **directly to main** during
@@ -187,31 +266,32 @@
 
 ## Open decisions (need user)
 
-### Spec 10 — Media mirror
-- **Pick `<DEST>` drive.** The spec recommends a second physical drive (e.g. `D:\`
-  or `E:\` if primary is `K:\`), or an external USB-C SSD. Once chosen, the
-  implementation is a single `robocopy` command → `scripts/mirror-media.bat`.
-- Manual-after-archive vs scheduled-weekly? (Recommended: manual.)
+### Spec 10 — Media mirror (partially resolved 2026-07-19)
+- ✅ **Pick `<DEST>` drive** — CHOSEN: `K:\MediaMirror\content-hoarder\media\`
+  (same drive; threat model is accidental delete / corruption, not drive
+  failure). See `scripts/mirror-media.bat` + `scripts/verify-mirror-media.bat`.
+- Manual-after-archive vs scheduled-weekly? (Recommended: manual, matches
+  the existing gating posture.)
 - Second mirror to a tailnet peer? (Default: no.)
+- Tier-2 escalation (separate physical drive / external USB-C SSD) is
+  available if the threat model widens.
 
-### Spec 11 — Video archive smoke
-- **OAuth or cookies?** Reddit video needs auth. Is `REDDIT_OAUTH_CLIENT_ID`
-  configured or should we use a `cookies.txt`?
+### Spec 11 — Video archive smoke (auth + rate-limit resolved 2026-07-19)
+- ✅ **OAuth or cookies?** — CHOSEN OAuth for user-list-driven ops; yt-dlp
+  + browser cookies for the `archive-media --videos` smoke (public
+  `v.redd.it` URLs don't need auth).
 - **Pick a representative candidate.** Run the `LIMIT 5` query from the spec to
   find a `v.redd.it` item that's recent enough to still be served.
 - yt-dlp + ffmpeg installed? Run the pre-flight check first.
 
 ### Ongoing
 - Real-device Pixel-6 QA for mobile changes (deck gestures, subreddit facet,
-  redirects).
+  redirects, **iOS splash screens** — the new feature from this session).
 
 ## Icebox
 - #72 Life-OS fixtures — real T1, needs Life-OS contract work; defer.
 - P2.1/P2.2 engagement Phase 1 — depends on user flipping
   `learn-triage --apply` (their switch, deferred once already).
-- Live media/archive/unsave runs — all user-gated (§7).
-- PKMS cross-substrate bakeoff check — run the same model comparison on the
-  PKMS substrate to confirm the routing table (per bakeoff plan §3).
 - iPhone PWA real-device test — deferred; user will test when ready.
-- iOS splash screen images (`apple-touch-startup-image`) — deferred cosmetic;
-  moved up to Next #1 for next session.
+- iOS splash screen images (`apple-touch-startup-image`) — **DONE 2026-07-19**;
+  see "Just done" above.
