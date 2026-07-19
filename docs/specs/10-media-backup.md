@@ -96,13 +96,29 @@ or `E:\` if the primary is `K:\`), NOT a subdir of the project. Rationale:
 
 ## Open user decisions
 
-1. **Which drive/path is `<DEST>`?** Needs the user's actual drive layout.
+1. **Which drive/path is `<DEST>`?** ✅ CHOSEN 2026-07-19: `K:\MediaMirror\content-hoarder\media`
+   (lives on the same K: drive root — not a subdir of the project — so a project-tree
+   `rm` cannot touch the mirror; eventually the same pattern can host mirrors for
+   other K:-drive projects). **Tradeoff accepted:** same-drive mirror does NOT
+   protect against the most likely failure (K: dies). The user's threat model is
+   "accidental deletion / corruption" (LAN-only, single-user), not drive failure —
+   the spec's §"Target drive/host" tier-2 (separate physical drive / external
+   USB-C SSD) remains an open escalation if the threat model widens.
 2. **Manual-after-archive vs scheduled-weekly?** Recommended: manual, matches
    the existing gating posture.
 3. **Second mirror to a tailnet peer?** No/yes. No is the default (single-user,
    one machine); yes if the user already runs a tailnet file server.
 4. **Off-site (restic/B2) ever?** Defer until threat model widens; not needed
    for the current LAN-only single-user stance.
+
+## Implementation (DEST chosen)
+
+`scripts/mirror-media.bat` (robocopy) + `scripts/verify-mirror-media.bat`
+(sha256 re-hash; filename IS expected hash) ship with the repo under
+`scripts/`. See each script's header for usage. Source
+`K:\Projects\content-hoarder\data\media\` and dest
+`K:\MediaMirror\content-hoarder\media\` are absolute paths in the scripts so
+no config setup is needed.
 
 ## What this spec does NOT cover
 

@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v123"; // v123: fastscroll jitter polish (#46)
+const CACHE = "ch-shell-v124"; // v124: iOS splash screens (apple-touch-startup-image, 11 sizes)
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)
@@ -30,11 +30,18 @@ const SHELL = [
   "/static/browse/operators.js",
   "/static/browse/fastscroll.js",
   "/static/vendor/hls.min.js",
-  "/static/icon.svg",
   "/static/apple-touch-icon.png",
-  "/static/icon-192.png",
-  "/static/icon-512.png",
-  "/manifest.webmanifest",
+  "/static/apple-touch-startup-image-1290x2796.png",
+  "/static/apple-touch-startup-image-1179x2556.png",
+  "/static/apple-touch-startup-image-1170x2532.png",
+  "/static/apple-touch-startup-image-1080x2340.png",
+  "/static/apple-touch-startup-image-750x1334.png",
+  "/static/apple-touch-startup-image-640x1136.png",
+  "/static/apple-touch-startup-image-2048x2732.png",
+  "/static/apple-touch-startup-image-1668x2388.png",
+  "/static/apple-touch-startup-image-1668x2224.png",
+  "/static/apple-touch-startup-image-1536x2048.png",
+  "/static/apple-touch-startup-image-1488x2266.png",
 ];
 
 self.addEventListener("install", (e) => {
