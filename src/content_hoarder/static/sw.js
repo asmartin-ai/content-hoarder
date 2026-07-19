@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v122"; // v122: #46 pause infinite scroll during fastscroll scrub
+const CACHE = "ch-shell-v123"; // v123: fastscroll jitter polish (#46)
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)

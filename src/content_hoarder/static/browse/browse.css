@@ -2360,6 +2360,9 @@ body.focus .batchstrip {
 .fastscroll-bar.active {
   opacity: 0.85;
 }
+.fastscroll-bar.dragging {
+  transition: none;
+}
 .fastscroll-track {
   position: absolute;
   top: var(--fastscroll-track-top);
@@ -2378,12 +2381,16 @@ body.focus .batchstrip {
   background: var(--text-dim);
   pointer-events: none;
   will-change: transform, height;
+  transition: background 0.15s var(--ease);
 }
 .fastscroll-bar.active .fastscroll-handle {
   background: var(--accent);
 }
 @media (prefers-reduced-motion: reduce) {
   .fastscroll-bar {
+    transition: none;
+  }
+  .fastscroll-handle {
     transition: none;
   }
 }

@@ -1,6 +1,31 @@
 # NEXT.md — content-hoarder session focus
 
-`main` pushed to both remotes. Suite: **1036 unit + UI passing.** (2026-07-14)
+`feat/46-mobile-fastscroll` (unpushed). Suite: **1038 unit + 9 fastscroll UI green.** (2026-07-19)
+
+## Just done (2026-07-19 session, #46 fastscroll jitter polish)
+- **Jitter polish IMPLEMENTED** on `feat/46-mobile-fastscroll`. 7 files changed:
+  - `fastscroll.js`: freeze metrics snapshot at pointerdown (avoid per-frame
+    getComputedStyle+scrollHeight reflow), defer layout() while dragging (guard
+    + layoutPending flag), ResizeObserver for image-load height changes (reuses
+    same rAF-coalesced scheduleLayout helper), `.dragging` class on bar during
+    grab. ResizeObserver teardown in the returned cleanup closure.
+  - `browse.css`: `.fastscroll-bar.dragging { transition: none }` kills the
+    250ms opacity fade-in at grab; `transition: background 0.15s var(--ease)`
+    on `.fastscroll-handle` softens the color flip; reduced-motion rule added
+    for the handle.
+  - `main.js` v122→v123 + `sw.js` CACHE v122→v123 in lockstep.
+  - 2 new regression UI tests: `test_fastscroll_dragging_class_toggles` and
+    `test_fastscroll_mid_drag_mutation_does_not_move_handle`. 9/9 fastscroll UI
+    green (7 existing + 2 new).
+  - 2 static guard tests bumped to v123.
+  - Spec: `docs/specs/46-fastscroll-jitter-fix-spec.md`.
+  - Audit: scout agent identified 8 candidate improvements; 5 jitter fixes
+    shipped (B1-B4, B5), option 2/3 remain icebox, B6 (deck-mode teardown)
+    deferred as not blocking.
+- **Delegation decision:** aider-delegate MCP timed out (known issue M23),
+  LM Studio had no models loaded. Per 2026-07-14 delegation-worthiness gate,
+  this is a deterministic transform (exact bytes known) → edited directly.
+- **Suite: 1038 unit + 65 UI all green.**
 
 ## Just done (2026-07-14 session, #46 fastscroll fix + port)
 - **Fastscroll track-offset bug fixed** on `staging/test-stack-2026-07-12`
