@@ -1,8 +1,22 @@
 # NEXT.md — content-hoarder session focus
 
-`feat/46-mobile-fastscroll` (unpushed). Suite: **1038 unit + 9 fastscroll UI green.** (2026-07-19)
+`main` pushed to both remotes. Suite: **1038 unit + 65 UI all green.** (2026-07-19)
 
-## Just done (2026-07-19 session, #46 fastscroll jitter polish)
+## Just done (2026-07-19 session, #46 fastscroll merged)
+- **#46 merged to main** (`90cc660`, `--no-ff`), pushed to both remotes,
+  feature branch deleted, issue closed.
+- **Additional fix:** rAF-deferred handle transform in `onScroll` — during
+  rapid fling scroll the compositor outruns main-thread scroll events;
+  deferring the transform write to `requestAnimationFrame` aligns it with
+  frame boundaries so handle tracks the visual scroll position.
+- **Suite: 1038 unit + 65 UI (9 fastscroll) all green.**
+- **Doc cleanup:** kept `docs/bugs/46-*.md` and `docs/specs/46-*.md` as
+  permanent design records; they document resolved decisions (option 2/3
+  icebox items, Nova rework reasoning, scrub-load fix plan).
+- **Note:** the original mobile-scrollbar spec (`docs/specs/mobile-scrollbar.md`)
+  still describes the pre-rework edge-zone pill design — kept as record
+  of what didn't ship; the bug doc at `docs/bugs/46-mobile-scrollbar.md`
+  is the source of truth for what shipped.
 - **Jitter polish IMPLEMENTED** on `feat/46-mobile-fastscroll`. 7 files changed:
   - `fastscroll.js`: freeze metrics snapshot at pointerdown (avoid per-frame
     getComputedStyle+scrollHeight reflow), defer layout() while dragging (guard
