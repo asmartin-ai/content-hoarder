@@ -62,3 +62,7 @@ design-ref/
 bakeoff/batch.log
 bakeoff/batch.out
 bakeoff/batch.pid
+
+# Long-running-job bookkeeping (heartbeat / pid / log files for fire-and-forget
+# background runs like scripts/run-video-archive.ps1)
+logs/
