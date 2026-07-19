@@ -80,6 +80,8 @@ export function installFastScroll(_listEl) {
   let lastMax = -1;
   let dragMt = null; // frozen metrics snapshot during drag (avoids per-frame reflow)
   let layoutPending = false; // deferred layout after drag ends
+  let scrollRaf = 0;
+  let pendingScrollTop = 0;
 
   function metrics() {
     const { se, viewH, max, scrollHeight } = scrollMetrics();
@@ -216,10 +218,18 @@ export function installFastScroll(_listEl) {
       layout();
       return;
     }
-    const targetTop = mt.handleMaxTop <= 0 ? 0 : (mt.se.scrollTop / mt.max) * mt.handleMaxTop;
-    handle.style.transform = `translateY(${targetTop}px)`;
+    // Store the computed target; defer the transform to rAF so the handle
+    // stays aligned with the compositor on rapid fling scroll (the main-
+    // thread scroll event lags behind the compositor-scrolled page).
+    pendingScrollTop = mt.handleMaxTop <= 0 ? 0 : (mt.se.scrollTop / mt.max) * mt.handleMaxTop;
     showActive();
     scheduleIdleHide();
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      if (dragging) return;
+      handle.style.transform = `translateY(${pendingScrollTop}px)`;
+    });
   }
 
   bar.addEventListener("pointerdown", onPointerDown, { passive: false });
@@ -256,6 +266,7 @@ export function installFastScroll(_listEl) {
     scrubbing = false;
     if (moveRaf) cancelAnimationFrame(moveRaf);
     if (layoutRaf) cancelAnimationFrame(layoutRaf);
+    if (scrollRaf) cancelAnimationFrame(scrollRaf);
     bar.removeEventListener("pointerdown", onPointerDown);
     bar.removeEventListener("pointermove", onPointerMove);
     bar.removeEventListener("pointerup", endDrag);
