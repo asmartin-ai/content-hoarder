@@ -41,6 +41,7 @@ import {
   createFirstPagePrefetcher,
 } from "./prefetch.js";
 import { initDeck, setHost as setDeckHost } from "./deck.js";
+import { installFastScroll, isFastScrollScrubbing } from "./fastscroll.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -1154,12 +1155,21 @@ new IntersectionObserver(
       entries[0].isIntersecting &&
       state.hasMore &&
       !state.focus &&
-      !state.loading
+      !state.loading &&
+      !isFastScrollScrubbing() // pause page loads mid-scrub (#46 follow-up)
     )
       loadItems(false);
   },
   { rootMargin: "600px" },
 ).observe($("#sentinel"));
+
+// A load suppressed mid-scrub never re-fires the observer (it only reports
+// intersection CHANGES), so re-check once when the scrub settles.
+window.addEventListener("fastscroll:settle", () => {
+  if (!state.hasMore || state.focus || state.loading) return;
+  const s = $("#sentinel").getBoundingClientRect();
+  if (s.top < window.innerHeight + 600) loadItems(false);
+});
 
 /* ---- mobile floating scroll-to-top (Epic 13 / 16) ---- */
 const gotop = $("#gotop");
@@ -1270,6 +1280,9 @@ if ("onscrollend" in window)
     { passive: true },
   );
 gotop.addEventListener("click", scrollToBrowseTop);
+
+/* ---- #46 mobile fast-scroll handle (right-edge scrub) ---- */
+installFastScroll(itemsEl);
 
 /* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
 const ambient = $("#ambient");
@@ -2345,7 +2358,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v119";
+const APP_VERSION = "v123";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
