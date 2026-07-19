@@ -119,14 +119,18 @@ Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror test + video smoke).
   (Fable/ClaudeCode) is also valid; the smoke command takes any v.redd.it
   item, the path proves itself either way.
 
-### Spec 10 — Media mirror (partially resolved 2026-07-19)
+### Spec 10 — Media mirror (DEST + cadence CHOSEN 2026-07-19)
 - ✅ **Pick `<DEST>` drive** — CHOSEN: `K:\MediaMirror\content-hoarder\media\`.
-- Manual-after-archive vs scheduled-weekly? (Recommended: manual, matches the
-  existing gating posture.)
-- Second mirror to a tailnet peer? **ICEBOXED 2026-07-19 p.m.** per user
-  direction (same-drive mirror + verify covers stated threat model).
-- Tier-2 escalation (separate physical drive / external USB-C SSD) is available
-  if the threat model widens.
+- ✅ **Manual-after-archive cadence** — CHOSEN 2026-07-19: operator runs
+  `scripts\mirror-media.bat` (then `scripts\verify-mirror-media.bat`)
+  after a meaningful `archive-media` batch. Matches the existing
+  user-gated posture; no Task Scheduler entry. Same-drive mirror covers
+  the stated threat model (accidental delete / corruption, not drive
+  failure).
+- **Second mirror to a tailnet peer** — ICEBOXED 2026-07-19 p.m. per user
+  direction.
+- Tier-2 escalation (separate physical drive / external USB-C SSD) is
+  available if the threat model widens.
 
 ### Ongoing
 - Real-device Pixel-6 + iPhone QA for mobile changes (now including the new
