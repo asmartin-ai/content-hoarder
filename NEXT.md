@@ -1,8 +1,8 @@
 # NEXT.md — content-hoarder session focus
 
-`main`. Suite: **1046 unit green** (+8 from the synthetic-corruption tests);
+`main`. Suite: **1054 unit green** (+8 from PR #76 + 3 from review fix);
 CI: passing on `main` (see `gh run list`).
-Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror test + video smoke).
+Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror + video smoke; late-p.m. PR #76 merge + audits).
 
 ## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
 - **iOS splash screens SHIPPED** on `main` (merged `e48c47e`, CI green on `8067e1b`):
@@ -88,6 +88,47 @@ Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror test + video smoke).
     can be verified without editing the file.
 - **Spec 10 tailnet peer mirror** ICEBOXED per user direction (same-drive
   mirror + verify-mirror covers the stated threat model).
+
+## Just done (2026-07-19 late-p.m. session — PR #76 review/merge + audits)
+- **PR #76 (`fix/74-comment-reader-empty`) MERGED into main** as
+  `55a775f`. Review found 1 P2 + 4 P3 findings; fixed the P2
+  (seed-pane duplication on render) + 2 cheap P3s (not_found copy,
+  stale `renderComments()` callers), documented the remaining 2 P3s
+  as TODO follow-ups in the module docstring. Added 3 regression
+  tests for the fixes. Rebased onto main (v124 cache bump) before
+  force-push; CI green on the post-fix commit. Issue #74 was closed
+  by the squash-merge's `Closes #74` footer.
+- **PR #76 squash-merge caveat (this session's process mistake):**
+  the worktree's `fix/74-comment-reader-empty` was rebased onto
+  *local* main (which had 3 unpublished commits) rather than
+  `origin/main`. The squash-merge on GitHub therefore bundled the
+  3 local commits' content with the PR's 2 commits. The code is
+  correct (all 8 tests + 1054 unit suite pass) but the squash-merge
+  commit message only says "Fix #74" — the corruption-test
+  refactor, the video-archive launcher, and the Spec 10 cadence
+  closeout are now invisibly inlined into that one commit. If
+  clean history matters, the next session can revert + redo as
+  separate commits; if not, the code is correct and tests pass.
+- **Public/private audit (2026-07-19 late-p.m.):** `origin/main`
+  and `private/main` were at the same commit (`3669b6e`) at
+  session start; local main was 3 commits ahead with the
+  corruption-test / launcher / cadence work. After the PR #76
+  merge + local rebase, local main and origin/main are now in
+  sync at `55a775f` (the squash-merge). The private remote
+  remains 1 commit behind. **Decision needed:** push `55a775f`
+  to `private` (canonical-public model says yes; user-gated).
+- **Doc audit (initial pass):** 83 product docs in `docs/`; many
+  are post-implementation retrospectives that could be folded or
+  moved (e.g. `app-css-audit-2026-06-26.md` for deleted `app.css`,
+  `epic-19-backend-hardening.md` every-checkbox-done archive,
+  `parallel-run-2026-06-12.md` one-off session notes,
+  `thread-hydration-feasibility.md` planning doc for shipped
+  feature, `bakeoff/RESULTS.md` etc.). Full audit table below.
+- **Video-archive run update (HEARTBEAT):** at the late-p.m.
+  audit point, 200/7,135 = 2.8% complete in ~24 min. Actual
+  per-item time is ~7-8 s (yt-dlp download + mux dominates the
+  2 s throttle), not the 2 s I estimated. **Full run estimate
+  revised: ~14 hours, not 2-3.** Resumable; can be paused/restarted.
 
 ## Next 1-3 actions (in order)
 1. **Spec 11 full video-archive run** (user-gated, smoke PASSED 2026-07-19
