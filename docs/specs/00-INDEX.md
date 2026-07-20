@@ -74,12 +74,12 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
 
 ## W1 (Epic 4 — hoard the bytes) report-only specs, added 2026-07-03
 
-- [10](10-media-backup.md) — `data/media/` backup strategy. **PROPOSED.**
-  Recommends robocopy mirror to a second local drive; SHA-256 verify is free
-  (content-addressed). Open: which drive, manual vs scheduled, tailnet peer.
-- [11](11-video-archive-smoke.md) — First live `archive-media --videos` smoke
-  plan. **PROPOSED**, user-gated. Pre-flight (yt-dlp/ffmpeg/auth), DB-copy
-  mandatory, single-item `--limit 1`, expected artifacts, abort criteria.
+- [10](10-media-backup.md) — `data/media/` backup strategy. **DECIDED 2026-07-12.**
+  Dest `F:\Backups\content-hoarder\media`; `scripts/mirror-media.bat` +
+  `scripts/verify-media-mirror.bat`. Manual after archive; no tailnet peer.
+- [11](11-video-archive-smoke.md) — First `archive-media --videos` smoke.
+  **SMOKE PASSED 2026-07-12** (DB copy, limit 1, OAuth). Full live run still
+  user-gated.
 
 ## W3 (Epic 17 — unify one surface) design gate, added 2026-07-03
 
@@ -87,4 +87,11 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   `/reddit` into v3 browse. **PROPOSED**, no code. Cuts P3.1-P3.5
   implementation packets (deck mode, density toggle, subreddit facet, unsave
   wiring, legacy retirement). Surfaces 4 user decisions before code starts.
+
+## Experimental (branch-only)
+
+- [14](14-ocr-tesseract.md) — Image OCR enrich via Tesseract (#26). **PLAN on
+  `feat/ocr-tesseract-experimental`.** Search wiring (`ocr_text` / `is:ocr`)
+  already on main; this spec covers the write path only. Engine: Tesseract
+  (not local vision).
 

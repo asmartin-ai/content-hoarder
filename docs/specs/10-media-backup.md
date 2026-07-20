@@ -1,8 +1,9 @@
 # Spec 10 — `data/media/` backup strategy (report-only)
 
-**Status: PROPOSED 2026-07-03.** Report-only per DIRECTION §5 P1.2 (T1); no code
-implemented. Deliverable = this document + one recommendation + open user
-decisions. Execution is user-gated.
+**Status: DECIDED 2026-07-12 (partial implementation).** Dest locked:
+`F:\Backups\content-hoarder\media`. Runner: `scripts/mirror-media.bat`
+(+ optional `scripts/verify-media-mirror.bat`). Manual-after-archive default.
+Tailnet peer: no.
 
 **Context:** `data/media/` is a content-addressed blob store (flat
 `<sha256>.<ext>` files, ~18 GB / ~32,506 blobs as of 2026-07-02) holding the
@@ -31,7 +32,11 @@ hoarded. See `media_store.py`, `AGENTS.md` gotcha #7.
 **One job, one command, idempotent:**
 
 ```bat
-robocopy K:\Projects\content-hoarder\data\media <DEST>\media /MIR /R:2 /W:5 /MT:16 /NP /LOG+:<DEST>\media-mirror.log
+REM Preferred: checked-in wrapper
+scripts\mirror-media.bat
+
+REM Equivalent:
+robocopy K:\Projects\content-hoarder\data\media F:\Backups\content-hoarder\media /MIR /R:2 /W:5 /MT:16 /NP /LOG+:F:\Backups\content-hoarder\media-mirror.log
 ```
 
 - `/MIR` — mirror mode (copies new+changed, purges dest files no longer in
@@ -129,6 +134,12 @@ no config setup is needed.
 
 ## Next concrete action (literal first step)
 
-Pick `<DEST>` (decision 1 above). Once chosen, the robocopy command above is
-the entire implementation; paste it into a `scripts\mirror-media.bat` for
-convenience and run once to seed.
+```bat
+scripts\mirror-media.bat
+```
+
+Optional integrity sample:
+
+```bat
+scripts\verify-media-mirror.bat
+```
