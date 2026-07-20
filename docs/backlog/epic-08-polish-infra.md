@@ -8,8 +8,9 @@
 - [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
   forward-capture library.
 
-- [ ] **P2 — Redesign the app icon.** New mark: a backwards "E" forming an "H" (hoarder). Replace
-  `static/icon.svg` + the 192/512 PNGs + the manifest; keep the teal-on-`#0f1115` tile.
+- [x] ~~**P2 — Redesign the app icon.**~~ **Cancelled 2026-07-12** (user decision: keep current mark;
+  do not redesign). Was: backwards "E" forming an "H"; replace `static/icon.svg` + 192/512 PNGs +
+  manifest.
 - [ ] **P3 — 60fps UI.** Audit list/scroll/swipe for jank (avoid layout thrash, prefer transforms /
   `will-change`, throttle handlers); target smooth 60fps on the Pixel-6 target.
 - [ ] **P3 — CSS platform feature audit.** Review the UI code for places where newer CSS can simplify
