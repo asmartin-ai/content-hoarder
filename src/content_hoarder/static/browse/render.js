@@ -15,7 +15,12 @@ import {
   tagChips,
   articleChip,
 } from "../core/render.js";
-import { thumb, ytFallback, mediaType } from "../core/media.js";
+import {
+  thumb,
+  ytFallback,
+  mediaType,
+  itemPreviewBlurb,
+} from "../core/media.js";
 
 export const isNsfw = (item) => !!(item.metadata || {}).over_18;
 
@@ -81,9 +86,10 @@ const metaHtml = (item) => {
 };
 
 const snippet = (item) => {
-  const body = (item.body || "").trim().replace(/\s+/g, " ");
+  // #31 non-AI preview blurb (body for text/comments; caption teaser for image+selftext)
+  const body = itemPreviewBlurb(item, 140);
   return body
-    ? '<div class="snippet">' + esc(body.slice(0, 140)) + "</div>"
+    ? '<div class="snippet">' + esc(body) + "</div>"
     : "";
 };
 
@@ -225,13 +231,18 @@ export const logRow = (item, opts) => {
 export const ledgerRow = (item, n, opts) => {
   const o = opts || {};
   const mt = mediaType(item);
+  // #39: text/self posts must not get a media playpill (only real media classes).
   const play =
-    mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery"
+    !isRedditTextPost(item, mt) &&
+    (mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery")
       ? '<button type="button" class="playpill" data-media="1">' +
         mt.icon +
         " view</button>"
-      : "";
+      : mt.cls === "text"
+        ? '<span class="playpill textish" title="Text post">📝 text</span>'
+        : "";
   const domainHtml = urlDomainHtml(item);
+  const blurb = snippet(item);
   return (
     '<div class="row" data-fullname="' +
     esc(item.fullname) +
@@ -255,6 +266,7 @@ export const ledgerRow = (item, n, opts) => {
     "</div>" +
     rowTags(item, o) +
     domainHtml +
+    blurb +
     "</div>" +
     '<div class="trail">' +
     play +
