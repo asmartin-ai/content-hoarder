@@ -76,6 +76,24 @@ const metaHtml = (item) => {
     );
   else if (m.channel) bits.push("<b>" + esc(m.channel) + "</b>");
   else if (item.source === "hackernews") bits.push("<b>HN</b>");
+  // HN author → profile (spec 04A); mirrors core/render.js metaLine.
+  if (item.source === "hackernews" && item.author)
+    bits.push(
+      "by " +
+        metaAnchor(
+          "https://news.ycombinator.com/user?id=" +
+            encodeURIComponent(item.author),
+          item.author,
+        ),
+    );
+  else if (item.source === "reddit" && item.author)
+    bits.push(
+      "by " +
+        metaAnchor(
+          "https://www.reddit.com/user/" + encodeURIComponent(item.author),
+          item.author,
+        ),
+    );
   if (Number.isFinite(m.score)) bits.push(Math.round(m.score) + " pts");
   bits.push(ageMeta(item));
   const consume = consumeMeta(item);

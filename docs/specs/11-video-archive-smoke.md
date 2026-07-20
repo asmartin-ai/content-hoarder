@@ -1,8 +1,12 @@
 # Spec 11 — Video-archive smoke procedure (no live run)
 
-**Status: PROPOSED 2026-07-03.** Plan-only per DIRECTION §5 P1.3 (T2). The
-first live `archive-media --videos` run is **user-gated** (DIRECTION §7);
-this document is the procedure. Execution needs the user at the keyboard.
+**Status: SMOKE PASSED 2026-07-12** (limit-1 on a DB copy; live `data/app.db`
+untouched). Full unlimited live run remains **user-gated**. Auth: OAuth
+(`reddit_oauth` token present). Candidate used:
+`reddit:t3_1utkjba` → `https://v.redd.it/pah23y78ulch1` → blob
+`8ef9217d4f3142707ad7e405437a47118a53d43b3f8d65ea201ebc1d6545531e.mp4`
+(~4.5 MB, has_audio). Note: local items use `metadata.media_url` +
+`media_type=reddit_video` (not `metadata.reddit_video.fallback_url`).
 
 **Context:** `archive-media --videos` opts into downloading `v.redd.it`
 video bytes via `yt-dlp` (lazy-imported) + `ffmpeg` mux to `.mp4`, stored as
