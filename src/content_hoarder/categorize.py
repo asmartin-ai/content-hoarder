@@ -312,6 +312,16 @@ _SUBREDDIT_TAGS.update(
         "ukrainianconflict": ["defense"],
         # science & tech
         "technology": ["science"],
+        # ai / ml (LLM-era subs)
+        "localllama": ["ai_ml"],
+        "claudeai": ["ai_ml"],
+        "openai": ["ai_ml"],
+        "chatgpt": ["ai_ml"],
+        "artificial": ["ai_ml"],
+        "singularity": ["ai_ml"],
+        "stablediffusion": ["ai_ml"],
+        "ollama": ["ai_ml"],
+        "mistralai": ["ai_ml"],
         # tips & guides
         "lifehacks": ["tips"],
         "socialskills": ["tips"],
