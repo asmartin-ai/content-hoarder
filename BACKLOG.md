@@ -229,4 +229,4 @@ monolithic file.
 - Milestone: https://github.com/asmartin-ai/content-hoarder/milestone/26
 - Active issues:
   - #70 — User-tag table: pre-create empty tags + rename-in-vocabulary
-  - #71 — Audit Reddit coverage for `ai_ml` tagging
+  - ~~#71 — Audit Reddit coverage for `ai_ml` tagging~~ (closed 2026-07-20: 9 LLM-era subs added; optional backfill retag in `delegation/NEXT-DELEGATION.md`)

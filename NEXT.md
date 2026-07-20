@@ -1,8 +1,33 @@
 # NEXT.md — content-hoarder session focus
 
-`main`. Suite: **1054 unit green** (+8 from PR #76 + 3 from review fix);
-CI: passing on `main` (see `gh run list`).
-Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror + video smoke; late-p.m. PR #76 merge + audits).
+`main`. Suite: non-UI suite green on `main` post-merges (see `gh run list` for CI).
+Last wrapup: 2026-07-20 (orchestration session — see block below).
+
+## Just done (2026-07-20 — orchestration session: issues, PR unblock, ADRs, scouts)
+- **Issue #71 CLOSED (ai_ml tagging).** Audit: 0 reddit items tagged `ai_ml` (HN 154,
+  Firefox 3); root cause: `_SUBREDDIT_TAGS` only had legacy ML subs. Fix delegated to
+  aider (deepseek executor), reviewed + merged: 9 LLM-era subs (localllama, claudeai,
+  openai, chatgpt, artificial, singularity, stablediffusion, ollama, mistralai) →
+  `ai_ml`; new test `test_ai_ml_subreddit_map`. Optional operator follow-up: backfill
+  retag of existing rows (new saves tag correctly already).
+- **Issue #72 CLOSED (Life-OS fixture).** Promotion-card fixture click-tested
+  end-to-end in life-os; substrate ADRs 0016/0017/0022/0025/0026 flipped Accepted.
+- **PR #77 LANDED via `rebase/pr-77`** (lightbox captions + text blurbs): conflicts
+  from the #76 squash resolved; SW/APP_VERSION unified to **v125**; PR closed.
+- **PR #75 LANDED via `rebase/pr-75`** (OCR enrich, splashes, browse packets, media
+  mirror docs): SW/APP_VERSION unified to **v126**; kept main's 11-size
+  apple-touch-startup-image set and `K:\MediaMirror` dest over the branch's older
+  splash/`F:\Backups` variants; reddit-image→thread guard combined with #77's
+  `withCap(opts)`; stale `test_app_version_v120` bumped. PR closed. **Note:** both
+  head branches (`feat/lightbox-caption-blurbs`, `feat/ocr-tesseract-experimental`)
+  are now superseded — safe to delete on origin.
+- **Scout memos** (UNVERIFIED — source-check before load-bearing use) committed under
+  `docs/research-scout/`: smart-sort (#24), deck architecture (#65), thumbnail crop (#28).
+- **Onramps direction recorded:** life-os ADR 0027 (Proposed) — Option C hybrid:
+  save stays save; promote via triage sprint on resurface cards; unsave-on-source
+  deferred behind `action_receipt`; Keep stays notes-only (YouTube links route here).
+  CH implication: a real `promote` action wired to the resurface card is the next
+  integration slice once ADR 0027 is accepted.
 
 ## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
 - **iOS splash screens SHIPPED** on `main` (merged `e48c47e`, CI green on `8067e1b`):
