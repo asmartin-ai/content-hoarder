@@ -1,9 +1,10 @@
 # NEXT.md — content-hoarder session focus
 
-`main`. Suite: **1038 unit green**; CI: passing on `main` (see `gh run list`).
-Last wrapup: 2026-07-19.
+`main`. Suite: **1046 unit green** (+8 from the synthetic-corruption tests);
+CI: passing on `main` (see `gh run list`).
+Last wrapup: 2026-07-19 (a.m. splash; p.m. verify-mirror test + video smoke).
 
-## Just done (2026-07-19 session, splash + mirror + Spec 10/11 + CI fix)
+## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
 - **iOS splash screens SHIPPED** on `main` (merged `e48c47e`, CI green on `8067e1b`):
   - `scripts/gen_splash_screens.py` (new): reads `manifest.webmanifest::background_color`
     (#0f1115) and emits 11 solid-color `apple-touch-startup-image-<WxH>.png` files
@@ -37,46 +38,99 @@ Last wrapup: 2026-07-19.
     `archive-media --throttle 2.0` for video runs (default 0.3s is for images).
   - `docs/specs/11-video-archive-smoke.md`: decisions #2 (auth) and #3
     (rate-limit) marked CHOSEN.
-- **Bakeoff routing table** (Next #3, resolved obsolete):
-  - `C:/Users/Kenja/Documents/LLM-dev/bakeoffs/Content-Hoarder-Bakeoff-Routing-2026-07-19.md`
-    written: routing table, CH-B3 discriminator, caveats, verdict verbatim.
-  - The `aider-headless-delegate` skill was already current (inspected
-    `~/.claude/skills/aider-headless-delegate/SKILL.md`); LLM-dev file is now
-    the audit trail / decision rationale.
-  - Cross-substrate (vs PKMS) verdict still pending — open item in the LLM-dev file.
 - **#46 mobile fastscroll** (also done this session, before splash):
   - Merged to main (`90cc660`, `--no-ff`); issue closed; rAF-deferred
     `onScroll` handle transform shipped in `b24903a`.
-- **CI fix** (`8067e1b`): Pillow added to dev deps (see above).
+
+## Just done (2026-07-19 p.m. session — verify-mirror test + Spec 11 video smoke)
+- **Spec 11 video-archive smoke PASSED** against a DB copy of `data/app.db`:
+  - Pre-flight: `yt-dlp 2026.06.09` + `ffmpeg 8.1.1` both on PATH; 2.6 TB free on K:.
+  - Selected candidate: `reddit:t3_100ekup` from r/hoggit (the candidates SQL has
+    no `ORDER BY created_utc DESC`, so it picked the first physical-order row —
+    a 2018 post, `v.redd.it/y7etx8k3xd9a1`, Reddit's CDN still serves it via
+    yt-dlp). User-chosen representative candidates in the spec's menu (e.g.
+    `reddit:t3_1v0nyf1`, the Fable/ClaudeCode post) would be equally valid;
+    the smoke proves the path regardless of which specific item is picked.
+  - Command: `CONTENT_HOARDER_DB=data/app.videosmoke-…db python -m
+    content_hoarder archive-media --videos --limit 1 --throttle 2.0 --apply`
+    → 1 item, 1 URL, 1 archived, 0 failed, 7,316,767 bytes, ~5 s, exit 0.
+  - DB row updated: `metadata.archived_media` set to
+    `{'https://v.redd.it/y7etx8k3xd9a1/DASH_720.mp4?source=fallback':
+     '969d0905c35fc98b8989be2d83367bce837b791a85e3afaa926000c7881b8161.mp4',
+     'https://v.redd.it/y7etx8k3xd9a1': '…161.mp4'}`;
+    `metadata.archived_media_details[…v.redd.it/y7etx8k3xd9a1] = {kind:
+    'reddit_video', blob: '…161.mp4', canonical_url, source_url, downloader:
+    'yt-dlp', container: 'mp4', has_audio: True, bytes: 7316767, fetched_utc}`.
+  - `media_status` NOT flipped (videos don't — spec contract).
+  - DB copies cleaned up; live `data/app.db` mtime untouched.
+  - **Spec 11 is now ready to escalate to a full un-`--limit`'d run** (still
+    user-gated; smoke proved the path).
+- **verify-mirror-media refactor + synthetic-corruption tests**:
+  - Extracted the verification logic from `scripts/verify-mirror-media.bat`
+    (cmd-internals-heavy, untestable) into `scripts/verify_mirror_media.py`;
+    the .bat is now a 12-line shim that calls the Python helper.
+  - `tests/test_verify_mirror_media.py` (new, 6 tests):
+    - `test_verify_mirror_reports_mismatch_when_one_byte_flipped` — the
+      headline regression (1-byte corruption → MISMATCH + count).
+    - `test_verify_mirror_exits_nonzero_on_mismatch_via_subprocess` — the
+      CLI contract (exit 1 on mismatch, "MISMATCH" + "FAILED:" in stdout).
+    - `test_verify_mirror_passes_on_all_good_blobs_in_process` — sanity
+      (3 good blobs → 0 mismatches).
+    - `test_verify_mirror_passes_via_subprocess_on_all_good_blobs` — the
+      same through `subprocess.run`, confirms "OK: all blobs verified."
+      + "files checked: 3" in stdout.
+    - `test_verify_mirror_skips_non_blob_housekeeping_files` — `Thumbs.db`,
+      `garbage.txt` etc. are not flagged as MISMATCH (only 64-hex-stem files
+      are checked; first 20 non-blobs echoed to stderr, more summarised).
+    - `test_verify_mirror_missing_dest_returns_nonzero_via_subprocess` —
+      missing dest → exit 1 + "ERROR"/"dest does not exist" in stderr.
+  - `.bat` accepts `VERIFY_MIRROR_DEST` env override so a staging mirror
+    can be verified without editing the file.
+- **Spec 10 tailnet peer mirror** ICEBOXED per user direction (same-drive
+  mirror + verify-mirror covers the stated threat model).
 
 ## Next 1-3 actions (in order)
-1. **Real-device Pixel-6 + iPhone QA**: deck gestures, subreddit facet, redirects,
-   iOS splash screens (the new feature — first launch on a real device). User-gated.
-2. **Spec 11 video-archive smoke** (user-gated first live run):
-   `python -m content_hoarder archive-media --videos --limit 1 --apply --yes`
-   against a DB copy of `data/app.db`. Spec 11 has the full procedure.
-3. **Run first media mirror** (user-gated): `scripts/mirror-media.bat` against
-   `K:\MediaMirror\`, then `scripts/verify-mirror-media.bat`. Re-runnable.
-4. **Synthetic-corruption test for verify-mirror-media.bat** (CONSIDER from
-   harvest Q2). Untested against real corruption; a 10-line pytest that writes
-   a dest file with one flipped byte, then asserts the verify script reports
-   MISMATCH, would harden it. ~S effort.
+1. **Spec 11 full video-archive run** (user-gated, smoke PASSED 2026-07-19
+   p.m.): same command without `--limit 1` against the live `data/app.db`:
+   ```
+   python -m content_hoarder archive-media --videos --throttle 2.0 --apply
+   ```
+   Per the spec, do NOT auto-escalate. The user runs the un-`--limit`'d
+   pass. Estimated size: ~7 MB × 7,135 candidates = ~50 GB; budget time
+   for ~2-3 hours at 2 s throttle.
+2. **Real-device Pixel-6 + iPhone QA**: deck gestures, subreddit facet,
+   redirects, iOS splash screens (the new feature — first launch on a real
+   device). User-gated.
+3. **First media mirror** (user-gated): `scripts\mirror-media.bat` against
+   `K:\MediaMirror\`, then `scripts\verify-mirror-media.bat`. Re-runnable.
 
 ## Open decisions (need user)
 
-### Spec 10 — Media mirror (partially resolved 2026-07-19)
-- ✅ **Pick `<DEST>` drive** — CHOSEN: `K:\MediaMirror\content-hoarder\media\`.
-- Manual-after-archive vs scheduled-weekly? (Recommended: manual, matches the
-  existing gating posture.)
-- Second mirror to a tailnet peer? (Default: no.)
-- Tier-2 escalation (separate physical drive / external USB-C SSD) is available
-  if the threat model widens.
+### Spec 11 — Video archive smoke (smoke PASSED 2026-07-19 p.m.)
+- ✅ **OAuth vs cookies** — CHOSEN 2026-07-19 (OAuth for user-list; yt-dlp +
+  browser cookies for `--videos` smoke — public v.redd.it URLs don't need
+  auth).
+- ✅ **Rate-limit posture** — CHOSEN 2026-07-19: keep the existing throttle
+  contract, no new flag. Operators pass `--throttle 2.0` for video runs.
+- ✅ **Pre-flight** — CHOSEN 2026-07-19: yt-dlp 2026.06.09 + ffmpeg 8.1.1
+  installed; 2.6 TB free.
+- ✅ **First smoke candidate** — `reddit:t3_100ekup` (r/hoggit, 2018
+  `v.redd.it/y7etx8k3xd9a1`); the user-recommended `reddit:t3_1v0nyf1`
+  (Fable/ClaudeCode) is also valid; the smoke command takes any v.redd.it
+  item, the path proves itself either way.
 
-### Spec 11 — Video archive smoke (auth + rate-limit resolved 2026-07-19)
-- ✅ **OAuth or cookies?** — CHOSEN OAuth for user-list-driven ops; yt-dlp +
-  browser cookies for the `archive-media --videos` smoke.
-- **Pick a representative candidate.** Run the `LIMIT 5` query in the spec.
-- yt-dlp + ffmpeg installed? Run the pre-flight check first.
+### Spec 10 — Media mirror (DEST + cadence CHOSEN 2026-07-19)
+- ✅ **Pick `<DEST>` drive** — CHOSEN: `K:\MediaMirror\content-hoarder\media\`.
+- ✅ **Manual-after-archive cadence** — CHOSEN 2026-07-19: operator runs
+  `scripts\mirror-media.bat` (then `scripts\verify-mirror-media.bat`)
+  after a meaningful `archive-media` batch. Matches the existing
+  user-gated posture; no Task Scheduler entry. Same-drive mirror covers
+  the stated threat model (accidental delete / corruption, not drive
+  failure).
+- **Second mirror to a tailnet peer** — ICEBOXED 2026-07-19 p.m. per user
+  direction.
+- Tier-2 escalation (separate physical drive / external USB-C SSD) is
+  available if the threat model widens.
 
 ### Ongoing
 - Real-device Pixel-6 + iPhone QA for mobile changes (now including the new
@@ -93,11 +147,14 @@ Last wrapup: 2026-07-19.
   2026-07-14 delegation-worthiness gate, this is a deterministic transform
   (exact bytes known) → edited directly. Decision validated by the same task's
   history (3 dead sessions on #46 fastscroll; direct took minutes).
+- **Synthetic-corruption test for verify-mirror-media.bat** (was Next #4) —
+  shipped 2026-07-19 p.m. as 6 tests in `tests/test_verify_mirror_media.py`,
+  refactored the .bat into a Python helper as part of the same change.
 
 ## Cherry-pick audit (2026-07-11) — no-op, already landed
 The 4 bakeoff oracle features were committed **directly to main** during the
 bakeoff session (commits `dcccc2c`, `248be11`, etc.), not left on run branches.
-All 21 oracle tests pass on main. Nothing to cherry-pick. Cleaned up 7 stale
+All 21 oracle tests pass on main. Nothing to cherry-pick. Cleaned up 7 stale:
 `delegated/run-*` local branches (all from a later LM-Studio qwen3-coder
 experiment, not the cloud bakeoff winners).
 
@@ -106,6 +163,9 @@ experiment, not the cloud bakeoff winners).
 - P2.1/P2.2 engagement Phase 1 — depends on user flipping `learn-triage --apply`
   (their switch, deferred once already).
 - iPhone PWA real-device test — deferred; user will test when ready.
+- **Spec 10 — second mirror to a tailnet peer** (deferred 2026-07-19 p.m.
+  per user direction; same-drive mirror + verify-mirror-media.bat covers
+  the stated threat model).
 - Cross-substrate bakeoff check (PKMS) — pending PKMS verdict.
 
 ---
@@ -114,7 +174,8 @@ experiment, not the cloud bakeoff winners).
 
 | Date | Session summary | Spec / ref |
 |---|---|---|
-| 2026-07-19 | iOS splash screens + media mirror + Spec 10/11 decisions + #46 merge + CI Pillow fix | this file's "Just done" |
+| 2026-07-19 (p.m.) | Spec 11 video-archive smoke PASSED (r/hoggit 2018 post, 7.3 MB, 5 s); verify-mirror-media.bat → Python shim + 6 corruption tests; peer mirror ICEBOXED | this file's "Just done (p.m.)" |
+| 2026-07-19 (a.m.) | iOS splash screens + media mirror + Spec 10/11 decisions + #46 merge + CI Pillow fix | this file's "Just done (a.m.)" |
 | 2026-07-19 | #46 mobile fastscroll merged (rAF-deferred onScroll handle transform) | `docs/bugs/46-*.md`, `docs/specs/46-*.md` |
 | 2026-07-14 | #46 fastscroll fix + port (track-offset bug, scrub-load cascade pause) | `docs/specs/46-fastscroll-scrub-loads-plan.md` |
 | 2026-07-12 | iOS PWA installability (Spec 13): 5 Apple meta tags, /sw.js root-scope, --tls flag, mkcert setup | `docs/specs/13-ios-pwa-installability.md` |
