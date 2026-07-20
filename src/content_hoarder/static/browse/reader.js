@@ -81,6 +81,43 @@ export function deadThreadCollapseSet(comments) {
   return out;
 }
 
+/* #74 — pure helper: honest empty-thread copy (node-testable).
+   Never returns "No comments on this post." unless the thread was actually
+   cached and empty. */
+export function threadEmptyMessage(res, opts) {
+  const o = opts || {};
+  const escFn = o.esc || ((s) => String(s == null ? "" : s));
+  const openHref = o.openHref || "";
+  const openLink = openHref
+    ? ' <a class="rd-oolink" href="' +
+      escFn(openHref) +
+      '" target="_blank" rel="noopener">Open original ↗</a>'
+    : "";
+  const st = (res && (res.hydrate_status || res.status)) || "";
+  if (st === "auth_missing" || st === "auth_expired") {
+    return (
+      "Sign in to Reddit to load this thread (reddit-oauth --login)." + openLink
+    );
+  }
+  if (st === "network_error") {
+    return "Network error loading the thread. Try again." + openLink;
+  }
+  if (st === "unavailable") {
+    return "Couldn’t find this thread (it may be deleted)." + openLink;
+  }
+  if (st === "not_found") {
+    return "This thread was removed and isn’t available." + openLink;
+  }
+  if (st === "no_permalink") {
+    return "This item has no Reddit permalink to load." + openLink;
+  }
+  if (res && res.cached === false) {
+    return "Thread not loaded yet." + openLink;
+  }
+  // Truly cached empty thread
+  return "No comments on this post.";
+}
+
 export function renderThread(comments, collapsed, helpers) {
   let html = "";
   for (let i = 0; i < comments.length; i++) {
@@ -1242,18 +1279,50 @@ export function initReader({
       )
       .join("") +
     "</select></div>";
-  function renderComments() {
+  /* #74: never claim "No comments on this post" for a cache miss / auth failure. */
+  function emptyThreadMessage(res) {
+    return threadEmptyMessage(res || {}, {
+      openHref: ooHref || "",
+      esc,
+    });
+  }
+  /* P2: show the saved comment body while the thread loads so the sheet isn't blank. */
+  function seedSavedCommentHtml() {
+    if (!item || item.kind !== "comment") return "";
+    const body = (item.body || "").trim();
+    if (!body) return "";
+    const sm = sourceMeta(item);
+    return (
+      '<div class="rd-cmtseed" data-seed="1">' +
+      '<div class="rd-cmtseed-lab">Your saved comment</div>' +
+      '<div class="rd-cmtseed-body">' +
+      sm.bodyHtml(body) +
+      "</div></div>"
+    );
+  }
+  function renderComments(res) {
+    // P2 fix: the seed is a loading-state placeholder — once comments
+    // are present the saved comment is already the first (or only) entry
+    // in the tree, so re-rendering it would duplicate the body.
+    if (comments.length) {
+      cmtsEl.innerHTML =
+        commentsHead(comments.length) +
+        renderThread(comments, collapsed, {
+          esc,
+          author: (author) => sourceMeta(item).author(author),
+          md: (body, media) => sourceMeta(item).bodyHtml(body, media),
+          ago,
+          opAuthor,
+        });
+      return;
+    }
+    const seed = seedSavedCommentHtml();
     cmtsEl.innerHTML =
-      commentsHead(comments.length) +
-      (comments.length
-        ? renderThread(comments, collapsed, {
-            esc,
-            author: (author) => sourceMeta(item).author(author),
-            md: (body, media) => sourceMeta(item).bodyHtml(body, media),
-            ago,
-            opAuthor,
-          })
-        : '<div class="rd-cmtstate">No comments on this post.</div>');
+      commentsHead(0) +
+      seed +
+      '<div class="rd-cmtstate">' +
+      emptyThreadMessage(res) +
+      "</div>";
   }
   function saveReaderScroll() {
     if (!fullname || !scrollEl) return;
@@ -1274,23 +1343,29 @@ export function initReader({
       "";
     if (!videoEl) renderPost(res.post || null); // don't clobber a playing inline video
     setChip(res.archived ? "archived" : justHydrated ? "hydrated" : "cached");
-    renderComments();
+    renderComments(res);
     if (readerScrollFullname === fullname && readerScrollTop) {
       requestAnimationFrame(() =>
         restoreReaderScroll(fullname, readerScrollTop),
       );
     }
   }
-  function failState() {
+  function failState(res) {
     const sm = sourceMeta(item);
+    const seed = seedSavedCommentHtml();
+    const msg = emptyThreadMessage(
+      res || { cached: false, hydrate_status: "error" },
+    );
     cmtsEl.innerHTML =
-      '<div class="rd-cmtstate err">Couldn’t load the ' +
-      esc(sm.label) +
-      " thread." +
-      '<a class="rd-oolink" href="' +
-      esc(ooHref || "#") +
-      '" target="_blank" rel="noopener">' +
-      "Open original ↗</a></div>";
+      seed +
+      '<div class="rd-cmtstate err">' +
+      msg +
+      (msg.indexOf("Open original") >= 0
+        ? ""
+        : '<a class="rd-oolink" href="' +
+          esc(ooHref || "#") +
+          '" target="_blank" rel="noopener">Open original ↗</a>') +
+      "</div>";
   }
   async function load() {
     const fn = fullname;
@@ -1298,18 +1373,25 @@ export function initReader({
     // before completing). Mirrors the _preloadCtl pattern in main.js so rapid
     // open/close/open cycles don't leave orphaned requests running to completion.
     if (loadCtl) {
-      try { loadCtl.abort(); } catch (e) { /* already aborted */ }
+      try {
+        loadCtl.abort();
+      } catch (e) {
+        /* already aborted */
+      }
     }
     loadCtl = new AbortController();
     const signal = loadCtl.signal;
-    cmtsEl.innerHTML = '<div class="rd-cmtstate">loading thread…</div>';
+    // P2: seed immediately so comment opens never flash a blank pane.
+    cmtsEl.innerHTML =
+      seedSavedCommentHtml() +
+      '<div class="rd-cmtstate">loading thread…</div>';
     const sm = sourceMeta(item);
     let res;
     try {
       res = await api.getJSON(sm.threadPath(fn, threadSort), { signal });
     } catch (e) {
       if (e && e.name === "AbortError") return; // superseded by a newer open
-      if (fullname === fn) failState();
+      if (fullname === fn) failState({ cached: false, hydrate_status: "network_error" });
       return;
     }
     if (fullname !== fn) return; // closed / switched mid-fetch
@@ -1317,16 +1399,40 @@ export function initReader({
       applyThread(res, res.hydrate_status === "hydrated");
       return;
     }
+    // Cache miss: surface hydrate_status from the same GET (lazy hydrate already ran server-side).
+    if (res && res.hydrate_status && res.hydrate_status !== "cached") {
+      // auth/network/unavailable — don't claim "no comments"
+      if (
+        /auth_|network_error|unavailable|no_permalink|not_found/.test(
+          res.hydrate_status,
+        )
+      ) {
+        failState(res);
+        return;
+      }
+    }
     if (!sm.hydratePath) {
-      failState();
+      failState(res || { cached: false });
       return;
     }
     cmtsEl.innerHTML =
+      seedSavedCommentHtml() +
       '<div class="rd-cmtstate">fetching the live thread…</div>';
+    let hyd = null;
     try {
-      await api.postJSON(sm.hydratePath(fn), {});
+      hyd = await api.postJSON(sm.hydratePath(fn), {});
     } catch (e) {
-      if (fullname === fn) failState();
+      // POST may reject with r.data.status for auth_missing etc.
+      const st =
+        (e && e.data && e.data.status) ||
+        (res && res.hydrate_status) ||
+        "network_error";
+      if (fullname === fn)
+        failState({
+          cached: false,
+          hydrate_status: st,
+          comments: [],
+        });
       return;
     } // 401 no-auth, 502 network, …
     if (fullname !== fn) return;
@@ -1334,12 +1440,24 @@ export function initReader({
       res = await api.getJSON(sm.threadPath(fn, threadSort), { signal });
     } catch (e) {
       if (e && e.name === "AbortError") return;
-      if (fullname === fn) failState();
+      if (fullname === fn)
+        failState({
+          cached: false,
+          hydrate_status: (hyd && hyd.status) || "network_error",
+        });
       return;
     }
     if (fullname !== fn) return;
     if (res && res.cached) applyThread(res, true);
-    else failState();
+    else
+      failState(
+        Object.assign({}, res || { cached: false }, {
+          hydrate_status:
+            (hyd && hyd.status) ||
+            (res && res.hydrate_status) ||
+            "error",
+        }),
+      );
   }
 
   /* ---- open / close (+ history so the system back-gesture returns to feed) ---- */
@@ -1553,7 +1671,7 @@ export function initReader({
     if (tog) {
       const ci = +tog.dataset.ci;
       collapsed.has(ci) ? collapsed.delete(ci) : collapsed.add(ci);
-      renderComments();
+      renderComments({});
       return;
     }
     // Tap ANYWHERE on a comment (byline OR body text) to collapse/expand its thread — a big tap
@@ -1564,7 +1682,7 @@ export function initReader({
       const ci = +cmt.dataset.ci;
       if (!Number.isNaN(ci)) {
         collapsed.has(ci) ? collapsed.delete(ci) : collapsed.add(ci);
-        renderComments();
+        renderComments({});
       }
       return;
     }
