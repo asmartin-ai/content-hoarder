@@ -1,6 +1,6 @@
 # Next delegation plan
 
-Snapshot: 2026-06-29 after GitHub Issues migration.
+Snapshot: 2026-07-20 after orchestration session (PRs #75/#77 landed, #71/#72 closed).
 
 ## Current state
 
@@ -19,6 +19,12 @@ Confirmed shipped and folded into local history before migration:
 - Firefox local/manual tab ingest endpoint and `firefox-token` setup command.
 - Bulk unsave-by-tag local queueing and web drain safety gates.
 - Scroll-to-top/top-bar stabilization for mobile browse; physical-device feel still needs QA.
+
+Added 2026-07-20:
+
+- ai_ml subreddit tag coverage (#71) — 9 LLM-era subs mapped; delegated to aider/deepseek, merged.
+- PR #77 (lightbox captions/blurbs) and PR #75 (OCR enrich, splashes, browse packets) rebased through the #76 conflict and merged; SW/APP_VERSION now **v126**. Head branches superseded.
+- Life-OS promotion-card fixture proven (#72 closed); life-os ADR 0027 (Proposed) records Option C hybrid promote direction.
 
 ## Immediate T1 gates / good next issues
 
@@ -41,13 +47,20 @@ Confirmed shipped and folded into local history before migration:
 | #15 Watch Later / WL3 import | T2 | Representative export sample and decision: one-shot import vs recurring workflow. | YouTube connector/parser fixture tests. |
 | #19 App icon redesign | T3 after visual decision | Approved backwards-E/H mark asset direction. | `static/icon.svg`, PNG icons, manifest, cache bump. |
 | #49 Mobile `/reddit` view | T1-led design first | Decide whether to improve `/reddit` or accelerate Epic 17 unification. | Design proposal before code. |
-| #26 OCR image text search | T1-led spike | Pick engine path: Tesseract vs local vision model; sample accuracy. | Enrich pass + FTS/search wiring after decision. |
+| #26 OCR image text search | T1-led spike | ~~Pick engine path~~ Tesseract path SHIPPED in PR #75 (`src/content_hoarder/ocr.py`, `ocr` CLI, spec 14). Remaining: FTS/search wiring + corpus enrich pass. | Enrich pass + FTS/search wiring. |
 
 ## Research-only / defer
 
 - **Firefox Sync account-backed tabs:** no issue was created because the local manual ingest path already solves the near-term need; only revisit if account-backed cross-device sync becomes necessary.
 - **Stable-height top chrome redesign:** only start if real-device QA still finds scroll/top-bar feel bad after the conservative stabilization (#48).
 - **Durable unsave batch IDs/cancel-by-batch:** defer unless the pending queue UX proves insufficient.
+
+## New T2-ready work (2026-07-20)
+
+| Task | Tier | Notes |
+|---|---:|---|
+| ai_ml backfill retag | T2 | Dry-run a retag over existing reddit rows with the new `_SUBREDDIT_TAGS`; report counts before `--apply`. DB copy first, per the standing rule. |
+| `promote` action (resurface card) | T1-led design, blocked on ADR 0027 acceptance | Wire the fixture's promote stub to a real action: capture envelope to PKMS `vault/inbox/`, two-hop `source_span`, `action_receipt`. Unsave-on-source is OUT of scope (deferred per ADR 0027). See PKMS roadmap packet S3. |
 
 ## Parallelization rules
 
