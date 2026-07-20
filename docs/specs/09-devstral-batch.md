@@ -1,8 +1,7 @@
 # Spec 09 — Devstral batch: offline-backend backlog tasks
 
-Historical self-contained spec for shipped tasks originally picked from the monolithic backlog +
-`docs/specs/parity-ideas.md` that fit a **local Devstral codegen model**. Active work now lives in
-GitHub Issues; local backlog history lives under `docs/backlog/`.
+**Status: SHIPPED 2026-06-25** (all tasks shipped; Task A merged `92c8877`, Tasks B-D merged on
+subsequent branches). This file is a historical build record; active work lives in GitHub Issues.
 
 ## Status
 - **Task A — HN comment-thread viewer backend: ✅ SHIPPED 2026-06-25** (`commit 92c8877`).

@@ -1,7 +1,7 @@
 # Spec 12 — Unify one surface (Epic 17, design-first gate)
 
-**Status: PROPOSED 2026-07-03.** Design-only per DIRECTION §5 P3.0 (T1,
-design-first — the gate for the rest of W3). **No code in this spec.**
+**Status: SHIPPED 2026-07-07** (P3.5 merged to main via `efc4f5c`; P3.1 deck, P3.3 subreddit
+facet, P3.5 legacy retirement all landed). Original design was PROPOSED 2026-07-03.
 Implementation packets P3.1..n are cut by this document.
 
 **Mission (D1, DIRECTION §3):** `/triage` and `/reddit` functionality migrates
