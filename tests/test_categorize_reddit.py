@@ -179,3 +179,10 @@ def test_new_tags_in_filter_vocab(conn):
                     title="g", metadata={"subreddit": "gamedeals", "tags": ["ephemeral"]}))
     conn.commit()
     assert db.tag_counts(conn)["ephemeral"] == 1
+
+
+def test_ai_ml_subreddit_map():
+    # LLM-era subs map to ai_ml (mixed-case input lowercased in reddit_tags)
+    assert categorize.reddit_tags(_item(sub="LocalLLaMA")) == ["ai_ml"]
+    assert categorize.reddit_tags(_item(sub="ClaudeAI")) == ["ai_ml"]
+    assert categorize.reddit_tags(_item(sub="StableDiffusion")) == ["ai_ml"]
