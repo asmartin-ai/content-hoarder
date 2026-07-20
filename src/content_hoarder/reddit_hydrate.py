@@ -31,6 +31,35 @@ _SUB_FROM_PERMALINK = re.compile(r"^/r/([^/]+)/")
 _SID_FROM_PERMALINK = re.compile(r"/comments/([A-Za-z0-9]+)/")
 
 
+def submission_id_from_permalink(permalink: str | None) -> str | None:
+    """Bare base36 submission id from a reddit permalink, or None."""
+    if not permalink:
+        return None
+    m = _SID_FROM_PERMALINK.search(str(permalink))
+    return m.group(1) if m else None
+
+
+def submission_fullname(permalink: str | None) -> str | None:
+    """``reddit:t3_<sid>`` for a permalink's submission, or None."""
+    sid = submission_id_from_permalink(permalink)
+    return f"reddit:t3_{sid}" if sid else None
+
+
+def _cache_thread_blob(
+    conn, fullname: str, metadata: dict, data, *, commit: bool = True
+) -> None:
+    """Store thread JSON under the item fullname and dual-write under the submission
+    ``t3_`` key when this is a comment (or any non-post fullname). Fixes #74 cache
+    misses where comment opens never reused a post-level hydrate."""
+    blob = json.dumps(data)
+    db.set_reddit_thread(conn, fullname, blob, commit=False)
+    post_fn = submission_fullname((metadata or {}).get("permalink"))
+    if post_fn and post_fn != fullname:
+        db.set_reddit_thread(conn, post_fn, blob, commit=False)
+    if commit:
+        conn.commit()
+
+
 def backfill_titles_local(conn, *, dry_run: bool = False) -> dict:
     """Spec 08 P1: restore real titles for title-less saved reddit items (mostly COMMENTS,
     which carry no title of their own) from ``raw_json.submission_title`` — the title of the
@@ -304,7 +333,7 @@ def hydrate_one(conn, fullname: str, *, getf=None, user_agent=None, providers=No
     except (KeyError, IndexError, TypeError):
         comments = 0
 
-    db.set_reddit_thread(conn, fullname, json.dumps(data), commit=True)
+    _cache_thread_blob(conn, fullname, metadata, data, commit=True)
     # Lazy thumbnail backfill: the just-fetched submission carries the preview/poster the
     # initial sync dropped — capture it for the row's feed thumbnail (only if missing).
     thumb = _thumb_from_thread(data)
@@ -403,6 +432,20 @@ def hydrate_if_missing(conn, fullname, *, getf=None, user_agent=None, providers=
     existing = db.get_reddit_thread(conn, fullname)
     if existing and existing.get("thread_json"):
         return {"status": "cached", "fullname": fullname}
+    # #74: comment items may miss their own key but share the submission's t3_ cache.
+    row = conn.execute(
+        "SELECT metadata FROM items WHERE fullname=?", (fullname,)
+    ).fetchone()
+    md = models.parse_metadata(row["metadata"] if row else None)
+    post_fn = submission_fullname(md.get("permalink"))
+    if post_fn and post_fn != fullname:
+        post_cached = db.get_reddit_thread(conn, post_fn)
+        if post_cached and post_cached.get("thread_json"):
+            # Mirror onto the comment key so later opens are direct hits.
+            db.set_reddit_thread(
+                conn, fullname, post_cached["thread_json"], commit=True
+            )
+            return {"status": "cached", "fullname": fullname, "via": "submission"}
     now = now if now is not None else int(time.time())
     failed_at = _hydrate_failed_at(conn, fullname)
     if failed_at is not None and now - failed_at < ttl:
@@ -604,7 +647,8 @@ def hydrate_one_from_archive(conn, fullname: str, *, providers=None, user_agent=
         {"kind": "Listing", "data": {"children": tree_comments}},
     ]
 
-    db.set_reddit_thread(conn, fullname, json.dumps(blob))
+    md = models.parse_metadata(item.get("metadata"))
+    _cache_thread_blob(conn, fullname, md, blob, commit=True)
 
     return {"status": "archived", "fullname": fullname, "comments": len(tree_comments)}
 
