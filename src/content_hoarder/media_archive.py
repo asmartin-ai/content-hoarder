@@ -396,9 +396,17 @@ def archive(
                     res["failed"] += 1
                     sc["failed"] += 1
                     res["fail_reasons"][reason] = res["fail_reasons"].get(reason, 0) + 1
+                if progress and res["items"] % 10 == 0:
+                    progress(
+                        f"  [videos] {res['items']} items, {res['archived']} archived, "
+                        f"{res['failed']} failed, {res['bytes'] // 1024 // 1024} MB"
+                    )
+                if progress and res["items"] % 50 == 0:
+                    fr = res.get("fail_reasons") or {}
+                    if fr:
+                        progress(f"  [videos] fail_reasons: {fr}")
                 if throttle:
                     sleep(throttle)
-                continue
 
             todo = [u for u in _urls_for(md, scope) if u not in arch]
             if not todo:
