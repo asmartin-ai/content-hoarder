@@ -57,8 +57,8 @@ def test_browse_meta_includes_hn_author_link():
     assert 'item.source === "hackernews" && item.author' in js
 
 
-def test_app_version_v120():
+def test_app_version_v126():
     main = (STATIC / "browse" / "main.js").read_text(encoding="utf-8")
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
-    assert 'APP_VERSION = "v120"' in main
-    assert "ch-shell-v120" in sw
+    assert 'APP_VERSION = "v126"' in main
+    assert "ch-shell-v126" in sw
