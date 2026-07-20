@@ -118,13 +118,46 @@ def get_thread(conn, fullname: str, sort: str = "best") -> dict | None:
     Returns ``None`` if the item doesn't exist, or ``{cached: False, …}`` if the item
     exists but has no cached thread yet (the UI then offers Recover / live fetch).
     Live cookie/OAuth fetch is layered on in a later phase.
+
+    For saved **comments** (``reddit:t1_…``), falls back to the parent submission's
+    cache key (``reddit:t3_<sid>`` from ``metadata.permalink``) so a once-hydrated
+    post is reusable (#74).
+
+    NOTE: the dual-key fallback path issues a commit-on-mirror so the next
+    open is a direct hit. This violates the historical "pure cache reader"
+    contract documented above; no current API route mixes open DML with a
+    ``get_thread`` call, so it is latent, not live. TODO(#74-followup):
+    factor the mirror into a caller-side helper once the dual-key logic
+    consolidates with ``reddit_hydrate.hydrate_if_missing`` (also duplicated).
     """
     item = db.get_item(conn, fullname)
     if item is None:
         return None
     cached = db.get_reddit_thread(conn, fullname)
+    via = None
+    if not (cached and cached.get("thread_json")):
+        # Dual-key fallback: comment → submission cache
+        from content_hoarder.reddit_hydrate import submission_fullname
+
+        md = item.get("metadata") or {}
+        if isinstance(md, str):
+            try:
+                md = json.loads(md) if md else {}
+            except (ValueError, TypeError):
+                md = {}
+        post_fn = submission_fullname(md.get("permalink") if isinstance(md, dict) else None)
+        if post_fn and post_fn != fullname:
+            alt = db.get_reddit_thread(conn, post_fn)
+            if alt and alt.get("thread_json"):
+                cached = alt
+                via = "submission"
+                # Mirror so the next open is a direct hit.
+                db.set_reddit_thread(conn, fullname, alt["thread_json"], commit=True)
     if cached and cached.get("thread_json"):
-        return parse_thread(cached["thread_json"], item, sort)
+        out = parse_thread(cached["thread_json"], item, sort)
+        if via:
+            out["cache_via"] = via
+        return out
     return {
         "post": {},
         "comments": [],
