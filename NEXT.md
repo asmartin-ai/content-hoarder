@@ -1,14 +1,36 @@
 # NEXT.md — content-hoarder session focus
 
 `main`. Suite: non-UI suite green on `main` post-merges (see `gh run list` for CI).
-Last wrapup: 2026-07-20 (orchestration session — see block below).
+Last wrapup: 2026-07-26 (Keep connector session — see block below).
+
+## Just done (2026-07-26 — Keep connector extended for modern Takeout)
+- **Google Keep as a CH source channel — wired.** The `connectors/keep.py`
+  Takeout path already existed and tested. This session extends it for the
+  modern Takeout format (`timestamps.createTime` in microsecond-epoch) with
+  an epoch-magnitude auto-detect helper (`_epoch_to_utc`), and adds a
+  `sync()` skeleton that points users at PKMS for live gkeepapi (life-os
+  ADR 0028 has PKMS as the canonical master-token-bearing surface). New
+  tests: `test_keep_modern_takeout_format_with_timestamps` (modern format
+  parses) and `test_keep_sync_raises_with_clear_message` (sync skeleton
+  points at PKMS). All 7 keep dispatch tests green.
+- **Flow for users with pre-existing Keep history:**
+  1. `pkms ingest keep-takeout <takeout.zip>` — bulk import into PKMS vault
+     (ADR 0028 path; attachments mirrored to `K:\MediaMirror\keep\`)
+  2. `ch import <extracted-keep-dir>` — bulk triage import into CH
+     (the connector here; uses the same Takeout JSON files but the
+     *extracted* directory, not the ZIP)
+  3. (Optional) `pkms ingest keep` + scheduled pull — live incremental
+     capture in PKMS
+- **Not changed in this session:** triage/promote workflow. Keep items in
+  CH follow the same Triage path as Reddit/HN. The promotion-card fixture
+  (CH#72, closed 2026-07-20) still applies.
 
 ## Just done (2026-07-20 — orchestration session: issues, PR unblock, ADRs, scouts)
 - **Issue #71 CLOSED (ai_ml tagging).** Audit: 0 reddit items tagged `ai_ml` (HN 154,
   Firefox 3); root cause: `_SUBREDDIT_TAGS` only had legacy ML subs. Fix delegated to
   aider (deepseek executor), reviewed + merged: 9 LLM-era subs (localllama, claudeai,
   openai, chatgpt, artificial, singularity, stablediffusion, ollama, mistralai) →
-  `ai_ml`; new test `test_ai_ml_subreddit_map`. Optional operator follow-up: backfill
+  `ai_ml`; new test `test_ai_ml_subreddit_tag_map`. Optional operator follow-up: backfill
   retag of existing rows (new saves tag correctly already).
 - **Issue #72 CLOSED (Life-OS fixture).** Promotion-card fixture click-tested
   end-to-end in life-os; substrate ADRs 0016/0017/0022/0025/0026 flipped Accepted.
@@ -28,6 +50,7 @@ Last wrapup: 2026-07-20 (orchestration session — see block below).
   deferred behind `action_receipt`; Keep stays notes-only (YouTube links route here).
   CH implication: a real `promote` action wired to the resurface card is the next
   integration slice once ADR 0027 is accepted.
+
 
 ## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
 - **iOS splash screens SHIPPED** on `main` (merged `e48c47e`, CI green on `8067e1b`):
