@@ -85,3 +85,21 @@ def test_search_items_author_list_is_or(conn):
 
     rows = db.search_items(conn, "", author=["spez", "kn0thing"])
     assert sorted(r["source_id"] for r in rows) == ["a", "b"]
+
+
+def test_search_items_author_list_case_insensitive(conn):
+    # Mixed-case stored values must match a lowercase comma-separated list.
+    db.merge_upsert(conn, mk(source="reddit", source_id="a", title="one", author="Spez"))
+    db.merge_upsert(conn, mk(source="reddit", source_id="b", title="two", author="Kn0thing"))
+
+    rows = db.search_items(conn, "", author=["spez", "kn0thing"])
+    assert sorted(r["source_id"] for r in rows) == ["a", "b"]
+
+
+def test_search_items_author_list_excludes_nonmembers(conn):
+    # Nonmembers in the list must not appear in results.
+    db.merge_upsert(conn, mk(source="reddit", source_id="a", title="one", author="spez"))
+    db.merge_upsert(conn, mk(source="reddit", source_id="b", title="two", author="kn0thing"))
+
+    rows = db.search_items(conn, "", author=["spez", "nobody"])
+    assert [r["source_id"] for r in rows] == ["a"]

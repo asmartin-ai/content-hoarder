@@ -113,3 +113,137 @@ def test_keep_sync_raises_with_clear_message() -> None:
         list(keep.sync())
     assert "PKMS" in str(exc.value)
     assert "ADR 0028" in str(exc.value)
+
+
+def test_keep_iso_createTime_parsed_to_utc_epoch(tmp_path: Path) -> None:
+    """ISO-8601 createTime strings resolve to the correct UTC epoch."""
+    f = tmp_path / "iso_note.json"
+    f.write_text(
+        json.dumps(
+            {
+                "title": "ISO note",
+                "textContent": "body",
+                "timestamps": {
+                    "createTime": "2024-01-15T10:30:00Z",
+                    "updateTime": "2024-01-16T12:00:00Z",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    keep = connectors.get("keep")
+    items = list(keep.import_file(f))
+    assert len(items) == 1
+    item = items[0]
+    created = item.created_utc if hasattr(item, "created_utc") else item["created_utc"]
+    saved = item.saved_utc if hasattr(item, "saved_utc") else item["saved_utc"]
+    # 2024-01-15T10:30:00Z == 1705314600
+    assert created == 1_705_314_600
+    # 2024-01-16T12:00:00Z == 1705406400
+    assert saved == 1_705_406_400
+
+
+def test_keep_iso_offset_createTime_parsed_to_utc_epoch(tmp_path: Path) -> None:
+    """ISO-8601 offset strings (non-Z) resolve to UTC epoch."""
+    f = tmp_path / "offset_note.json"
+    f.write_text(
+        json.dumps(
+            {
+                "title": "offset note",
+                "textContent": "body",
+                "timestamps": {
+                    "createTime": "2024-01-15T10:30:00+02:00",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    keep = connectors.get("keep")
+    items = list(keep.import_file(f))
+    assert len(items) == 1
+    item = items[0]
+    created = item.created_utc if hasattr(item, "created_utc") else item["created_utc"]
+    # 2024-01-15T10:30:00+02:00 == 2024-01-15T08:30:00Z == 1705307400
+    assert created == 1_705_307_400
+
+
+def test_keep_invalid_timestamp_returns_zero(tmp_path: Path) -> None:
+    """Invalid timestamp values (non-parseable string, garbage) yield 0."""
+    f = tmp_path / "bad_ts.json"
+    f.write_text(
+        json.dumps(
+            {
+                "title": "bad ts note",
+                "textContent": "body",
+                "timestamps": {
+                    "createTime": "not-a-timestamp",
+                    "updateTime": "also-not",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    keep = connectors.get("keep")
+    items = list(keep.import_file(f))
+    assert len(items) == 1
+    item = items[0]
+    created = item.created_utc if hasattr(item, "created_utc") else item["created_utc"]
+    saved = item.saved_utc if hasattr(item, "saved_utc") else item["saved_utc"]
+    assert created == 0
+    assert saved == 0
+
+
+def test_keep_modern_checked_true_marks_complete(tmp_path: Path) -> None:
+    """Modern Takeout uses `checked` (bool) for list item completion."""
+    f = tmp_path / "checked_note.json"
+    f.write_text(
+        json.dumps(
+            {
+                "title": "checklist note",
+                "listContent": [
+                    {"text": "done item", "checked": True},
+                    {"text": "undone item", "checked": False},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    keep = connectors.get("keep")
+    items = list(keep.import_file(f))
+    assert len(items) == 1
+    item = items[0]
+    body = item.body if hasattr(item, "body") else item["body"]
+    assert "[x] done item" in body
+    assert "[ ] undone item" in body
+
+
+def test_keep_legacy_isChecked_takes_precedence_over_modern_checked(
+    tmp_path: Path,
+) -> None:
+    """When both `isChecked` (legacy) and `checked` (modern) exist,
+    legacy isChecked takes precedence."""
+    f = tmp_path / "precedence_note.json"
+    f.write_text(
+        json.dumps(
+            {
+                "title": "precedence note",
+                "listContent": [
+                    # legacy says unchecked, modern says checked -> legacy wins
+                    {"text": "conflict item", "isChecked": False, "checked": True},
+                    # only modern checked -> uses it
+                    {"text": "modern only", "checked": True},
+                    # only legacy isChecked -> uses it
+                    {"text": "legacy only", "isChecked": True},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    keep = connectors.get("keep")
+    items = list(keep.import_file(f))
+    assert len(items) == 1
+    item = items[0]
+    body = item.body if hasattr(item, "body") else item["body"]
+    assert "[ ] conflict item" in body
+    assert "[x] modern only" in body
+    assert "[x] legacy only" in body
