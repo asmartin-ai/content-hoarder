@@ -1,7 +1,30 @@
 # NEXT.md — content-hoarder session focus
 
-`main`. Suite: non-UI suite green on `main` post-merges (see `gh run list` for CI).
-Last wrapup: 2026-07-26 (Keep connector session — see block below).
+`main`. Suite: non-UI suite green (see `gh run list` for CI).
+Last wrapup: 2026-07-27 (correctness pass — see block below).
+
+## Just done (2026-07-27 — Keep Takeout parsing + multi-value filter fixes)
+- **Push routing remains the open decision** carried from the 2026-07-19
+  audit: `origin` is public, `private` is the canonical mirror. Check actual
+  sync with `git rev-list --left-right --count origin/main...main`, never a
+  frozen claim here.
+- **`_epoch_to_utc` now parses ISO-8601 timestamps.** The 2026-07-26 session
+  assumed modern Takeout always uses microsecond-epoch ints; it also emits
+  ISO-8601 strings (`Z` and offset forms). Those hit `int()`, raised, and
+  returned 0 — so affected notes silently lost their real created/saved
+  times. The ISO branch runs only where `int()` already failed, so the
+  numeric ms-vs-µs magnitude detection is untouched.
+- **Checklist `checked` honored.** Modern Takeout uses `checked`; the
+  connector only read legacy `isChecked`, so completed checklist items
+  imported as unchecked — a silent meaning change in the note body that
+  feeds search and triage. Legacy `isChecked` still wins when both exist,
+  tested by membership not truthiness so `isChecked=False` is respected.
+- **Multi-value `subreddit:` / `author:` filters were silently
+  case-sensitive.** `expr IN (...) COLLATE NOCASE` applies NOCASE to the
+  boolean *result* of `IN`, not to each comparison, so
+  `author:spez,kn0thing` missed rows stored as `Spez` while the
+  single-value branch matched fine. Collation moved to the left operand.
+- **Verified:** 1062 passed, 75 deselected (UI suite excluded by `addopts`).
 
 ## Just done (2026-07-26 — Keep connector extended for modern Takeout)
 - **Google Keep as a CH source channel — wired.** The `connectors/keep.py`
