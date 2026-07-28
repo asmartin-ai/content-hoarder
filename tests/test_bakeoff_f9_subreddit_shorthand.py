@@ -16,7 +16,12 @@ Anti-gaming shape: the fix must be a PURE ADDED recognizer branch in
 guard below must remain green (the recognizer has to be anchored ``^r/<name>$`` — a
 reddit URL token must NOT be captured).
 """
-from content_hoarder import search_query
+from content_hoarder import db, models, search_query
+
+
+def mk(**kw):
+    kw.setdefault("now", 1000)
+    return models.new_item(**kw)
 
 
 def test_bare_r_slash_is_subreddit_shorthand():
@@ -53,3 +58,21 @@ def test_r_slash_must_be_standalone_token_not_inside_a_url():
     # capture this. Keeps the added recognizer anchored to a standalone ^r/<name>$ token.
     pq = search_query.parse("https://www.reddit.com/r/tankporn/comments/abc/")
     assert pq.subreddit is None
+
+
+def test_search_items_subreddit_list_case_insensitive(conn):
+    # Mixed-case stored subreddit values must match a lowercase comma-separated list.
+    db.merge_upsert(conn, mk(source="reddit", source_id="a", title="one", metadata={"subreddit": "TankPorn"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="b", title="two", metadata={"subreddit": "Amateur"}))
+
+    rows = db.search_items(conn, "", subreddit=["tankporn", "amateur"])
+    assert sorted(r["source_id"] for r in rows) == ["a", "b"]
+
+
+def test_search_items_subreddit_list_excludes_nonmembers(conn):
+    # Nonmembers in the list must not appear in results.
+    db.merge_upsert(conn, mk(source="reddit", source_id="a", title="one", metadata={"subreddit": "tankporn"}))
+    db.merge_upsert(conn, mk(source="reddit", source_id="b", title="two", metadata={"subreddit": "amateur"}))
+
+    rows = db.search_items(conn, "", subreddit=["tankporn", "nonexistent"])
+    assert [r["source_id"] for r in rows] == ["a"]

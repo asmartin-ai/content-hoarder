@@ -970,7 +970,7 @@ def search_items(
             if isinstance(subreddit, list):
                 ph = ",".join("?" for _ in subreddit)
                 filters.append(
-                    f"json_extract({a}metadata, '$.subreddit') IN ({ph}) COLLATE NOCASE"
+                    f"json_extract({a}metadata, '$.subreddit') COLLATE NOCASE IN ({ph})"
                 )
                 params.extend(subreddit)
             else:
@@ -983,7 +983,7 @@ def search_items(
             # to mirror subreddit. Drives the `author:` operator + the bare `u/<user>` shorthand.
             if isinstance(author, list):
                 ph = ",".join("?" for _ in author)
-                filters.append(f"{a}author IN ({ph}) COLLATE NOCASE")
+                filters.append(f"{a}author COLLATE NOCASE IN ({ph})")
                 params.extend(author)
             else:
                 filters.append(f"{a}author = ? COLLATE NOCASE")
