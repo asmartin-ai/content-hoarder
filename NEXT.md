@@ -68,11 +68,13 @@ Last wrapup: 2026-07-27 (correctness pass — see block below).
   are now superseded — safe to delete on origin.
 - **Scout memos** (UNVERIFIED — source-check before load-bearing use) committed under
   `docs/research-scout/`: smart-sort (#24), deck architecture (#65), thumbnail crop (#28).
-- **Onramps direction recorded:** life-os ADR 0027 (Proposed) — Option C hybrid:
-  save stays save; promote via triage sprint on resurface cards; unsave-on-source
-  deferred behind `action_receipt`; Keep stays notes-only (YouTube links route here).
-  CH implication: a real `promote` action wired to the resurface card is the next
-  integration slice once ADR 0027 is accepted.
+- **Onramps direction recorded:** life-os ADR 0027 (**Accepted 2026-07-28**)
+  — Option C hybrid: save stays save; promote via triage sprint on resurface
+  cards; unsave-on-source deferred behind `action_receipt`; Keep stays
+  notes-only (YouTube links route here). Boundary stays modular so A/B remain
+  swappable. CH implication: a real `promote` action wired to the resurface
+  card is the next integration slice — spec lives in
+  `K:\Projects\PKMS\docs\delegation-roadmap.md`.
 
 
 ## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
