@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -62,11 +63,21 @@ class KeepConnector(BaseConnector):
 
     @staticmethod
     def _epoch_to_utc(value: Any) -> int:
-        """Detect a millisecond- or microsecond-epoch int and normalise to
-        Unix seconds. Returns 0 for missing/empty/non-numeric input."""
+        """Detect a millisecond- or microsecond-epoch int, or an ISO-8601
+        string, and normalise to Unix seconds. Returns 0 for missing/empty/
+        non-numeric/unparseable input."""
         try:
             n = int(value)
         except (TypeError, ValueError):
+            # Not an int — try ISO-8601 string parsing (e.g. "2024-01-15T10:30:00Z").
+            if isinstance(value, str):
+                try:
+                    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    return int(dt.timestamp())
+                except (ValueError, TypeError, OSError):
+                    return 0
             return 0
         if not n:
             return 0
@@ -131,7 +142,8 @@ class KeepConnector(BaseConnector):
             lines = []
             for entry in list_content:
                 if isinstance(entry, dict) and "text" in entry:
-                    mark = "[x]" if entry.get("isChecked") else "[ ]"
+                    checked = entry["isChecked"] if "isChecked" in entry else entry.get("checked")
+                    mark = "[x]" if checked else "[ ]"
                     lines.append(f"{mark} {entry.get('text', '')}")
             checklist = "\n".join(lines)
             body = text_content
