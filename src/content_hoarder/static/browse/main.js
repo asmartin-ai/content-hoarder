@@ -2282,6 +2282,12 @@ function openRowMenu(fn) {
     const show = it.source === "reddit" && it.is_saved !== 0;
     unsaveBtn.hidden = !show;
   }
+  // "Promote" — hidden once a promoted receipt exists (re-promote is a no-op).
+  const promoBtn = frag.querySelector('[data-relay="promote"]');
+  if (promoBtn) {
+    const pmd = (it.metadata || {}).promotion || {};
+    promoBtn.hidden = pmd.status === "promoted";
+  }
 
   row.appendChild(frag);
   relayFn = fn;
@@ -2313,6 +2319,7 @@ itemsEl.addEventListener("click", (e) => {
   if (action === "tag") tagEditor.open(fn, rowEl(fn));
   else if (action === "share")
     shareItem(state.items.find((i) => i.fullname === fn));
+  else if (action === "promote") promoteItem(fn);
   else if (action === "snooze") snooze(fn);
   else if (action === "unsave") unsaveRow(fn);
 });
