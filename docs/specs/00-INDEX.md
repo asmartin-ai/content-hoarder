@@ -99,7 +99,8 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
 
 - [15](15-promote-action.md) — PKMS promote action wired to the triage feed
   (resurface card proposes, explicit per-item accept promotes to PKMS
-  `vault/inbox/` with a two-hop `source_span` + `action_receipt`). **PROPOSED,
-  phase 1 design + prep only** — transport (file drop vs `POST /capture`)
-  awaits the PKMS ingest spec (build-plan.md §S3).
+  `vault/inbox/` with a two-hop `source_span` + `action_receipt`). **SHIPPED
+  2026-07-31 on `feat/promote-action`** — transport CHOSEN (extended
+  `POST /capture` per PKMS build-plan Slice 9); `bridge/pkms.py` + route +
+  browse row-menu Promote + 13 tests; suite 1075 green.
 
