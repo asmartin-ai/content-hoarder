@@ -1,12 +1,15 @@
 # Spec 15 — PKMS promote action (resurface-card integration)
 
-**Status: PROPOSED — phase 1 design + prep only. No implementation in this phase.**
+**Status: SHIPPED (phase 2, 2026-07-31) — transport CHOSEN; implemented on
+`feat/promote-action` (commit faaae86 = phase 1 design; implementation commits
+below).**
 
 Governing decision: life-os ADR 0027 (Accepted 2026-07-28, Option C hybrid).
-PKMS-side ingest spec in flight: `K:\Projects\PKMS\vault\projects\pkms-design\build-plan.md`
-§S3, branch `feat/promotion-ingest-spec`. This spec is transport-agnostic by
-design — the transport decision (file drop vs `POST /capture`) belongs to the
-PKMS spec; §5 lists the exact decision points awaiting it.
+The PKMS-side ingest spec LANDED (Slice 9 of
+`K:\Projects\PKMS\vault\projects\pkms-design\build-plan.md`, branch
+`feat/promotion-ingest-spec`): transport = **extended `POST /capture`** (file
+drop rejected). §5 now records the finalized contract and the DP-1..6
+resolutions; the phase-1 PROVISIONAL text is replaced, not kept alongside.
 
 Contract references (cite, don't copy): `K:\Projects\life-os\docs\contracts.md`
 (`capture`, `external_item`, `resurface_card`, `source_span`, `action_receipt`,
@@ -107,55 +110,63 @@ The gate sits at **proposal time**, and it already exists in CH:
   delegation-roadmap pins the `POST /capture` contract as stable
   ("existing … capture `POST /capture` contract don't change without a packet").
 
-**[INFERENCE]** PKMS `POST /capture` exists as a route today (the roadmap
-references it as an existing stable contract). Exact path, auth header shape,
-and response body are not verified in this session — they are decision points
-DP-2/DP-3 for the PKMS spec. Nothing in §5 depends on them being final.
+**[CONFIRMED phase 2]** PKMS `POST /capture` exists and was read directly
+(`capture_service.py do_POST`): token-gated, JSON/form/raw bodies, 200
+`saved ✓ <name>` / 403 `bad token` / 400 `empty capture`. The Slice 9 extended
+fields and the `already saved ✓` replay body land in PKMS's own build packet;
+CH sends them now (additive, ignored by the current build).
 
 ---
 
 ## 3. Item → `capture` envelope mapping + two-hop `source_span`
 
-### 3.1 Field mapping (CH item → capture envelope)
+### 3.1 Field mapping (CH item → capture envelope) — CHOSEN
 
-`contracts.md`'s `capture` sketch is explicitly placeholder ("Treat field names
-as placeholders until fixtures are created and validated"); S3 pins the CH
-envelope to its six fields. Mapping:
+Finalized Slice 9 envelope, field names verbatim (implemented in
+`bridge/pkms.py build_capture()`):
 
-| capture field | CH source (column / metadata key) | Notes |
+```json
+{
+  "text": "<title>\n\n<summary>\n\n<url>",
+  "source_account_id": "acct_content_hoarder_<source>",
+  "raw_ref": "<original url>",
+  "context": {"device": "desktop"|"phone", "app": "content-hoarder"},
+  "ch_item_id": "ext_ch_<sha1(fullname)[:10]>",
+  "ch_origin_ref": "content-hoarder:fullname:<fullname>",
+  "ch_captured_at": "<first_seen_utc ISO-8601>"
+}
+```
+
+| field | CH source (column / metadata key) | Notes |
 |---|---|---|
-| `id` | derived: `capture_<source>_<source_id>` | DP-7: PKMS may assign instead; the idempotency key is `raw_ref` regardless. |
-| `captured_at` | now, ISO-8601 | Promotion time, NOT `saved_utc`/`created_utc`. |
-| `source` | constant `"content-hoarder"` | Per S3. Not in contracts.md's sketch enum — new value, expected. |
-| `source_account_id` | `null` | DP-8: CH has no account registry; the fixture's `acct_*` ids are life-os-side. A derived stable id (`ch:<source>`) is possible if PKMS wants one. |
-| `raw_text` | `title` + `"\n\n"` + `body` (fall back to either alone; `fullname` last resort) | Text-composition precedent: `bridge/karakeep.py _payload()`. Recommended to end with the original `url` line so the note is self-contained — placement is DP-4 (envelope format). |
-| `raw_ref` | `"content-hoarder:fullname:<fullname>"` | The stable two-hop anchor (fixture precedent: `origin_ref`/`source_ref`). NEVER the bare URL. |
-| `context.device` | `"desktop"` (web) / `"phone"` (mobile PWA) | DP-9: cheapest truthful signal; exact detection is phase-2 detail. |
-| `context.app` | `"content-hoarder"` | Constant. |
+| `text` | `title` + `"\n\n"` + `summary` + `"\n\n"` + `url`, joined over non-empty parts | Raw markdown, no headings, zero pre-shaping. `summary` = first non-empty of `metadata.{summary,description,selftext,text}`, else the `body` column, else empty. |
+| `source_account_id` | derived `acct_content_hoarder_<source>` | DP-8 resolved: deterministic CH pseudo-account per source (CH has no account registry; `acct_` prefix matches the fixture convention). |
+| `raw_ref` | the item's original `url`; fallback `content-hoarder:fullname:<fullname>` when there is no URL | Hop 3 (original URL). NEVER flattened to a CH pointer when a URL exists. |
+| `context.device` | `"desktop"` default; `"phone"` when the UA carries Mobile/Android/iPhone/iPad | DP-9 resolved: cheapest truthful signal, sniffed in the route. |
+| `context.app` | constant `"content-hoarder"` | — |
+| `ch_item_id` | `ext_ch_<sha1(fullname)[:10]>` | **The idempotency/dedupe key** (DP-5 resolved: NOT `raw_ref` — phase-1 wording corrected). Deterministic from the fullname. |
+| `ch_origin_ref` | `content-hoarder:fullname:<fullname>` | Hop 2, the live CH pointer — tags/decay/receipt state resolve through it, never flattened. |
+| `ch_captured_at` | `first_seen_utc` (fallback `saved_utc`, then now), ISO-8601 UTC `Z` | CH's capture time, NOT promotion time. |
 
-Not in the envelope (deliberately): `author`, `created_utc`, `status`,
-`metadata.tags`/`labels`, `triage_score`. S3: "classification happens after";
-the CH hop (`raw_ref`) is the pointer through which PKMS can later pull
-tags/decay/receipt state (a future CH read API — DP-10 if PKMS wants
-`tags_hint` at capture time).
+`source` travels as the query param `?source=content-hoarder` (PKMS's existing
+source channel), not a body field. Not in the envelope (deliberately):
+`author`, `created_utc`, `status`, `metadata.tags`/`labels`, `triage_score`
+(classification happens after; the CH hop is the pull-through pointer).
 
-### 3.2 Two-hop `source_span` construction
+### 3.2 Provenance — the two-hop `source_span`, expressed in the envelope
 
-The span is expressed by two references; the CH pointer is authoritative, the
-URL is never the primary key:
+The finalized contract carries three references (Slice 9 wording: "two-hop
+source_span… + raw_ref"):
 
 ```
-hop 1 (CH item)   source_type: "content-hoarder_item"
-                  source_ref:  "content-hoarder:fullname:<fullname>"
-                  quote:       title (or body opening if title empty)
-                  location_hint: "<source> item · saved <saved_utc date>"
-                  confidence:  1.0        (verbatim from the CH row)
-hop 2 (original)  the item's `url` — carried in raw_text / envelope (DP-4);
-                  recoverable via the CH hop, never flattened to
+hop 2 (live CH pointer)  ch_origin_ref = "content-hoarder:fullname:<fullname>"
+                         ch_item_id    = "ext_ch_<sha1[:10]>"  (dedupe key)
+hop 3 (original)         raw_ref       = the item's original url
 ```
 
-IDs are deterministic from the fullname so re-promotes are idempotent and
-audit-friendly (fixture precedent `span_ch_001` style):
+Never flatten to the original URL only — the CH hop (`ch_origin_ref`) carries
+tags/decay/receipt state that PKMS can pull through it. Receipt/source-span ids
+stay deterministic from the fullname (audit-friendly, idempotent):
 
 - `span_id = "span_ch_" + sha1(fullname)[:10]`
 - `env_id  = "env_ch_" + sha1(fullname)[:10] + "_promote"`
@@ -171,15 +182,17 @@ needs no schema change"). No new table in phase 1 (decision D4; a dedicated
 `promotions` side table, mirroring the `reddit_unsave` state-machine pattern,
 is deferred until the unsave-on-source follow-up needs queryable history).
 
-**Proposed shape** (fixture `sample_receipts.promote` precedent + transport
-state the fixture stubs couldn't carry):
+**Shipped shape** (implemented in `bridge/pkms.py record_receipt()`; fixture
+`sample_receipts.promote` precedent + the transport state the fixture stubs
+couldn't carry):
 
 ```json
 "metadata.promotion": {
   "status": "promoted" | "failed",
   "attempted_at": 1754000000,
-  "transport": "http_post_capture" | "file_drop",
-  "delivery_ref": "capture_..." | "vault/inbox/2026-07-31-<fn>.md",
+  "transport": "http_post_capture",
+  "delivery_ref": "inbox/2026-07-31-<fn>.md",     // note name parsed from the response
+  "response": "saved ✓ <name> | already saved ✓ <name>",  // deterministic external evidence, verbatim
   "receipt": {
     "id": "receipt_ch_<sha1[:10]>_promote",
     "action_envelope_id": "env_ch_<sha1[:10]>_promote",
@@ -189,7 +202,7 @@ state the fixture stubs couldn't carry):
     "reason": "User chose promote on the triage feed (ADR 0027).",
     "source_span_ids": ["span_ch_<sha1[:10]>"],
     "reversibility": "reversible",
-    "human_summary": "Promoted to PKMS vault/inbox (capture <id>)."
+    "human_summary": "Promoted to PKMS vault/inbox (<name>)."
   },
   "error": "..."            // only when status=failed
 }
@@ -198,57 +211,69 @@ state the fixture stubs couldn't carry):
 **Write path:** direct `UPDATE items SET metadata=?` inside the route's
 `conn()` transaction — the `bridge/karakeep.py` precedent. Explicitly NOT
 `merge_upsert` (that is the re-import path; gotcha #2 stays untouched).
-**Idempotency:** a `status: "promoted"` receipt short-circuits re-promote to a
-no-op returning the existing receipt (DP-11 if re-promote should instead be
-allowed, producing a receipt list). **Ledger conventions check:** CH has no
-general ledger table today; `settings` holds JSON state
-(`resurfacing_state`), `reddit_unsave` is a state machine, `tag_suggestions` a
-proposal log. The `ledger_event` contract is life-os-side; where its events
-are written is DP-6.
+**Idempotency / dedupe semantics (DP-5 + DP-11 resolved):**
+
+- Item already `promoted` → re-promote short-circuits at the CH level: no
+  second POST, the existing receipt is returned (`status: "replay"`). One
+  stamp, never two.
+- First POST answered `already saved ✓ <name>` (PKMS-side dedupe on
+  `ch_item_id` against `.index/ch-promote-ledger.txt`) → `status: "replay"`,
+  receipt stamped once with the deterministic body as evidence.
+- Transport/HTTP failure → `status: "failed"` receipt recorded (with
+  `error`); the route surfaces it as a 502. No automatic retry loop — a
+  re-promote IS the retry, and PKMS dedupe makes it safe.
+
+**Ledger conventions check:** CH has no general ledger table; `settings` holds
+JSON state (`resurfacing_state`), `reddit_unsave` is a state machine,
+`tag_suggestions` a proposal log. DP-6 resolved: PKMS returns no separate
+receipt/`ledger_event` id — **the response body is the evidence**, stored
+verbatim in `metadata.promotion.response`; `ledger_event` bookkeeping stays
+life-os/PKMS-side.
 
 ---
 
-## 5. Transport — PROVISIONAL recommendation + decision points
+## 5. Transport — CHOSEN (extended `POST /capture`)
 
-**Recommendation (PROVISIONAL): HTTP `POST /capture`** to the PKMS web
-service, over file drop. Rationale:
+**Decision (PKMS Slice 9, finalized): extended `POST /capture`; file drop
+rejected.** `text` stays the only required field; `source` stays a query
+param (`?source=content-hoarder`); the new fields are additive optionals the
+current PKMS build ignores until its own packet lands. The capture path gains
+zero decisions — the card's explicit promote accept is the only gate.
 
-1. **Contract already exists.** PKMS's roadmap pins the `POST /capture`
-   contract as stable and token-gated; the envelope is JSON, so the mapping in
-   §3 is a direct body, no encoding layer.
-2. **Truthful receipts.** A response can carry PKMS's capture id →
-   `delivery_ref`; the receipt then says "PKMS accepted", not just "file
-   written". File drop has no ack channel — the receipt can only attest to a
-   local write.
-3. **Retry/duplicate is natural.** Idempotency key = `raw_ref` (CH fullname);
-   PKMS dedups, CH retries on timeout with the existing `_http` helper
-   (15 s timeout precedent in `bridge/karakeep.py`).
-4. **Fewer moving parts on CH.** File drop needs a watched directory + a
-   filename/encoding convention + atomic-write discipline + partial-failure
-   handling, and pushes the watcher problem onto PKMS.
+**Wiring contract (confirmed by reading `K:\Projects\PKMS\src\pkms\capture_service.py`):**
 
-File drop's real advantages (works with `pkms serve` down; no token
-handling; offline-friendly) matter only if the PKMS spec finds POST-hosted
-capture unacceptable — that is exactly the S3 open question.
+- Endpoint: `POST http://127.0.0.1:8765/capture?source=content-hoarder`
+  (`PKMS_CAPTURE_URL` + `/capture?source=content-hoarder`).
+- Auth: `X-Capture-Token` header (or `?token=` query — PKMS accepts both;
+  CH sends the header). Token via `PKMS_CAPTURE_TOKEN` env; the value may come
+  from `K:\Projects\PKMS\.secrets\capture-token` at runtime via env. Never
+  hardcoded, never logged/printed. `is_configured()` = both env vars set
+  (mirrors the Karakeep precedent).
+- Request: `Content-Type: application/json`; body = the §3.1 envelope.
+- Responses (deterministic — the body IS the receipt's external evidence):
+  - 200 `saved ✓ <name>` — first write.
+  - 200 `already saved ✓ <name>` — `ch_item_id` replay against
+    `.index/ch-promote-ledger.txt`; no second file.
+  - 403 `bad token`, 400 `empty capture`, 5xx — failure.
+- Unconfigured → route answers 400 with a clear error naming
+  `PKMS_CAPTURE_URL`/`PKMS_CAPTURE_TOKEN`; transport failure → 502 with the
+  recorded `failed` receipt.
 
-**Decision points awaiting the PKMS ingest spec** (DP-1..DP-6; each blocks a
-phase-2 implementation detail):
+**DP resolutions (phase-1 decision points, now closed):**
 
-| DP | Decision | What CH needs to know |
-|---|---|---|
-| DP-1 | **Transport mechanism** | file drop vs `POST /capture` (S3's declared open question). |
-| DP-2 | **Endpoint** | `POST /capture` URL + host: `http://127.0.0.1:8765/...` vs tailnet host; path shape. |
-| DP-3 | **Auth** | token mechanism (`Authorization: Bearer` vs `?token=` query); env var name; when PKMS serve runs token-gated, how CH obtains/rotates the token. |
-| DP-4 | **Envelope delivery format** | exact field names/values (contracts.md sketch is placeholder); where the original URL travels (raw_text footer vs context field); whether `context` may grow fields. |
-| DP-5 | **Retry / duplicate handling** | idempotency key semantics on PKMS (`raw_ref`); PKMS duplicate response; CH retry policy (count, backoff, when to give up and record `failed`). |
-| DP-6 | **Ledger** | does PKMS return a receipt/`ledger_event` id for `delivery_ref`; where `ledger_event` records live; whether CH's receipt is the whole record or half of one. |
-| (DP-f) | **File-drop shape, only if DP-1 picks it** | directory, filename convention (idempotency key), atomic write, watcher ownership, ack mechanism. |
+| DP | Resolution |
+|---|---|
+| DP-1 | **Transport: extended `POST /capture`** (file drop rejected). |
+| DP-2 | **Endpoint:** `POST {PKMS_CAPTURE_URL}/capture?source=content-hoarder`; PKMS serves at `http://127.0.0.1:8765` (token-gated). |
+| DP-3 | **Auth:** `X-Capture-Token` header (PKMS accepts header or `?token=`); env `PKMS_CAPTURE_TOKEN`, sourced from `.secrets/capture-token` via env at runtime; never printed. |
+| DP-4 | **Envelope format:** the §3.1 JSON, field names verbatim; URL travels in `text` (footer line) and as `raw_ref`; `ch_*` fields carry provenance. |
+| DP-5 | **Idempotency key = `ch_item_id`** (NOT `raw_ref` — phase-1 wording corrected). Replay → 200 `already saved ✓`; CH: no auto-retry loop, re-promote is the retry, CH-level short-circuit when already promoted. |
+| DP-6 | **No separate receipt id** — the response body is the evidence, stored verbatim (`metadata.promotion.response`); `ledger_event` stays life-os/PKMS-side. |
+| DP-f | n/a — file drop rejected. |
 
-Config on the CH side mirrors the Karakeep precedent (`config.py` + env):
-`PKMS_CAPTURE_URL` + `PKMS_CAPTURE_TOKEN` (HTTP) or `PKMS_INBOX_DIR`
-(file drop). Unconfigured → `is_configured()` false → UI hides/disabled,
-CLI prints the "not configured" message (Karakeep behavior). Secrets never
-logged or printed.
+Config (shipped in `config.py`): `PKMS_CAPTURE_URL`, `PKMS_CAPTURE_TOKEN`
+(both default `""` = opt-in). `PKMS_INBOX_DIR` was NOT added — file drop is
+rejected.
 
 ---
 
@@ -270,62 +295,64 @@ logged or printed.
 
 ---
 
-## 7. Integration-point map (phase 2 hooks)
+## 7. Integration-point map — SHIPPED (phase 2)
 
-Backend:
-
-| File | Hook | Role |
-|---|---|---|
-| `src/content_hoarder/bridge/pkms.py` **(new)** | `build_capture(item)`, `is_configured()`, `deliver(envelope)` (transport-agnostic: `post_capture` vs `deliver_file`), `record_receipt(conn, fullname, receipt, transport, delivery_ref)` | The whole promote pipeline, mirroring `bridge/karakeep.py` structure so the two outbound bridges stay parallel. |
-| `src/content_hoarder/web.py` | **new** `POST /items/<path:fullname>/promote` | Explicit accept: `conn()` → load item → `build_capture` → `deliver` → `record_receipt` → return receipt JSON. Follows the `/items/<fn>/snooze` route pattern. |
-| `src/content_hoarder/web.py` | `GET /resurface` (line ~1384) | Unchanged payload for now (D1: promote is item-level). Optionally add `"promote_configured": bool` so the UI can hide the affordance — phase-2 detail. |
-| `src/content_hoarder/resurface.py` | `candidate()` | Unchanged in phase 2 start; its `sample[].fullname` already anchors any card-level promote variant (D1 alternative). |
-| `src/content_hoarder/db.py` | `_row_to_public()` | Item shape consumed by `build_capture`; no schema change. |
-| `src/content_hoarder/config.py` | `PKMS_CAPTURE_URL` / `PKMS_CAPTURE_TOKEN` / `PKMS_INBOX_DIR` | Env wiring, Karakeep precedent. |
-| `src/content_hoarder/_http.py` | stdlib `request()` | POST transport (15 s timeout precedent). |
-| `src/content_hoarder/cli.py` | `cmd_promote` | **Naming collision:** `promote` already = Karakeep push. PKMS path gets `promote-pkms` or a `--target pkms` flag — DP-12. Phase-2 minimal is web-only; CLI optional. |
-
-Frontend:
+Backend (all shipped on `feat/promote-action`):
 
 | File | Hook | Role |
 |---|---|---|
-| `src/content_hoarder/static/browse/main.js` | `act(fn, act)` dispatcher | Add `"promote"` → `api.postJSON("/items/<fn>/promote")` → toast/snackbar with `receipt.human_summary` → re-render (status/menu state). |
-| `src/content_hoarder/static/browse/main.js` / `render.js` | row long-press + right-click menu (Share precedent) | **D1 (recommended):** Promote joins the menu, next to Share. Desktop inline cluster stays F/A/D + IN (locked rule); mobile hides `.acts` → long-press. |
-| `src/content_hoarder/static/browse/reader.js` | reader header action row (optional) | D1 variant if the reader should carry Promote too. |
+| `src/content_hoarder/bridge/pkms.py` **(new)** | `build_capture(item, device=)`, `is_configured()`, `deliver(envelope)`, `record_receipt(conn, fullname, …)`, `promote(conn, item, device=)` | The whole promote pipeline, mirroring `bridge/karakeep.py`; stdlib `_http.request` POST (15 s timeout), `X-Capture-Token` header, direct metadata UPDATE. |
+| `src/content_hoarder/web.py` | **new** `POST /items/<path:fullname>/promote` (+ `_mobile_ua` helper) | Explicit accept: 404 unknown item → 400 unconfigured (clear error) → `promote()` → 200 with `{status, response, receipt}` (response = the deterministic PKMS body) → 502 on transport failure. UA-sniffs `context.device`. |
+| `src/content_hoarder/config.py` | `PKMS_CAPTURE_URL` / `PKMS_CAPTURE_TOKEN` (default `""`) | Env wiring, Karakeep precedent. `PKMS_INBOX_DIR` deliberately NOT added (file drop rejected). |
+| `src/content_hoarder/_http.py` | `request()` (unchanged) | POST transport. |
+| `src/content_hoarder/resurface.py`, `db.py` | unchanged | No schema change, no ranking change (constraints D3/D4). |
+| `src/content_hoarder/cli.py` | not touched | DP-12 deferred: web-only in this slice; `promote` CLI still = Karakeep push. |
 
-Tests (phase 2): `tests/test_pkms_bridge.py` (offline: envelope-mapping golden
-test per §3, receipt recording, transport fakes for both HTTP and file-drop
-shapes), web-route test with `deliver` monkeypatched, `validate.py`-style
-shape checks against the fixture contracts.
+Frontend (all shipped; the row menu is the relay-strip template, NOT
+`render.js` — the brief's file pointer corrected to code reality):
 
----
+| File | Hook | Role |
+|---|---|---|
+| `templates/index.html` | `#relay-strip-tpl` gains a Promote button (`data-relay="promote"`, arrow-up glyph) | D1: joins the row long-press / right-click menu, next to Share. Desktop inline cluster stays F/A/D + IN (locked rule). |
+| `src/content_hoarder/static/browse/main.js` | `openRowMenu()` hides Promote once `metadata.promotion.status === "promoted"`; relay click listener routes `promote` → `promoteItem(fn)` | `promoteItem` POSTs, stores the receipt back onto `it.metadata.promotion`, snackbars the PKMS response body; errors toast `data.error`. No re-render needed (item stays in feed). |
+| `src/content_hoarder/static/browse/reader.js` | not touched | Reader-header Promote (D1 variant) left out to keep the slice minimal. |
 
-## 8. Decision registry
-
-**Awaiting the PKMS ingest spec:** DP-1 transport, DP-2 endpoint, DP-3 auth,
-DP-4 envelope format, DP-5 retry/duplicate, DP-6 ledger (+ DP-f file-drop
-shape if chosen).
-
-**CH-internal, phase 2:** D1 promote affordance placement (recommended: item
-row menu, not the ambient cluster card); DP-7 capture id assignment; DP-8
-`source_account_id` value; DP-9 `context.device` detection; DP-10 tags_hint
-extension; DP-11 re-promote semantics (recommended: no-op + existing receipt);
-DP-12 CLI naming.
-
-**Pre-decided here (design, not open):** D2 receipt shape
-(`metadata.promotion` single slot, §4); D3 no new attention-budget state in CH
-(§1.1); D4 no `promotions` table in phase 1 (§4).
+Tests (shipped): `tests/test_pkms_bridge.py` — 13 tests: envelope golden
+(field names verbatim, text composition, `ch_origin_ref`, no-URL fallback),
+summary-preference, device override, transport (URL/token/header/body),
+happy-path receipt, CH-level replay (no double POST), PKMS-side `already
+saved` replay, transport-failure `failed` receipt, route happy path /
+unconfigured 400 / not-found 404 / UA→device / failure 502.
 
 ---
 
-## 9. Verification plan (phase 2; nothing here runs in phase 1)
+## 8. Decision registry — status
 
-- Envelope mapping golden tests (row → capture JSON, byte-exact fields per §3).
-- Receipt recording tests (success + transport-failure paths; idempotent
-  re-promote).
-- Web route test with a fake deliver: happy path, `not configured` 4xx/disabled
-  path, transport failure → `metadata.promotion.status = failed`.
-- Synthetic end-to-end (tests fixture DB): promote → fake transport captures
-  envelope → receipt asserted on the row.
-- Real transport smoke: user-gated (matches archive.today posture; PKMS spec
-  must land first).
+**PKMS-spec decisions (DP-1..6, DP-f):** all resolved — see the §5 DP table
+(transport CHOSEN: extended `POST /capture`; idempotency key `ch_item_id`;
+response body = evidence).
+
+**CH-internal:** D1 resolved (row menu, not the ambient card); DP-7 resolved
+(`ch_item_id` = `ext_ch_<sha1[:10]>`, deterministic); DP-8 resolved
+(`acct_content_hoarder_<source>`); DP-9 resolved (UA sniff); DP-10 deferred
+(tags_hint — classification happens after per S3); DP-11 resolved (re-promote
+= no-op returning the existing receipt); DP-12 deferred (`promote` CLI still
+Karakeep; PKMS path is web-only for now).
+
+**Pre-decided (design, held):** D2 receipt shape (`metadata.promotion` single
+slot, §4); D3 no new attention-budget state in CH (§1.1); D4 no `promotions`
+table (§4) — the receipt is per-item metadata; a queryable table stays
+available for the unsave-on-source follow-up.
+
+---
+
+## 9. Verification — EXECUTED (phase 2)
+
+- Envelope mapping golden test (byte-exact fields per §3.1).
+- Receipt recording tests (happy, transport-failure, both replay shapes).
+- Route oracle tests: happy 200, unconfigured 400, not-found 404, UA→device,
+  transport failure 502 with `failed` receipt persisted.
+- No live PKMS calls anywhere — `deliver`/`_http.request` mocked in every test.
+- Full non-UI suite: **1075 passed, 75 deselected** (baseline 1062 + 13 new).
+- Real transport smoke: user-gated — run only after the PKMS Slice 9 build
+  lands (its endpoint does not yet persist the new fields).
