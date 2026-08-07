@@ -1,10 +1,11 @@
 /* ============================================================
    content-hoarder · design tokens v3 — "Log Book"
    Source of truth: design-ref/v3-explorations/05-log-book-2.html
-   (Gate-1 approved 2026-06-09). Single entry point for v3 pages.
-   CONSUMERS: the v3 browse page (index.html) ONLY. The legacy non-module
-   pages /triage + /reddit keep static/tokens.css until their own rewrite.
-   Both files are live + intentional; do NOT "dedupe" by deleting one.
+   (Gate-1 approved 2026-06-09). Single entry point — the ONLY
+   token system. The legacy static/tokens.css (v2 teal) and the
+   /triage + /reddit pages it served were deleted in P3.5
+   (2026-07-04); those routes are now 302 redirects into v3.
+   CONSUMER: the v3 browse page (index.html).
 
    Theming: data-theme="light"|"dark" on <html>; no attribute =
    dark, the native identity ("night ops"). Light = "daylight ops".
