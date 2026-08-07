@@ -220,7 +220,7 @@ export const logRow = (item, opts) => {
     esc(item.fullname) +
     '" style="--src:' +
     srcAccent(item.source) +
-    '" tabindex="0">' +
+    '" tabindex="0" draggable="true">' +
     underlay +
     '<div class="item-fg">' +
     '<span class="idx"></span>' +
@@ -266,7 +266,7 @@ export const ledgerRow = (item, n, opts) => {
     esc(item.fullname) +
     '" style="--src:' +
     srcAccent(item.source) +
-    '" tabindex="0">' +
+    '" tabindex="0" draggable="true">' +
     underlay +
     '<div class="item-fg">' +
     '<span class="idx">' +

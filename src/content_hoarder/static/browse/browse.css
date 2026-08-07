@@ -356,6 +356,14 @@ a:focus-visible {
     background: var(--surface-card);
 }
 
+/* Drag-and-drop: status folders light up while an item is being dragged.
+   A ring + accent text reads as "drop target" without a full fill swap. */
+.folder.drop-armed {
+    box-shadow: 0 0 0 2px var(--focus-ring);
+    color: var(--text-body);
+    border-color: var(--focus-ring);
+}
+
 .statuspills {
     display: none;
     margin: var(--sp-3) auto 0;

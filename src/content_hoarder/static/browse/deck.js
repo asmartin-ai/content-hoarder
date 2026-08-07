@@ -30,6 +30,7 @@ export function initDeck(injected) {
     open: openDeck,
     close: closeDeck,
     key: deckKey,
+    commit, // status change + queue advance (deck-mode DnD drops route here)
     syncFromUrl,
     isDeckUrl,
     mountToggleHandlers,
@@ -150,7 +151,7 @@ function deckCard(it) {
   const body = it.body ? `<div class="deck-body">${esc(snippet(it.body, 480))}</div>` : "";
   const sub = it.subreddit ? `<span class="deck-sub">r/${esc(it.subreddit)}</span> ` : "";
   return (
-    `<div class="deck-card" data-fullname="${esc(it.fullname)}">
+    `<div class="deck-card" data-fullname="${esc(it.fullname)}" draggable="true">
       <div class="deck-src"><span class="deck-glyph">${glyph}</span>${esc(src)} ${sub}</div>
       <h3 class="deck-title">${title}</h3>
       <div class="deck-meta">${meta}</div>
