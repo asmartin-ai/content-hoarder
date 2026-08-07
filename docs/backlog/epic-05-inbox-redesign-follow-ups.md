@@ -8,9 +8,13 @@ import modal; Keep/Archive/Done legend. Remaining patterns (ref
 - [x] ~~**Status as a left sidebar.**~~ Shipped (`#status-nav` + mobile drawer).
 - [x] ~~**Triage card parity.**~~ Shipped: Tinder-style swipe stamps + an inline Reddit click-to-load
   embed on the triage card.
-- [ ] **P3 — Smooth drag-and-drop to buckets.** Drag cards onto category/status buckets.
-  [SortableJS](https://github.com/SortableJS/Sortable) (~20 KB, touch-capable) or
-  [html5sortable](https://github.com/lukasoppermann/html5sortable) (~4 KB).
+- [x] ~~**P3 — Smooth drag-and-drop to buckets.**~~ ✅ SHIPPED 2026-08-07 (issue #13):
+  **vanilla** HTML5 drag-and-drop (SortableJS/html5sortable rejected — repo no-runtime-deps
+  standard), desktop-only (mobile keeps swipe, the cheapest gesture per friction asymmetry);
+  **status buckets only** (categories are tag facets, not drop targets). Rows + deck cards
+  draggable → drops reuse the existing act() path (haptics/undo); deck-mode drops advance the
+  deck queue via `deck.commit`. APP_VERSION/CACHE v126→v127; 2 Playwright regressions in
+  `tests/ui/test_drag_to_bucket.py`.
 - [x] ~~**P3 — Consolidate triage swipe onto `swipe.js`.**~~ ✅ Shipped 2026-06-29: `triage.js`
   now uses shared `core/swipe.js` for horizontal + vertical card gestures. The helper grew left-long
   `commit2` support, optional `onUp`/`onDown` callbacks, and `haptics:false` so triage keeps

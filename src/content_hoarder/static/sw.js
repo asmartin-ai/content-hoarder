@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v126"; // v126: OCR enrich + header Sync newest + reddit image→thread
+const CACHE = "ch-shell-v127"; // v127: drag-and-drop to status buckets
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)

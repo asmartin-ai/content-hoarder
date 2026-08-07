@@ -1613,6 +1613,67 @@ $$(".folder, .spill").forEach((t) =>
   }),
 );
 
+/* Drag-and-drop to status buckets (desktop). Rows + deck cards are draggable
+   (native HTML5 DnD — no library; mobile keeps swipe, the friction-asymmetry
+   cheapest gesture). Drop targets are the four real status buckets (the "All"
+   tab has data-status="" and is not a bucket). List drops reuse act(); deck
+   drops route through deck.commit so the queue advances and undo works. */
+let dragFullname = null;
+function dropTargetFrom(e) {
+  const t = e.target.closest(
+    ".folder[data-status], .spill[data-status], .statuspills [data-status]",
+  );
+  return t && t.dataset.status ? t : null; // "All" (empty status) is not a bucket
+}
+function setDropTargets(on) {
+  dragTargets().forEach((t) => t.classList.toggle("drop-armed", on));
+}
+function dragTargets() {
+  // Real buckets only: a non-empty data-status, excluding the "All" tab.
+  return $$(".folder[data-status], .spill[data-status], .statuspills [data-status]").filter(
+    (t) => t.dataset.status,
+  );
+}
+document.addEventListener("dragstart", (e) => {
+  // Reset first: dragend is not guaranteed (spec skips it when the source
+  // node is removed mid-drag), so never trust leftover state from a prior drag.
+  dragFullname = null;
+  setDropTargets(false);
+  const row = e.target.closest("[data-fullname]");
+  if (!row) return;
+  dragFullname = row.dataset.fullname;
+  e.dataTransfer.setData("text/plain", dragFullname);
+  e.dataTransfer.effectAllowed = "move";
+  setDropTargets(true);
+});
+document.addEventListener("dragend", () => {
+  dragFullname = null;
+  setDropTargets(false);
+});
+document.addEventListener("dragover", (e) => {
+  if (!dragFullname) return;
+  const t = dropTargetFrom(e);
+  if (!t) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+});
+document.addEventListener("drop", (e) => {
+  if (!dragFullname) return;
+  const t = dropTargetFrom(e);
+  if (!t) return;
+  e.preventDefault();
+  const status = t.dataset.status;
+  if (status === (state.status || "")) return; // dropping onto the active bucket = no-op
+  setDropTargets(false);
+  if (state.deck) {
+    // Deck mode has its own commit path: leave-anim, queue advance, undo.
+    deck.commit(state, { fullname: dragFullname }, status);
+  } else {
+    act(dragFullname, status);
+  }
+  dragFullname = null;
+});
+
 async function loadCounts() {
   // Keep + Done get counts (processed piles read as wins); Inbox/Archived/All never do.
   try {
@@ -2372,7 +2433,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v126";
+const APP_VERSION = "v127";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;
