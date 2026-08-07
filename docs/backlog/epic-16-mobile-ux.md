@@ -30,10 +30,13 @@ Absorbs "make the Reddit view more mobile-friendly".*
   r/AskReddit text post. Fix media classification/rendering so text/self posts without playable media show a
   text/thread preview affordance, not a play button. Likely area: `media_type`, thumbnail fallback, and
   `browse/render.js` media tile selection.
-- [ ] **P2 — Reader should swipe up from bottom when opened via triage swipe-up.** The triage ↑ gesture
-  currently opens the reader functionally, but the transition should match the gesture: reader sheet/card
-  enters upward from the bottom and returns to the triage deck on close. Coordinate with `overlaynav.js` so OS
-  back and nested lightboxes still close correctly.
+- [x] ~~**P2 — Reader should swipe up from bottom when opened via triage swipe-up.**~~ ✅ SHIPPED
+  2026-08-07 (issue #40): deck ↑ gesture → `openReader(it, { triageEnter: true })`; forced reflow so
+  the `translateY(100%)` start paints before `.show` (the class was dead code — the base right-side
+  entrance played instead); close keeps `.triage-enter` while removing `.show` so the exit slides back
+  down to the deck, then clears it (`fired`-guarded, reopen-safe). Overlay coordination via
+  `pushOverlay` preserved. APP_VERSION/CACHE v127→v128; regression in
+  `tests/ui/test_deck_reader_triage_enter.py`.
 - [ ] **P3 — Surprise-me view should include a preview/blurb.** The Surprise card already renders media and
   opens the reader; add a short preview (text snippet, cached summary, or non-AI blurb) so the user can decide
   whether to open it. Cross-links Epic 20 Surprise card and Epic 15 reader/text-post preview blurbs.

@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v127"; // v127: drag-and-drop to status buckets
+const CACHE = "ch-shell-v128"; // v128: reader triage swipe-up enter/exit (#40)
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)
