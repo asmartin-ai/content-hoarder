@@ -2,6 +2,31 @@
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Drag-and-drop to status buckets on desktop (issue #13): rows and deck cards drag onto the
+  Inbox/Keep/Archived/Done folders, reusing the existing status path (haptics, undo snackbar);
+  deck drops advance the deck queue. Vanilla HTML5 DnD — no new runtime dependency.
+- `assist-auto-archive` CLI (issue #25): lists high-skip subreddit buckets from the learned
+  triage model with live inbox counts, and (with `--apply`) archives each via the reversible,
+  wave-stamped decay path (`label='auto-archive'`, queryable via `is:decayed`).
+
+### Changed
+
+- Reader now slides up from the bottom when opened via the triage deck ↑ gesture, and slides
+  back down on close (issue #40): the `triage-enter` transition is wired to the gesture and
+  plays correctly (previously the class was dead code and the base side-entrance played).
+
+### Fixed
+
+- AGENTS.md layout map and both frontend-design skills no longer describe the retired v2 teal
+  system or legacy `/triage` + `/reddit` pages — they are 302 redirects into the v3 surface.
+- Triage state roles (`ready-for-agent` / `ready-for-human` / `needs-info`) applied across the
+  open backlog; already-implemented issues #18 (Karakeep bridge) and #55 (unified surface)
+  closed as wontfix.
+
 ## 1.1.0 - 2026-07-01
 
 ### Added

@@ -1,10 +1,33 @@
 # NEXT.md — content-hoarder session focus
 
 `main`. Suite: non-UI suite green (see `gh run list` for CI).
-Last wrapup: 2026-08-07 (pushes + backlog audit + agent-doc v3 rewrite + review — see block below).
+Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, #40 reader triage-enter — see blocks below).
+
+## Just done (2026-08-07 — implement round: #13 drag-to-bucket, #25 assist-auto-archive, #40 reader triage-enter)
+- **Remotes in sync.** Both `origin` (public) and `private` (canonical mirror) at the current
+  `main` tip. Check actual sync with `git rev-list --left-right --count origin/main...main`
+  (and `private/main...main`), never a frozen claim here.
+- **#13 — drag-and-drop to status buckets SHIPPED.** Vanilla HTML5 DnD (SortableJS rejected —
+  repo no-runtime-deps standard), desktop-only (mobile keeps swipe); rows + deck cards
+  draggable onto the 4 status folders; list drops reuse `act()`, deck drops route through
+  `deck.commit` (queue advance + undo). APP_VERSION/CACHE v126→v127.
+- **#25 — `assist-auto-archive` SHIPPED.** Loads the persisted triage model, lists high-skip
+  `sub:` buckets (dry-run default), `--apply` archives each via `db.decay(label='auto-archive')`
+  — wave-stamped, `is:decayed`-queryable, reversible. sk/chan/media/cat/age buckets informational
+  only (no decay selector / range mismatch — documented). APP_VERSION unchanged (backend-only).
+- **#40 — reader triage swipe-up enter/exit SHIPPED.** Deck ↑ gesture → `triageEnter: true`;
+  forced reflow so the `translateY(100%)` start paints before `.show` (class was dead code);
+  close keeps `.triage-enter` through the exit (slides back down), clears it via a
+  `fired`-guarded fin. Overlay coordination (pushOverlay) preserved. APP_VERSION/CACHE v127→v128.
+- **Backlog triage cleanup:** #18 (Karakeep bridge) and #55 (one unified surface) CLOSED as
+  already-implemented; #66 (blocked on #65 gate) + #44 (deferred) relabeled `ready-for-human`;
+  #40 relabeled `ready-for-human` (real-device QA pending). Remaining `ready-for-agent`: #24,
+  #28 (both research — memos exist), #56, #59, #67, #68, #70.
+- All three issues carry implementation comments (AI-triage disclaimer); epic-05/08/10/16
+  backlog files updated to shipped.
 
 ## Just done (2026-08-07 — pushes, backlog audit, agent-doc v3 rewrite + review fixes)
-- **Both remotes in sync at `1cc49fe`.** Pushed the 5 pre-session commits (Keep Takeout
+- **Both remotes in sync.** Pushed the 5 pre-session commits (Keep Takeout
   parsing, multi-value filter fixes, OCR note, watchdog, NEXT.md) + this session's work to
   `origin` (public) and `private` (canonical mirror). Pre-push `publish_safety_check.py`
   clean (exit 0); the watchdog's ntfy topic + `K:/Projects` paths match what's already
@@ -15,11 +38,11 @@ Last wrapup: 2026-08-07 (pushes + backlog audit + agent-doc v3 rewrite + review 
   The 8 epics with no migrated issues (1,2,3,6,14,19,23) are all **fully shipped**. 3
   unmigrated sub-notes are covered by parent issues #16/#20/#66. Private repo has 0 issues
   by design.
-- **Agent docs rewritten to v3 reality** (`e610f12`): AGENTS.md layout map + both
+- **Agent docs rewritten to v3 reality**: AGENTS.md layout map + both
   `frontend-design` SKILL.md (`.agents/` + `.claude/`) no longer claim legacy /triage +
   /reddit pages or the v2 teal token system — those are 302 redirects / deleted (P3.5
   2026-07-04). Corrected to the single v3 apricot system (`static/core/tokens.css`).
-- **Review fixes** (`1cc49fe`): post-commit code-review caught + fixed 4 stale-v2 carries —
+- **Review fixes**: post-commit code-review caught + fixed 4 stale-v2 carries —
   nonexistent `--danger` token, nonexistent `static/icons/` dir, dead `.card-stack` class
   (deck uses `.deck-host`/`.deck-card`), dangling "reddit inlines its own SVG where legacy".
 - **Triage state roles applied** to the open backlog (needs-triage / ready-for-agent /
