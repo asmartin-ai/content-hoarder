@@ -65,8 +65,9 @@ src/content_hoarder/
                  overlaynav + tokens.css (the v3 "Log Book" token system — the only one in use)
   static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js, deck.js,
                  fastscroll.js, prefetch.js, tagedit.js + browse.css
-  static/        PWA + page assets: sw.js, theme.js, haptics.js, manifest.webmanifest, fonts/, icons/,
-                 vendor/, apple-touch-startup-image-* (iOS splash set)
+  static/        PWA + page assets: sw.js, theme.js, haptics.js, manifest.webmanifest, fonts/, vendor/,
+                 apple-touch-icon.png + icon-{192,512}.png + icon.svg + firefox.svg,
+                 apple-touch-startup-image-* (iOS splash set) + splashes/
 scripts/        standalone harnesses: recover_archive_today (archive.today live-smoke probe),
                  rehearse_decay / rehearse_triage_score (dry-run previews), serve_branch_verify /
                  serve_browse_test (local-serve smoke helpers)
