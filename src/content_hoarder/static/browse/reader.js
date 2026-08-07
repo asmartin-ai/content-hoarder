@@ -1502,6 +1502,12 @@ export function initReader({
     renderPost(null); // instant, from the list item
     reader.style.transition = "";
     reader.style.transform = "";
+    if (opts.triageEnter) {
+      // Paint the translateY(100%) start BEFORE .show flips it to none — otherwise
+      // both classes land in the same frame and the slide-up never plays (the
+      // reader would inherit the base translateX(100%) entrance instead).
+      void reader.offsetHeight;
+    }
     reader.classList.add("show");
     reader.setAttribute("aria-hidden", "false");
     // capture the feed scroll BEFORE the overflow:hidden lock (which resets it) so we can
@@ -1544,10 +1550,35 @@ export function initReader({
     returnTo = "";
     saveReaderScroll();
     stopInlineVideo(); // pause+reset+remove the <video> so audio doesn't bleed after close
-    reader.classList.remove("show", "from-triage", "triage-enter");
+    const wasTriageEnter = reader.classList.contains("triage-enter");
+    reader.classList.remove("show", "from-triage");
+    if (wasTriageEnter) {
+      // Slide back down to the deck the way it came up (issue #40): keep
+      // .triage-enter so removing .show transitions transform to translateY(100%).
+      // No inline transition here — the base .reader rule (transform +
+      // visibility 0s var(--dur-slow)) applies once .show is gone, keeping the
+      // reader visible during the exit. Clear the class once the exit has
+      // played so the resting state is the base translateX(100%) (off-right).
+      let fired = false;
+      const fin = () => {
+        if (fired) return;
+        fired = true;
+        reader.removeEventListener("transitionend", fin);
+        // If the reader was re-opened during the exit window, the new entrance
+        // owns the classes now — don't strip triage-enter mid-slide-up.
+        if (isOpen) return;
+        reader.classList.remove("triage-enter");
+        reader.style.transition = "";
+        reader.style.transform = "";
+      };
+      reader.addEventListener("transitionend", fin);
+      setTimeout(fin, 240); // fallback if transitionend never fires
+    } else {
+      reader.classList.remove("triage-enter");
+      reader.style.transition = "";
+      reader.style.transform = "";
+    }
     reader.setAttribute("aria-hidden", "true");
-    reader.style.transition = "";
-    reader.style.transform = "";
     document.documentElement.classList.remove("reader-lock");
     // restore the feed scroll the lock discarded (all close paths funnel here: button, Esc,
     // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
