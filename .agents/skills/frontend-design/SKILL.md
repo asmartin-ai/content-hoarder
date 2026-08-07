@@ -61,7 +61,7 @@ applies it before first paint. **v3 rule: components consume the SEMANTIC ALIASE
   `--led-glow` (0 0 8px accent) for the "phosphor" cockpit feel.
 - **Status language (fixed):** **keep = blue** `--keep`, **archive = green** `--archive`,
   **done = red** `--done`; each has an `-ink` (text-on-fill) and `-tint` variant. Consume
-  the semantic `--status-*` aliases. `--danger` is a legacy alias for `--archive`.
+  the semantic `--status-*` aliases.
 - **Source badges (theme-independent):** `--source-reddit|youtube|hackernews|obsidian|keep|firefox|twitter`.
 - **Type:** Lexend (humans) + JetBrains Mono (instruments — counts, gauges, keys), both
   vendored woff2, no CDN. `--fs-xs .73 · --fs-sm .85 · --fs-md .97 · --fs-lg 1.18 ·
@@ -74,14 +74,15 @@ applies it before first paint. **v3 rule: components consume the SEMANTIC ALIASE
   (`--dur-fast 120 / --dur-slow 200`). Reduced-motion is global, handled once in tokens.css.
 - **Icons:** `core/icons.js` (ES module) exports `chIcon("keep"|"archive"|"done"|"firefox")` →
   inline SVG (recolors via `currentColor`) and `fillIcons(root)` to hydrate static `[data-ico]`
-  placeholders (call it on init). All views import it; reddit inlines its own SVG where legacy.
+  placeholders (call it on init). All views import it.
 - **Inbox:** three densities (compact/comfortable/card) via a class on `.items`; rows have a
   source avatar that swaps to a select checkbox, hover-revealed icon actions, and swipe
   (right = archive, left = done). Browse keys: J/K move · S keep · E archive · Y done · X select.
 
 ## Mobile / PWA rules (do not regress)
-- Target **Chrome on Android (Pixel 6)**. The triage card keeps its **40px `.card-stack`
-  inset + 30px pointer edge-deadzone** so the system back-gesture never fires — never reduce it.
+- Target **Chrome on Android (Pixel 6)**. The deck keeps its **40px card edge-inset + 30px
+  pointer edge-deadzone** (`browse.css` `.deck-host`/`.deck-card`) so the system back-gesture
+  never fires — never reduce it.
 - Respect `env(safe-area-inset-*)`; `viewport-fit=cover` is set.
 
 ## Standalone mockups & device frames (gotchas that shipped broken phone views once)
