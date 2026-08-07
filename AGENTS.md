@@ -60,10 +60,13 @@ src/content_hoarder/
   assist/       llm.py (optional local-LLM suggestions; Phase 2)
   reddit_*.py   reddit_unsave / reddit_sync / reddit_oauth / reddit_thread / reddit_hydrate / reddit_trickle / rsm_threads
   firefox_youtube.py tab->youtube promotion + migrate-firefox-tabs (exempt from "connectors never touch DB")
-  templates/     index.html (v3 browse) + triage.html + reddit.html + manifest.webmanifest
-  static/core/   v3 ES modules: util, api, toast, render, media, swipe, icons + tokens.css
-  static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js + browse.css
-  static/        legacy still used by /triage + /reddit: app.css, triage.js, reddit.js/.css, sw.js
+  templates/     index.html (the ONE v3 browse shell; /triage + /reddit are 302 redirects, no legacy pages)
+  static/core/   v3 ES modules: util, api, toast, render, media, swipe, tags, icons, markdown,
+                 overlaynav + tokens.css (the v3 "Log Book" token system — the only one in use)
+  static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js, deck.js,
+                 fastscroll.js, prefetch.js, tagedit.js + browse.css
+  static/        PWA + page assets: sw.js, theme.js, haptics.js, manifest.webmanifest, fonts/, icons/,
+                 vendor/, apple-touch-startup-image-* (iOS splash set)
 scripts/        standalone harnesses: recover_archive_today (archive.today live-smoke probe),
                  rehearse_decay / rehearse_triage_score (dry-run previews), serve_branch_verify /
                  serve_browse_test (local-serve smoke helpers)
@@ -72,8 +75,7 @@ scripts/        standalone harnesses: recover_archive_today (archive.today live-
 strings, served by `chIcon(name)`) → `core/render.js` `CH_SOURCES[source] = { icon?, glyph?, token }`
 → `browse/render.js glyph(item)`, which honors `m.icon` (full SVG) → `m.glyph` (1-char) → `source[0]`.
 **Never `esc()` the `glyph()` output** — `chIcon` returns trusted HTML and glyph chars are safe;
-escaping turns `<svg>` into visible text. The triage (`triage.js`) + reddit views have their own markup
-and don't use `glyph()`.
+escaping turns `<svg>` into visible text.
 
 ## Data model (one generic `items` table)
 PK `fullname = "<source>:<source_id>"` (namespaces every source — no cross-source collisions).
@@ -146,8 +148,8 @@ via `adb backup`, **not** `adb pull`.
 - **Gallery lightbox = stacked images, NEVER a reddit iframe.** Populated `metadata.gallery[]` →
   `core/media.js openGallery` stacks plain `<img>`s in a `flex-direction:column` `.media-gallery`.
   **Empty/missing `gallery[]`** → a clean placeholder ("Gallery images unavailable (not archived).")
-  + "Open on Reddit ↗" link (via `lightbox.openHtml(...)` in `browse/main.js openMediaFor` and the
-  `data-gallery-embed` gate in `triage.js .rd-preview-lg`) — not a degraded embed. The iframe fallback
+  + "Open on Reddit ↗" link (via `lightbox.openHtml(...)` in `browse/main.js openMediaFor`) — not a
+  degraded embed. The iframe fallback
   (`openMedia(permalink)`) is for non-gallery permalink items only.
 - Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu
   (mobile hides `.acts` via `@media(hover:none)` → long-press).

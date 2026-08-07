@@ -7,20 +7,16 @@ description: "Design principles + content-hoarder's design system. Use when edit
 
 Distilled from the Codex-Frontend-Design-Toolkit (the lightweight, dependency-free
 parts). Apply these when touching the UI. **No new runtime dependencies, no CDN web fonts,
-no heavy frameworks** — this is a local-first vanilla-JS PWA (locally-vendored woff2 is
-allowed; v3 ships Lexend + JetBrains Mono in `static/fonts/`).
+no heavy frameworks** — this is a local-first vanilla-JS PWA. v3 ships Lexend + JetBrains
+Mono as locally-vendored woff2 in `static/fonts/`.
 
-> **v3 transition (Epic 20, 2026-06-09):** the sections below describe the **v2** system,
-> which still governs `/triage` + `/reddit` and legacy `static/tokens.css`. **v3 pages**
-> (browse rewrite onward, branch `feat/frontend-v3`) use `static/core/tokens.css` —
-> "Log Book II" design: charcoal night + apricot accent / dimmed daylight light, Lexend +
-> JetBrains Mono, soft radii, components consume the semantic aliases only. Spec:
-> `design-ref/v3-explorations/05-log-book-2.html` + README there. Rewrite this skill to
-> v3 once Epic 20 ships all three pages.
->
-> **Page→route map (verified 2026-06-11):** the app serves exactly three pages — `/`
-> (the v3 browse shell, `index.html` + `static/browse/*`), `/triage`, and `/reddit`
-> (both still v2). There is **NO `/browse` route** — don't assert or link one.
+> **v3 only (Epic 20 shipped; P3.5 retired the legacy pages 2026-07-04).** The app serves
+> exactly **one** page — `/` (`index.html`, the v3 browse shell + `static/browse/*` +
+> `static/core/*`). `/triage` → 302 `/?deck=1` and `/reddit` → 302 `/?source=reddit` are
+> redirects, NOT live pages. There is **NO `/browse` route** — don't assert or link one.
+> The v2 teal system (`static/tokens.css` + `triage.js`/`reddit.js`) is **deleted**; the
+> single live token system is `static/core/tokens.css` (v3 "Log Book", apricot). Do NOT
+> recreate v2 tokens or legacy page markup.
 
 > **Shared ADHD design language (2026-06-12):** the cross-project *behavioral* principles
 > (friction asymmetry, no backlog counts, guilt-free decay, recognition-over-recall
@@ -39,9 +35,10 @@ allowed; v3 ships Lexend + JetBrains Mono in `static/fonts/`).
 4. **Contrast + hierarchy.** Body text ≥ 4.5:1 on its background; muted text ≥ 3:1 and only
    for secondary info. Lead with one clear focal element per view.
 5. **Restrained motion.** Short (120–200ms), eased, purposeful. ALWAYS wrap in
-   `@media (prefers-reduced-motion: reduce)` to disable.
+   `@media (prefers-reduced-motion: reduce)` to disable (v3 makes this global in tokens.css).
 6. **Accessibility is non-negotiable.** Visible `:focus-visible` rings on every interactive
-   element; hit targets ≥ 40px on touch; `aria-*` on icon-only controls.
+   element; hit targets ≥ 40px on touch (v3 `--touch-min: 44px`); `aria-*` on icon-only
+   controls.
 7. **Depth via subtle elevation,** not heavy borders — small shadows + 1px hairline borders.
 8. **Friction asymmetry (ADHD core thesis: process and reduce).** Actions that REDUCE the
    backlog (Archive, Done) must be the cheapest gestures in reach; the one action that
@@ -50,35 +47,40 @@ allowed; v3 ships Lexend + JetBrains Mono in `static/fonts/`).
    side of reduce/preserve it sits on and price its gesture accordingly. (User-ratified
    2026-06-09 during the v3 Gate-1 review.)
 
-## content-hoarder design system (source of truth: `static/tokens.css`)
-All design values live in `src/content_hoarder/static/tokens.css` (linked before `app.css`
-in every template). **Theme via `data-theme="light"|"dark"` on `<html>`** (no attribute =
-dark, the native identity); `theme.js` persists the choice and applies it before first paint.
-- **Surfaces (dark):** `--bg #0f1115`, `--panel #171a21`, `--panel2 #1e222b`, `--row-hover`,
-  `--border #262b34`, `--border-strong`. Light inverts (`--bg #f5f6f8`, `--panel #fff`).
-  **Text:** `--text`, `--muted`, `--dim`.
-- **Accent (one brand teal):** `--accent #56c4b5` dark / `#2a9d8f` light, plus
-  `--accent-strong`, `--accent-ink` (text on an accent fill), `--accent-tint` (wash).
+## content-hoarder design system (source of truth: `static/core/tokens.css`)
+All design values live in `src/content_hoarder/static/core/tokens.css` (linked from
+`index.html`). **Theme via `data-theme="light"|"dark"` on `<html>`** (no attribute = dark,
+the native "night ops" identity); light = "daylight ops". `theme.js` persists the choice and
+applies it before first paint. **v3 rule: components consume the SEMANTIC ALIASES
+(`--surface-*`, `--text-*`, `--status-*`, `--border-*`, `--focus-ring`), not raw tokens.**
+- **Surfaces (night):** `--bg #101216`, `--panel #171a21`, `--panel2 #20242d`,
+  `--row-hover`, `--border #2a2f3a`, `--border-strong #3d4452`. Daylight inverts
+  (`--bg #e1e5ea`, `--panel #edf0f3`). **Text:** `--text #e0e5ec`, `--muted`, `--dim`.
+- **Accent (one brand apricot):** `--accent #f2a97e` night / `#a96a05` light, plus
+  `--accent-strong`, `--accent-ink` (text on an accent fill), `--accent-tint` (wash),
+  `--led-glow` (0 0 8px accent) for the "phosphor" cockpit feel.
 - **Status language (fixed):** **keep = blue** `--keep`, **archive = green** `--archive`,
-  **done = red** `--done`; each has an `-ink` (text-on-fill) and `-tint` variant. Use the
-  token, never the hex; `--danger` is a legacy alias for `--archive`.
-- **Source badges (theme-independent):** `--source-reddit|youtube|hackernews|obsidian|keep|firefox`.
-- **Type:** system stack only; `--fs-xs .75 · --fs-sm .85 · --fs-md .95 · --fs-lg 1.15 ·
-  --fs-xl 1.4rem`; weights `--fw-medium 600 / --fw-bold 700 / --fw-heavy 800`. Headings
-  `letter-spacing:-.01em`.
-- **Spacing:** `--sp-1 .25 … --sp-5 1.5rem`. **Radius:** `--r-sm 8 · --r-md 12 · --r-lg 16 ·
-  --r-pill`. **Elevation:** `--shadow-row / --shadow-pop / --shadow-toast` (theme-tuned;
-  `--shadow` aliases `--shadow-pop`).
-- **Motion:** `--ease cubic-bezier(.2,.7,.3,1)`, `--dur 160ms` (`--dur-fast 120 / --dur-slow 200`).
+  **done = red** `--done`; each has an `-ink` (text-on-fill) and `-tint` variant. Consume
+  the semantic `--status-*` aliases. `--danger` is a legacy alias for `--archive`.
+- **Source badges (theme-independent):** `--source-reddit|youtube|hackernews|obsidian|keep|firefox|twitter`.
+- **Type:** Lexend (humans) + JetBrains Mono (instruments — counts, gauges, keys), both
+  vendored woff2, no CDN. `--fs-xs .73 · --fs-sm .85 · --fs-md .97 · --fs-lg 1.18 ·
+  --fs-xl 1.45rem`; weights `--fw-regular 400 … --fw-bold 700`. Headings
+  `letter-spacing:-.01em`; `--lh-tight 1.26 / --lh-snug 1.32 / --lh-normal 1.55`.
+- **Spacing:** `--sp-1 .25 … --sp-5 1.5rem`. **Radius (soft "Pebble"):**
+  `--r-sm 8 · --r-md 14 · --r-lg 20 · --r-pill 999px`. **Elevation:**
+  `--shadow-row / --shadow-pop` (theme-tuned).
+- **Motion:** `--ease cubic-bezier(.25,.9,.35,1)`, `--dur 150ms`
+  (`--dur-fast 120 / --dur-slow 200`). Reduced-motion is global, handled once in tokens.css.
 - **Icons:** `core/icons.js` (ES module) exports `chIcon("keep"|"archive"|"done"|"firefox")` →
   inline SVG (recolors via `currentColor`) and `fillIcons(root)` to hydrate static `[data-ico]`
-  placeholders (call it on init). Browse + triage import it; reddit inlines its own SVG.
+  placeholders (call it on init). All views import it; reddit inlines its own SVG where legacy.
 - **Inbox:** three densities (compact/comfortable/card) via a class on `.items`; rows have a
   source avatar that swaps to a select checkbox, hover-revealed icon actions, and swipe
   (right = archive, left = done). Browse keys: J/K move · S keep · E archive · Y done · X select.
 
 ## Mobile / PWA rules (do not regress)
-- Target **Firefox on Android (Pixel 6)**. The triage card keeps its **40px `.card-stack`
+- Target **Chrome on Android (Pixel 6)**. The triage card keeps its **40px `.card-stack`
   inset + 30px pointer edge-deadzone** so the system back-gesture never fires — never reduce it.
 - Respect `env(safe-area-inset-*)`; `viewport-fit=cover` is set.
 
@@ -123,9 +125,9 @@ When building self-contained HTML mockups with a phone-frame toggle (the v3 Gate
   count** (`git diff --cached --name-only | wc -l`) before committing; use `git add -f` only deliberately.
 
 ## Checklist before finishing a UI change
-- [ ] New values reference tokens (no stray hex/px); status colors use `--keep/--archive/--done`.
+- [ ] New values reference tokens (no stray hex/px); status colors use `--status-*` aliases.
 - [ ] Works in both light and dark (`data-theme`); on-fill text uses an `-ink` token.
 - [ ] Interactive elements have `:focus-visible`.
-- [ ] Any animation has a reduced-motion fallback.
+- [ ] Any animation has a reduced-motion fallback (global in v3; per-component where added).
 - [ ] Looks right at 375px (mobile) and ≥1100px (desktop).
 - [ ] No new dependency / web font added.
