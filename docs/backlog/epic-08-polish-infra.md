@@ -5,8 +5,10 @@
   accessibility) so AI agents produce consistent UI that respects the v3 tokens and avoids generic output.
   Distilled from the Codex-Frontend-Design-Toolkit. Referenced automatically by Zed agents when editing
   frontend files.
-- [ ] **P3 — Optional Karakeep bridge** (already a stub) if a stock instance is adopted for a
-  forward-capture library.
+- [x] ~~**P3 — Optional Karakeep bridge**~~ ✅ ALREADY SHIPPED (issue #18 closed 2026-08-07 as
+  wontfix/already-implemented): `bridge/karakeep.py` (configured-gate no-op, `_payload` URL/text +
+  tags + provenance, `_post` via shared `_http`, idempotent `karakeep_id`, dry-run) + `promote` CLI
+  + `tests/test_bridge_karakeep.py` (3 offline tests). The "stub" was a full bridge.
 
 - [x] ~~**P2 — Redesign the app icon.**~~ **Cancelled 2026-07-12** (user decision: keep current mark;
   do not redesign). Was: backwards "E" forming an "H"; replace `static/icon.svg` + 192/512 PNGs +

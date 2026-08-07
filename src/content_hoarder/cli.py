@@ -731,6 +731,65 @@ def cmd_learn_triage(args) -> int:
     return 0
 
 
+def cmd_assist_auto_archive(args) -> int:
+    """Issue #25: one-click reversible bulk-archive for high-skip buckets.
+
+    Loads the persisted triage model, lists the high-skip subreddit buckets,
+    and (with --apply) archives each via db.decay — the wave-stamped,
+    reversible path (undo with `decay --undo`). Dry-run by default.
+    """
+    from content_hoarder import db, triage_score
+
+    with _connect() as conn:
+        plan = triage_score.auto_archive_plan(
+            conn,
+            min_skip_rate=args.min_skip_rate,
+            min_support=args.min_support,
+            source=args.source,
+        )
+        if not plan["model_present"]:
+            print(json.dumps(plan, indent=2))
+            print(
+                "(no persisted triage model — run `learn-triage --apply` first. "
+                "Run against a COPY of the DB.)",
+                file=sys.stderr,
+            )
+            return 1
+        if args.apply:
+            applied = []
+            for b in plan["actionable"]:
+                if b["inbox_count"] == 0:
+                    continue
+                res = db.decay(
+                    conn,
+                    subreddits=[b["subreddit"]],
+                    source=args.source,
+                    label="auto-archive",
+                    apply=True,
+                )
+                applied.append({
+                    "subreddit": b["subreddit"],
+                    "skip_rate": b["skip_rate"],
+                    "n": b["n"],
+                    "total": res["total"],
+                    "decayed_at": res.get("decayed_at"),
+                })
+            plan["applied"] = True
+            plan["applied_buckets"] = applied
+    print(json.dumps(plan, indent=2))
+    if not args.apply:
+        print(
+            f"(dry run — {plan['total_actionable']} inbox item(s) across "
+            f"{len(plan['actionable'])} high-skip subreddit bucket(s) would archive; "
+            f"re-run with --apply to commit. Each bucket's wave is stamped "
+            f"metadata.decayed_at (surfaced as decayed_at in the apply output) and "
+            f"reverses via `decay --undo` scoped to that stamp's day — or inspect the "
+            f"decayed_at ids if multiple waves share a day.)",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def cmd_triage_drift(args) -> int:
     from content_hoarder import triage_score
 
@@ -1988,6 +2047,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write scores + persist the model (default: dry run).",
     )
     plt.set_defaults(func=cmd_learn_triage)
+
+    paa = sub.add_parser(
+        "assist-auto-archive",
+        help="Issue #25: list high-skip subreddit buckets from the triage model "
+        "and (with --apply) archive each via the reversible decay path.",
+    )
+    paa.add_argument(
+        "--min-skip-rate",
+        type=float,
+        default=0.9,
+        help="Only buckets whose skip-rate is at least this (default 0.9).",
+    )
+    paa.add_argument(
+        "--min-support",
+        type=int,
+        default=2,
+        help="Only buckets seen at least this many times (default 2).",
+    )
+    paa.add_argument(
+        "--source", default="reddit", help="Source to scope the archive to (default: reddit)."
+    )
+    paa.add_argument(
+        "--apply",
+        action="store_true",
+        help="Commit the per-bucket decays (default: dry run). Run against a DB copy first.",
+    )
+    paa.set_defaults(func=cmd_assist_auto_archive)
 
     pdel = sub.add_parser(
         "delete",

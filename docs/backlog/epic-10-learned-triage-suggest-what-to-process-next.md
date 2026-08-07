@@ -28,9 +28,13 @@ and surface what I'm most likely to act on, instead of a flat random batch.*
   recent successful triage streaks, source/category diversity, novelty vs familiarity, media/text effort,
   skip/snooze friction, old-save resurfacing, and exploration/exploitation. Output should be a short research
   note + concrete scoring changes, then offline rehearsal against a DB copy before any default-sort change.
-- [ ] **P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.** Where the learned
-  skip-rate for a bucket (e.g. a subreddit) is very high, offer a one-click reversible bulk-archive
-  (built on `db.bankruptcy`-style ops) so low-value buckets clear fast.
+- [x] ~~**P3 — Per-source / per-subreddit "auto-archive likely-skip" assist.**~~ ✅ SHIPPED
+  2026-08-07 (issue #25): `assist-auto-archive` CLI — loads the persisted triage model,
+  lists high-skip `sub:` buckets with live inbox counts (dry-run default), `--apply` archives
+  each via `db.decay` (wave-stamped, reversible; `label='auto-archive'` keeps it queryable
+  via `is:decayed`). Other high-skip feature kinds (sk/chan/media/cat) are informational only
+  (no decay selector); `age:` ranges excluded (one-sided `before_utc` can't express ranges).
+  5 tests in `tests/test_assist_auto_archive.py`.
 
 - [x] ~~**P2 — Shuffle / mixed-content mode.**~~ ✅ Shipped 2026-06-13: a "SHUFFLE · MIX" sort that
   interleaves sources round-robin (`db._order_clause` window fn: nth-of-each-source then source —

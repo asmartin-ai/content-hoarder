@@ -156,6 +156,69 @@ def _feature_rate(entry) -> float:
         return 0.0
 
 
+def auto_archive_plan(conn, *, min_skip_rate: float = 0.9,
+                      min_support: int = 2, source: str = "reddit") -> dict:
+    """Issue #25: plan a one-click reversible bulk-archive for high-skip buckets.
+
+    Loads the persisted triage model and applies :func:`high_skip_buckets`.
+    Buckets that map to a ``db.decay`` selector — ``sub:<subreddit>`` —
+    become actionable: each lists the live inbox count it would archive.
+    Other high-skip feature kinds (``sk:``, ``chan:``, ``media:``, ``cat:``)
+    have no decay selector and are reported as informational only. ``age:``
+    buckets map to ``decay --before`` in principle but are excluded here: the
+    age labels are RANGES (e.g. ``2-4y``), and ``before_utc`` is one-sided, so
+    only ``age:>=4y`` would be representable — a marginal case left to the
+    explicit ``decay --before`` command rather than folded into this assist.
+
+    Caveat: ``fit()`` builds ``sub:`` features across ALL sources, while the
+    archive scopes by ``--source`` — a subreddit's skip-rate blends sources,
+    so on multi-source data the archive acts on the blended signal. Re-run
+    ``learn-triage`` with source-scoped data before treating the plan as
+    source-precise.
+
+    Pure analysis — never mutates. The caller decides dry-run vs apply.
+    """
+    raw = db.get_setting(conn, MODEL_SETTING_KEY)
+    model = json.loads(raw) if raw else None
+    if model is None:
+        return {
+            "applied": False,
+            "model_present": False,
+            "model_fitted_utc": None,
+            "actionable": [],
+            "informational": [],
+            "total_actionable": 0,
+        }
+
+    buckets = high_skip_buckets(
+        model, min_skip_rate=min_skip_rate, min_support=min_support
+    )
+    actionable, informational = [], []
+    for b in buckets:
+        feature = b["feature"]
+        if feature.startswith("sub:"):
+            sub = feature[len("sub:"):]
+            n = conn.execute(
+                "SELECT COUNT(*) FROM items WHERE status='inbox' AND source=? "
+                "AND lower(json_extract(metadata, '$.subreddit')) = ?",
+                (source, sub),
+            ).fetchone()[0]
+            actionable.append({**b, "inbox_count": n, "subreddit": sub})
+        else:
+            informational.append(b)
+
+    total = sum(b["inbox_count"] for b in actionable)
+    return {
+        "applied": False,
+        "model_present": True,
+        "model_fitted_utc": model.get("fitted_utc"),
+        "actionable": actionable,
+        "informational": informational,
+        "total_actionable": total,
+    }
+
+
+
 def drift(prev_model: dict, curr_model: dict, *, top_n: int = 10) -> dict:
     """Compare two fitted triage models and summarize feature/prior drift.
 
