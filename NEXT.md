@@ -1,7 +1,29 @@
 # NEXT.md — content-hoarder session focus
 
 `main`. Suite: non-UI suite green (see `gh run list` for CI).
-Last wrapup: 2026-07-27 (correctness pass — see block below).
+Last wrapup: 2026-08-07 (pushes + backlog audit + agent-doc v3 rewrite + review — see block below).
+
+## Just done (2026-08-07 — pushes, backlog audit, agent-doc v3 rewrite + review fixes)
+- **Both remotes in sync at `1cc49fe`.** Pushed the 5 pre-session commits (Keep Takeout
+  parsing, multi-value filter fixes, OCR note, watchdog, NEXT.md) + this session's work to
+  `origin` (public) and `private` (canonical mirror). Pre-push `publish_safety_check.py`
+  clean (exit 0); the watchdog's ntfy topic + `K:/Projects` paths match what's already
+  public in `run-video-archive.ps1`/`bakeoff_arm.py` — same sensitivity class.
+- **Backlog migration verified complete + clean.** All 61 `docs/backlog/github-issues.json`
+  items are live on public origin (11–78). Audited all 65 live issue bodies: no sensitive
+  content (only the embedded "This repository is public" disclaimer + benign path refs).
+  The 8 epics with no migrated issues (1,2,3,6,14,19,23) are all **fully shipped**. 3
+  unmigrated sub-notes are covered by parent issues #16/#20/#66. Private repo has 0 issues
+  by design.
+- **Agent docs rewritten to v3 reality** (`e610f12`): AGENTS.md layout map + both
+  `frontend-design` SKILL.md (`.agents/` + `.claude/`) no longer claim legacy /triage +
+  /reddit pages or the v2 teal token system — those are 302 redirects / deleted (P3.5
+  2026-07-04). Corrected to the single v3 apricot system (`static/core/tokens.css`).
+- **Review fixes** (`1cc49fe`): post-commit code-review caught + fixed 4 stale-v2 carries —
+  nonexistent `--danger` token, nonexistent `static/icons/` dir, dead `.card-stack` class
+  (deck uses `.deck-host`/`.deck-card`), dangling "reddit inlines its own SVG where legacy".
+- **Triage state roles applied** to the open backlog (needs-triage / ready-for-agent /
+  ready-for-human) — see issue labels.
 
 ## Just done (2026-07-27 — Keep Takeout parsing + multi-value filter fixes)
 - **Push routing remains the open decision** carried from the 2026-07-19
