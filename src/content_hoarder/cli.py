@@ -1541,6 +1541,61 @@ def cmd_folder_delete(args) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# User-tag commands (issue #70 — user_tags vocabulary registry)
+# ---------------------------------------------------------------------------
+
+
+def cmd_user_tag_list(args) -> int:
+    from content_hoarder import db
+
+    with _connect() as conn:
+        tags = db.list_user_tags(conn)
+    if not tags:
+        print("(no user tags registered — try `tag create <name>`)")
+        return 0
+    for t in tags:
+        print(f"[{t['id']}] {t['name']}  ({t['item_count']} item(s))")
+    return 0
+
+
+def cmd_user_tag_create(args) -> int:
+    from content_hoarder import db
+
+    with _connect() as conn:
+        try:
+            t = db.create_user_tag(conn, args.name)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    print(f"Created user tag [{t['id']}] {t['name']}")
+    return 0
+
+
+def cmd_user_tag_rename(args) -> int:
+    from content_hoarder import db
+
+    with _connect() as conn:
+        try:
+            t = db.rename_user_tag_in_vocab(conn, args.id, args.name)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    print(f"Renamed user tag [{t['id']}] -> {t['name']}")
+    return 0
+
+
+def cmd_user_tag_delete(args) -> int:
+    from content_hoarder import db
+
+    with _connect() as conn:
+        if not db.delete_user_tag(conn, args.id):
+            print(f"error: user tag {args.id} not found", file=sys.stderr)
+            return 1
+    print(f"Deleted user tag {args.id}")
+    return 0
+
+
 def cmd_folder_evaluate(args) -> int:
     from content_hoarder import folders as fmod
 
@@ -2611,6 +2666,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     pf_stats = pf_sub.add_parser("stats", help="Per-folder item counts.")
     pf_stats.set_defaults(func=cmd_folder_stats)
+
+    # --- User-tag subcommand (issue #70) ---
+    pt = sub.add_parser(
+        "tag", help="Manage the user-tag vocabulary (Epic 26 P3)."
+    )
+    pt_sub = pt.add_subparsers(dest="tag_cmd", required=True)
+
+    pt_list = pt_sub.add_parser(
+        "list", help="List registered user tags with item counts."
+    )
+    pt_list.set_defaults(func=cmd_user_tag_list)
+
+    pt_create = pt_sub.add_parser(
+        "create", help="Pre-create an empty user tag (0 items — issue #70)."
+    )
+    pt_create.add_argument("name", help="Tag name (normalized to lowercase).")
+    pt_create.set_defaults(func=cmd_user_tag_create)
+
+    pt_rename = pt_sub.add_parser(
+        "rename",
+        help="Rename a user tag across the vocabulary in one action "
+        "(row + every item's stamp).",
+    )
+    pt_rename.add_argument("id", type=int, help="User tag id.")
+    pt_rename.add_argument("name", help="New display name.")
+    pt_rename.set_defaults(func=cmd_user_tag_rename)
+
+    pt_delete = pt_sub.add_parser(
+        "delete", help="Delete a user tag (row + every item's stamp)."
+    )
+    pt_delete.add_argument("id", type=int, help="User tag id.")
+    pt_delete.set_defaults(func=cmd_user_tag_delete)
 
     prr = sub.add_parser(
         "resolve-redgifs",

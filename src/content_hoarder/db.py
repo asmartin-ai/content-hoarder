@@ -123,6 +123,13 @@ CREATE TABLE IF NOT EXISTS folders (
 CREATE INDEX IF NOT EXISTS idx_items_folder ON items(
     json_extract(metadata, '$.folder')
 );
+
+CREATE TABLE IF NOT EXISTS user_tags (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,   -- normalized tag string (== what items carry)
+    created_utc INTEGER NOT NULL,
+    updated_utc INTEGER
+);
 """
 
 _FTS_SCHEMA = """
@@ -2559,24 +2566,24 @@ def folder_counts(conn: sqlite3.Connection) -> dict[str, int]:
     return {r["folder"]: r["c"] for r in rows}
 
 
-def rename_user_tag(
-    conn: sqlite3.Connection, old: str, new: str
+def _rewrite_manual_tag(
+    conn: sqlite3.Connection, old: str, new: str | None
 ) -> int:
-    """Rename a user-entered tag across every item that carries it in
-    ``metadata.tags_manual`` (CH-B4).
+    """Rewrite ``metadata.tags_manual``/``tags`` on every item carrying ``old``:
+    ``new`` = rename to, ``None`` = remove the tag entirely.
 
     The HUMAN stamp (``tags_manual``) and the displayed UNION (``tags``) are
     rewritten; the PROGRAMMATIC stamp (``tags_auto``) is left untouched so the
-    rename can never bleed into the heuristic path. After the writes,
+    rewrite can never bleed into the heuristic path. After the writes,
     ``search_text`` is rebuilt per row and the external-content trigram FTS
     index is fully rebuilt (``INSERT INTO items_trgm(items_trgm) VALUES('rebuild')`` —
     SQLite's canonical FTS5 external-content rebuild command; ``INSERT ...
     SELECT`` is the documented gotcha to avoid). Returns the count of items
     whose ``tags_manual`` actually contained ``old`` (0 = no-op + no FTS rebuild).
-    Caller commits."""
+    Shared by :func:`rename_user_tag` (CH-B4) and the user_tags delete path
+    (issue #70). Caller commits."""
     old_tag = _norm_user_tag(old)
-    new_tag = _norm_user_tag(new)
-    if not old_tag or not new_tag or old_tag == new_tag:
+    if not old_tag:
         return 0
 
     rows = conn.execute(
@@ -2590,19 +2597,25 @@ def rename_user_tag(
     for r in rows:
         item = dict(r)
         md = parse_metadata(item.get("metadata"))
-        manual = [
-            (new_tag if t == old_tag else t)
-            for t in _tag_list(md.get("tags_manual"))
-        ]
-        # Rebuild the displayed UNION from the manual stamp (renamed) + the auto
-        # stamp (preserved verbatim) so the auto-stamped ``old`` (which never
-        # appears in tags_manual for that item) survives untouched in `tags`.
+        manual: list[str] = []
+        for t in _tag_list(md.get("tags_manual")):
+            if t == old_tag:
+                if new is not None:
+                    manual.append(new)
+            else:
+                manual.append(t)
+        # Rebuild the displayed UNION from the manual stamp (renamed/removed) +
+        # the auto stamp (preserved verbatim) so the auto-stamped ``old`` (which
+        # never appears in tags_manual for that item) survives untouched in `tags`.
         auto = _tag_list(md.get("tags_auto"))
         union: list[str] = []
         for t in manual + auto:
             if t not in union:
                 union.append(t)
-        md["tags_manual"] = manual
+        if manual:
+            md["tags_manual"] = manual
+        else:
+            md.pop("tags_manual", None)
         if union:
             md["tags"] = union
         else:
@@ -2615,26 +2628,148 @@ def rename_user_tag(
         )
 
     # Rebuild the external-content trigram FTS over search_text so a search for
-    # ``new_tag`` surfaces the renamed items. ``'rebuild'`` is SQLite's canonical
-    # FTS5 command for external-content tables (INSERT … SELECT is the gotcha).
+    # the new name surfaces the renamed items (or drops the removed ones).
+    # ``'rebuild'`` is SQLite's canonical FTS5 command for external-content
+    # tables (INSERT … SELECT is the gotcha).
     conn.execute("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')")
     return len(rows)
 
 
-def user_tag_vocab(conn: sqlite3.Connection) -> list[str]:
-    """The user-tag registry: distinct tags the user applied by hand, derived from the
-    ``metadata.tags_manual`` stamps that :func:`set_tags` writes (Epic 26).
+def rename_user_tag(
+    conn: sqlite3.Connection, old: str, new: str
+) -> int:
+    """Rename a user-entered tag across every item that carries it in
+    ``metadata.tags_manual`` (CH-B4). Returns the count of affected items
+    (0 = no-op + no FTS rebuild). Caller commits."""
+    old_tag = _norm_user_tag(old)
+    new_tag = _norm_user_tag(new)
+    if not old_tag or not new_tag or old_tag == new_tag:
+        return 0
+    return _rewrite_manual_tag(conn, old_tag, new_tag)
 
-    No separate table — a tag is "in the vocabulary" exactly while it's stamped on at least one
-    item, so it survives re-import via the same stamp and drops out when the last item loses it.
-    Crucially this reads ``tags_manual`` (only user-applied tags), NOT ``tags`` (which also holds
-    the tens-of-thousands of enrich keywords), so surfacing these in the rail stays cheap + clean.
+
+def list_user_tags(conn: sqlite3.Connection) -> list[dict]:
+    """All registered user tags (stable id + display name), ordered by name,
+    each with the count of items currently stamped with it (0 = pre-created
+    empty tag — issue #70 / Epic 26 P3)."""
+    rows = conn.execute(
+        "SELECT ut.id, ut.name, ut.created_utc, ut.updated_utc, "
+        "(SELECT COUNT(*) FROM items, json_each(items.metadata, '$.tags_manual') je "
+        " WHERE je.value = ut.name) AS item_count "
+        "FROM user_tags ut ORDER BY ut.name COLLATE NOCASE ASC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_user_tag(conn: sqlite3.Connection, tag_id: int) -> dict | None:
+    """Look up a registered user tag by its stable id."""
+    row = conn.execute(
+        "SELECT id, name, created_utc, updated_utc FROM user_tags WHERE id=?",
+        (tag_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def create_user_tag(conn: sqlite3.Connection, name: str) -> dict:
+    """Pre-create a user tag in the vocabulary (issue #70): a 0-item tag gets a
+    stable id + display name to live in before it is applied to any item.
+    Raises ValueError on empty or duplicate name. Names are normalized exactly
+    like the editor's stamps (strip + lowercase, :func:`_norm_user_tag`) so the
+    row name always equals what ``set_tags`` writes."""
+    import time as _time
+
+    norm = _norm_user_tag(name)
+    if not norm:
+        raise ValueError("Tag name cannot be empty")
+    try:
+        conn.execute(
+            "INSERT INTO user_tags (name, created_utc) VALUES (?, ?)",
+            (norm, int(_time.time())),
+        )
+        conn.commit()
+    except Exception:
+        raise ValueError(f"User tag {name!r} already exists")
+    row = conn.execute(
+        "SELECT id, name, created_utc, updated_utc FROM user_tags WHERE name=?",
+        (norm,),
+    ).fetchone()
+    return dict(row)
+
+
+def rename_user_tag_in_vocab(
+    conn: sqlite3.Connection, tag_id: int, new_name: str
+) -> dict:
+    """Rename a user tag across the VOCABULARY in one action (issue #70): the
+    stable-id row AND every item carrying the old name (bulk rewrite via
+    :func:`rename_user_tag`) commit in one transaction, so the old name can
+    never vanish from the vocabulary mid-rename. Returns the updated row;
+    raises ValueError on a missing tag, an empty name, or a collision with
+    another registered tag."""
+    import time as _time
+
+    row = get_user_tag(conn, tag_id)
+    if row is None:
+        raise ValueError(f"user tag {tag_id} not found")
+    norm = _norm_user_tag(new_name)
+    if not norm:
+        raise ValueError("Tag name cannot be empty")
+    if norm == row["name"]:
+        return row  # no-op
+    clash = conn.execute(
+        "SELECT 1 FROM user_tags WHERE name=? AND id<>?", (norm, tag_id)
+    ).fetchone()
+    if clash:
+        raise ValueError(f"User tag name {new_name!r} already exists")
+    conn.execute(
+        "UPDATE user_tags SET name=?, updated_utc=? WHERE id=?",
+        (norm, int(_time.time()), tag_id),
+    )
+    rename_user_tag(conn, row["name"], norm)
+    conn.commit()
+    return get_user_tag(conn, tag_id)
+
+
+def delete_user_tag(conn: sqlite3.Connection, tag_id: int) -> bool:
+    """Delete a user tag from the vocabulary (issue #70): drops the row AND
+    strips the tag from every item's ``tags_manual``/``tags`` (same bulk
+    rewrite + FTS rebuild cost as rename — Epic 26 unlocks it cheaply).
+    Returns True if a row was deleted, False if not found. Caller commits."""
+    row = get_user_tag(conn, tag_id)
+    if row is None:
+        return False
+    try:
+        _rewrite_manual_tag(conn, row["name"], None)
+        conn.execute("DELETE FROM user_tags WHERE id=?", (tag_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return True
+
+
+def user_tag_vocab(conn: sqlite3.Connection) -> list[str]:
+    """The user-tag vocabulary: table-registered tags (``user_tags`` — including
+    pre-created empty ones, issue #70) UNION the distinct ``tags_manual`` stamps
+    that :func:`set_tags` writes (Epic 26).
+
+    Registered rows give tags a stable home (id + display name) before or without
+    any item; tags applied before registration (or applied without registering)
+    still surface via the derived union, so nothing that rendered before drops
+    out. Crucially this reads ``tags_manual`` (only user-applied tags), NOT
+    ``tags`` (which also holds the tens-of-thousands of enrich keywords), so
+    surfacing these in the rail stays cheap + clean.
     """
     rows = conn.execute(
         "SELECT DISTINCT je.value AS tag "
         "FROM items, json_each(items.metadata, '$.tags_manual') je"
     ).fetchall()
-    return [r["tag"] for r in rows]
+    out = [r["tag"] for r in rows]
+    seen = set(out)
+    for r in conn.execute("SELECT name FROM user_tags ORDER BY name COLLATE NOCASE ASC"):
+        if r["name"] not in seen:
+            out.append(r["name"])
+            seen.add(r["name"])
+    return out
 
 
 def tag_counts(
