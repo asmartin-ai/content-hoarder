@@ -2687,7 +2687,7 @@ def create_user_tag(conn: sqlite3.Connection, name: str) -> dict:
             (norm, int(_time.time())),
         )
         conn.commit()
-    except Exception:
+    except sqlite3.IntegrityError:
         raise ValueError(f"User tag {name!r} already exists")
     row = conn.execute(
         "SELECT id, name, created_utc, updated_utc FROM user_tags WHERE name=?",
@@ -2720,12 +2720,16 @@ def rename_user_tag_in_vocab(
     ).fetchone()
     if clash:
         raise ValueError(f"User tag name {new_name!r} already exists")
-    conn.execute(
-        "UPDATE user_tags SET name=?, updated_utc=? WHERE id=?",
-        (norm, int(_time.time()), tag_id),
-    )
-    rename_user_tag(conn, row["name"], norm)
-    conn.commit()
+    try:
+        conn.execute(
+            "UPDATE user_tags SET name=?, updated_utc=? WHERE id=?",
+            (norm, int(_time.time()), tag_id),
+        )
+        rename_user_tag(conn, row["name"], norm)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     return get_user_tag(conn, tag_id)
 
 
@@ -2733,7 +2737,8 @@ def delete_user_tag(conn: sqlite3.Connection, tag_id: int) -> bool:
     """Delete a user tag from the vocabulary (issue #70): drops the row AND
     strips the tag from every item's ``tags_manual``/``tags`` (same bulk
     rewrite + FTS rebuild cost as rename — Epic 26 unlocks it cheaply).
-    Returns True if a row was deleted, False if not found. Caller commits."""
+    Returns True if a row was deleted, False if not found. Commits on
+    success; rolls back and re-raises on error."""
     row = get_user_tag(conn, tag_id)
     if row is None:
         return False

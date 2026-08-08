@@ -32,6 +32,7 @@ from content_hoarder.models import parse_metadata
 # PKMS-side replay marker in capture response bodies; the name after the
 # checkmark is the vault/inbox filename, used as delivery_ref.
 _ALREADY_SAVED_PREFIX = "already saved \u2713 "
+_SAVED_PREFIX = "saved \u2713 "
 
 
 def _id_slug(fullname: str) -> str:
@@ -225,13 +226,32 @@ def promote(
         return {"status": "failed", "promoted": False, "response": "",
                 "receipt": receipt, "error": str(exc)}
 
-    receipt = record_receipt(
-        conn, fullname, status="promoted", attempted_at=attempted, response=response
+    if response.startswith(_SAVED_PREFIX) or response.startswith(
+        _ALREADY_SAVED_PREFIX
+    ):
+        replay = response.startswith(_ALREADY_SAVED_PREFIX)
+        receipt = record_receipt(
+            conn, fullname, status="promoted", attempted_at=attempted, response=response
+        )
+        return {
+            "status": "replay" if replay else "promoted",
+            "promoted": True,
+            "response": response,
+            "receipt": receipt,
+        }
+    # Spec 15 §5/§1.6: the body IS the external evidence of the write — a 2xx
+    # without the ✓ confirmation is not a promoted write. Record failed (no
+    # delivery_ref) and leave the item retryable: re-promote re-POSTs, and
+    # PKMS's ch_item_id dedupe makes the repeat safe (DP-5).
+    error = (
+        "PKMS capture returned an unrecognized response body "
+        f"{response!r} (no \u2713 confirmation)"
     )
-    replay = response.startswith(_ALREADY_SAVED_PREFIX)
+    receipt = record_receipt(
+        conn, fullname, status="failed", attempted_at=attempted,
+        response=response, error=error,
+    )
     return {
-        "status": "replay" if replay else "promoted",
-        "promoted": True,
-        "response": response,
-        "receipt": receipt,
+        "status": "failed", "promoted": False,
+        "response": response, "receipt": receipt, "error": error,
     }
