@@ -29,6 +29,14 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   `[hidden]` attribute now honored by the relay buttons (`browse.css`).
 - `bridge.pkms._note_name` no longer records a non-✓ 2xx body as the vault-path
   `delivery_ref`.
+- PKMS promote: a 2xx body without the ``saved ✓``/``already saved ✓`` confirmation is now
+  recorded ``failed`` (error set, no delivery_ref) instead of being stamped ``promoted`` —
+  a partial receipt was previously presented as success and permanently blocked re-promote
+  (Spec 15 §5/§1.6).
+- `db.create_user_tag` masks only duplicate-name (UNIQUE) failures as "already exists";
+  other DB errors propagate instead of being mislabeled.
+- `db.rename_user_tag_in_vocab` rolls back the vocabulary row + item stamps on failure
+  (matches `delete_user_tag`); docstring now matches the actual commit contract.
 - SW cache + APP_VERSION bumped v128 → v129 (new static assets must not serve stale).
 
 ### Changed
