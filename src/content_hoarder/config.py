@@ -36,6 +36,10 @@ _DEFAULTS = {
     "REDDIT_OAUTH_REDIRECT_URI": "redreader://rr_oauth_redir",
     "KARAKEEP_BASE_URL": "",
     "KARAKEEP_API_KEY": "",
+    # PKMS promote bridge (spec 15): the capture endpoint + its token. Token may
+    # come from PKMS .secrets/capture-token via env at runtime; never hardcoded.
+    "PKMS_CAPTURE_URL": "",
+    "PKMS_CAPTURE_TOKEN": "",
     "LLM_BASE_URL": "http://127.0.0.1:1234/v1",
     "LLM_MODEL": "",
 }

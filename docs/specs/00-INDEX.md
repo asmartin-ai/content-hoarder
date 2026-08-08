@@ -95,3 +95,12 @@ Order (low-risk → higher, so a failure late doesn't block easy wins):
   already on main; this spec covers the write path only. Engine: Tesseract
   (not local vision).
 
+## W4 (ADR 0027 — promote action) design, added 2026-07-31
+
+- [15](15-promote-action.md) — PKMS promote action wired to the triage feed
+  (resurface card proposes, explicit per-item accept promotes to PKMS
+  `vault/inbox/` with a two-hop `source_span` + `action_receipt`). **SHIPPED
+  2026-07-31 on `feat/promote-action`** — transport CHOSEN (extended
+  `POST /capture` per PKMS build-plan Slice 9); `bridge/pkms.py` + route +
+  browse row-menu Promote + 13 tests; suite 1075 green.
+
