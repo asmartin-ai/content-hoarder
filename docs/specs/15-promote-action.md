@@ -1,8 +1,7 @@
 # Spec 15 — PKMS promote action (resurface-card integration)
 
-**Status: SHIPPED (phase 2, 2026-07-31) — transport CHOSEN; implemented on
-`feat/promote-action` (commit faaae86 = phase 1 design; implementation commits
-below).**
+**Status: SHIPPED — merged to `main` (2026-08-08); review-fixed; CI green.
+Transport CHOSEN; implementation history below (`feat/promote-action` commits).**
 
 Governing decision: life-os ADR 0027 (Accepted 2026-07-28, Option C hybrid).
 The PKMS-side ingest spec LANDED (Slice 9 of
