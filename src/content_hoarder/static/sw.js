@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v128"; // v128: reader triage swipe-up enter/exit (#40)
+const CACHE = "ch-shell-v129"; // v129: PKMS promote action (Spec 15) + user_tags CLI
 const SHELL = [
   "/",
   // v3 browse shell (what "/" actually loads)

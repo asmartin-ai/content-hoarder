@@ -60,6 +60,13 @@ export const bulkUndo = (fullnames) =>
     failed: rs.map((r, i) => (r.status === "rejected" ? fullnames[i] : null)).filter(Boolean),
   }));
 
+/* Promote to PKMS (Spec 15): POSTs the bridge route; the server stamps
+   metadata.promotion and returns {status, response, receipt} — the PKMS
+   capture answer is the snackbar text. 400 (unconfigured) / 502 (transport)
+   bodies carry `error` for the toast. */
+export const promoteItem = (fullname) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/promote");
+
 export const fetchDuplicates = (params) =>
   getJSON("/duplicates" + (params ? "?" + new URLSearchParams(params) : ""));
 

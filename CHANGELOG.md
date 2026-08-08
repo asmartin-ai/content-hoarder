@@ -12,6 +12,24 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 - `assist-auto-archive` CLI (issue #25): lists high-skip subreddit buckets from the learned
   triage model with live inbox counts, and (with `--apply`) archives each via the reversible,
   wave-stamped decay path (`label='auto-archive'`, queryable via `is:decayed`).
+- PKMS promote action (Spec 15, ADR 0027): the row menu's Promote affordance POSTs the item to
+  PKMS via the opt-in bridge (`PKMS_CAPTURE_URL`/`PKMS_CAPTURE_TOKEN`); the deterministic
+  capture answer (``saved ✓``/``already saved ✓``, deduped on `ch_item_id`) is stamped onto
+  `metadata.promotion` with a lifecycle receipt, snackbared verbatim; errors toast
+  `data.error` (unconfigured 400 / transport 502). Never reads or prints the token.
+- `user_tags` registry + `tag create|list|rename|delete` CLI (Epic 26 P3, issue #70):
+  pre-create empty tags (stable id + display name), rename across the whole vocabulary in one
+  transaction (bulk rewrite of `tags_manual`/`tags`, FTS rebuild), delete-from-vocabulary;
+  the derived vocabulary still surfaces unregistered stamps, so nothing drops out.
+
+### Fixed
+
+- Promote row-menu action was dead UI: `promoteItem` was dispatched but never defined
+  (Spec 15 §7) — handler wired, `promoteItem` wrapper added to `core/api.js`, and the
+  `[hidden]` attribute now honored by the relay buttons (`browse.css`).
+- `bridge.pkms._note_name` no longer records a non-✓ 2xx body as the vault-path
+  `delivery_ref`.
+- SW cache + APP_VERSION bumped v128 → v129 (new static assets must not serve stale).
 
 ### Changed
 
