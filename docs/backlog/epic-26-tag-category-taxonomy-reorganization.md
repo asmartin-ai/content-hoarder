@@ -36,8 +36,9 @@ namespace) and builds on Epic 9 (tagging).*
   editor on all three surfaces + `POST /items/<fn>/tags` (stamps `tags_manual`, survives re-import) + the rail
   registry (`db.user_tag_vocab`, derived **inline from `tags_manual`** — no table — unioned into `db.tag_counts`
   so user tags render under the rail's "More" group). Remaining trade-offs split to the P3 below.
-- [ ] **P3 — User-tag table: pre-create empty tags + rename-in-vocabulary.** *(Follow-up to the shipped registry,
-  2026-06-22.)* The registry derives the vocabulary from `metadata.tags_manual`, so a tag exists exactly while it
+- [x] **P3 — User-tag table: pre-create empty tags + rename-in-vocabulary.** ✅ SHIPPED 2026-07-31 (`feat/user-tags`, issue #70): `user_tags` registry table (stable id + display name, additive `CREATE TABLE IF NOT EXISTS` — no live-DB migration step), `db.{create,rename_user_tag_in_vocab,delete,list,get}_user_tag`, `tag {list,create,rename,delete}` CLI, `user_tag_vocab` now unions table rows + `tags_manual` stamps; rename rewrites the row + every item's stamp in one transaction (bulk rewrite via the existing `rename_user_tag`, trigram FTS rebuilt); delete strips items too. 12 tests. Follow-ups: auto-register on apply, web surface for the registry, per-tag colour/order.
+
+  *(Follow-up to the shipped registry, 2026-06-22.)* The registry derives the vocabulary from `metadata.tags_manual`, so a tag exists exactly while it
   is applied to ≥1 item — two things derive-from-usage cannot do, both needing a real `user_tags` table (or a
   settings list): (a) **create an empty tag** ahead of applying it (a 0-item tag has nowhere to live); (b)
   **rename a user tag** across the vocabulary in one action (today a rename = re-tag every item and the old name
