@@ -273,14 +273,28 @@ def test_note_name_fallback_empty_without_checkmark():
     assert pkms._note_name("saved \u2713 inbox/x.md") == "inbox/x.md"
 
 
-def test_promote_unparseable_body_records_empty_delivery_ref(tmp_db, monkeypatch):
+def test_promote_unparseable_2xx_is_failure_and_retryable(tmp_db, monkeypatch):
+    """Spec 15 §5/§1.6: a 2xx body without the ``saved ✓`` confirmation is not
+    a promoted write — record ``failed`` (no delivery_ref, error set) and keep
+    the item retryable so a re-promote re-POSTs (PKMS dedupe makes it safe)."""
     monkeypatch.setenv("PKMS_CAPTURE_URL", "http://127.0.0.1:8765")
     monkeypatch.setenv("PKMS_CAPTURE_TOKEN", "tok")
     cl = _client(tmp_db)
-    monkeypatch.setattr(pkms, "deliver", lambda env: "ok")
+    calls: list[str] = []
+    monkeypatch.setattr(pkms, "deliver", lambda env: (calls.append(1) or "ok"))
 
     r = cl.post("/items/reddit:t3_a/promote")
-    assert r.status_code == 200
+    assert r.status_code == 502
+    res = r.get_json()
+    assert res["status"] == "failed" and res["promoted"] is False
+    assert "unrecognized response body" in res["error"]
     promo = _promotion(db.connect(tmp_db), "reddit:t3_a")
+    assert promo["status"] == "failed"
     assert promo["delivery_ref"] == ""
     assert promo["response"] == "ok"
+    assert promo["error"]
+
+    # The failed stamp must not short-circuit the next promote: re-POST.
+    r2 = cl.post("/items/reddit:t3_a/promote")
+    assert r2.status_code == 502
+    assert len(calls) == 2
