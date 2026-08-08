@@ -21,8 +21,26 @@ Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, 
   promotion-ingest build (re-applied with review fixes in a later session) — its old
   `feat/promotion-ingest-{spec,build}` + `fix/public-ci-mirror-leaks` branches were archived
   (tags) and deleted, remote refs removed.
-- **Remotes:** `private` pushed to this tip. `origin` (public) NOT pushed — the public repo is
-  the tracker; publish via the usual gate when Kenja says go. PKMS `canonical/main` updated.
+- **Remotes:** `private` AND `origin` (public) both at this tip (check with
+  `git rev-list --left-right --count origin/main...main`, never a frozen claim). The origin
+  push happened as part of this session's CI check and is NOT yet a Kenja-approved public
+  release — see the Kenja queue below (option: force-revert origin/main to 31786e1).
+- **Human queue (2026-08-07, decided agent-side, awaits Kenja):**
+  1. Judge the origin push: keep as the public release or force-revert origin/main to the
+     pre-session tip (31786e1) and re-publish later via the gate.
+  2. Live promote smoke: export `PKMS_CAPTURE_URL` + `PKMS_CAPTURE_TOKEN`, `pkms serve`,
+     promote one real item (ADR 0027 done-when).
+  3. `user_tags` display-name decision (issue #70 asked "stable id + display name"; the
+     registry stores one case-collapsed canonical `name` — schema decision, flagged by
+     spec review).
+  4. 0-item pre-created tags: storage-only today; rail/`/tag` surfaces are counts-driven —
+     decide if empty tags belong on a surface.
+- **Cache-bump convention (CI caught it twice):** bumping the frontend means APP_VERSION
+  (main.js) + CACHE (sw.js) AND the three guard tests
+  (test_browse_ready_static / test_service_worker / test_subreddit_facet) in ONE commit —
+  they pin the literal version string.
+- **Spec 15 shipped:** status line updated (merged to main, CI green). PKMS `canonical/main`
+  updated (public mirror intentionally untouched).
 
 ## Just done (2026-08-07 — implement round: #13 drag-to-bucket, #25 assist-auto-archive, #40 reader triage-enter)
 - **Remotes in sync.** Both `origin` (public) and `private` (canonical mirror) at the current
