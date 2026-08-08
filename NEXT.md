@@ -3,6 +3,27 @@
 `main`. Suite: non-UI suite green (see `gh run list` for CI).
 Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, #40 reader triage-enter — see blocks below).
 
+## Just done (2026-08-07 — promote action + user_tags MERGED into main, review fixes landed)
+- **`feat/promote-action` + `feat/user-tags` merged to `main`** (clean 3-way, both behind by 8
+  main commits — no conflicts). Fixed points: Spec
+  [docs/specs/15-promote-action.md](docs/specs/15-promote-action.md) + issue #70 + Epic 26.
+- **Review fixes landed on top of the merges (one commit):**
+  - `promoteItem` handler + `core/api.js` wrapper (frontend dispatch previously threw
+    ReferenceError — dead UI), `[hidden]` honored in relay CSS (hide-after-receipt + Unsave
+    visibility were silently no-ops), `_note_name` no longer stores non-✓ 2xx bodies as
+    `delivery_ref`, dead `_SAVED_PREFIX` removed, SW cache/APP_VERSION v128→v129.
+  - New regression tests: `tests/ui/test_promote_action.py` (unconfigured toast + configured
+    snackbar + hide-after-receipt; self-heals its row vs the shared UI seed DB) + 2 offline
+    bridge tests. Unit suite + full UI suite (79) green at merge tip.
+- **Trackers:** PKMS issue #3 (Save→promote handoff shape) closed — ADR 0027 + Spec 15 chose
+  the transport and it is shipped; CH #70 closed — Epic 26 P3 shipped (registry + CLI). Both
+  closing comments carry the AI-triage disclaimer. PKMS main already contained the
+  promotion-ingest build (re-applied with review fixes in a later session) — its old
+  `feat/promotion-ingest-{spec,build}` + `fix/public-ci-mirror-leaks` branches were archived
+  (tags) and deleted, remote refs removed.
+- **Remotes:** `private` pushed to this tip. `origin` (public) NOT pushed — the public repo is
+  the tracker; publish via the usual gate when Kenja says go. PKMS `canonical/main` updated.
+
 ## Just done (2026-08-07 — implement round: #13 drag-to-bucket, #25 assist-auto-archive, #40 reader triage-enter)
 - **Remotes in sync.** Both `origin` (public) and `private` (canonical mirror) at the current
   `main` tip. Check actual sync with `git rev-list --left-right --count origin/main...main`
