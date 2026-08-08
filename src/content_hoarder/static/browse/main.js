@@ -2408,6 +2408,30 @@ async function unsaveRow(fn) {
     toast("Unsave failed.");
   }
 }
+/* Promote the row item into PKMS (Spec 15 §7): POST the bridge route, mirror
+   the server-stamped metadata.promotion onto the local item so the row menu
+   hides the Promote button on re-open, snackbar the PKMS response body.
+   Errors toast data.error (unconfigured 400, transport 502). Item stays in
+   the feed — no re-render needed. */
+async function promoteItem(fn) {
+  const it = state.items.find((i) => i.fullname === fn);
+  if (!it) return;
+  try {
+    const res = await api.promoteItem(fn);
+    // Server always stamps status "promoted" (replay is a transient HTTP
+    // answer); mirror that so the menu's hide rule matches the receipt.
+    it.metadata = Object.assign({}, it.metadata, {
+      promotion: {
+        status: res.status === "replay" ? "promoted" : res.status,
+        ...(res.response ? { response: res.response } : {}),
+        receipt: res.receipt,
+      },
+    });
+    snackbar(res.response || "Promoted.");
+  } catch (e) {
+    toast((e && e.data && e.data.error) || "Promote failed.");
+  }
+}
 // desktop has no long-press → right-click a row opens the same menu
 itemsEl.addEventListener("contextmenu", (e) => {
   // Keep the native browser menu on real links so users can copy/open URLs.
@@ -2440,7 +2464,7 @@ $("#dock-settings").addEventListener("click", () => {
 /* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
    APP_VERSION is baked into THIS (cached) main.js, so the badge shows what your phone is actually
    running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v128";
+const APP_VERSION = "v129";
 (() => {
   const ver = $("#app-version");
   if (ver) ver.textContent = APP_VERSION;

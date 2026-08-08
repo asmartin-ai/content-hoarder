@@ -263,3 +263,24 @@ def test_route_promote_transport_failure_502_with_failed_receipt(tmp_db, monkeyp
     conn = db.connect(tmp_db)
     assert _promotion(conn, "reddit:t3_a")["status"] == "failed"
     conn.close()
+
+
+def test_note_name_fallback_empty_without_checkmark():
+    # A non-confirmation 2xx body must never be recorded as a vault path.
+    assert pkms._note_name("") == ""
+    assert pkms._note_name("saved") == ""
+    assert pkms._note_name("200 OK") == ""
+    assert pkms._note_name("saved \u2713 inbox/x.md") == "inbox/x.md"
+
+
+def test_promote_unparseable_body_records_empty_delivery_ref(tmp_db, monkeypatch):
+    monkeypatch.setenv("PKMS_CAPTURE_URL", "http://127.0.0.1:8765")
+    monkeypatch.setenv("PKMS_CAPTURE_TOKEN", "tok")
+    cl = _client(tmp_db)
+    monkeypatch.setattr(pkms, "deliver", lambda env: "ok")
+
+    r = cl.post("/items/reddit:t3_a/promote")
+    assert r.status_code == 200
+    promo = _promotion(db.connect(tmp_db), "reddit:t3_a")
+    assert promo["delivery_ref"] == ""
+    assert promo["response"] == "ok"

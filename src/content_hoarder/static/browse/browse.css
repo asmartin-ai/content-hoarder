@@ -1916,6 +1916,9 @@ body.focus .batchstrip {
         border-color var(--dur) var(--ease),
         background var(--dur) var(--ease);
 }
+.relay-btn[hidden] {
+    display: none;
+}
 .relay-btn svg {
     width: 28px;
     height: 28px;

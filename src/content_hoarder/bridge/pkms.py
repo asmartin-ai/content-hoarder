@@ -29,9 +29,8 @@ from datetime import datetime, timezone
 from content_hoarder import _http, config
 from content_hoarder.models import parse_metadata
 
-# PKMS-side note-name prefix in the capture response bodies; the name after the
+# PKMS-side replay marker in capture response bodies; the name after the
 # checkmark is the vault/inbox filename, used as delivery_ref.
-_SAVED_PREFIX = "saved \u2713 "
 _ALREADY_SAVED_PREFIX = "already saved \u2713 "
 
 
@@ -120,12 +119,13 @@ def deliver(envelope: dict[str, object]) -> str:
 
 def _note_name(response: str) -> str:
     """Extract the vault/inbox filename from a capture response body. Empty when
-    the body is missing or unparseable (delivery_ref then stays '')."""
+    the body is missing or lacks the ✓ marker (delivery_ref then stays '' —
+    a non-confirmation 2xx body must never be recorded as a vault path)."""
     if not response:
         return ""
     if "\u2713" in response:
         return response.split("\u2713", 1)[-1].strip()
-    return response.strip()
+    return ""
 
 
 def record_receipt(
