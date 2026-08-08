@@ -38,6 +38,12 @@ def _int(value, default: int = 0) -> int:
         return default
 
 
+def _mobile_ua(ua: str) -> bool:
+    """Cheapest truthful device signal for the capture envelope's
+    ``context.device`` (spec 15 DP-9): a phone/PWA UA carries a mobile marker."""
+    return any(m in ua for m in ("Mobile", "Android", "iPhone", "iPad"))
+
+
 # Tailscale hands out CGNAT-range addresses; ipaddress doesn't class them as private.
 _TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 
@@ -436,6 +442,33 @@ def create_app(db_path: str | None = None) -> Flask:
                 "unknown item"
             ) else 400
         return jsonify(res)
+
+    @app.post("/items/<path:fullname>/promote")
+    def promote_item(fullname):
+        # Explicit per-item accept (ADR 0027): build the capture envelope,
+        # POST to PKMS, stamp metadata.promotion, return the deterministic
+        # PKMS response body ("saved ✓ <name>" / "already saved ✓ <name>") so
+        # the UI shows the external evidence. Unconfigured -> clear 400.
+        from content_hoarder.bridge import pkms
+
+        device = (
+            "phone" if _mobile_ua(request.headers.get("User-Agent", "")) else "desktop"
+        )
+        with conn() as c:
+            row = c.execute(
+                "SELECT * FROM items WHERE fullname=?", (fullname,)
+            ).fetchone()
+            if row is None:
+                return jsonify({"error": "not found"}), 404
+            if not pkms.is_configured():
+                return jsonify(
+                    {"error": "PKMS not configured (set PKMS_CAPTURE_URL + PKMS_CAPTURE_TOKEN)"}
+                ), 400
+            result = pkms.promote(c, db._row_to_public(row), device=device)
+            c.commit()
+        if result["status"] == "failed":
+            return jsonify(result), 502
+        return jsonify(result)
 
     @app.post("/snooze/undo")
     def snooze_undo():
