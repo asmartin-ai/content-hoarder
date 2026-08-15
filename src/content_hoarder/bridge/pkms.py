@@ -2,7 +2,7 @@
 
 No-op unless ``PKMS_CAPTURE_URL`` and ``PKMS_CAPTURE_TOKEN`` are configured
 (config/env contract only — the token value may be sourced at runtime from
-``K:\\Projects\\PKMS\\.secrets\\capture-token`` via env; this module never reads
+``K:\\Projects\\khaos\\PKMS\\.secrets\\capture-token`` via env; this module never reads
 the secret file and never prints the token).
 
 Envelope per the finalized PKMS Slice 9 contract (see docs/specs/15-promote-action.md):

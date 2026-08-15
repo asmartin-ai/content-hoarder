@@ -54,10 +54,10 @@ The DB path defaults to `data/app.db` *relative to the current directory*, so to
 folder without `cd`-ing in, point `CONTENT_HOARDER_DB` at an absolute path and call the venv's
 Python directly. One line to paste (PowerShell):
 ```powershell
-$env:CONTENT_HOARDER_DB="K:\Projects\content-hoarder\data\app.db"; & "K:\Projects\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve
+$env:CONTENT_HOARDER_DB="K:\Projects\khaos\content-hoarder\data\app.db"; & "K:\Projects\khaos\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve
 ```
 Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe equivalent:
-`set "CONTENT_HOARDER_DB=K:\Projects\content-hoarder\data\app.db" && "K:\Projects\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve`.)
+`set "CONTENT_HOARDER_DB=K:\Projects\khaos\content-hoarder\data\app.db" && "K:\Projects\khaos\content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve`.)
 
 ## CLI commands
 | Command | Description |

@@ -83,10 +83,10 @@ OWN_MSG_PREFIXES = (
 # (label, dir, expected_during_phase)
 # phase values: "ch" (CH running), "pkms" (PKMS running)
 WATCH_DIRS = [
-    ("CH bakeoff", Path("K:/Projects/content-hoarder/bakeoff"), "ch"),
-    ("CH tests", Path("K:/Projects/content-hoarder/tests"), "ch"),
-    ("PKMS bakeoff", Path("K:/Projects/PKMS/bakeoff"), "pkms"),
-    ("PKMS tests", Path("K:/Projects/PKMS/tests"), "pkms"),
+    ("CH bakeoff", Path("K:/Projects/khaos/content-hoarder/bakeoff"), "ch"),
+    ("CH tests", Path("K:/Projects/khaos/content-hoarder/tests"), "ch"),
+    ("PKMS bakeoff", Path("K:/Projects/khaos/PKMS/bakeoff"), "pkms"),
+    ("PKMS tests", Path("K:/Projects/khaos/PKMS/tests"), "pkms"),
 ]
 
 LOG_DIR = Path("K:/Users/Kenja/Documents/LLM-dev/bakeoffs")
@@ -382,8 +382,8 @@ def check_pkms_started():
     """Transition to pkms_running if PKMS dirs show fresh activity after ch_done."""
     if state.phase != "ch_done_pkms_pending":
         return
-    pkms_bakeoff = latest_mtime_in(Path("K:/Projects/PKMS/bakeoff"))
-    pkms_tests = latest_mtime_in(Path("K:/Projects/PKMS/tests"))
+    pkms_bakeoff = latest_mtime_in(Path("K:/Projects/khaos/PKMS/bakeoff"))
+    pkms_tests = latest_mtime_in(Path("K:/Projects/khaos/PKMS/tests"))
     now = time.time()
     if (pkms_bakeoff and now - pkms_bakeoff < STALL_THRESHOLD) or (
         pkms_tests and now - pkms_tests < STALL_THRESHOLD

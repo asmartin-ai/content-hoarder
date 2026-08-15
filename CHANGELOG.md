@@ -41,9 +41,8 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
-- Reader now slides up from the bottom when opened via the triage deck ↑ gesture, and slides
-  back down on close (issue #40): the `triage-enter` transition is wired to the gesture and
-  plays correctly (previously the class was dead code and the base side-entrance played).
+- Repository relocated under `K:\Projects\khaos\` (2026-08-15 unification); all internal path
+  references updated to the new parent; venv editable hook repointed to `src`.
 
 ### Fixed
 

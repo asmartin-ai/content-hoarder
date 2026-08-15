@@ -1,6 +1,6 @@
 ## Epic 21 — ADHD-research adoption: guilt-free decay  (`enhancement`, `area:triage`)
 *From the PKMS research handoff (2026-06-10; evidence in
-`K:\Projects\PKMS\vault\resources\research\`, esp. `17-hoarder-mining.md`): 97.55% of 84,250
+`K:\Projects\khaos\PKMS\vault\resources\research\`, esp. `17-hoarder-mining.md`): 97.55% of 84,250
 items never left `inbox` in the app's lifetime; ~80% of the hoard is entertainment; saving is
 the only proven-durable behavior. Direction: promote-on-demand (search/All/Archived already
 reach every status — nothing is ever lost) + guilt-free bulk decay; per-item review of the

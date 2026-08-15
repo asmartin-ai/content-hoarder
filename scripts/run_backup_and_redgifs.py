@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # === 1. Backup media ===
-src = Path("K:/Projects/content-hoarder/data/media")
+src = Path("K:/Projects/khaos/content-hoarder/data/media")
 dst = Path("F:/Backups/content-hoarder/media")
 dst.mkdir(parents=True, exist_ok=True)
 

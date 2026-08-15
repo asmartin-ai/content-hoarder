@@ -3,6 +3,22 @@
 `main`. Suite: non-UI suite green (see `gh run list` for CI).
 Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, #40 reader triage-enter — see blocks below).
 
+## Note (2026-08-15 — repo move to `khaos/` + port conflict)
+- **Repo moved** to `K:\Projects\khaos\content-hoarder` (unification with PKMS, life-os,
+  life-os-public, adhd-design-language). venv editable hook (`__editable__.content_hoarder-1.0.0.pth`)
+  repointed to the new `src`. `python -m content_hoarder …` works from the new path.
+- **Wrapup:** relocation path rewrites committed to `main` this session (canonical `private`
+  mirror pushed; `origin` push remains user-gated per the standing push-routing rule).
+- **PORT CONFLICT: `serve` default port 8788 is occupied by the local LiteLLM free-pool**
+  proxy (ai-stack provider-support; PROJECTS.md: "local LiteLLM proxy on `:8788`").
+  `python -m content_hoarder serve` boots Flask but exits with
+  `An attempt was made to access a socket in a way forbidden by its access permissions`
+  (socket bind clash). **Fix options when serving the PWA is needed:**
+  1. Run LiteLLM on a different port, or
+  2. Add a `--port`/env override for the CH web server, or
+  3. Serve CH only when free-pool is down (Tailscale/phone access currently blocked).
+  Decision pending — this note exists so the next session doesn't chase a phantom regression.
+
 ## Just done (2026-08-07 — promote action + user_tags MERGED into main, review fixes landed)
 - **`feat/promote-action` + `feat/user-tags` merged to `main`** (clean 3-way, both behind by 8
   main commits — no conflicts). Fixed points: Spec
@@ -158,7 +174,7 @@ Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, 
   notes-only (YouTube links route here). Boundary stays modular so A/B remain
   swappable. CH implication: a real `promote` action wired to the resurface
   card is the next integration slice — spec lives in
-  `K:\Projects\PKMS\docs\delegation-roadmap.md`.
+  `K:\Projects\khaos\PKMS\docs\delegation-roadmap.md`.
 
 
 ## Just done (2026-07-19 a.m. session — iOS splash + media mirror + Spec 10/11)
