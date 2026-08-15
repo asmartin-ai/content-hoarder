@@ -7,6 +7,11 @@ Last wrapup: 2026-08-07 (implement round: #13 drag-to-bucket, #25 auto-archive, 
 - **Repo moved** to `K:\Projects\khaos\content-hoarder` (unification with PKMS, life-os,
   life-os-public, adhd-design-language). venv editable hook (`__editable__.content_hoarder-1.0.0.pth`)
   repointed to the new `src`. `python -m content_hoarder …` works from the new path.
+- **uv venv migration (2026-08-15, ch-private #1 closed):** `.venv` is now uv-managed
+  (uv 0.12.5, CPython 3.13.14; `uv = 0.12.5` in pyvenv.cfg). Setup/tests/run all via
+  `uv sync` / `uv run` (README quickstart + AGENTS.md updated). Global Python 3.12
+  editable install **removed** — the old `.pth`-repoint notes below are historical.
+  Repo moved again? Run `uv sync` once (regenerates the editable path).
 - **Wrapup:** relocation path rewrites committed to `main` this session (canonical `private`
   mirror pushed; `origin` push remains user-gated per the standing push-routing rule).
 - **PORT CONFLICT: `serve` default port 8788 is occupied by the local LiteLLM free-pool**
