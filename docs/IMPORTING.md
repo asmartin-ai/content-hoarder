@@ -4,8 +4,8 @@ All imports are idempotent — re-running never duplicates or clobbers your tria
 
 ```bash
 # from /path/to/content-hoarder, with the venv active:
-python -m content_hoarder import <path>            # auto-detects the source
-python -m content_hoarder import <path> --source X # or force a connector
+uv run content-hoarder import <path>            # auto-detects the source
+uv run content-hoarder import <path> --source X # or force a connector
 ```
 
 ---
@@ -14,7 +14,7 @@ python -m content_hoarder import <path> --source X # or force a connector
 Imported from a copy of `/path/to/reddit-saved-manager/data/app.db` — **64,615 items**.
 To re-sync later (after the Reddit tool pulls new saves):
 ```bash
-python -m content_hoarder import "/path/to/reddit-saved-manager/data/app.db"
+uv run content-hoarder import "/path/to/reddit-saved-manager/data/app.db"
 ```
 
 ### Recovering removed / un-hydrated Reddit content
@@ -23,9 +23,9 @@ never captured**, can be refilled from public web archives (PullPush.io → Arct
 It's **non-destructive** (triage state is never touched) and **resumable** (every attempt is stamped,
 so re-runs continue where they left off).
 ```bash
-python -m content_hoarder enrich --source reddit --archives             # recover everything eligible
-python -m content_hoarder enrich --source reddit --archives --limit 200 # one chunk at a time
-python -m content_hoarder enrich --source reddit --archives --all       # re-attempt already-tried items
+uv run content-hoarder enrich --source reddit --archives             # recover everything eligible
+uv run content-hoarder enrich --source reddit --archives --limit 200 # one chunk at a time
+uv run content-hoarder enrich --source reddit --archives --all       # re-attempt already-tried items
 ```
 It first prints how many items are eligible (your data: ~9.5k, mostly un-hydrated comment bodies).
 Bulk runs are throttled to be polite to the archives (~4 s between PullPush requests), so a full pass
@@ -47,7 +47,7 @@ regular playlists, so they work.)
 **Then dump + import** (yt-dlp is already installed in the venv):
 ```bash
 python -m yt_dlp --flat-playlist --dump-single-json "https://www.youtube.com/playlist?list=PLxxxx" > wl2.json
-python -m content_hoarder import wl2.json
+uv run content-hoarder import wl2.json
 ```
 - If the playlist is **Private**, either set it to **Unlisted** temporarily, or add
   `--cookies-from-browser firefox` to the yt-dlp command.
@@ -72,8 +72,8 @@ python -m content_hoarder import wl2.json
    website, same as voting — so it must be confirmed once.)
 3. **Sync** the public favorites page directly:
    ```bash
-   python -m content_hoarder hn-sync --user YOURNAME
-   python -m content_hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
+   uv run content-hoarder hn-sync --user YOURNAME
+   uv run content-hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
    ```
    `hn-sync` follows HN's "More" pagination link and stops at a high-water mark, so routine runs are
    incremental. It inserts bare saved-story rows and leaves title/score/author/preview hydration to the
@@ -82,8 +82,8 @@ python -m content_hoarder import wl2.json
 Manual fallback: save the favorites page as HTML and import it — the HN connector already parses
 `item?id=`/`athing` out of HN HTML (and bare-id `.txt`/`.json` lists):
    ```bash
-   python -m content_hoarder import "path/to/favorites.html" --source hackernews
-   python -m content_hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
+   uv run content-hoarder import "path/to/favorites.html" --source hackernews
+   uv run content-hoarder enrich --source hackernews   # fills score/author/og:image from HN's free API
    ```
 
 ### Legacy — Materialistic app DB (reference only; being retired)
@@ -95,7 +95,7 @@ imports (as `hn_list=read`, archived). Clear the phone's saved list with the app
 ```bash
 adb backup -f materialistic.ab -noapk io.github.hidroh.materialistic   # tap "Back up my data", blank password
 ( printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" ; tail -c +25 materialistic.ab ) | tar xfz -
-python -m content_hoarder import "apps/io.github.hidroh.materialistic/db/Materialistic.db" --source hackernews
+uv run content-hoarder import "apps/io.github.hidroh.materialistic/db/Materialistic.db" --source hackernews
 ```
 > `adb backup` is deprecated but **still worked on Android 16** (2026-06-22) when `allowBackup` is set —
 > the old "Android 12+ may be empty" warning didn't bite. On Windows/**Git Bash**, prefix any adb command
@@ -106,7 +106,7 @@ python -m content_hoarder import "apps/io.github.hidroh.materialistic/db/Materia
 ## Firefox tabs (Export Tabs URLs / JSON snapshot)  ✅ done
 Install the **"Export Tabs URLs"** add-on, export in **Rich format** to a `.txt`, then:
 ```bash
-python -m content_hoarder import "path\to\tabs.txt"
+uv run content-hoarder import "path\to\tabs.txt"
 ```
 Each tab → a `firefox:<url-hash>` item (de-duped across overlapping daily exports).
 
@@ -138,14 +138,14 @@ for the first-party Firefox WebExtension / manual-export fallback:
 ```
 Import it the same way:
 ```bash
-python -m content_hoarder import "path\to\firefox-tabs.json"
+uv run content-hoarder import "path\to\firefox-tabs.json"
 ```
 
 For direct local push from an extension, generate a local ingest token, copy the printed token into the
 extension once, then run the web app:
 ```bash
-python -m content_hoarder firefox-token --generate
-python -m content_hoarder serve
+uv run content-hoarder firefox-token --generate
+uv run content-hoarder serve
 ```
 The extension should `POST` the same JSON schema to `http://127.0.0.1:8788/import/firefox-tabs` with
 `Authorization: Bearer <token>` (or `X-Content-Hoarder-Token: <token>`). Only the token's SHA-256 hash
@@ -162,8 +162,8 @@ Later and is enrichable. Browse the batch with the **"📑 Firefox tabs"** filte
 To migrate tabs imported *before* this behavior existed (one-time reconciliation):
 ```bash
 # dry run first — and always against a COPY of the DB
-python -m content_hoarder migrate-firefox-tabs
-python -m content_hoarder migrate-firefox-tabs --apply
+uv run content-hoarder migrate-firefox-tabs
+uv run content-hoarder migrate-firefox-tabs --apply
 ```
 This re-keys YouTube `firefox:` rows to `youtube:<vid>` (collapsing any Watch-Later duplicates) and
 removes the superseded tab rows. Afterwards run `enrich --source youtube` to fill real
@@ -175,7 +175,7 @@ titles/durations. (OneTab / `recovery.jsonlz4` remain future inputs.)
 
 Use a browser-side bookmark exporter that writes JSON or CSV, then import the file:
 ```bash
-python -m content_hoarder import "path\to\x-bookmarks.json" --source twitter
+uv run content-hoarder import "path\to\x-bookmarks.json" --source twitter
 ```
 
 The connector stores each tweet as `twitter:<tweet_id>` with tweet text, author handle/display
@@ -191,12 +191,12 @@ thumbnail when X includes one.
 Outbound links are stored in `metadata.outlinks`. Tweets that link to YouTube videos can be folded
 into canonical `youtube:<id>` rows with the shared migration:
 ```bash
-python -m content_hoarder consolidate --apply
+uv run content-hoarder consolidate --apply
 ```
 
 To cache imported tweet images and videos locally for offline/survivable viewing:
 ```bash
-python -m content_hoarder archive-media --twitter --apply
+uv run content-hoarder archive-media --twitter --apply
 ```
 
 ---
@@ -204,6 +204,6 @@ python -m content_hoarder archive-media --twitter --apply
 ## Google Keep
 Export from <https://takeout.google.com> → deselect all → select **Keep** → export → unzip, then:
 ```bash
-python -m content_hoarder import "path\to\Takeout\Keep"
+uv run content-hoarder import "path\to\Takeout\Keep"
 ```
 Repeat per account. (The unofficial `gkeepapi` is intentionally not used.)

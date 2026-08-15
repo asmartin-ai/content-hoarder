@@ -49,7 +49,8 @@ Send-Ntfy $startBody
 
 # Launch python detached. -WindowStyle Hidden so no console pops up. The
 # actual work continues in the background and writes to the log files.
-$proc = Start-Process -FilePath 'python' `
+$VenvPython = Join-Path $RepoRoot '.venv\Scripts\python.exe'
+$proc = Start-Process -FilePath $VenvPython `
     -ArgumentList @('-u', '-m', 'content_hoarder', 'archive-media',
                     '--videos', '--throttle', '2.0', '--apply') `
     -WorkingDirectory $RepoRoot `

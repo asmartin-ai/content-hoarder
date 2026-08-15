@@ -41,5 +41,5 @@ echo.
 echo === Verifying sha256 of every blob under %DEST% ===
 echo.
 
-python -u "%SCRIPT_DIR%verify_mirror_media.py" "%DEST%"
+"%SCRIPT_DIR%..\.venv\Scripts\python.exe" -u "%SCRIPT_DIR%verify_mirror_media.py" "%DEST%"
 endlocal

@@ -13,19 +13,20 @@ the **recovery arc**: `scan-media` (detect deleted media) → `archive-media` (h
 Offline PWA (service worker + manifest) ships.
 
 ## Stack & run
-- Python 3.12, Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
+- Python 3.13 (uv-managed venv; `requires-python >=3.12`), Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
 - `yt-dlp` optional (YouTube only, **lazy-imported**); `adb` is an external CLI the user runs.
-- Run: `python -m content_hoarder <cmd>`. Full command set + flags: see the README CLI table.
+- Run: `uv run content-hoarder <cmd>` (or `uv run python -m content_hoarder <cmd>`). Full command set + flags: see the README CLI table.
   Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` = offline local-archive hydrate;
   `--batch` = rate-limited resumable backfill — OAuth-preferred when configured, else the cookie.)
-- Tests: `python -m pytest` — all offline, `:memory:` SQLite, synthetic fixtures, **no network**.
-- **UI / browser tests** (`tests/ui/`, Playwright): `pip install -e .[ui] && playwright install chromium`,
-  then `pytest -m ui`. Real headless Chromium at a **Pixel-6** viewport + **PWA-standalone** emulation,
+- Tests: `uv sync --extra dev && uv run pytest` — all offline, `:memory:` SQLite, synthetic fixtures, **no network**.
+- **Repo moved?** Run `uv sync` once after relocating the checkout — the uv-managed `.venv` regenerates its editable path from the new location (global Python carries no install of this package).
+- **UI / browser tests** (`tests/ui/`, Playwright): `uv sync --extra ui && playwright install chromium`,
+  then `uv run pytest -m ui`. Real headless Chromium at a **Pixel-6** viewport + **PWA-standalone** emulation,
   against the app served in-process off a **copy** of the live DB with autosync OFF (no live mutation,
   no scheduler). Excluded from the default run (`addopts -m "not ui"`). **Verify any mobile/PWA UI
   change here** — it catches what unit tests + the preview tool miss. Add a regression test per UI bug.
   If `playwright install chromium` is blocked by local TLS/corporate certs, system Chrome can run the
-  suite with `pytest -m ui --browser-channel chrome`. If `data/app.db` is absent in a sandbox, point
+  suite with `uv run pytest -m ui --browser-channel chrome`. If `data/app.db` is absent in a sandbox, point
   `CONTENT_HOARDER_DB` at a temporary synthetic DB with enough rows for the smoke tests; never commit it.
 
 ## Layout
