@@ -5,7 +5,7 @@ Transport CHOSEN; implementation history below (`feat/promote-action` commits).*
 
 Governing decision: life-os ADR 0027 (Accepted 2026-07-28, Option C hybrid).
 The PKMS-side ingest spec LANDED (Slice 9 of
-`/path/to/pkms\vault\projects\pkms-design\build-plan.md`, branch
+`/path/to\PKMS\vault\projects\pkms-design\build-plan.md`, branch
 `feat/promotion-ingest-spec`): transport = **extended `POST /capture`** (file
 drop rejected). §5 now records the finalized contract and the DP-1..6
 resolutions; the phase-1 PROVISIONAL text is replaced, not kept alongside.
@@ -239,13 +239,13 @@ param (`?source=content-hoarder`); the new fields are additive optionals the
 current PKMS build ignores until its own packet lands. The capture path gains
 zero decisions — the card's explicit promote accept is the only gate.
 
-**Wiring contract (confirmed by reading `/path/to/pkms\src\pkms\capture_service.py`):**
+**Wiring contract (confirmed by reading `/path/to\PKMS\src\pkms\capture_service.py`):**
 
 - Endpoint: `POST http://127.0.0.1:8765/capture?source=content-hoarder`
   (`PKMS_CAPTURE_URL` + `/capture?source=content-hoarder`).
 - Auth: `X-Capture-Token` header (or `?token=` query — PKMS accepts both;
   CH sends the header). Token via `PKMS_CAPTURE_TOKEN` env; the value may come
-  from `/path/to/pkms\.secrets\capture-token` at runtime via env. Never
+  from `/path/to\PKMS\.secrets\capture-token` at runtime via env. Never
   hardcoded, never logged/printed. `is_configured()` = both env vars set
   (mirrors the Karakeep precedent).
 - Request: `Content-Type: application/json`; body = the §3.1 envelope.

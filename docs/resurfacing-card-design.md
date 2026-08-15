@@ -3,7 +3,7 @@
 *Epic 20 Stage-C design input (PKMS research adoption, 2026-06-10). Status: **DESIGN
 LOCKED 2026-06-11** (all four open questions decided by the owner — see Decisions at the
 bottom). **BUILT + SHIPPED 2026-06-11** (`resurface.py` + `/resurface*` routes + the v3 browse card in `main.js`). Research constraints baked in from
-`/path/to/pkms\vault\resources\research\32-theme-retrieval.md`.*
+`/path/to\PKMS\vault\resources\research\32-theme-retrieval.md`.*
 
 ## What it is
 
