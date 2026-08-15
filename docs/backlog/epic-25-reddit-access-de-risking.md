@@ -5,7 +5,7 @@ Reddit's sanctioned lane. **Full risk model + per-feature rationale + as-built n
 there, not here. All 7 features SHIPPED + merged to main 2026-06-16 (`282a0d8`): new `reddit_oauth.py` +
 `_http` jitter helpers; +33 offline tests, full suite 454 green; passed a high-effort /code-review.
 **OAuth ships DORMANT** — `hydrate_one` prefers it once a refresh token exists; activate once with
-`python -m content_hoarder reddit-oauth --login` (cookie stays as the automatic fallback).*
+`uv run content-hoarder reddit-oauth --login` (cookie stays as the automatic fallback).*
 
 - [x] ~~**F1 — Jitter the throttle.**~~ `_http.jittered_throttle` (uniform `[0.75,1.75]×base`) replaces
   the fixed inter-request `sleep` on hydrate/drain/sync — kills the exact-interval bot fingerprint.

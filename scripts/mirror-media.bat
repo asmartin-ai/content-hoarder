@@ -42,7 +42,7 @@ set "LOG=K:\MediaMirror\content-hoarder\media-mirror.log"
 
 if not exist "%SRC%" (
     echo ERROR: source does not exist: %SRC%
-    echo Run "python -m content_hoarder archive-media --apply" first to seed.
+    echo Run "uv run content-hoarder archive-media --apply" first to seed.
     exit /b 1
 )
 

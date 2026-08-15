@@ -1075,7 +1075,7 @@ def cmd_archive_media(args) -> int:
 
 def cmd_ocr(args) -> int:
     """OCR local archived images into metadata.ocr_text (Spec 14 / #26). Dry-run default;
-    --apply writes + rebuilds search_text. Needs optional ``pip install -e '.[ocr]'`` +
+    --apply writes + rebuilds search_text. Needs optional ``uv sync --extra ocr`` +
     Tesseract on PATH. Offline-testable via injectable engine in content_hoarder.ocr."""
     from content_hoarder import ocr as ocr_mod
 
@@ -2303,7 +2303,7 @@ def build_parser() -> argparse.ArgumentParser:
     pocr = sub.add_parser(
         "ocr",
         help="OCR local archived images into metadata.ocr_text (Spec 14); "
-        "dry-run default, --apply writes. Needs Tesseract + pip install -e '.[ocr]'.",
+        "dry-run default, --apply writes. Needs Tesseract + uv sync --extra ocr.",
     )
     pocr.add_argument(
         "--limit",
