@@ -58,7 +58,7 @@ winget install --id UB-Mannheim.TesseractOCR
 # or choco install tesseract
 
 # python extras (proposed)
-pip install -e ".[ocr]"
+uv sync --extra ocr
 # where [ocr] = pytesseract + Pillow
 ```
 
@@ -164,7 +164,7 @@ Use the same path other metadata writers use so FTS triggers fire:
 
 ### P0 — Spike (half day, no product merge)
 
-1. Install Tesseract + `pip install pytesseract Pillow`.
+1. Install Tesseract + `uv run python -c "import pytesseract, PIL"` (both in `uv sync --extra ocr`).
 2. Hand-run on 10 local archived images (mix: screenshot, meme, UI capture, low-contrast).
 3. Record a short table in this doc (or `docs/specs/14-ocr-spike-notes.md`): fullname, blob, chars, confidence, human "usable?" Y/N.
 4. Gate: ≥7/10 usable for screenshot-like; meme text may be poor (document, don't block).
@@ -219,7 +219,7 @@ UI tests: not required for P1 (no UI). Add later only if a "text from image" bad
 
 ```bash
 winget install --id UB-Mannheim.TesseractOCR
-pip install pytesseract Pillow
+uv sync --extra ocr
 tesseract --version
 ```
 

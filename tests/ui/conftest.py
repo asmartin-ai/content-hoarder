@@ -1,6 +1,6 @@
 """Playwright UI tests - real browser + Pixel-6 / PWA emulation against the running app.
 
-Run:   pytest -m ui                      (needs chromium: `playwright install chromium`)
+Run:   uv run pytest -m ui             (needs chromium: `playwright install chromium`; sync via `uv sync --extra ui`)
 These are EXCLUDED from the default `pytest` run (pyproject addopts `-m "not ui"`), so the
 fast unit suite + CI stay browser-free.
 

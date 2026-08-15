@@ -75,7 +75,7 @@ def default_engine(
         from PIL import Image
     except ImportError as e:
         raise OcrError(
-            "OCR extras missing — install with: pip install -e '.[ocr]' "
+            "OCR extras missing — install with: uv sync --extra ocr "
             f"(need pytesseract + Pillow). Import error: {e}"
         ) from e
 

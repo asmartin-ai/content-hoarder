@@ -38,15 +38,11 @@ Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content
 
 ## Quickstart
 ```bash
-python -m venv .venv
-# Windows:        .venv\Scripts\activate
-# macOS/Linux:    source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
-python -m content_hoarder --version
-python -m content_hoarder init-db
-python -m content_hoarder import <path>     # a file or a directory (auto-detects the source)
-python -m content_hoarder serve             # then open http://127.0.0.1:8788
+uv sync                       # creates .venv (uv-managed) from pyproject.toml
+uv run content-hoarder --version
+uv run content-hoarder init-db
+uv run content-hoarder import <path>   # a file or a directory (auto-detects the source)
+uv run content-hoarder serve           # then open http://127.0.0.1:8788
 ```
 
 ### Serve from anywhere (no `cd`)
@@ -69,7 +65,7 @@ Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe e
 | `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
 | `scan-media [--status S] [--limit N] [--apply] [--recheck] [--workers N] [--batch N]` | Probe saved Reddit image/gallery items for deleted media and classify them on `metadata.media_status` (`gone` / `salvageable`, recording the salvageable preview URL for the `archive-media` pass). `--apply` writes (+ a `deleted` tag on gone items, surfaced by `is:deleted`); dry-run by default, crash-safe + resumable (skips already-classified unless `--recheck`). |
 | `archive-media [--salvageable] [--galleries] [--images] [--twitter] [--videos] [--limit N] [--throttle S] [--max-video-bytes N] [--video-timeout S] [--apply]` | **Hoard the bytes:** download + store saved Reddit and Twitter/X media locally (content-addressed under `data/media/`, served same-origin via `/media/<blob>` so the PWA survives remote deletion). Scopes, cheap→bulk: `--salvageable` (rescue still-live previews of already-deleted posts — run first), `--galleries`, `--images` (the bulk `i.redd.it` set, ~15 GB+), `--twitter` (imported `pbs.twimg.com` images and `video.twimg.com` MP4s), `--videos` (explicit opt-in for v.redd.it; requires `yt-dlp` and a muxable audio+video result). Dry-run by default; resumable (skips already-archived); per-item commit. ⚠️ `data/media/` is gitignored and **not** in DB backups — back it up separately. |
-| `ocr [--limit N] [--apply] [--force] [--lang eng] [--min-confidence 40] [--throttle S]` | **Image text search (Spec 14 / #26):** OCR local archived images (`metadata.archived_media` → `data/media/`) into `metadata.ocr_text` so bare search + `is:ocr` can find words that only appear in the picture. Dry-run by default; `--apply` writes + rebuilds `search_text`. Resumable (skips rows with `ocr_at` unless `--force`). Needs optional deps (`pip install -e ".[ocr]"` → pytesseract + Pillow) **and** the Tesseract binary on PATH. Offline-testable (injectable engine). Prefer a DB copy for the first apply pass. |
+| `ocr [--limit N] [--apply] [--force] [--lang eng] [--min-confidence 40] [--throttle S]` | **Image text search (Spec 14 / #26):** OCR local archived images (`metadata.archived_media` → `data/media/`) into `metadata.ocr_text` so bare search + `is:ocr` can find words that only appear in the picture. Dry-run by default; `--apply` writes + rebuilds `search_text`. Resumable (skips rows with `ocr_at` unless `--force`). Needs optional deps (`uv sync --extra ocr` → pytesseract + Pillow) **and** the Tesseract binary on PATH. Offline-testable (injectable engine). Prefer a DB copy for the first apply pass. |
 | `resolve-redgifs [--limit N] [--redgifs-ok] [--apply]` | Resolve dead Gfycat media URLs against RedGifs. Safe by default: without `--redgifs-ok` it only counts candidates and does no network; without `--apply` it previews metadata-only rewrites without writing. |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `consolidate [--apply] [--undo]` | Fold a Reddit post / HN story / Firefox tab that links to a YouTube video into one canonical `youtube:<id>` item (companions linked). Re-runnable; dry-run by default; reversible. |
@@ -103,26 +99,26 @@ rationale in [docs/reddit-derisking.md](docs/reddit-derisking.md).
 ```bash
 # (Optional, recommended) one-time: switch hydration onto the sanctioned read-only OAuth lane.
 # Set REDDIT_OAUTH_CLIENT_ID in .env first (see .env.example), then authorize interactively:
-python -m content_hoarder reddit-oauth --login      # paste the redirected URL back when prompted
-python -m content_hoarder reddit-oauth --status      # confirm it's configured (else cookie is used)
+uv run content-hoarder reddit-oauth --login      # paste the redirected URL back when prompted
+uv run content-hoarder reddit-oauth --status      # confirm it's configured (else cookie is used)
 
 # Hydrate one thread on demand (OAuth if configured, else the reddit_session cookie):
-python -m content_hoarder reddit-hydrate t3_abc123
+uv run content-hoarder reddit-hydrate t3_abc123
 
 # Hydrate offline from a local BDFR archive — lossless, no network, no account exposure:
-python -m content_hoarder reddit-hydrate --from "K:\path\to\bdfr_export"
+uv run content-hoarder reddit-hydrate --from "K:\path\to\bdfr_export"
 
 # Bulk-hydrate the prioritized backlog. Safe-by-default: a bare --batch is a dry-run preview;
 # add --yes to actually fetch (jittered throttle, small cap (25), resumable):
-python -m content_hoarder reddit-hydrate --batch              # preview what would be fetched
-python -m content_hoarder reddit-hydrate --batch --yes        # fetch for real
+uv run content-hoarder reddit-hydrate --batch              # preview what would be fetched
+uv run content-hoarder reddit-hydrate --batch --yes        # fetch for real
 
 # Backfill real titles for saved Reddit COMMENTS that imported as "(untitled)":
-python -m content_hoarder reddit-hydrate-titles               # offline: fill from cached threads
-python -m content_hoarder reddit-hydrate-titles --network     # recover the rest via PullPush/Arctic
+uv run content-hoarder reddit-hydrate-titles               # offline: fill from cached threads
+uv run content-hoarder reddit-hydrate-titles --network     # recover the rest via PullPush/Arctic
 
 # Recover [removed]/[deleted] Reddit posts & un-hydrated saved comments from archive mirrors:
-python -m content_hoarder enrich --source reddit --archives
+uv run content-hoarder enrich --source reddit --archives
 ```
 
 ## Mobile access
@@ -133,7 +129,7 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 
 ### Phone quickstart (Tailscale)
 1. On the PC, find your Tailscale IP (`tailscale ip -4`, a `100.x.y.z` address) and start the app
-   bound to it: `python -m content_hoarder serve --host 100.x.y.z` (the web guard already accepts
+   bound to it: `uv run content-hoarder serve --host 100.x.y.z` (the web guard already accepts
    tailnet addresses; add real DNS names via `CONTENT_HOARDER_ALLOWED_HOSTS`).
 2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Chrome.
 3. Install it: Chrome menu (⋮) → **Install app** (a real WebAPK). The PWA opens fullscreen with the
@@ -158,7 +154,7 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
   rows are keyed as `twitter:<tweet_id>` and retain tweet text, author, permalink, outbound links,
   quote/reply context, and image/video media URLs. Re-importing overlapping daily exports de-dups by URL. Tweets that link to YouTube
   videos can be folded into canonical `youtube:<id>` rows with `consolidate`; imported tweet images
-  and videos can be cached locally with `python -m content_hoarder archive-media --twitter --apply`.
+  and videos can be cached locally with `uv run content-hoarder archive-media --twitter --apply`.
 
 ## Privacy & data safety
 The SQLite database (`data/app.db`), all exports, `.env`, and `nsfw_rules.json` are gitignored.

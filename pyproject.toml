@@ -20,8 +20,8 @@ youtube = ["yt-dlp"]
 # (dev-time generator, not imported by the package). Pillow is not
 # required at runtime by any import in src/content_hoarder/.
 dev = ["pytest", "Pillow"]
-# UI/e2e: real-browser tests (Pixel-6 + PWA emulation). `pip install -e .[ui]` then
-# `playwright install chromium`, run with `pytest -m ui`. Kept out of `dev` so the unit
+# UI/e2e: real-browser tests (Pixel-6 + PWA emulation). `uv sync --extra ui` then
+# `playwright install chromium`, run with `uv run pytest -m ui`. Kept out of `dev` so the unit
 # suite + CI don't need a browser.
 ui = ["pytest-playwright"]
 # OCR enrich (Spec 14 / #26): also needs the Tesseract binary on PATH.
