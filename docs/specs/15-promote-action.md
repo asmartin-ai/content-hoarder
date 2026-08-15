@@ -5,15 +5,15 @@ Transport CHOSEN; implementation history below (`feat/promote-action` commits).*
 
 Governing decision: life-os ADR 0027 (Accepted 2026-07-28, Option C hybrid).
 The PKMS-side ingest spec LANDED (Slice 9 of
-`K:\Projects\PKMS\vault\projects\pkms-design\build-plan.md`, branch
+`K:\Projects\khaos\PKMS\vault\projects\pkms-design\build-plan.md`, branch
 `feat/promotion-ingest-spec`): transport = **extended `POST /capture`** (file
 drop rejected). §5 now records the finalized contract and the DP-1..6
 resolutions; the phase-1 PROVISIONAL text is replaced, not kept alongside.
 
-Contract references (cite, don't copy): `K:\Projects\life-os\docs\contracts.md`
+Contract references (cite, don't copy): `K:\Projects\khaos\life-os\docs\contracts.md`
 (`capture`, `external_item`, `resurface_card`, `source_span`, `action_receipt`,
 `attention_budget`, `ledger_event`); click-tested fixture
-`K:\Projects\life-os\fixtures\content-hoarder\` (issue CH#72, closed 2026-07-20):
+`K:\Projects\khaos\life-os\fixtures\content-hoarder\` (issue CH#72, closed 2026-07-20):
 `item-001.json`, `item-002.json`, `attention_budget.json`, `promotion-card/`,
 `validate.py`.
 
@@ -239,13 +239,13 @@ param (`?source=content-hoarder`); the new fields are additive optionals the
 current PKMS build ignores until its own packet lands. The capture path gains
 zero decisions — the card's explicit promote accept is the only gate.
 
-**Wiring contract (confirmed by reading `K:\Projects\PKMS\src\pkms\capture_service.py`):**
+**Wiring contract (confirmed by reading `K:\Projects\khaos\PKMS\src\pkms\capture_service.py`):**
 
 - Endpoint: `POST http://127.0.0.1:8765/capture?source=content-hoarder`
   (`PKMS_CAPTURE_URL` + `/capture?source=content-hoarder`).
 - Auth: `X-Capture-Token` header (or `?token=` query — PKMS accepts both;
   CH sends the header). Token via `PKMS_CAPTURE_TOKEN` env; the value may come
-  from `K:\Projects\PKMS\.secrets\capture-token` at runtime via env. Never
+  from `K:\Projects\khaos\PKMS\.secrets\capture-token` at runtime via env. Never
   hardcoded, never logged/printed. `is_configured()` = both env vars set
   (mirrors the Karakeep precedent).
 - Request: `Content-Type: application/json`; body = the §3.1 envelope.

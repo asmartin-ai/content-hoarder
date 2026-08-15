@@ -22,7 +22,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO = Path(r"K:\Projects\content-hoarder").resolve()
+REPO = Path(r"K:\Projects\khaos\content-hoarder").resolve()
 BAKEOFF = REPO / "bakeoff"
 RESULTS_CSV = BAKEOFF / "results.csv"
 LOG = BAKEOFF / "batch.log"

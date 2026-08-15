@@ -184,7 +184,7 @@ class KeepConnector(BaseConnector):
     def sync(self):
         """Live pull via gkeepapi is intentionally not implemented in CH.
 
-        The PKMS project (``K:\\Projects\\PKMS``) is the canonical
+        The PKMS project (``K:\\Projects\\khaos\\PKMS``) is the canonical
         live-sync surface for Google Keep. It owns the master-token blast
         radius (per life-os ADR 0028 + ADR 0005) and produces the
         durable vault capture. CH's role here is the Takeout path:

@@ -8,8 +8,8 @@ Binding user direction (2026-06-08): **avoid the Reddit iframe embed** — rende
 natively from the archived `media`/`gallery` metadata; study how RES + old.reddit present media.
 
 Inputs: live-DB inventory (read-only, `data/app.db`, scripts in `K:\Projects\overnight-20260612\q*.py`),
-v2 code (`K:\Projects\content-hoarder`, `main` branch — read at the time via the `ch-score` worktree,
-removed 2026-06-16), v3 code (`K:\Projects\content-hoarder`, `feat/frontend-v3`),
+v2 code (`K:\Projects\khaos\content-hoarder`, `main` branch — read at the time via the `ch-score` worktree,
+removed 2026-06-16), v3 code (`K:\Projects\khaos\content-hoarder`, `feat/frontend-v3`),
 RES source (fetched verbatim from GitHub this session), live URL probes against reddit CDNs
 (curl, 2026-06-12). All claims below are tagged **[measured]**, **[probed]**, **[fetched]**
 (verbatim source read this session), or **[reported]** (web search/paraphrase, not independently verified).
@@ -74,7 +74,7 @@ themed wrong, frequently refuses to render in an iframe, and leaks browsing to R
 **v2 reddit threads — `static\reddit.js`:** only URL-heuristic `mediaType()` classification
 (637–656); no playback path of its own.
 
-**v3 browse — `K:\Projects\content-hoarder\src\content_hoarder\static\browse\`** (ES modules):
+**v3 browse — `K:\Projects\khaos\content-hoarder\src\content_hoarder\static\browse\`** (ES modules):
 
 | Function | File:lines | Behavior today |
 |---|---|---|

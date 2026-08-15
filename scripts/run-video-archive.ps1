@@ -21,7 +21,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$RepoRoot  = 'K:\Projects\content-hoarder'
+$RepoRoot  = 'K:\Projects\khaos\content-hoarder'
 $LogDir    = Join-Path $RepoRoot 'logs'
 $Topic     = 'kenja-bench-r7k2q9'
 

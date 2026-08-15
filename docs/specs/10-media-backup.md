@@ -36,7 +36,7 @@ REM Preferred: checked-in wrapper
 scripts\mirror-media.bat
 
 REM Equivalent:
-robocopy K:\Projects\content-hoarder\data\media F:\Backups\content-hoarder\media /MIR /R:2 /W:5 /MT:16 /NP /LOG+:F:\Backups\content-hoarder\media-mirror.log
+robocopy K:\Projects\khaos\content-hoarder\data\media F:\Backups\content-hoarder\media /MIR /R:2 /W:5 /MT:16 /NP /LOG+:F:\Backups\content-hoarder\media-mirror.log
 ```
 
 - `/MIR` — mirror mode (copies new+changed, purges dest files no longer in
@@ -71,7 +71,7 @@ run after each mirror.
 
 **Restore drill:**
 1. Stop the app.
-2. `robocopy <DEST>\media K:\Projects\content-hoarder\data\media /E` (reverse
+2. `robocopy <DEST>\media K:\Projects\khaos\content-hoarder\data\media /E` (reverse
    direction, no purge).
 3. `python -m content_hoarder` — the app reads blobs by hash; no DB change
    needed.
@@ -121,7 +121,7 @@ or `E:\` if the primary is `K:\`), NOT a subdir of the project. Rationale:
 `scripts/mirror-media.bat` (robocopy) + `scripts/verify-mirror-media.bat`
 (sha256 re-hash; filename IS expected hash) ship with the repo under
 `scripts/`. See each script's header for usage. Source
-`K:\Projects\content-hoarder\data\media\` and dest
+`K:\Projects\khaos\content-hoarder\data\media\` and dest
 `K:\MediaMirror\content-hoarder\media\` are absolute paths in the scripts so
 no config setup is needed.
 

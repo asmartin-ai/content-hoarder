@@ -2,7 +2,7 @@
 REM ============================================================
 REM  scripts/mirror-media.bat
 REM
-REM  Mirror K:\Projects\content-hoarder\data\media\ (the
+REM  Mirror K:\Projects\khaos\content-hoarder\data\media\ (the
 REM  content-addressed blob store for rescued Reddit media) to
 REM  K:\MediaMirror\.
 REM
@@ -36,7 +36,7 @@ REM ============================================================
 
 setlocal
 
-set "SRC=K:\Projects\content-hoarder\data\media"
+set "SRC=K:\Projects\khaos\content-hoarder\data\media"
 set "DEST=K:\MediaMirror\content-hoarder\media"
 set "LOG=K:\MediaMirror\content-hoarder\media-mirror.log"
 

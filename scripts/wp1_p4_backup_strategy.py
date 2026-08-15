@@ -92,7 +92,7 @@ print()
 print(f"EXACT COMMAND:")
 print(
     "  robocopy /MIR /R:3 /W:5 /MT:4 /NP /NDL /NFL "
-    '"K:\\Projects\\content-hoarder\\data\\media" '
+    '"K:\\Projects\\khaos\\content-hoarder\\data\\media" '
     '"F:\\Backups\\content-hoarder\\media"'
 )
 print()
@@ -104,7 +104,7 @@ print(f"  - Once at-save-time archiving ships, switch to daily")
 print()
 print(f"Verification: after each run, compare counts:")
 print(
-    '  echo K: count && dir "K:\\Projects\\content-hoarder\\data\\media" /s /a-d | find "File(s)"'
+    '  echo K: count && dir "K:\\Projects\\khaos\\content-hoarder\\data\\media" /s /a-d | find "File(s)"'
 )
 print(
     '  echo F: count && dir "F:\\Backups\\content-hoarder\\media" /s /a-d | find "File(s)"'
