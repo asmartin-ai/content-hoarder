@@ -13,7 +13,7 @@ the **recovery arc**: `scan-media` (detect deleted media) → `archive-media` (h
 Offline PWA (service worker + manifest) ships.
 
 ## Stack & run
-- Python 3.13 (uv-managed venv; `requires-python >=3.12`), Flask, SQLite (WAL + FTS5 incl. `trigram`), vanilla JS/HTML/CSS. No npm, no cloud.
+- Python 3.13 (uv-managed venv; `requires-python >=3.12`), Flask, SQLite (WAL + FTS5 incl. `trigram`), HTML/CSS. No cloud. **Frontend transition ambition: HTMX + TS** (life-os ADR 0033, accepted) — htmx partials for list/facets/bulk/deck; interactive islands (swipe, lightbox, operator popover) migrate from vanilla JS to TypeScript compiled to ES modules; contract types generated from the API. No React, no Node backend.
 - `yt-dlp` optional (YouTube only, **lazy-imported**); `adb` is an external CLI the user runs.
 - Run: `uv run content-hoarder <cmd>` (or `uv run python -m content_hoarder <cmd>`). Full command set + flags: see the README CLI table.
   Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` = offline local-archive hydrate;
