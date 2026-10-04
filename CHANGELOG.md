@@ -41,6 +41,9 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- Refreshed the Python lockfile for Linux maintenance (2026-10-03), retaining
+  Flask 3.x and preserving the imported Windows `.venv`; native dependencies
+  are isolated in `.venv-linux`, including optional OCR/YouTube/UI packages.
 - Repository relocated under `/path/to\` (2026-08-15 unification); all internal path
   references updated to the new parent; venv editable hook repointed to `src`.
 

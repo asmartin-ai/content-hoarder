@@ -45,6 +45,36 @@ uv run content-hoarder import <path>   # a file or a directory (auto-detects the
 uv run content-hoarder serve           # then open http://127.0.0.1:8788
 ```
 
+### Linux migration (preserve the Windows environment)
+
+Keep the copied Windows `.venv/` intact. Restore dependencies into a separate
+Linux environment using the existing lockfile, without source-package builds:
+
+```bash
+UV_PROJECT_ENVIRONMENT=.venv-linux uv sync --frozen --no-build --no-install-project --extra dev --extra youtube --extra ocr
+./bin/content-hoarder --help
+```
+
+`bin/content-hoarder` uses `.venv-linux/bin/python` with this checkout's `src/`
+and runs from the repository root, so `.env`, rules, and the default `data/app.db`
+resolve to this project even when invoked from another directory. Absolute
+`CONTENT_HOARDER_DB` overrides still work. Relative import/export paths are
+relative to the repository root when using this launcher.
+OCR additionally needs the Tesseract binary on `PATH`.
+This setup starts no server, scheduler, OAuth flow, or media-mirror job;
+the `.bat` and PowerShell operational scripts remain Windows-specific.
+
+The 2026-10-03 dependency refresh keeps Flask on 3.x and updates yt-dlp to
+2026.8.19 and the optional Playwright package to 1.63.0. The native environment
+includes `dev`, `youtube`, `ocr`, and `ui`; restore the same selection by adding
+`--extra ui` to the command above. Chromium 153.0.8010.12, its headless shell
+and FFmpeg browser payload were installed using this environment's Playwright.
+Playwright uses its Ubuntu fallback on Arch; an actual headless launch/render
+passed. Tesseract 5.5.3 and English OCR data also passed a synthetic-image OCR
+smoke. Final offline checks passed 26 selected tests and the real Flask app's
+pages/host guard with a temporary SQLite database. No real database, connector,
+OAuth flow or media job was accessed.
+
 ### Serve from anywhere (no `cd`)
 The DB path defaults to `data/app.db` *relative to the current directory*, so to launch from any
 folder without `cd`-ing in, point `CONTENT_HOARDER_DB` at an absolute path and call the venv's
