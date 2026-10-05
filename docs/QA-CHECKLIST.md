@@ -12,8 +12,8 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 ## How to run / test
 
-- **Desktop:** `python -m content_hoarder serve` → http://127.0.0.1:8788
-- **Mobile:** `python -m content_hoarder serve --host <tailscale-ip>` → open the URL on the phone
+- **Desktop:** `bun run start` → http://127.0.0.1:8788
+- **Mobile:** `bun run src/cli.ts serve --host <tailscale-ip>` → open the URL on the phone
   (Chrome / Pixel-6 target) and install to home screen. See [MOBILE_TAILSCALE.md](MOBILE_TAILSCALE.md).
 - **Mobile layout** engages at **≤ 860 px** (left sidebar becomes a hamburger drawer). Preview on
   desktop via DevTools device-emulation, but do a real-phone pass for swipe/touch.
@@ -264,7 +264,7 @@ Use this section after a QA pass to decide what to delegate. Treat **T3** as tig
 
 | Task | Why T3-safe | Done when |
 |---|---|---|
-| **Add/extend Playwright coverage for QA stories** | Clear oracle; mostly synthetic fixtures and UI assertions. | New tests cover one QA story without requiring private `data/app.db`; `pytest -m ui` passes. |
+| **Add/extend browser coverage for QA stories** | Clear oracle; use synthetic fixtures, never private `data/app.db`. | New behavior tests pass with `bun test`, and the matching story passes a desktop/mobile browser check. |
 | **App icon replacement assets** (#19) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
 | **QA/docs reconciliation after each sprint** | No app behavior risk; good cleanup work. | Checklist/backlog/delegation docs have no stale branch/staging wording. |
 | **Small CSS polish from an approved spec** | Safe only when the visual decision is already made. | One isolated CSS change, before/after screenshot, no broad refactor. |

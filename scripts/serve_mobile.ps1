@@ -18,4 +18,4 @@ Write-Host "    $url" -ForegroundColor Green
 Write-Host "  Ctrl+C here to stop." -ForegroundColor DarkGray
 Write-Host ""
 
-& "$repo\.venv\Scripts\python.exe" -u -m content_hoarder.cli serve --host 127.0.0.1 --port $port
+& bun run src/cli.ts serve --host 127.0.0.1 --port $port

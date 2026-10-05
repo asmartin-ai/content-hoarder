@@ -1,0 +1,111 @@
+/* core/api.js — fetch layer + thin endpoint wrappers used by 2+ pages.
+   All wrappers reject on !r.ok (reddit.js's raw fetch().json() chains lacked this).
+   UI reactions (toasts, count bumps, reloads) stay page-side. */
+
+const rejectResponse = (r) =>
+  r
+    .clone()
+    .json()
+    .catch(() => null)
+    .then((data) => {
+      r.data = data;
+      throw r;
+    });
+
+export const getJSON = (url, opts) =>
+  fetch(url, opts).then((r) => (r.ok ? r.json() : rejectResponse(r)));
+
+export const postJSON = (url, body) =>
+  getJSON(
+    url,
+    body === undefined
+      ? { method: "POST" }
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+  );
+
+/* ---- item actions ---- */
+export const setStatus = (fullname, status) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/status", { status });
+
+export const fetchItem = (fullname) => getJSON("/items/" + encodeURIComponent(fullname));
+
+export const undoItem = (fullname) => postJSON("/items/" + encodeURIComponent(fullname) + "/undo");
+
+export const snoozeItem = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/snooze", body || { window_days: 7 });
+
+export const undoSnooze = (body) => postJSON("/snooze/undo", body);
+
+export const recoverItem = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/recover", body);
+
+export const recoverArchiveToday = (fullname, mode = "apply") =>
+  recoverItem(fullname, {
+    metadata: false,
+    archive_today: mode,
+    confirm_external_archive_today: true,
+  });
+
+export const setBody = (fullname, body) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/body", { body });
+
+export const bulkStatus = (fullnames, status) => postJSON("/bulk/status", { fullnames, status });
+
+/* Bulk undo (Epic 13:369): /bulk/status has no server-side undo, so replay the
+   per-item undo for every affected fullname. Resolves with {ok, failed[]}. */
+export const bulkUndo = (fullnames) =>
+  Promise.allSettled((fullnames || []).map((f) => undoItem(f))).then((rs) => ({
+    ok: rs.filter((r) => r.status === "fulfilled").length,
+    failed: rs.map((r, i) => (r.status === "rejected" ? fullnames[i] : null)).filter(Boolean),
+  }));
+
+/* Promote to PKMS (Spec 15): POSTs the bridge route; the server stamps
+   metadata.promotion and returns {status, response, receipt} — the PKMS
+   capture answer is the snackbar text. 400 (unconfigured) / 502 (transport)
+   bodies carry `error` for the toast. */
+export const promoteItem = (fullname) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/promote");
+
+export const fetchDuplicates = (params) =>
+  getJSON("/duplicates" + (params ? "?" + new URLSearchParams(params) : ""));
+
+export const resolveDuplicates = (keep, archive) =>
+  postJSON("/duplicates/resolve", { keep, archive });
+
+export const undoDuplicates = (fullnames) => postJSON("/duplicates/undo", { fullnames });
+
+/* ---- lists / counts ---- */
+export const fetchItems = (params) =>
+  getJSON("/items" + (params ? "?" + new URLSearchParams(params) : ""));
+
+export const fetchSources = (status) =>
+  getJSON("/sources" + (status ? "?status=" + encodeURIComponent(status) : ""));
+
+export const fetchStats = (params) =>
+  getJSON("/stats" + (params ? "?" + new URLSearchParams(params) : ""));
+
+/* ---- reddit sync + unsave queue ---- */
+export const redditSync = (body) => postJSON("/reddit/sync", body || {});
+
+export const unsaveStatus = () => getJSON("/reddit/unsave/status");
+
+export const unsaveDrain = (body) => postJSON("/reddit/unsave/drain", body || { dry_run: true });
+
+/* Queue one reddit item for unsave (no Reddit contact until /drain runs).
+   Optimistically flips is_saved=0; the row stays until drain. */
+export const unsaveItem = (fullname) =>
+  postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/unsave");
+
+/* Cancel a still-pending per-item unsave (no Reddit call). */
+export const undoRedditUnsave = (fullname) =>
+  postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/undo");
+
+/* Bulk enqueue unsaves for every reddit saved item under a tag (preview
+   when apply=false; commits the local queue when apply=true). Reddit is
+   not contacted until /drain runs. */
+export const unsaveByTag = (tag, { apply = false } = {}) =>
+  postJSON("/reddit/unsave/enqueue-by-tag", apply ? { tag, apply: true, yes: true } : { tag });

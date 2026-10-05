@@ -16,7 +16,7 @@ tailscale status        # shows your PC as e.g. 100.x.y.z  my-pc.tailXXXX.ts.net
 ## 2a. Quick way — plain HTTP (browse only, no install)
 Bind the app to all interfaces and open it by Tailscale IP from the phone:
 ```bash
-python -m content_hoarder serve --host 0.0.0.0
+bun run src/cli.ts serve --host 0.0.0.0
 ```
 On the phone (Tailscale toggled on): browse to `http://<PC-tailscale-ip>:8788`.
 This works for browsing/triage, but **Chrome won't let you _install_ the PWA over plain HTTP.**
@@ -35,7 +35,7 @@ This works for browsing/triage, but **Chrome won't let you _install_ the PWA ove
 Tailscale can put a real TLS cert in front of your local app:
 ```bash
 # Terminal 1 — run the app on localhost (default):
-python -m content_hoarder serve
+bun run start
 
 # Terminal 2 — expose it over HTTPS on your tailnet (persists across reboots):
 tailscale serve --bg 8788

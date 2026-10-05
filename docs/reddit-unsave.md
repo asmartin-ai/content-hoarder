@@ -38,17 +38,17 @@ modhash CSRF token read from `/api/me.json`.
 1. **Get your cookie.** In a browser logged into Reddit: DevTools → Application → Cookies →
    `https://www.reddit.com` → copy the **`reddit_session`** value.
 2. **Store it** (validates against `/api/me.json` and captures your username):
-   ```
-   python -m content_hoarder reddit-unsave --login --cookie "<reddit_session value>"
+   ```bash
+   bun run src/cli.ts reddit-unsave --login --cookie "<reddit_session value>"
    ```
    …or paste it into the **Reddit sync** panel on the Browse page (sidebar → "Reddit sync").
 3. **Enable** the behavior:
-   ```
-   python -m content_hoarder reddit-unsave --enable
+   ```bash
+   bun run src/cli.ts reddit-unsave --enable
    ```
 4. *(Optional)* **Backfill** items you've already marked Done:
-   ```
-   python -m content_hoarder reddit-unsave --enqueue-existing
+   ```bash
+   bun run src/cli.ts reddit-unsave --enqueue-existing
    ```
 
 The cookie expires every few days–weeks. When a drain reports `auth_error` (CLI exits non-zero; the UI
@@ -61,9 +61,8 @@ non-interactive lane) for scheduled runs — **not** `--drain`, which is now dry
 `--live --yes` (the bulk money-action gate, wrong for an unattended job). Windows Task Scheduler
 example (every 30 min):
 
-```
-schtasks /Create /TN "content-hoarder reddit unsave" /SC MINUTE /MO 30 /TR ^
-  "/path/to/content-hoarder/.venv/Scripts/python.exe -m content_hoarder reddit-unsave --trickle --limit 200"
+```powershell
+schtasks /Create /TN "content-hoarder reddit unsave" /SC MINUTE /MO 30 /TR "bun.exe run C:\path\to\content-hoarder\src\cli.ts reddit-unsave --trickle --limit 200" /F
 ```
 
 `--trickle` prints a JSON summary (`{selected, unsaved, failed, auth_error, remaining, transport,
@@ -74,17 +73,15 @@ so a scheduled run can alert you.
 
 `--drain` mutates real Reddit state, so verify against a copy:
 
-```
-copy data\app.db data\app.test.db
-set CONTENT_HOARDER_DB=data\app.test.db
-python -m content_hoarder reddit-unsave --login --cookie "<value>"     # prints "Signed in as u/<you>"
-python -m content_hoarder reddit-unsave --enable
-# in the app, mark one known-saved reddit item Done, then:
-python -m content_hoarder reddit-unsave --status                       # pending: 1
-python -m content_hoarder reddit-unsave --drain --limit 1              # unsaved: 1
-#   -> confirm it's gone from reddit.com/user/me/saved
-python -m content_hoarder reddit-unsave --drain --limit 1              # no-op, pending: 0 (idempotent)
-# undo that item in the app -> it reappears in Reddit Saved (best-effort resave)
+```bash
+cp data/app.db data/app.test.db
+CONTENT_HOARDER_DB=data/app.test.db bun run src/cli.ts reddit-unsave --login --cookie "<value>"
+CONTENT_HOARDER_DB=data/app.test.db bun run src/cli.ts reddit-unsave --enable
+# In the app, mark one known-saved Reddit item Done, then inspect the queue:
+CONTENT_HOARDER_DB=data/app.test.db bun run src/cli.ts reddit-unsave --status
+CONTENT_HOARDER_DB=data/app.test.db bun run src/cli.ts reddit-unsave --drain --limit 1
+# After explicitly confirming the account-side result, a second drain is idempotent:
+CONTENT_HOARDER_DB=data/app.test.db bun run src/cli.ts reddit-unsave --drain --limit 1
 ```
 
 A garbage/expired cookie should make `--drain` return `auth_error: true` and exit non-zero, while the local
@@ -96,5 +93,4 @@ Done/undo still work.
   surface loudly; the queue persists so nothing is lost. `reddit_unsave._http_post` (the default for the
   injectable `post=` param) is the single network seam — swapping to an OAuth "script" app transport later is localized.
 - Reddit's unofficial rate limit is unknown; `--limit`/`--throttle` + a resumable queue keep drains polite.
-- All of `reddit_unsave.py` is offline-tested with injected `post`/`getf`/`sleep`
-  (`tests/test_reddit_unsave.py`).
+- Offline Bun tests should exercise the queued-unsave boundaries through an injected transport; never drain a real Reddit account in CI or smoke checks.

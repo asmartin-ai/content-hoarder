@@ -37,6 +37,8 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   other DB errors propagate instead of being mislabeled.
 - `db.rename_user_tag_in_vocab` rolls back the vocabulary row + item stamps on failure
   (matches `delete_user_tag`); docstring now matches the actual commit contract.
+- Bun CLI parity: preserve Python dry-run/safety notes and JSON export bytes, retain Twitter
+  bookmark order, and scope nested folder/tag options and positional arguments to their commands.
 - SW cache + APP_VERSION bumped v128 → v129 (new static assets must not serve stale).
 
 ### Changed

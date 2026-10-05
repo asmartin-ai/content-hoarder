@@ -19,19 +19,15 @@ takeout*/
 saved*.json
 saved*.csv
 
-# Python
-.venv/
-.venv-linux/
+# Bun / Node
+node_modules/
+
+# Python test and packaging artifacts
 __pycache__/
-*.pyc
 *.egg-info/
-dist/
-build/
 .pytest_cache/
-.pytest-tmp/
-.pytest-review-tmp/
-.pytest-*-tmp/
-.mypy_cache/
+/.pytest-tmp/
+/.pytest-review-tmp/
 
 # OS / editor
 .DS_Store
@@ -44,7 +40,7 @@ Thumbs.db
 .claude/launch.json
 .claude/settings.local.json
 
-# Ephemeral worktrees created by scripts/serve_branch_verify.py (auto-cleaned)
+# Ephemeral worktrees created by scripts/serve_branch_verify.ts (auto-cleaned)
 .verify-worktrees/
 
 # Local MCP server picks (machine-specific; brave-search reads an ambient BRAVE_API_KEY)

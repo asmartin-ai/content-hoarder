@@ -1,44 +1,32 @@
-# Reddit management view
+# Reddit management view (iceboxed)
 
-The dedicated Reddit workspace at **`/reddit`** — the reddit-saved-manager (RSM) interface folded
-into content-hoarder. It runs over the same `items` table as everything else (no separate app, no
-separate DB); Reddit-specific fields live in each item's `metadata` blob and are flattened by the
-`/reddit/*` adapter into the shape the UI expects.
+The former dedicated Reddit workspace is not part of the current UI. `/reddit`
+redirects to the main browse page filtered to Reddit. Its API and cached-thread
+storage remain in `src/web.ts`, `src/db.ts`, and `src/reddit_thread.ts`; this
+note records the former view and behavior to preserve if it is resumed.
 
-## What it gives you
-- **Table / grid browse** of your Reddit items, with full-text + fuzzy search.
-- **Subreddit sidebar** (counts, filterable) — click to scope the list to one subreddit.
-- **Thread / comment viewer** — opens the cached post + comment tree in a detail panel.
-- **Stats** modal: by kind, by triage status, top subreddits, NSFW count, by-year.
-- **NSFW blur** with click-to-reveal.
-- One-click **unsave** (enqueues for the Reddit unsave drain) and **re-save** (undo).
-- The header **Triage** link opens `/triage?source=reddit` — one-click Reddit-only swipe triage.
-- **Sort** dropdown defaults to **Recently synced** (`first_seen_utc` desc) — the closest proxy to
-  newest-saved-first, since Reddit exposes no save timestamp (saved items are ingested newest-first,
-  so sync order tracks save order for incrementally-synced items; the legacy bulk import shares one
-  timestamp). Other options: Recently posted, Top score, Subreddit A–Z, Title A–Z. Table column
-  headers still sort and stay in sync with the dropdown.
+## Former view
 
-## Architecture (how it maps onto content-hoarder)
-- **No schema change.** `subreddit/score/over_18/permalink/media_*` stay in `items.metadata`; the
-  adapter (`web._reddit_view`) flattens them. `db.search_items` gained a `subreddit=` filter and
-  `score`/`subreddit` sort keys.
-- **`reddit_threads` side table** (`fullname` PK, `thread_json`, `hydrated_at`) holds the post+comment
-  trees, kept *out* of `metadata` so search stays cheap. Read/written via `db.get_reddit_thread` /
-  `db.set_reddit_thread`; parsed by `reddit_thread.py`.
-- **Routes** (`web.py`): `GET /reddit` (page), `/reddit/items`, `/reddit/subreddits`, `/reddit/stats`,
-  `/reddit/items/<fn>/thread`, `POST /reddit/items/<fn>/unsave` (enqueues + optimistically flips
-  `is_saved=0`), `POST /reddit/items/<fn>/undo` (cancels a still-pending unsave locally, or live
-  re-saves one already drained to Reddit). Plus `POST /reddit/sync`, `/reddit/items/<fn>/hydrate`, and
-  the `/reddit/unsave/{status,auth,enable,drain,enqueue-by-tag}` family (see `web.py` for the full list).
-- **Frontend**: `templates/reddit.html` + `static/reddit.js` + `static/reddit.css`, reskinned from RSM
-  to content-hoarder's palette.
+- Table/grid browse, subreddit counts and filters, cached thread/comment viewer,
+  stats, NSFW blur, and per-item unsave/re-save controls.
+- Reddit-only triage linked to the main triage surface.
+- Recent-sync-first sorting; Reddit does not provide save timestamps.
+
+## Current architecture
+
+- No schema change: Reddit-specific facts stay in `items.metadata`.
+- `reddit_threads` stores cached thread JSON by item fullname, outside metadata.
+- `src/web.ts` serves Reddit API routes and redirects the old `/reddit` page.
+  `src/db.ts` owns SQL and row conversions; `src/reddit_thread.ts` parses
+  cached thread data.
+- The current PWA is under `src/static/`; the former `templates/reddit.html`
+  interface is not a current route.
 
 ## Migrating from reddit-saved-manager
 The 64.6k Reddit items were already imported. To bring over RSM's cached threads:
 
 ```bash
-python -m content_hoarder migrate-rsm-threads --from "/path/to/reddit-saved-manager/data/app.db"
+bun run src/cli.ts migrate-rsm-threads --from "/path/to/reddit-saved-manager/data/app.db"
 ```
 
 Reads the RSM DB read-only and copies non-empty `thread_json` into `reddit_threads`, re-keyed

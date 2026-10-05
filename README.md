@@ -30,95 +30,87 @@ Status: **1.0.0 local release** — content-hoarder now follows [Semantic Versio
 - Per-item status: `inbox` → `keep` / `archived` / `done`, with one-step undo and a reversible
   "content bankruptcy" bulk-archive.
 - Responsive, installable **PWA** so you can triage on desktop or phone.
-- Runs entirely locally. Minimal dependencies (Flask + SQLite); `yt-dlp` and a local LLM are optional.
+- Runs locally on Bun + TypeScript, with SQLite and native media/network integrations. No Python runtime or yt-dlp dependency.
 
 ## Project tracking
 
-Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues), grouped by one milestone per epic. `BACKLOG.md` is now a compact issue index, while historical/as-built backlog notes are split by epic under [`docs/backlog/`](docs/backlog/README.md) for offline/sandboxed agents.
+Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues); offline issue history is in [`docs/backlog/`](docs/backlog/README.md).
 
 ## Quickstart
-```bash
-uv sync                       # creates .venv (uv-managed) from pyproject.toml
-uv run content-hoarder --version
-uv run content-hoarder init-db
-uv run content-hoarder import <path>   # a file or a directory (auto-detects the source)
-uv run content-hoarder serve           # then open http://127.0.0.1:8788
-```
 
-### Linux migration (preserve the Windows environment)
-
-Keep the copied Windows `.venv/` intact. Restore dependencies into a separate
-Linux environment using the existing lockfile, without source-package builds:
+Install Bun 1.4 or newer, then run:
 
 ```bash
-UV_PROJECT_ENVIRONMENT=.venv-linux uv sync --frozen --no-build --no-install-project --extra dev --extra youtube --extra ocr
-./bin/content-hoarder --help
+bun install --frozen-lockfile
+bun run src/cli.ts --version
+bun run src/cli.ts init-db
+bun run src/cli.ts import <path>   # a file or directory; detects the source
+bun run start                      # http://127.0.0.1:8788
 ```
 
-`bin/content-hoarder` uses `.venv-linux/bin/python` with this checkout's `src/`
-and runs from the repository root, so `.env`, rules, and the default `data/app.db`
-resolve to this project even when invoked from another directory. Absolute
-`CONTENT_HOARDER_DB` overrides still work. Relative import/export paths are
-relative to the repository root when using this launcher.
-OCR additionally needs the Tesseract binary on `PATH`.
-This setup starts no server, scheduler, OAuth flow, or media-mirror job;
-the `.bat` and PowerShell operational scripts remain Windows-specific.
+The default database path is `data/app.db` under the current working directory.
+Set `CONTENT_HOARDER_DB` to use a different path. The CLI loads `.env` from the
+working directory; existing shell environment values take precedence.
 
-The 2026-10-03 dependency refresh keeps Flask on 3.x and updates yt-dlp to
-2026.8.19 and the optional Playwright package to 1.63.0. The native environment
-includes `dev`, `youtube`, `ocr`, and `ui`; restore the same selection by adding
-`--extra ui` to the command above. Chromium 153.0.8010.12, its headless shell
-and FFmpeg browser payload were installed using this environment's Playwright.
-Playwright uses its Ubuntu fallback on Arch; an actual headless launch/render
-passed. Tesseract 5.5.3 and English OCR data also passed a synthetic-image OCR
-smoke. Final offline checks passed 26 selected tests and the real Flask app's
-pages/host guard with a temporary SQLite database. No real database, connector,
-OAuth flow or media job was accessed.
+Native media tools are optional and only needed by their corresponding commands:
+`ffmpeg` for video/HLS work, `tesseract` for OCR, and ImageMagick `magick` for
+image preparation. No server, scheduler, OAuth flow, sync, or archive operation
+runs during installation or startup.
 
-### Serve from anywhere (no `cd`)
-The DB path defaults to `data/app.db` *relative to the current directory*, so to launch from any
-folder without `cd`-ing in, point `CONTENT_HOARDER_DB` at an absolute path and call the venv's
-Python directly. One line to paste (PowerShell):
-```powershell
-$env:CONTENT_HOARDER_DB="/path/to/content-hoarder\data\app.db"; & "/path/to/content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve
+### Serve from anywhere
+
+Set `CONTENT_HOARDER_DB` to an explicit database path and run the entry point
+from this checkout:
+
+```bash
+CONTENT_HOARDER_DB=/path/to/app.db bun run /path/to/content-hoarder/src/cli.ts serve
 ```
-Append `--host 100.x.y.z` to bind your Tailscale IP for phone access. (cmd.exe equivalent:
-`set "CONTENT_HOARDER_DB=/path/to/content-hoarder\data\app.db" && "/path/to/content-hoarder\.venv\Scripts\python.exe" -m content_hoarder serve`.)
+
+The web server binds to `127.0.0.1:8788` by default. Use `--host` only on a
+trusted private network; never expose this personal-data application publicly.
 
 ## CLI commands
 | Command | Description |
 |---------|-------------|
 | `--version` | Print the installed content-hoarder version. |
 | `init-db` | Create the local SQLite database + FTS5 search tables. |
-| `import <path> [--source ID]` | Import a file/dir; auto-detects the source (Reddit DB/CSV/JSON, YouTube yt-dlp JSON, HN DB/txt, Obsidian/Keep folders, Firefox "Export Tabs URLs" .txt, Twitter/X bookmark JSON/CSV), or force with `--source`. |
+| `import <path> [--source ID] [--enrich] [--reconcile [--reconcile-dry-run] [--reconcile-complete]]` | Import supported files/directories through the source registry. Reconciliation marks missing Reddit saves unsaved; use `--reconcile-dry-run` to preview. `--reconcile-complete` disables the truncation guard only for a confirmed complete export. |
 | `categorize [--source youtube\|reddit\|firefox\|hackernews] [--topics] [--dry-run] [--all] [--limit N]` | Tag items by heuristics. `--source youtube` → processing areas *listenable* / *watch* / *wotagei* on `metadata.category`; `--topics` (youtube) / `--source reddit\|firefox\|hackernews` → multi-label topic tags (gaming/defense/investing/…) on `metadata.tags` (host + title keywords; `--dry-run` previews accuracy without writing). |
-| `enrich [--source ID] [--all] [--limit N]` | Fill sparse items. `--source youtube` adds per-video duration/views/categories (yt-dlp); `--source reddit --archives` recovers removed/un-hydrated items (PullPush + Arctic-Shift); `--source youtube --titles` recovers deleted titles (Wayback). |
+| `enrich [--source ID] [--all] [--archives] [--titles] [--scores] [--gallery-previews] [--limit N]` | Enrich imported metadata, recover archive text/titles, hydrate scores, or recover gallery previews. |
 | `scan-media [--status S] [--limit N] [--apply] [--recheck] [--workers N] [--batch N]` | Probe saved Reddit image/gallery items for deleted media and classify them on `metadata.media_status` (`gone` / `salvageable`, recording the salvageable preview URL for the `archive-media` pass). `--apply` writes (+ a `deleted` tag on gone items, surfaced by `is:deleted`); dry-run by default, crash-safe + resumable (skips already-classified unless `--recheck`). |
-| `archive-media [--salvageable] [--galleries] [--images] [--twitter] [--videos] [--limit N] [--throttle S] [--max-video-bytes N] [--video-timeout S] [--apply]` | **Hoard the bytes:** download + store saved Reddit and Twitter/X media locally (content-addressed under `data/media/`, served same-origin via `/media/<blob>` so the PWA survives remote deletion). Scopes, cheap→bulk: `--salvageable` (rescue still-live previews of already-deleted posts — run first), `--galleries`, `--images` (the bulk `i.redd.it` set, ~15 GB+), `--twitter` (imported `pbs.twimg.com` images and `video.twimg.com` MP4s), `--videos` (explicit opt-in for v.redd.it; requires `yt-dlp` and a muxable audio+video result). Dry-run by default; resumable (skips already-archived); per-item commit. ⚠️ `data/media/` is gitignored and **not** in DB backups — back it up separately. |
-| `ocr [--limit N] [--apply] [--force] [--lang eng] [--min-confidence 40] [--throttle S]` | **Image text search (Spec 14 / #26):** OCR local archived images (`metadata.archived_media` → `data/media/`) into `metadata.ocr_text` so bare search + `is:ocr` can find words that only appear in the picture. Dry-run by default; `--apply` writes + rebuilds `search_text`. Resumable (skips rows with `ocr_at` unless `--force`). Needs optional deps (`uv sync --extra ocr` → pytesseract + Pillow) **and** the Tesseract binary on PATH. Offline-testable (injectable engine). Prefer a DB copy for the first apply pass. |
-| `resolve-redgifs [--limit N] [--redgifs-ok] [--apply]` | Resolve dead Gfycat media URLs against RedGifs. Safe by default: without `--redgifs-ok` it only counts candidates and does no network; without `--apply` it previews metadata-only rewrites without writing. |
+| `archive-media [--salvageable] [--galleries] [--images] [--twitter] [--videos] [--limit N] [--throttle S] [--max-video-bytes N] [--video-timeout S] [--apply]` | Download supported Reddit/Twitter media into the content-addressed local store. Scope flags select work; default is salvageable and gallery media. Preview only unless `--apply`; uses native ffmpeg for video. |
+| `ocr [--limit N] [--apply] [--force] [--lang eng] [--min-confidence 40] [--throttle S]` | OCR local archived images into searchable metadata. Preview by default; apply writes results. Requires Tesseract on PATH. |
+| `resolve-redgifs [--limit N] [--redgifs-ok] [--apply]` | Resolve dead Gfycat media URLs against RedGifs. Network and writes are separate explicit gates. |
 | `dedup [--by url\|title] [--resolve] [--clear]` | Flag possible duplicates (non-destructive); `--resolve` archives all-but-richest per group (reversible), `--clear` removes the flags. |
 | `consolidate [--apply] [--undo]` | Fold a Reddit post / HN story / Firefox tab that links to a YouTube video into one canonical `youtube:<id>` item (companions linked). Re-runnable; dry-run by default; reversible. |
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
 | `migrate-firefox-tabs [--apply]` | One-time: promote Firefox YouTube tabs imported before auto-promotion into `youtube:<id>` items and collapse duplicates (dry-run by default; run against a DB copy first). |
 | `migrate-note-youtube [--apply]` | One-time: promote Keep/Obsidian notes that contain YouTube links into `youtube:<id>` items and attach the note as a companion (dry-run by default; run against a DB copy first). |
-| `reddit-sync` | Pull new saved Reddit items (newest-first, stop-on-overlap). Prefers the OAuth `history` scope when configured, else the `reddit_session` cookie (set it with `reddit-unsave --login`). |
-| `reddit-unsave [--enable\|--disable] [--drain [--live --yes]] [--limit N]` | Unsave-on-Done: enqueue (gated, off by default) + drain the queue to Reddit. **`--drain` is a DRY RUN by default** (lists the scope, sends nothing); add `--live --yes` to execute — it MUTATES your real Reddit Saved list (reversible via re-save), is jittered + rate-limited with 429 backoff, prefers the sanctioned OAuth `save` scope when configured (else the cookie), and appends every unsave to `data/unsave-audit.jsonl`. |
+| `reddit-sync [--max-pages N] [--full] [--reconcile [--reconcile-dry-run]] [--enable-auto|--disable-auto]` | Sync saved Reddit items (default three pages, stop at known items; `--full` defaults to 50 pages). Reconcile is a full-walk census and should be previewed first. |
+| `hn-sync --user USER [--max-pages N] [--full] [--throttle S]` | Sync public Hacker News favorites (default five pages; `--full` defaults to 50) and stop at known items unless full. |
+| `reddit-unsave [--login --cookie VALUE] [--enable|--disable] [--drain [--live --yes]|--trickle] [--status] [--enqueue-existing] [--limit N] [--throttle S]` | Manage the local unsave queue. `--drain` is a dry run unless both live-consent flags are present; `--trickle` is the opted-in bounded network lane. |
+| `firefox-token [--generate]` | Show whether an ingest token exists; `--generate` rotates it and prints the one-time token. |
 | `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **OAuth** transport (installed-app, no client secret; requests read + history + identity + save scopes; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads (hydration, saved-list sync) **and** writes (unsave) — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
 | `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item (OAuth if configured, else cookie), `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (jittered throttle, small cap, resumable; safe-by-default — needs `--yes` to fetch). |
 | `reddit-hydrate-titles [--network] [--dry-run] [--limit N]` | Backfill real titles for saved Reddit **comments** that imported as "(untitled)" — the saved row is the comment, so the title is its submission's title. Default fills from already-cached thread JSON (offline); `--network` recovers the rest via PullPush/Arctic-Shift. |
 | `reddit-thumbnails [--apply] [--limit N]` | Backfill Reddit thumbnails (esp. `v.redd.it` video posters) from already-cached thread blobs — zero network. Dry-run by default. |
-| `serve [--host HOST]` | Start the local web app (default host `127.0.0.1`, port `8788`). |
-| `stats` | Print counts by source/kind/status, inbox size, and processed-this-week. |
-| `sources` | List the available source connectors. |
+| `serve [--host HOST] [--port PORT] [--tls]` | Start the local web app (default `127.0.0.1:8788`). |
+| `stats` | Print item counts by source/kind/status. |
+| `sources` | List the registered import connectors. |
 | `bankruptcy --before YYYY-MM-DD [--source ID] [--dry-run]` | Reversibly bulk-archive inbox items older than a date. |
 | `decay --tag T... [--subreddit S...] [--before DATE] [--label swept] [--apply] [--undo]` | Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped per wave + reversible (`--undo` selects a wave by `--decayed-after/--decayed-before`). Pull decayed items with the `is:decayed` / `is:swept` search operators. |
 | `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
-| `export --out FILE [--format csv\|json] [--tag T...] [--status S]` | Dump matching items to CSV/JSON (permalink-oriented, for re-saving elsewhere). Same filters live at `GET /export`. |
-| `promote [--status keep] [--dry-run]` | (Opt-in) push items you've marked **keep** to a stock Karakeep instance via its API. |
-| `export-obsidian --vault DIR [--status keep]` | Write items (default: `keep`) to an Obsidian vault as Markdown notes. |
-| `suggest [--source ID] [--limit N]` | Annotate inbox items with local-LLM keep/skip suggestions (optional; Phase 2 assist). |
-| `learn-triage [--apply] [--min-support N] [--alpha F] [--limit N]` | Fit the transparent likely-to-process model from triage history and score inbox items (`metadata.triage_score` + why; "smart" batches use it). Dry-run by default. |
+| `export --out FILE [--format csv|json] [--tag T...] [--status S] [--source ID] [--subreddit S]` | Export matching items to CSV or JSON. |
+| `promote [--status keep] [--limit N] [--dry-run]` | Push eligible items to Karakeep when configured; output reports readiness when it is not configured. |
+| `export-obsidian --vault DIR [--status keep]` | Export matching items as Markdown notes. |
+| `suggest [--source ID] [--limit N]` | Annotate inbox items with local-LLM keep/skip suggestions. |
+| `learn-triage [--apply] [--min-support N] [--alpha F] [--limit N]` | Fit the transparent process-likelihood model and score inbox items. Preview by default. |
+| `assist-auto-archive [--source reddit] [--min-skip-rate F] [--min-support N] [--apply]` | Preview high-skip subreddit buckets from the learned model; apply archives through reversible decay. |
+| `triage-drift [--apply] [--min-support N] [--alpha F] [--limit N] [--since-processed UTC]` | Report drift in processing outcomes; optionally update scores. |
+| `snooze --fullname ITEM... [--until EPOCH_SECONDS|--window-days N] [--undo --wave N|--escalate] [--limit N] [--apply --yes]` | Defer inbox items, reverse a snooze wave, or escalate repeatedly snoozed items. Mutations need both confirmation flags. |
+| `folder list|create|rename|delete|evaluate|assign|stats` | Manage and evaluate saved query folders. |
+| `tag list|create|rename|delete` | Manage the user-tag vocabulary and item stamps. |
+| `purge-done [--retention-days N] [--max N] [--apply --yes]` | Preview then permanently purge old done items; apply needs both confirmation flags and writes a backup/audit. |
 
 ### Reddit hydration & recovery — worked examples
 "Hydration" caches a saved post's full comment thread so the **inline reader** can show it offline.
@@ -127,28 +119,23 @@ browser-blending User-Agent, and an optional sanctioned read-only OAuth transpor
 rationale in [docs/reddit-derisking.md](docs/reddit-derisking.md).
 
 ```bash
-# (Optional, recommended) one-time: switch hydration onto the sanctioned read-only OAuth lane.
-# Set REDDIT_OAUTH_CLIENT_ID in .env first (see .env.example), then authorize interactively:
-uv run content-hoarder reddit-oauth --login      # paste the redirected URL back when prompted
-uv run content-hoarder reddit-oauth --status      # confirm it's configured (else cookie is used)
+bun run src/cli.ts reddit-oauth --login
+bun run src/cli.ts reddit-oauth --status
 
-# Hydrate one thread on demand (OAuth if configured, else the reddit_session cookie):
-uv run content-hoarder reddit-hydrate t3_abc123
+# Hydrate one thread, or import an existing local BDFR archive:
+bun run src/cli.ts reddit-hydrate t3_abc123
+bun run src/cli.ts reddit-hydrate --from /path/to/bdfr_export
 
-# Hydrate offline from a local BDFR archive — lossless, no network, no account exposure:
-uv run content-hoarder reddit-hydrate --from "K:\path\to\bdfr_export"
+# Preview the bounded batch before opting into network hydration:
+bun run src/cli.ts reddit-hydrate --batch
+bun run src/cli.ts reddit-hydrate --batch --yes
 
-# Bulk-hydrate the prioritized backlog. Safe-by-default: a bare --batch is a dry-run preview;
-# add --yes to actually fetch (jittered throttle, small cap (25), resumable):
-uv run content-hoarder reddit-hydrate --batch              # preview what would be fetched
-uv run content-hoarder reddit-hydrate --batch --yes        # fetch for real
+# Offline cached titles, or opt-in archive-provider title recovery:
+bun run src/cli.ts reddit-hydrate-titles
+bun run src/cli.ts reddit-hydrate-titles --network
 
-# Backfill real titles for saved Reddit COMMENTS that imported as "(untitled)":
-uv run content-hoarder reddit-hydrate-titles               # offline: fill from cached threads
-uv run content-hoarder reddit-hydrate-titles --network     # recover the rest via PullPush/Arctic
-
-# Recover [removed]/[deleted] Reddit posts & un-hydrated saved comments from archive mirrors:
-uv run content-hoarder enrich --source reddit --archives
+# Recover removed posts and unhydrated saved comments from archive mirrors:
+bun run src/cli.ts enrich --source reddit --archives
 ```
 
 ## Mobile access
@@ -159,7 +146,7 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 
 ### Phone quickstart (Tailscale)
 1. On the PC, find your Tailscale IP (`tailscale ip -4`, a `100.x.y.z` address) and start the app
-   bound to it: `uv run content-hoarder serve --host 100.x.y.z` (the web guard already accepts
+   bound to it: `bun run src/cli.ts serve --host 100.x.y.z` (the web guard already accepts
    tailnet addresses; add real DNS names via `CONTENT_HOARDER_ALLOWED_HOSTS`).
 2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Chrome.
 3. Install it: Chrome menu (⋮) → **Install app** (a real WebAPK). The PWA opens fullscreen with the
@@ -184,7 +171,7 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
   rows are keyed as `twitter:<tweet_id>` and retain tweet text, author, permalink, outbound links,
   quote/reply context, and image/video media URLs. Re-importing overlapping daily exports de-dups by URL. Tweets that link to YouTube
   videos can be folded into canonical `youtube:<id>` rows with `consolidate`; imported tweet images
-  and videos can be cached locally with `uv run content-hoarder archive-media --twitter --apply`.
+  and videos can be cached locally with `bun run src/cli.ts archive-media --twitter --apply`.
 
 ## Privacy & data safety
 The SQLite database (`data/app.db`), all exports, `.env`, and `nsfw_rules.json` are gitignored.

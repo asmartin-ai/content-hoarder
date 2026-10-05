@@ -2,6 +2,8 @@
 
 **Status: IMPLEMENTED 2026-07-12** (merged to `main` via `feat/ios-pwa`).
 
+> Historical implementation record. The Python paths and test commands below are no longer current; use the Bun/TypeScript setup and `bun run check` documented in [`README.md`](../../README.md).
+
 ## Problem
 iOS Safari has no `beforeinstallprompt` event, so the Android-centric PWA flow
 doesn't help iPhone users. The app also has 3 missing pieces that prevent iOS

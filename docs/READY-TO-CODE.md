@@ -1,3 +1,5 @@
+> **Historical snapshot (2026-07-12):** branch status, check results, and task availability below are no longer current. The project now uses Bun/TypeScript; current setup and commands are in [`README.md`](../README.md), and the current offline check is `bun run check`.
+
 # READY-TO-CODE — startable engineering work
 
 Snapshot: **2026-07-12** after the ready-to-code sweep on `feat/ocr-tesseract-experimental`.

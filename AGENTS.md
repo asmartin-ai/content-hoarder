@@ -12,66 +12,35 @@ the **recovery arc**: `scan-media` (detect deleted media) → `archive-media` (h
 **"↻ Recover"** (`recover_one`, also tries archive.today for media bytes when `media_status='gone'`).
 Offline PWA (service worker + manifest) ships.
 
-## Stack & run
-- Python 3.13 (uv-managed venv; `requires-python >=3.12`), Flask, SQLite (WAL + FTS5 incl. `trigram`), HTML/CSS. No cloud. **Frontend transition ambition: HTMX + TS** (life-os ADR 0033, accepted) — htmx partials for list/facets/bulk/deck; interactive islands (swipe, lightbox, operator popover) migrate from vanilla JS to TypeScript compiled to ES modules; contract types generated from the API. No React, no Node backend.
-- `yt-dlp` optional (YouTube only, **lazy-imported**); `adb` is an external CLI the user runs.
-- Run: `uv run content-hoarder <cmd>` (or `uv run python -m content_hoarder <cmd>`). Full command set + flags: see the README CLI table.
-  Web default `127.0.0.1:8788`. (`reddit-hydrate --from <bdfr-dir>` = offline local-archive hydrate;
-  `--batch` = rate-limited resumable backfill — OAuth-preferred when configured, else the cookie.)
-- Tests: `uv sync --extra dev && uv run pytest` — all offline, `:memory:` SQLite, synthetic fixtures, **no network**.
-- **Repo moved?** Run `uv sync` once after relocating the checkout — the uv-managed `.venv` regenerates its editable path from the new location (global Python carries no install of this package).
-- **UI / browser tests** (`tests/ui/`, Playwright): `uv sync --extra ui && playwright install chromium`,
-  then `uv run pytest -m ui`. Real headless Chromium at a **Pixel-6** viewport + **PWA-standalone** emulation,
-  against the app served in-process off a **copy** of the live DB with autosync OFF (no live mutation,
-  no scheduler). Excluded from the default run (`addopts -m "not ui"`). **Verify any mobile/PWA UI
-  change here** — it catches what unit tests + the preview tool miss. Add a regression test per UI bug.
-  If `playwright install chromium` is blocked by local TLS/corporate certs, system Chrome can run the
-  suite with `uv run pytest -m ui --browser-channel chrome`. If `data/app.db` is absent in a sandbox, point
-  `CONTENT_HOARDER_DB` at a temporary synthetic DB with enough rows for the smoke tests; never commit it.
+- Bun + TypeScript 7, SQLite via `bun:sqlite`, Zod validation, HTML/CSS and static ES modules. Local-first; no Node backend or web framework.
+- Media archival, scans, YouTube recovery use native TypeScript/HTTP/ffmpeg integrations; do not add a Python sidecar or yt-dlp dependency.
+- Run: `bun run src/cli.ts <cmd>` (or `bun run start -- <cmd>`). Full command set + flags: see the README CLI table. Web default `127.0.0.1:8788`.
+- Install: `bun install --frozen-lockfile`. Checks: `bun run check` (typecheck, lint, format check, offline Bun tests).
+- Tests use synthetic data, temporary/in-memory SQLite, and loopback fixtures; keep them offline and deterministic. Never contact live sync/unsave/archive/publish services or write to the user's database.
+- Browser/PWA acceptance uses a synthetic database copy and local server. Never point browser smoke tests at the user's database or enable autosync.
 
 ## Layout
 ```
-src/content_hoarder/
-  config.py     env + .env loader (shell wins; no python-dotenv)
-  db.py         schema, FTS5, merge_upsert, search, status/undo/bulk, stats   <-- core
-  models.py     new_item()/build_search_text() — the ONLY place items are shaped
-  pipeline.py   dispatch -> import_file -> merge_upsert -> enrich; SOLE owner of DB writes
-  enrich.py     select sparse rows, call connector.enrich, merge results
-  web.py        Flask factory + routes
-  cli.py        argparse command dispatch
-  archival/     recovery chain: providers.py (PullPush, Arctic-Shift, **archive.today**) +
-                 service.py (recover bulk / recover_one per-item) + _http.py (shared urllib transport)
-  media_scan.py probe saved Reddit media for deletions -> metadata.media_status (gone/salvageable)
-  media_archive.py hoard the bytes: download + store via media_store (content-addressed, /media/<blob>)
-  media_store.py content-addressed blob store under data/media/ (dedup, served same-origin)
-  youtube_recover.py deleted YouTube title recovery via Wayback Machine
-  hn_thread.py   HN comment-thread viewer backend — Algolia fetch + parse into the reddit_thread
-                 render shape, cached in the (source-agnostic) reddit_threads table; served by
-                 GET /hackernews/items/<fn>/thread. Backend-only (no thread-render UI yet).
-  search_query.py the operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
-  categorize.py heuristic tagger (processing areas + multi-label topics) backing `categorize`
-  consolidate.py fold reddit-post/HN-story/firefox-tab -> youtube:<id> (`consolidate`)
-  dedup.py      duplicate detection + reversible resolve (`dedup`)
-  export.py     CSV/JSON + Obsidian export + Karakeep promote (`export`, `export-obsidian`, `promote`)
-  resurface.py  decay/snooze resurfacing logic (`decay`, `bankruptcy`)
-  triage_score.py the transparent likely-to-process model (`learn-triage`)
-  _http.py      shared stdlib urllib request helper (HN, Karakeep, archival — no requests/httpx)
-  connectors/   base.py (BaseConnector ABC + registry); one module per source
-  bridge/       karakeep.py (opt-in push of 'keep' items; no-op when unconfigured)
-  assist/       llm.py (optional local-LLM suggestions; Phase 2)
-  reddit_*.py   reddit_unsave / reddit_sync / reddit_oauth / reddit_thread / reddit_hydrate / reddit_trickle / rsm_threads
-  firefox_youtube.py tab->youtube promotion + migrate-firefox-tabs (exempt from "connectors never touch DB")
-  templates/     index.html (the ONE v3 browse shell; /triage + /reddit are 302 redirects, no legacy pages)
-  static/core/   v3 ES modules: util, api, toast, render, media, swipe, tags, icons, markdown,
-                 overlaynav + tokens.css (the v3 "Log Book" token system — the only one in use)
-  static/browse/ v3 browse shell: main.js, render.js, reader.js, operators.js, palette.js, deck.js,
-                 fastscroll.js, prefetch.js, tagedit.js + browse.css
-  static/        PWA + page assets: sw.js, theme.js, haptics.js, manifest.webmanifest, fonts/, vendor/,
-                 apple-touch-icon.png + icon-{192,512}.png + icon.svg + firefox.svg,
-                 apple-touch-startup-image-* (iOS splash set) + splashes/
-scripts/        standalone harnesses: recover_archive_today (archive.today live-smoke probe),
-                 rehearse_decay / rehearse_triage_score (dry-run previews), serve_branch_verify /
-                 serve_browse_test (local-serve smoke helpers)
+src/
+  models.ts       Zod-validated metadata, raw database rows, item construction
+  db.ts           schema, atomic migration, FTS5, merge_upsert, search, triage and audit data
+  pipeline.ts     connector dispatch -> import -> merge/enrich; owns import writes
+  config.ts       environment + .env configuration
+  cli.ts          full command dispatch
+  web.ts          Bun HTTP server, API, PWA/static and autosync lifecycle
+  search_query.ts operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
+  categorize.ts / dedup.ts / resurface.ts / triage_score.ts / tag_suggest.ts
+  consolidate.ts / folders.ts / note_youtube.ts
+  archival/       providers.ts, service.ts and shared _http transport
+  media_scan.ts / media_archive.ts / media_store.ts / youtube_recover.ts
+  connectors/     base.ts, registry.ts and Reddit/YouTube/HN/Twitter/Obsidian/Keep/Firefox sources
+  reddit_*.ts     sync, OAuth, unsave, hydration, threads and trickle
+  hn_sync.ts / hn_thread.ts / rsm_threads.ts / firefox_tabs.ts / firefox_youtube.ts
+  export.ts       CSV/JSON, Obsidian export, Karakeep and PKMS promotion
+  assist/llm.ts   optional local-LLM suggestions
+  static/         PWA shell and browse ES modules
+tests/            offline Bun tests
+scripts/          operational scripts (inspect before changing runtime assumptions)
 ```
 **Source-badge icon contract:** a source's avatar glyph flows `core/icons.js` (`D` map of inline-SVG
 strings, served by `chIcon(name)`) → `core/render.js` `CH_SOURCES[source] = { icon?, glyph?, token }`
@@ -97,40 +66,32 @@ inbox; `status_prev` enables one-step undo.
    shallow-merge `metadata`, and **never** overwrite user/triage state
    (`status`, `processed_utc`, `status_prev`, `is_saved`, `metadata.karakeep_id`) or move
    `first_seen_utc` forward. This is what makes multi-source merges + re-imports idempotent.
-3. **Connectors never touch the DB.** `import_file()` only parses and *yields* normalized dicts (built
-   via `models.new_item`). `pipeline.py` owns all writes. Keep it that way — it's why connectors are
-   unit-testable with no DB.
-4. **Lazy-import heavy/optional deps** (e.g. `import yt_dlp` *inside* the function). A missing optional
-   dep must break only its one connector, never `init-db`/`serve`/search.
-5. **HTTP is stdlib `urllib`** (HN Firebase, Karakeep push). No `requests`/`httpx`.
-6. **When inspecting `items.metadata` from sqlite, `SELECT` the full column and `json.loads()` it** —
-   never `substr(metadata,1,N)`. JSON keys sort alphabetically, so a 400-char truncation hides late
-   keys (e.g. `gallery`, `media_type` sit after `author`/`body`) and makes a populated row look empty.
-7. **The recovery chain has two shapes, not one.** `archival/providers.py` holds both:
-   - `ArchiveProvider` subclasses (PullPush, Arctic-Shift) are **reddit-id-keyed + JSON +
-     metadata-only** — `recover_one()` loops them by *bare base36 id* and takes the first that
-     returns `meaningful=True` (a real title/body).
-   - `ArchiveTodayProvider` is **URL-keyed + HTML + media-bytes** — it does NOT subclass
-     `ArchiveProvider` (that contract can't express "look up by original URL, parse HTML, return
-     image bytes"). It's wired into `recover_one()` as an explicit **post-chain step**
-     (`_try_archive_today`) that runs *only when `media_status='gone'`* after PullPush/Arctic — it
-     fetches `archive.ph/newest/<original_url>`, extracts `og:image` + inlined `<img>`s, and stores
-     bytes via `media_store` (→ `metadata.archived_media` + `media_status='recovered_archive_today'`).
-     Don't try to fold it into the id-keyed loop; its inputs and outputs are a different shape.
-   Both are loud-fail tolerant: a provider raising/403ing is a soft miss, never a crash. Fetcher +
-   byte-fetcher are injectable → `tests/test_archive_today.py` is fully offline. Per-item only
-   (archive.today is Cloudflare-gated, ~2s throttle, no bulk API) — never wire it into a bulk pass.
-8. **Reddit video metadata is `media_type` + `media_url` (often `v.redd.it/...`), not `metadata.reddit_video.fallback_url`.** Spec 11-era docs assumed a nested `reddit_video` blob; live rows frequently only have `media_type=reddit_video` and a bare `media_url`. `media_archive._video_evidence_urls` already accepts both shapes.
-9. **Reddit thread cache keys are per-item fullname.** Posts land under `reddit:t3_<id>`; hydrating a saved comment stores under `reddit:t1_<id>` unless dual-written. Comment opens must fall back to the submission `t3_` key from `metadata.permalink` (see #74 / `reddit_hydrate.submission_fullname`).
+3. **Connectors never touch the DB.** `importFile()` parses into validated `RawItem` values. `pipeline.ts` owns import writes; keep connector parsing independently testable.
+4. **Do not add unnecessary runtime dependencies.** Keep provider-specific parsing and native video/ffmpeg integrations isolated so `init-db` and search do not depend on network tools.
+5. HTTP uses the shared transport in `_http.ts`; do not add a second networking convention without a concrete need.
+6. **When inspecting `items.metadata` from SQLite, select the full column and parse it with `JSON.parse()`** — never truncate it; late keys (such as galleries and media fields) can be lost.
+7. **The recovery chain has two shapes, not one.** `src/archival/providers.ts` has two
+   `ArchiveProvider` subclasses (PullPush, Arctic-Shift) that are keyed by Reddit id and return
+   recovered text/metadata. `src/archival/service.ts` runs those as the recovery chain. The
+   archive.today media provider is URL-keyed, parses HTML, and stores recovered bytes in the
+   content-addressed media store; it remains a separate post-chain step and runs only for an item
+   whose media is already marked `gone`. It is per-item, never part of bulk recovery. Providers
+   treat errors as misses; tests inject transports and byte fetchers rather than contacting services.
+8. **Reddit video metadata is `media_type` + `media_url` (often `v.redd.it/...`), not
+   `metadata.reddit_video.fallback_url`.** Accept both shapes when deciding which URLs to archive.
+9. **Reddit thread cache keys are per-item fullname.** Posts land under `reddit:t3_<id>`; hydrating a
+   saved comment stores under `reddit:t1_<id>` unless dual-written. Comment opens must fall back to
+   the submission `t3_` key from `metadata.permalink` (see #74 / `reddit_hydrate.submission_fullname`).
 
 
 ## Connector authoring checklist
-1. Subclass `BaseConnector`; set `id` (== `items.source`), `label`, `badge_color`.
-2. `can_import(path)` = a cheap sniff (extension / filename / dir marker).
-3. `import_file(path)` yields `models.new_item(...)` dicts. DB-free.
-4. Optional `enrich(items)` to fill sparse rows from an API (stdlib urllib; tolerate per-item failure).
-5. Register the instance in `connectors/__init__.py` (`REGISTRY`).
-6. Add `tests/test_connector_<id>.py` + a tiny fixture under `fixtures/<id>/`.
+
+1. Implement `BaseConnector`; set `id` (== `items.source`), `label`, and `badgeColor`.
+2. `canImport(path)` must be a cheap sniff (extension, filename, or directory marker).
+3. `importFile(path)` returns validated `RawItem[]`; connectors do not write to SQLite.
+4. Optional `enrich(items)` fills sparse rows and tolerates per-item provider failures.
+5. Register the connector in `connectors/registry.ts`.
+6. Add offline Bun tests with small synthetic fixtures.
 
 ## Per-source inputs
 Per-source format details (reddit DB/CSV/JSON/MD, youtube `--flat-playlist --dump-single-json` JSON,
@@ -156,13 +117,10 @@ via `adb backup`, **not** `adb pull`.
 - Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu
   (mobile hides `.acts` via `@media(hover:none)` → long-press).
 
-## Working with the local LLM (when an agent delegates codegen)
-Qwen3.6 reliably (a) drops `await` on async calls and (b) starves answers with small `max_tokens`.
-After any delegated code: grep for un-awaited async calls and `python -m py_compile` the file. Prefer
-the Devstral model for pure codegen. Most of this codebase is **synchronous**, so prefer plain
-functions over async.
+## Delegated code changes
+Use the repository's configured Bun/TypeScript tools and preserve strict types, await asynchronous calls, and validate external input at boundaries. The assigned integration owner runs the single final check pass after all edits land.
 
-## Reddit unsave-on-Done (`reddit_unsave.py`)
+## Reddit unsave-on-Done (`reddit_unsave.ts`)
 Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Off by default,
 gated on the `settings` flag `reddit_unsave_on_done`. Full design (decoupled queue, transport, drain):
 **`docs/reddit-unsave.md`**. Load-bearing: **`is_saved` means "still in the user's Reddit Saved list"**

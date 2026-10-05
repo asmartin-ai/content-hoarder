@@ -1,4 +1,4 @@
-name: tests
+name: checks
 
 on:
   push:
@@ -6,16 +6,12 @@ on:
   pull_request:
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: oven-sh/setup-bun@v2
         with:
-          python-version: "3.12"   # pyproject: requires-python >=3.12
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"       # so the node-driven tests run instead of skipping
-      - run: uv sync --extra dev      # flask + pytest (pyproject optional-deps: dev)
-      - run: uv run pytest            # testpaths=tests, addopts=-q (pyproject)
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run check

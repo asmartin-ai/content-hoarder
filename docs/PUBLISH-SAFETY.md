@@ -1,32 +1,32 @@
 # Publication safety — public/private boundary for content-hoarder
 
-**Status: ACTIVE 2026-07-03.** Implements issue #73 (Pi.1). The repo is
+**Status: ACTIVE (updated 2026-10-04).** Implements issue #73 (Pi.1). The repo is
 already public (`github.com/asmartin-ai/content-hoarder`); this document
-defines the boundary + the repeatable check that runs before any push.
+defines the boundary and the repeatable check to run before publication.
 
 ## Boundary
 
 content-hoarder is **single-repo public-canonical** (not private-canonical +
 public-mirror). The sensitive material it touches — live DBs, Takeout dumps,
-NSFW rule lists, exports, real saved-content text — is **gitignored at the
-path level**, never scrubbed from history. As of 2026-07-03 a full
-`publish_safety_check.py --history` scan is clean: no secrets, no
-data files, no NSFW rule JSON, no DBs anywhere in the commit history.
+NSFW rule lists, exports, and saved-content text — is **gitignored at the
+path level**, never scrubbed from history. The last recorded
+`publish_safety_check.py --history` scan (2026-07-03) found no secrets or
+sensitive data in tracked history. This historical result is not current;
+re-run the Bun checker before publication.
 
 ### Public-safe (tracked, mirrors fine)
 
-- `src/content_hoarder/**/*.py` — source.
-- `src/content_hoarder/{static,templates}/` — v3 + legacy UI.
-- `tests/` — except `tests/fixtures/sandbox/` outputs (see below).
-- `docs/`, `scripts/`, `AGENTS.md`, `README.md`, `.env.example`,
-  `nsfw_rules.example.json` — synthetic/placeholder only.
-- `pyproject.toml`, `MANIFEST.in`, `.gitignore`.
+- `src/**/*.ts`, `src/static/`, and `tests/` — source, UI, and synthetic regressions.
+- `docs/`, `scripts/`, `AGENTS.md`, `README.md`, `.env.example`, and
+  `nsfw_rules.example.json` — review contents for private data before adding files.
+- Bun project/tooling files such as `package.json`, `bun.lock`, `tsconfig.json`,
+  and lint/format configuration.
 
 ### Private-only (gitignored — NEVER commit)
 
 | Path | Why |
 |---|---|
-| `.env` | real secrets (Flask secret, Karakeep key, OAuth client id) |
+| `.env` | real secrets (Reddit OAuth, Karakeep token, PKMS credentials) |
 | `data/` | the live SQLite DB + content-addressed media blobs (~18 GB) |
 | `data/app.db*` | the items table — years of personal saved content |
 | `data/media/` | hoarded deleted-media bytes (the only copy) |
@@ -48,15 +48,15 @@ data files, no NSFW rule JSON, no DBs anywhere in the commit history.
 
 ## The repeatable check
 
-`scripts/publish_safety_check.py` — exit 0 clean, exit 1 with findings.
+`scripts/publish_safety_check.ts` — exit 0 clean, exit 1 with findings.
 
 ```bash
 # Working tree only (fast; always run before push)
-python scripts/publish_safety_check.py
+bun run scripts/publish_safety_check.ts
 
 # Include git blob history (slower; run before any force-push / history rewrite
 # or the first publish of a fresh public mirror)
-python scripts/publish_safety_check.py --history
+bun run scripts/publish_safety_check.ts --history
 ```
 
 Findings categorized:
@@ -66,9 +66,11 @@ Findings categorized:
   content (AWS key, OAuth refresh-token blob, PEM header, `client_secret=...`).
 - `HISTORY_SECRET` — same, but in a historical blob (`--history` only).
 
-The script is read-only and offline. Placeholder / example lines are
-filtered (`change-me`, `your-`, `<...>`, `{{...}}`) so `.env.example` and
-doc placeholders don't false-positive.
+The script is read-only and offline. Placeholder values such as
+`change-me`, `your-`, `<...>`, and `{{...}}` are ignored in a matched
+credential value; an unrelated example comment cannot hide a real secret.
+Test source files are excluded because they contain deliberate credential-shaped
+fixtures. Serialized files under `tests/fixtures/` are still scanned.
 
 ## Workflow interaction with the existing public repo
 
@@ -93,10 +95,10 @@ Until then: one repo, path-level ignore, this check before every push.
 
 ## Concrete next action
 
-Add `python scripts/publish_safety_check.py` to whatever runs before `git push`
+Add `bun run scripts/publish_safety_check.ts` to whatever runs before `git push`
 (pre-push hook or the user's manual checklist). A pre-push hook:
 
 ```bash
 # .git/hooks/pre-push (chmod +x)
-exec python scripts/publish_safety_check.py || exit 1
+exec bun run scripts/publish_safety_check.ts || exit 1
 ```

@@ -255,7 +255,7 @@ all 54k posts with **zero JS change**. The deliberate parts:
 
 ## 6. Rollout / scale
 
-- Lights up via `python -m content_hoarder enrich --source reddit --scores --limit N`
+- Lights up via `bun run src/cli.ts enrich --source reddit --scores --limit N`
   (resumable; `hydrated_at` marks attempts). The score-hydration and media
   refinement are the same pass.
 - Full coverage is ~54k posts. PullPush batches 100 ids/request at a 4 s throttle
