@@ -149,22 +149,12 @@ export class HttpError extends Error {
 export function retryAfterSeconds(
   headers: Record<string, string> | null | undefined,
 ): number | null {
-  if (!headers) return null;
-  let ra = "";
+  const found = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === "retry-after");
 
-  for (const [k, v] of Object.entries(headers)) {
-    if (k.toLowerCase() === "retry-after") {
-      ra = v;
-      break;
-    }
-  }
+  if (!found) return null;
+  const seconds = Number.parseFloat(found[1]);
 
-  if (!ra) return null;
-  const seconds = Number.parseFloat(ra);
-
-  if (Number.isNaN(seconds)) return null;
-
-  return seconds >= 0 ? seconds : null;
+  return Number.isNaN(seconds) || seconds < 0 ? null : seconds;
 }
 
 /**
@@ -359,8 +349,6 @@ export async function request(
   let delay = backoff;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout * 1000);
     let resp: Response;
     let raw: Uint8Array;
 
@@ -375,7 +363,7 @@ export async function request(
             : opts.data
               ? new TextEncoder().encode(opts.data)
               : undefined,
-        signal: controller.signal,
+        signal: AbortSignal.timeout(timeout * 1000),
       });
       raw =
         resp.status >= 400
@@ -386,8 +374,8 @@ export async function request(
     } catch (e) {
       if (e instanceof HttpError) throw e;
 
-      // Read timeouts surface as AbortError and do NOT go through the
-      // network-error branch — catch them so a stall can't escape unwrapped.
+      // Read timeouts surface as TimeoutError (AbortSignal.timeout) and do NOT
+      // go through the network-error branch — catch them so a stall can't escape.
       if (e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError")) {
         throw new HttpError(`connection error for ${url}: ${e}`, { kind: "conn" });
       }
@@ -398,8 +386,6 @@ export async function request(
         kind: "url",
         reason: e,
       });
-    } finally {
-      clearTimeout(timer);
     }
 
     const respHeaders: Record<string, string> = {};

@@ -27,12 +27,8 @@ const ArchiveResponseSchema = z.union([
   z.object({ data: JsonSchema }).catchall(JsonSchema),
 ]);
 
-function wait(seconds: number): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, seconds * 1000);
-
-  return promise;
-}
+/** Seconds-based sleep, matching the shape of the injectable `sleep` options. */
+const sleepSeconds = (seconds: number): Promise<void> => Bun.sleep(seconds * 1000);
 
 export type NormalizedPost = {
   title: string;
@@ -259,13 +255,12 @@ function normalizeCommentTree(rec: JsonObject): NormalizedCommentTree {
 export async function getJson(
   url: string,
   userAgent: string,
-  timeout = 20_000,
 ): Promise<[number, Record<string, string>, Json]> {
   try {
     const [status, headers, raw] = await request(url, {
       method: "GET",
       headers: { "User-Agent": userAgent, Accept: "application/json" },
-      timeout,
+      timeout: 20_000,
     });
 
     try {
@@ -316,7 +311,7 @@ export abstract class ArchiveProvider {
   protected abstract searchCommentsUrl(linkFullname: string, limit: number): string;
   private async requestJson(url: string): Promise<JsonObject> {
     if (this.madeRequest && (this.options.minInterval ?? 0) > 0)
-      await (this.options.sleep ?? wait)(this.options.minInterval ?? 0);
+      await (this.options.sleep ?? sleepSeconds)(this.options.minInterval ?? 0);
     let delay = 2;
 
     for (let attempt = 0; ; attempt++) {
@@ -337,7 +332,7 @@ export abstract class ArchiveProvider {
           attempt >= (this.options.maxRetries ?? 3)
         )
           throw error;
-        await (this.options.sleep ?? wait)(error.retryAfter ?? delay);
+        await (this.options.sleep ?? sleepSeconds)(error.retryAfter ?? delay);
         delay *= 2;
       }
     }
@@ -428,7 +423,7 @@ export class ArchiveTodayProvider {
         headers: { "User-Agent": this.userAgent, Accept: "text/html" },
         timeout: 20_000,
         retries: this.options.maxRetries ?? 2,
-        sleep: (seconds) => (this.options.sleep ?? wait)(seconds),
+        sleep: (seconds) => (this.options.sleep ?? sleepSeconds)(seconds),
       });
 
       return new TextDecoder().decode(bytes);
@@ -444,15 +439,9 @@ export class ArchiveTodayProvider {
       );
     }
   }
-  recoverMedia(
+  async recoverMedia(
     item: { metadata: JsonObject | string },
     opts: { wantGallery?: boolean } = {},
-  ): Promise<Array<{ url: string; title: string }>> {
-    return this.resolveMedia(item, opts);
-  }
-  private async resolveMedia(
-    item: { metadata: JsonObject | string },
-    opts: { wantGallery?: boolean },
   ): Promise<Array<{ url: string; title: string }>> {
     const md = ArchiveTodayMetadataSchema.parse(item.metadata);
     const mediaUrl = text(md.media_url);
@@ -463,7 +452,7 @@ export class ArchiveTodayProvider {
 
     for (const original of unique) {
       if (this.madeRequest && (this.options.minInterval ?? 2) > 0)
-        await (this.options.sleep ?? wait)(this.options.minInterval ?? 2);
+        await (this.options.sleep ?? sleepSeconds)(this.options.minInterval ?? 2);
       this.madeRequest = true;
       let html: string;
 

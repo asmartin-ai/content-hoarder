@@ -2077,7 +2077,7 @@ async function runExtended(command: string, args: CliArgs): Promise<number> {
 
       case "suggest":
         json(
-          await llm.suggest(conn, {
+          await llm.suggestInbox(conn, {
             source: text(args, "source"),
             limit: number(args, "limit", 20),
           }),

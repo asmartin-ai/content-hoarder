@@ -2,7 +2,9 @@ import { Database } from "bun:sqlite";
 import { readFileSync, statSync } from "node:fs";
 import * as z from "zod";
 import { newItem, parseMetadata, type Metadata, type RawItem } from "../models.ts";
-import type { BaseConnector } from "./base.ts";
+import { sqliteNames, type BaseConnector } from "./base.ts";
+import { request } from "../_http.ts";
+import * as config from "../config.ts";
 
 const hnItemSchema = z
   .object({
@@ -19,8 +21,6 @@ const hnItemSchema = z
   .catchall(z.json());
 
 const hnIds = z.array(z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]));
-
-const sqliteNames = z.array(z.object({ name: z.string() }));
 
 const sqliteRow = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
 
@@ -69,6 +69,31 @@ const ogImage = (source: string, base: string): string => {
   }
 };
 
+/**
+ * Best-effort og:image for an external article URL; "" on any failure
+ * (blocked, network, non-HTML, no tag) so a flaky or hostile article never
+ * breaks the enrich pass. `url` is attacker-controlled — any HN submission
+ * may link a loopback or link-local address — so it goes through the
+ * SSRF-guarded transport like every other network path.
+ */
+export async function fetchOgImage(url: string): Promise<string> {
+  try {
+    const [, headers, raw] = await request(url, {
+      headers: { Accept: "text/html,application/xhtml+xml" },
+      userAgent: config.get("USER_AGENT"),
+      timeout: 10,
+      retries: 1,
+      jitter: true,
+    });
+
+    if (!(headers["content-type"] ?? "").toLowerCase().includes("html")) return "";
+
+    return ogImage(new TextDecoder().decode(raw).slice(0, 262144), url);
+  } catch {
+    return "";
+  }
+}
+
 const storyItem = (
   id: string,
   fields: { title?: string; url?: string; time?: number; status?: string; list?: string } = {},
@@ -105,9 +130,9 @@ export class HackerNewsConnector implements BaseConnector {
         const db = new Database(path, { readonly: true, create: false });
 
         try {
-          return sqliteNames
-            .parse(db.query("SELECT name FROM sqlite_master WHERE type='table'").all())
-            .some((entry) => ["favorite", "favorites", "saved"].includes(entry.name.toLowerCase()));
+          return sqliteNames(
+            db.query("SELECT name FROM sqlite_master WHERE type='table'").all(),
+          ).some((name) => ["favorite", "favorites", "saved"].includes(name.toLowerCase()));
         } finally {
           db.close();
         }
@@ -156,9 +181,9 @@ export class HackerNewsConnector implements BaseConnector {
     const db = new Database(path, { readonly: true, create: false });
 
     try {
-      const tables = sqliteNames
-        .parse(db.query("SELECT name FROM sqlite_master WHERE type='table'").all())
-        .map((row) => row.name);
+      const tables = sqliteNames(
+        db.query("SELECT name FROM sqlite_master WHERE type='table'").all(),
+      );
 
       const favorite = tables.find((name) =>
         ["favorite", "favorites", "saved"].includes(name.toLowerCase()),
@@ -168,9 +193,9 @@ export class HackerNewsConnector implements BaseConnector {
       const seen = new Set<string>();
 
       if (favorite) {
-        const columns = sqliteNames
-          .parse(db.query(`PRAGMA table_info(${JSON.stringify(favorite)})`).all())
-          .map((row) => row.name);
+        const columns = sqliteNames(
+          db.query(`PRAGMA table_info(${JSON.stringify(favorite)})`).all(),
+        );
 
         const lookup = new Map(columns.map((column) => [column.toLowerCase(), column]));
 
@@ -212,9 +237,9 @@ export class HackerNewsConnector implements BaseConnector {
 
       if (
         tables.includes("read") &&
-        sqliteNames
-          .parse(db.query("PRAGMA table_info('read')").all())
-          .some((row) => row.name.toLowerCase() === "itemid")
+        sqliteNames(db.query("PRAGMA table_info('read')").all()).some(
+          (name) => name.toLowerCase() === "itemid",
+        )
       ) {
         for (const row of readRows.parse(db.query("SELECT itemid FROM read").all())) {
           const id = String(row.itemid);
@@ -236,12 +261,15 @@ export class HackerNewsConnector implements BaseConnector {
         if (!item.source_id) return item;
 
         try {
-          const response = await fetch(
+          // Guarded transport: a non-2xx raises HttpError, which the outer
+          // catch turns into "leave the item alone".
+          const [, , raw] = await request(
             `https://hacker-news.firebaseio.com/v0/item/${item.source_id}.json`,
+            { userAgent: config.get("USER_AGENT"), timeout: 10 },
           );
 
-          if (!response.ok) return item;
-          const parsed = hnItemSchema.safeParse(await response.json());
+          const value: unknown = JSON.parse(new TextDecoder().decode(raw));
+          const parsed = hnItemSchema.safeParse(value);
 
           if (!parsed.success) return item;
           const data = parsed.data;
@@ -261,23 +289,7 @@ export class HackerNewsConnector implements BaseConnector {
             !articleUrl.toLowerCase().includes("news.ycombinator.com/item?id=") &&
             !metadata.og_image
           ) {
-            try {
-              const article = await fetch(articleUrl, {
-                signal: AbortSignal.timeout(10_000),
-                headers: { Accept: "text/html,application/xhtml+xml" },
-              });
-
-              if (
-                article.ok &&
-                (article.headers.get("content-type") ?? "").toLowerCase().includes("html")
-              ) {
-                const image = ogImage((await article.text()).slice(0, 262144), articleUrl);
-
-                if (image) metadata.og_image = image;
-              }
-            } catch {
-              /* a story's metadata does not depend on its linked article */
-            }
+            metadata.og_image ||= await fetchOgImage(articleUrl);
           }
 
           return newItem({

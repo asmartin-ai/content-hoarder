@@ -40,6 +40,14 @@ export function looseText(value: JsonValue | undefined): string {
   return parsed.success ? String(parsed.data) : "";
 }
 
+/** Table or column names from a `sqlite_master` / `PRAGMA table_info` row set. */
+export function sqliteNames(rows: readonly unknown[]): string[] {
+  return z
+    .array(z.object({ name: z.string() }))
+    .parse(rows)
+    .map((row) => row.name);
+}
+
 const csvCells = (line: string): string[] => {
   const cells: string[] = [];
 

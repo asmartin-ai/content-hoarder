@@ -17,9 +17,11 @@ const searchNames = (database: Database, query: string): string[] =>
 // SAFETY: bun:sqlite `get()` returns `unknown`-shaped rows; every column
 // here is written by this file's own INSERT/UPDATE above.
 const stored = (database: Database): string =>
-  (database.query("SELECT search_text FROM items WHERE fullname='reddit:t3_sync'").get() as
-    | { search_text: string }
-    | undefined)?.search_text ?? "";
+  (
+    database.query("SELECT search_text FROM items WHERE fullname='reddit:t3_sync'").get() as
+      | { search_text: string }
+      | undefined
+  )?.search_text ?? "";
 
 const withDb = (body: (database: Database) => void): void => {
   const database = new Database(":memory:");
@@ -28,14 +30,18 @@ const withDb = (body: (database: Database) => void): void => {
     db.initDb(database);
     db.mergeUpsert(
       database,
-      newItem({ source: "reddit", source_id: "t3_sync", title: "Original title", body: "body text" }),
+      newItem({
+        source: "reddit",
+        source_id: "t3_sync",
+        title: "Original title",
+        body: "body text",
+      }),
     );
     body(database);
   } finally {
     database.close();
   }
 };
-
 
 test("a tag added through the human edit path becomes searchable", () => {
   withDb((database) => {
@@ -87,7 +93,10 @@ test("clearing auto tags leaves the manual vocabulary searchable", () => {
 
 test("setAutoTags with an explicit last-seen still rewrites the search blob", () => {
   withDb((database) => {
-    db.setAutoTags(database, "reddit:t3_sync", ["fresh"], { preserveTags: [], lastSeenUtc: 1_700_000_000 });
+    db.setAutoTags(database, "reddit:t3_sync", ["fresh"], {
+      preserveTags: [],
+      lastSeenUtc: 1_700_000_000,
+    });
 
     // SAFETY: both columns are written by the setAutoTags call immediately
     // above; last_seen_utc is non-null only because lastSeenUtc was passed.

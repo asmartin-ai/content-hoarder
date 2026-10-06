@@ -636,14 +636,41 @@ export function metadataWithCategoryTag(
   return md;
 }
 
-function updateMetadata(db: Database, item: RawItem, metadata: Metadata): void {
+/**
+ * The ONLY write path for `items.metadata` plus the `search_text`
+ * mirror the external-content FTS indexes read (AGENTS.md rebuild
+ * rule: no code path may write items without keeping both columns
+ * in step). Pass `lastSeenUtc` only when the caller may move the
+ * item in the feed; omit it to leave `last_seen_utc` untouched.
+ */
+function writeItemMetadata(
+  db: Database,
+  item: RawItem,
+  metadata: Metadata,
+  lastSeenUtc?: number | null,
+): void {
   const searchText = buildSearchText(item, metadata);
-  run(db, "UPDATE items SET metadata=?, search_text=?, last_seen_utc=? WHERE fullname=?", [
-    JSON.stringify(metadata),
-    searchText,
-    Number(item.last_seen_utc || Math.floor(Date.now() / 1000)),
-    item.fullname,
-  ]);
+
+  if (lastSeenUtc === undefined || lastSeenUtc === null) {
+    run(db, "UPDATE items SET metadata=?, search_text=? WHERE fullname=?", [
+      JSON.stringify(metadata),
+      searchText,
+      item.fullname,
+    ]);
+  } else {
+    run(db, "UPDATE items SET metadata=?, search_text=?, last_seen_utc=? WHERE fullname=?", [
+      JSON.stringify(metadata),
+      searchText,
+      lastSeenUtc,
+      item.fullname,
+    ]);
+  }
+}
+
+function updateMetadata(db: Database, item: RawItem, metadata: Metadata): void {
+  const lastSeen = Number(item.last_seen_utc || Math.floor(Date.now() / 1000));
+
+  writeItemMetadata(db, item, metadata, lastSeen);
 }
 
 /**
@@ -687,11 +714,7 @@ export function patchItemMetadata(
   }
 
   if (!changed) return false;
-  run(db, "UPDATE items SET metadata=?, search_text=? WHERE fullname=?", [
-    JSON.stringify(md),
-    buildSearchText(item, md),
-    fullname,
-  ]);
+  writeItemMetadata(db, item, md);
 
   return true;
 }
@@ -782,11 +805,7 @@ export function setTags(
 
     if (manual.length) md.tags_manual = manual;
     else delete md.tags_manual;
-    run(db, "UPDATE items SET metadata=?, search_text=? WHERE fullname=?", [
-      JSON.stringify(md),
-      buildSearchText(item, md),
-      fullname,
-    ]);
+    writeItemMetadata(db, item, md);
   }
 
   return tags;
@@ -831,23 +850,7 @@ export function setAutoTags(
   if (auto.length) md.tags_auto = auto;
   else delete md.tags_auto;
 
-  const metadataJson = JSON.stringify(md);
-  const searchText = buildSearchText(item, md);
-
-  if (opts.lastSeenUtc === undefined || opts.lastSeenUtc === null) {
-    run(db, "UPDATE items SET metadata=?, search_text=? WHERE fullname=?", [
-      metadataJson,
-      searchText,
-      fullname,
-    ]);
-  } else {
-    run(db, "UPDATE items SET metadata=?, search_text=?, last_seen_utc=? WHERE fullname=?", [
-      metadataJson,
-      searchText,
-      Number(opts.lastSeenUtc),
-      fullname,
-    ]);
-  }
+  writeItemMetadata(db, item, md, opts.lastSeenUtc);
 
   return final;
 }
@@ -2294,6 +2297,13 @@ const _STRIP_DECAY_SQL =
   "json_remove(metadata, '$.decayed_at', '$.decay_label', " +
   "'$.snoozed_until', '$.snoozed_wave')";
 
+/** Reject a status outside the models-owned domain before any status write. */
+function assertStatus(status: string): void {
+  if (!VALID_STATUSES.some((validStatus) => validStatus === status)) {
+    throw new Error(`invalid status: ${JSON.stringify(status)}`);
+  }
+}
+
 /**
  * Set an item's triage status; record the previous one for undo.
  *
@@ -2312,9 +2322,7 @@ export function setStatus(
 ): Item | null {
   const queueUnsave = opts.queueUnsave ?? true;
 
-  if (!VALID_STATUSES.some((validStatus) => validStatus === status)) {
-    throw new Error(`invalid status: ${JSON.stringify(status)}`);
-  }
+  assertStatus(status);
 
   const r = row<{ status: string }>(db, "SELECT status FROM items WHERE fullname=?", [fullname]);
 
@@ -2388,9 +2396,7 @@ export function undoStatus(db: Database, fullname: string): Item | null {
 
 /** Apply a status to many items; returns the number updated. */
 export function bulkSetStatus(db: Database, fullnames: string[], status: string): number {
-  if (!VALID_STATUSES.some((validStatus) => validStatus === status)) {
-    throw new Error(`invalid status: ${JSON.stringify(status)}`);
-  }
+  assertStatus(status);
 
   const now = Math.floor(Date.now() / 1000);
   const processed = status === "inbox" ? null : now;
@@ -2428,15 +2434,9 @@ export function bulkSetStatus(db: Database, fullnames: string[], status: string)
 }
 
 function dedupeFullnames(fullnames: string[] | null | undefined): string[] {
-  const out: string[] = [];
+  const trimmed = (fullnames ?? []).map((fn) => String(fn || "").trim());
 
-  for (const fn of fullnames ?? []) {
-    const s = String(fn || "").trim();
-
-    if (s && !out.includes(s)) out.push(s);
-  }
-
-  return out;
+  return [...new Set(trimmed.filter(Boolean))];
 }
 
 function sampleItems(list: Array<{ fullname: string; title: string }>, samples = 5): string[] {
@@ -2551,6 +2551,8 @@ export function snooze(
     const now = Math.floor(Date.now() / 1000);
     let appliedTotal = 0;
 
+    // SAFETY: no search_text rewrite — snoozed_until, snooze_count and
+    // snoozed_wave are absent from models._META_SEARCH_KEYS.
     if (toSnooze.length) {
       const wave = allocateSnoozeWave(db, now);
       const placeholders = toSnooze.map(() => "?").join(",");
@@ -2648,6 +2650,9 @@ export function unsnooze(
     sample: sampleItems(list, samples),
   };
 
+  // SAFETY: no search_text rewrite — none of the keys this touches
+  // (snoozed_until, snoozed_wave) appear in models._META_SEARCH_KEYS, so
+  // buildSearchText is unchanged. Matches the Python oracle's UPDATE.
   if (opts.apply) {
     res.applied = true;
 
@@ -2756,6 +2761,27 @@ export interface DecayOpts {
 }
 
 /**
+ * Random `r/<sub>: title` preview of the rows a bulk triage
+ * operation selected — the dry-run sample `decay`, `undecay` and
+ * `deleteItems` all show before anything is applied.
+ */
+function randomSubredditSamples(
+  db: Database,
+  where: string,
+  params: SQLQueryBindings[],
+  samples: number,
+): string[] {
+  const list = rows<{ subreddit: string | null; title: string }>(
+    db,
+    `SELECT json_extract(metadata, '$.subreddit') AS subreddit, title FROM items ` +
+      `WHERE ${where} ORDER BY RANDOM() LIMIT ?`,
+    [...params, samples],
+  );
+
+  return list.map((r) => `r/${r.subreddit ?? "?"}: ${r.title.slice(0, 60)}`);
+}
+
+/**
  * Guilt-free bulk decay: archive inbox items by tag/subreddit/age,
  * stamped for reversal.
  *
@@ -2844,14 +2870,7 @@ export function decay(db: Database, opts: DecayOpts = {}): DecayResult {
     ">=4y": Number(b?.b3 || 0),
   };
 
-  const sampleList = rows<{ subreddit: string | null; title: string }>(
-    db,
-    `SELECT json_extract(metadata, '$.subreddit') AS subreddit, title FROM items ` +
-      `WHERE ${where} ORDER BY RANDOM() LIMIT ?`,
-    [...params, samples],
-  );
-
-  const sample = sampleList.map((r) => `r/${r.subreddit ?? "?"}: ${r.title.slice(0, 60)}`);
+  const sample = randomSubredditSamples(db, where, params, samples);
 
   const res: DecayResult = {
     total,
@@ -3009,14 +3028,7 @@ export function undecay(
   const where = clauses.join(" AND ");
   const total = scalar(db, `SELECT COUNT(*) AS c FROM items WHERE ${where}`, params);
 
-  const sampleList = rows<{ subreddit: string | null; title: string }>(
-    db,
-    `SELECT json_extract(metadata, '$.subreddit') AS subreddit, title FROM items ` +
-      `WHERE ${where} ORDER BY RANDOM() LIMIT ?`,
-    [...params, samples],
-  );
-
-  const sample = sampleList.map((r) => `r/${r.subreddit ?? "?"}: ${r.title.slice(0, 60)}`);
+  const sample = randomSubredditSamples(db, where, params, samples);
 
   const res: UndecayResult = { total, applied: false, sample };
 
@@ -3051,6 +3063,37 @@ export interface DeleteItemsOpts {
   apply?: boolean;
   samples?: number;
   maxRows?: number;
+}
+
+/**
+ * Chunked hard-delete of selected `victims` and their dependent rows:
+ * cached `reddit_threads` first, then the pending `reddit_unsave`
+ * queue (skipped when `clearPendingUnsave` is false because the caller
+ * just queued real unsaves for these items), then the item itself.
+ * 500 fullnames per statement keeps the binding count well under
+ * SQLite's variable limit. Caller owns the transaction; returns the
+ * number of `reddit_threads` rows removed.
+ */
+function deleteVictims(db: Database, victims: string[], clearPendingUnsave: boolean): number {
+  let threads = 0;
+
+  for (let i = 0; i < victims.length; i += 500) {
+    const chunk = victims.slice(i, i + 500);
+    const placeholders = chunk.map(() => "?").join(",");
+    threads += run(db, `DELETE FROM reddit_threads WHERE fullname IN (${placeholders})`, chunk);
+
+    if (clearPendingUnsave) {
+      run(
+        db,
+        `DELETE FROM reddit_unsave WHERE fullname IN (${placeholders}) AND state='pending'`,
+        chunk,
+      );
+    }
+
+    run(db, `DELETE FROM items WHERE fullname IN (${placeholders})`, chunk);
+  }
+
+  return threads;
 }
 
 /**
@@ -3158,14 +3201,7 @@ export function deleteItems(db: Database, opts: DeleteItemsOpts = {}): DeleteIte
 
   const total = victims.length;
 
-  const sampleList = rows<{ subreddit: string | null; title: string }>(
-    db,
-    `SELECT json_extract(metadata, '$.subreddit') AS subreddit, title FROM items ` +
-      `WHERE ${where} ORDER BY RANDOM() LIMIT ?`,
-    [...params, samples],
-  );
-
-  const sample = sampleList.map((r) => `r/${r.subreddit ?? "?"}: ${r.title.slice(0, 60)}`);
+  const sample = randomSubredditSamples(db, where, params, samples);
 
   const res: DeleteItemsResult = {
     total,
@@ -3201,25 +3237,7 @@ export function deleteItems(db: Database, opts: DeleteItemsOpts = {}): DeleteIte
       enqueued = scalar(db, "SELECT COUNT(*) AS c FROM reddit_unsave") - beforeQ;
     }
 
-    let threads = 0;
-
-    for (let i = 0; i < total; i += 500) {
-      const chunk = victims.slice(i, i + 500);
-      const placeholders = chunk.map(() => "?").join(",");
-      threads += run(db, `DELETE FROM reddit_threads WHERE fullname IN (${placeholders})`, chunk);
-
-      if (!alsoUnsave) {
-        run(
-          db,
-          `DELETE FROM reddit_unsave WHERE fullname IN (${placeholders}) AND state='pending'`,
-          chunk,
-        );
-      }
-
-      run(db, `DELETE FROM items WHERE fullname IN (${placeholders})`, chunk);
-    }
-
-    return { enqueued, threads };
+    return { enqueued, threads: deleteVictims(db, victims, !alsoUnsave) };
   });
 
   res.threads_deleted = writes.threads;
@@ -3314,23 +3332,7 @@ export function purgeDone(
     params,
   ).map((r) => String(r.fullname));
 
-  const threadsDeleted = withTransaction(db, () => {
-    let threads = 0;
-
-    for (let i = 0; i < victims.length; i += 500) {
-      const chunk = victims.slice(i, i + 500);
-      const placeholders = chunk.map(() => "?").join(",");
-      threads += run(db, `DELETE FROM reddit_threads WHERE fullname IN (${placeholders})`, chunk);
-      run(
-        db,
-        `DELETE FROM reddit_unsave WHERE fullname IN (${placeholders}) AND state='pending'`,
-        chunk,
-      );
-      run(db, `DELETE FROM items WHERE fullname IN (${placeholders})`, chunk);
-    }
-
-    return threads;
-  });
+  const threadsDeleted = withTransaction(db, () => deleteVictims(db, victims, true));
 
   return { ...res, applied: true, threads_deleted: threadsDeleted };
 }
@@ -3583,6 +3585,9 @@ export function setItemFolder(db: Database, fullname: string, folderName: string
   } else {
     delete md.folder;
   }
+  // SAFETY: no search_text rewrite — `folder` is not a _META_SEARCH_KEYS
+  // entry, so the search blob cannot change here. Adding it to that list
+  // without routing this through writeItemMetadata would silently desync FTS.
 
   run(db, "UPDATE items SET metadata=? WHERE fullname=?", [JSON.stringify(md), fullname]);
 
@@ -3667,13 +3672,7 @@ function rewriteManualTag(db: Database, old: string, newName: string | null): nu
 
     if (union.length) md.tags = union;
     else delete md.tags;
-    item.metadata = JSON.stringify(md);
-    item.search_text = buildSearchText(item, md);
-    run(db, "UPDATE items SET metadata=?, search_text=? WHERE fullname=?", [
-      item.metadata,
-      item.search_text,
-      item.fullname,
-    ]);
+    writeItemMetadata(db, item, md);
   }
 
   // Rebuild the external-content trigram FTS over search_text so

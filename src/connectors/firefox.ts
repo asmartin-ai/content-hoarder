@@ -47,10 +47,6 @@ const firefoxPayloadSchema = z
   })
   .passthrough();
 
-interface FirefoxTabOptions {
-  skipIncognito?: boolean;
-}
-
 const domain = (url: string): string => url.match(/^https?:\/\/([^/]+)/i)?.[1]?.toLowerCase() ?? "";
 
 const normalizedUrl = (url: string): string => {
@@ -161,12 +157,8 @@ export function ytItem(
   });
 }
 
-export function itemFromTabRecord(
-  record: FirefoxTab,
-  options: FirefoxTabOptions = {},
-): RawItem | null {
-  if (options.skipIncognito !== false && (record.incognito === true || record.incognito === 1))
-    return null;
+export function itemFromTabRecord(record: FirefoxTab): RawItem | null {
+  if (record.incognito === true || record.incognito === 1) return null;
   const url = stringValue(record.url).trim();
 
   if (!httpUrl.test(url)) return null;

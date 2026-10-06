@@ -3,7 +3,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { inflateRawSync } from "node:zlib";
 import * as z from "zod";
 import { newItem, type JsonValue, type Metadata, type RawItem } from "../models.ts";
-import { looseRecord, looseText, parseCsv, type BaseConnector, type JsonRecord } from "./base.ts";
+import {
+  looseRecord,
+  looseText,
+  parseCsv,
+  sqliteNames,
+  type BaseConnector,
+  type JsonRecord,
+} from "./base.ts";
 
 const sqliteText = z.union([z.string(), z.number(), z.null()]);
 
@@ -49,6 +56,14 @@ export function previewThumb(value: JsonValue): string {
 
   return thumbnail.startsWith("http") ? thumbnail : "";
 }
+
+/** A finite number from a loose sqlite column, or null when absent/blank/unparseable. */
+const finiteNumber = (value: string | number | null | undefined): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const commentPermalink = /\/comments\/([a-z0-9]+)\/[^/]*\/([a-z0-9]+)/i;
 
@@ -170,15 +185,9 @@ export const childToItem = (
   if (permalink) metadata.permalink = permalink;
 
   if (data.over_18 !== undefined && data.over_18 !== null) metadata.over_18 = data.over_18 ? 1 : 0;
-  const preview = looseRecord(data.preview);
-  const images = z.array(z.json()).safeParse(preview?.images);
-  const firstImage = looseRecord(images.success ? images.data.at(0) : undefined);
-  const source = looseRecord(firstImage?.source);
-  const thumbnail = z.string().safeParse(source?.url);
+  const thumbnail = previewThumb(data);
 
-  if (thumbnail.success) metadata.thumbnail = thumbnail.data.replaceAll("&amp;", "&");
-  else if (looseText(data.thumbnail).startsWith("http"))
-    metadata.thumbnail = looseText(data.thumbnail);
+  if (thumbnail) metadata.thumbnail = thumbnail;
 
   if (options.savedSeenUtc !== undefined) metadata.saved_seen_utc = options.savedSeenUtc;
   const url = classifyMedia(metadata, looseText(data.url), permalink, body, kind);
@@ -429,16 +438,13 @@ export class RedditConnector implements BaseConnector {
     const db = new Database(path, { readonly: true, create: false });
 
     try {
-      const tables = z
-        .array(z.object({ name: z.string() }))
-        .parse(db.query("SELECT name FROM sqlite_master WHERE type='table'").all());
+      const tables = sqliteNames(
+        db.query("SELECT name FROM sqlite_master WHERE type='table'").all(),
+      );
 
-      if (!tables.some((entry) => entry.name.toLowerCase() === "items")) return false;
+      if (!tables.some((name) => name.toLowerCase() === "items")) return false;
 
-      const columns = z
-        .array(z.object({ name: z.string() }))
-        .parse(db.query("PRAGMA table_info(items)").all())
-        .map((entry) => entry.name);
+      const columns = sqliteNames(db.query("PRAGMA table_info(items)").all());
 
       return (
         (columns.includes("permalink") || columns.includes("subreddit")) &&
@@ -467,27 +473,15 @@ export class RedditConnector implements BaseConnector {
         if (subredditValue) metadata.subreddit = subredditValue;
 
         if (permalink) metadata.permalink = permalink;
-        const score = Number(data.score);
+        const score = finiteNumber(data.score);
 
-        if (
-          data.score !== null &&
-          data.score !== undefined &&
-          data.score !== "" &&
-          Number.isFinite(score)
-        )
-          metadata.score = score;
+        if (score !== null) metadata.score = score;
         const over18 = looseText(data.over_18).toLowerCase();
 
         if (over18) metadata.over_18 = ["true", "1", "yes"].includes(over18) ? 1 : 0;
-        const commentCount = Number(data.num_comments);
+        const commentCount = finiteNumber(data.num_comments);
 
-        if (
-          data.num_comments !== null &&
-          data.num_comments !== undefined &&
-          data.num_comments !== "" &&
-          Number.isFinite(commentCount)
-        )
-          metadata.num_comments = commentCount;
+        if (commentCount !== null) metadata.num_comments = commentCount;
         const redditId = looseText(data.reddit_id);
 
         if (redditId) metadata.reddit_id = redditId;

@@ -135,44 +135,38 @@ async function chat(
   return content;
 }
 
-function parseSuggestion(text: string): Suggestion | null {
+/** The first `{...}` in a model reply, parsed through `schema`; null if absent or invalid. */
+function extractJson<T>(text: string, schema: z.ZodType<T>): T | null {
   const match = /\{.*\}/s.exec(text);
 
   if (!match) return null;
 
   try {
     const value: unknown = JSON.parse(match[0]);
-    const parsed = SuggestionSchema.safeParse(value);
+    const parsed = schema.safeParse(value);
 
-    return parsed.success
-      ? {
-          ...parsed.data,
-          tags: parsed.data.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
-        }
-      : null;
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
 }
 
-export function suggest(item: Item): Promise<Suggestion | null>;
-export function suggest(
-  database: Database,
-  opts?: { source?: string; limit?: number },
-): Promise<SuggestInboxResult>;
-export async function suggest(
-  subject: Item | Database,
-  opts: { source?: string; limit?: number } = {},
-): Promise<Suggestion | SuggestInboxResult | null> {
-  if (subject instanceof Database) return suggestInbox(subject, opts);
+function parseSuggestion(text: string): Suggestion | null {
+  const parsed = extractJson(text, SuggestionSchema);
 
+  return parsed
+    ? { ...parsed, tags: parsed.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean) }
+    : null;
+}
+
+export async function suggest(item: Item): Promise<Suggestion | null> {
   if (!isAvailable()) return null;
 
   try {
     return parseSuggestion(
       await chat([
         { role: "system", content: SYSTEM },
-        { role: "user", content: itemText(subject) },
+        { role: "user", content: itemText(item) },
       ]),
     );
   } catch {
@@ -218,22 +212,8 @@ export async function suggestInbox(
   return { available: true, annotated, scanned: rows.length };
 }
 
-function parseCategory(
-  text: string,
-): { category: (typeof VALID_CATEGORIES)[number]; reason: string } | null {
-  const match = /\{.*\}/s.exec(text);
-
-  if (!match) return null;
-
-  try {
-    const value: unknown = JSON.parse(match[0]);
-    const parsed = CategorySchema.safeParse(value);
-
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
+const parseCategory = (text: string): { category: Category; reason: string } | null =>
+  extractJson(text, CategorySchema);
 
 type ChatOverride = (messages: Array<{ role: string; content: string }>) => Promise<string>;
 
