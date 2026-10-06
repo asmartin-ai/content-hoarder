@@ -35,9 +35,9 @@ Snapshot: **2026-07-12** after the ready-to-code sweep on `feat/ocr-tesseract-ex
 ## Verification
 
 ```bash
-python -m pytest
+bun run check
 # focused:
-python -m pytest tests/test_ocr_enrich.py tests/test_browse_ready_static.py
+bun test tests/ocr.test.ts tests/connectors.test.ts
 ```
 
 ## Locked decisions

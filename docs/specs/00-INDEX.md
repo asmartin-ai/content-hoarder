@@ -9,6 +9,12 @@ Created 2026-06-14.
 Context at the time: frontend-v3 *design* work was parked pending Fable 5. These were the
 **non-design, offline-testable backlog features** safe to build unsupervised. This file is now
 historical; active work lives in GitHub Issues, with local history under `docs/backlog/`.
+The specs below were written against the Python runtime and keep its file names, `python -m
+pytest` commands, and `.venv` paths verbatim as a record of what was planned at the time. None
+of that is current: the project now runs on Bun + TypeScript, the TypeScript equivalents are
+`src/search_query.ts`, `src/_http.ts`, `src/reddit_hydrate.ts`, and `src/archival/`, and the
+gate is `bun run check`. Do not follow a Python command in these documents; read `AGENTS.md` for
+the current toolchain.
 
 ## The batch (7 items)
 

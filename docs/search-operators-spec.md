@@ -142,7 +142,7 @@ needs no change — it already sends raw `q`).
   work identically; the FTS exact + `#fuzzy` paths are preserved).
 - Non-destructive: read-only query path; no schema or data changes.
 
-## Testing (this repo runs offline pytest)
+## Testing (this repo runs offline, on Bun)
 
 - Add `tests/test_search_query.py`: pure-function tests for `parse()` — each operator, combinations,
   quoting, negation, malformed values, unknown keys falling through to text.
@@ -150,12 +150,12 @@ needs no change — it already sends raw `q`).
   `models.new_item` (see existing tests for the pattern), then assert `search_items` / `GET /items`
   return the right rows for representative operator queries (including AND-tags, date range, score,
   nsfw, negation).
-- Run: `.venv\Scripts\python.exe -m pytest -q` (Windows; all tests are offline). Keep the suite green.
+- Run: `bun run check` (all tests are offline). Keep the suite green.
 - Conventional Commits (`feat(search): ...`, `test(search): ...`). Small logical commits.
 
 ## Constraints / gotchas
 
-- Windows dev box; use the project venv at `.venv\Scripts\python.exe`. One venv per project.
+- The FTS5 caveats below still hold. The venv/Windows instructions they used to sit beside do not: this project runs on Bun + TypeScript with no Python runtime.
 - FTS5 syntax is strict — an unquoted bare `OR`/`AND`/`NEAR`/`NOT` or an empty MATCH 500s the request.
   That's exactly why `_fts_query` quotes every token; preserve that discipline when adding phrases/NOT.
 - Don't regress the `fuzzy` (trigram) path or the `include_consolidated` / `open_in_firefox` filters.

@@ -37,25 +37,27 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   other DB errors propagate instead of being mislabeled.
 - `db.rename_user_tag_in_vocab` rolls back the vocabulary row + item stamps on failure
   (matches `delete_user_tag`); docstring now matches the actual commit contract.
-- Bun CLI parity: preserve Python dry-run/safety notes and JSON export bytes, retain Twitter
-  bookmark order, and scope nested folder/tag options and positional arguments to their commands.
+- Bun CLI parity: the legacy Python dry-run/safety note text and JSON export bytes are
+  preserved verbatim, Twitter bookmark order is retained, and nested folder/tag options and
+  positional arguments are scoped to their own commands. Help output and malformed-command
+  errors match the Python original byte-for-byte.
 - SW cache + APP_VERSION bumped v128 → v129 (new static assets must not serve stale).
 
 ### Changed
 
-- Refreshed the Python lockfile for Linux maintenance (2026-10-03), retaining
-  Flask 3.x and preserving the imported Windows `.venv`; native dependencies
-  are isolated in `.venv-linux`, including optional OCR/YouTube/UI packages.
+- **Runtime cutover to Bun + TypeScript.** The CLI, web app, SQLite layer, connectors, archival,
+  media, and OCR paths are TypeScript on Bun (`bun run check` is the gate: tsc,
+  `oxlint --deny-warnings`, oxfmt, tests). `bun:sqlite` replaces stdlib sqlite3 with the same
+  schema, FTS5 external-content indexes, durability triggers, and non-destructive upsert
+  semantics. SSRF policy is enforced with `node:net` `BlockList`, refusing IPv4-mapped IPv6,
+  noncanonical/encoded IPv4 spellings, and every localhost alias form. OCR is magick
+  first-frame plus native tesseract; video archival is ffmpeg over HLS/DASH via youtubei.js.
+  No yt-dlp and no Python sidecar.
+- The previous "refreshed the Python lockfile / Flask 3.x / `.venv`" entry has been removed: it
+  described a runtime this project no longer has.
 - Repository relocated under `/path/to\` (2026-08-15 unification); all internal path
-  references updated to the new parent; venv editable hook repointed to `src`.
+  references updated to the new parent.
 
-### Fixed
-
-- AGENTS.md layout map and both frontend-design skills no longer describe the retired v2 teal
-  system or legacy `/triage` + `/reddit` pages — they are 302 redirects into the v3 surface.
-- Triage state roles (`ready-for-agent` / `ready-for-human` / `needs-info`) applied across the
-  open backlog; already-implemented issues #18 (Karakeep bridge) and #55 (unified surface)
-  closed as wontfix.
 
 ## 1.1.0 - 2026-07-01
 
