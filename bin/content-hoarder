@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT=$(readlink -f -- "$0")
-ROOT=$(dirname "$(dirname "$SCRIPT"))
+ROOT=$(dirname "$(dirname "$SCRIPT")")
 
 if ! command -v bun >/dev/null 2>&1; then
     printf '%s\n' 'content-hoarder requires Bun; see README.md install steps.' >&2
