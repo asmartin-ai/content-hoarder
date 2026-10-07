@@ -21,7 +21,7 @@ Mono as locally-vendored woff2 in `static/fonts/`.
 > **Shared ADHD design language (2026-06-12):** the cross-project *behavioral* principles
 > (friction asymmetry, no backlog counts, guilt-free decay, recognition-over-recall
 > resurfacing, shame-free copy, …) now live in
-> **`/path/to\adhd-design-language\DESIGN-LANGUAGE.md`** — the single source of truth
+> **`../adhd-design-language/DESIGN-LANGUAGE.md`** (sibling repo) — the single source of truth
 > shared with PKMS (Epic 23). Consult it before designing any new surface/flow/copy;
 > reference by path, never copy. This skill keeps the content-hoarder-specific visual
 > system (tokens, gestures, PWA rules) below.
@@ -80,7 +80,7 @@ applies it before first paint. **v3 rule: components consume the SEMANTIC ALIASE
   (right = archive, left = done). Browse keys: J/K move · S keep · E archive · Y done · X select.
 
 ## Mobile / PWA rules (do not regress)
-- Target **Chrome on Android (Pixel 6)**. The deck keeps its **40px card edge-inset + 30px
+- Target **Chrome on Android (OnePlus 15)**. The deck keeps its **40px card edge-inset + 30px
   pointer edge-deadzone** (`browse.css` `.deck-host`/`.deck-card`) so the system back-gesture
   never fires — never reduce it.
 - Respect `env(safe-area-inset-*)`; `viewport-fit=cover` is set.

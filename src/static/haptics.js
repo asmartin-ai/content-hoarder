@@ -1,7 +1,7 @@
 /* haptics.js — window.chHaptic(kind): subtle Web-Vibration feedback for triage/browse commits. No-op where unsupported. */
 (function () {
   // Keyed on the real status enum (models.VALID_STATUSES) so call sites pass `status` directly.
-  // navigator.vibrate is DURATION-ONLY (no amplitude knob), and a Pixel-class LRA needs ~12-15ms to
+  // navigator.vibrate is DURATION-ONLY (no amplitude knob), and a typical phone LRA needs ~12-15ms to
   // spin up to full force — so sub-10ms pulses feel "soft." Tuned 2026-06-22 for a FIRM-but-crisp tap:
   // durations land in the firm zone (felt, not a long buzz). History: ~18ms = "too strong", 8ms = "too
   // soft"; these sit in the middle. Relative hierarchy kept (backlog-reducers stronger than preserve/skip).

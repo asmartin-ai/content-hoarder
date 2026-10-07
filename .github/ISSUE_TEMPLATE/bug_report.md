@@ -18,4 +18,4 @@ labels: bug
 ## Environment
 - Source(s): <!-- reddit / youtube / hackernews / obsidian / keep -->
 - Where: <!-- browse / triage / CLI -->
-- Browser / OS: <!-- e.g. Firefox on Pixel 6 -->
+- Browser / OS: <!-- e.g. Chrome on Android (OnePlus 15) -->

@@ -60,7 +60,7 @@
       { "name": "slow", "value": "200ms", "purpose": "Sheet or overlay transition ceiling." }
     ],
     "breakpoints": [
-      { "name": "phone", "value": "Pixel 6 / Chrome Android target" },
+      { "name": "phone", "value": "OnePlus 15 / Chrome Android target" },
       { "name": "desktop-shell", "value": "max-width: 1100px console row" }
     ]
   },

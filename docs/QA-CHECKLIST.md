@@ -13,7 +13,7 @@ Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 - **Desktop:** `bun run start` → http://127.0.0.1:8788
 - **Mobile:** `bun run src/cli.ts serve --host <tailscale-ip>` → open the URL on the phone
-  (Chrome / Pixel-6 target) and install to home screen. See [MOBILE_TAILSCALE.md](MOBILE_TAILSCALE.md).
+  (Chrome on Android; OnePlus 15) and install to home screen. See [MOBILE_TAILSCALE.md](MOBILE_TAILSCALE.md).
 - **Mobile layout** engages at **≤ 860 px** (left sidebar becomes a hamburger drawer). Preview on
   desktop via DevTools device-emulation, but do a real-phone pass for swipe/touch.
 - **Service worker:** the shell is precached (`sw.js` — check the current `CACHE` constant for the
@@ -247,7 +247,7 @@ These already have GitHub issues:
 
 - **Hold-to-preview media** (B4): verify swipe/long-press race + click-after-peek suppression.
 - **Pinch-zoom / pan / swipe-far-to-close lightbox** (C2/C3): verify physical pinch, zoomed pan clamp,
-  and 1× vertical drag close on a Pixel-6-class device.
+  and 1× vertical drag close on a real Android phone (OnePlus 15).
 - **Reader triage without feed refresh** (A2): verify feed position and lazy item removal on real device.
 - **Sidebar/sheets scroll-lock:** verify drawer/sheets trap scroll and restore the feed position on close.
 - **Tag editor mobile flow:** verify three suggestions, tap-without-keyboard, Enter closes once, no keyboard flicker.

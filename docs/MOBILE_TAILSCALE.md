@@ -1,12 +1,12 @@
 # Triaging on your phone (Tailscale)
 
-Goal: open content-hoarder on your Pixel 6 (Chrome) over a **private** connection and install it
+Goal: open content-hoarder on your Android phone (Chrome) over a **private** connection and install it
 as a PWA. We use Tailscale (a zero-config WireGuard mesh VPN) so the app is reachable **only by your
 own devices** — never the public internet.
 
 ## 1. Install Tailscale on both devices (same account)
-- **Windows PC:** download from <https://tailscale.com/download/windows>, install, sign in.
-- **Pixel 6:** install **Tailscale** from the Play Store, sign in with the **same** account.
+- **Linux desktop:** install from <https://tailscale.com/download/linux>, then `sudo tailscale up` and sign in.
+- **Phone:** install **Tailscale** from the Play Store, sign in with the **same** account.
 
 Both devices are now on your private "tailnet". Find your PC's name/IP:
 ```bash

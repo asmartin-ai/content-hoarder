@@ -100,7 +100,7 @@ live in **`docs/IMPORTING.md`**. One gotcha worth keeping here: Materialistic `M
 via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
-- Target: **Chrome on Android (Pixel 6)**. Chrome fires `beforeinstallprompt`, so a custom "Install"
+- Target: **Chrome on Android (OnePlus 15)**. Chrome fires `beforeinstallprompt`, so a custom "Install"
   button is viable (capture the event, call `prompt()` on tap) rather than a menu-hint fallback.
   (The `firefox` *connector* — tab imports, `migrate-firefox-tabs`, `firefox_youtube` — is unrelated.)
 - **Android gesture-nav conflict:** horizontal swipe must NOT trigger system back. Use a ~30px

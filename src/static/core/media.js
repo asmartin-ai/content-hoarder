@@ -457,7 +457,7 @@ export function mountVideo(container, srcUrl, posterUrl, opts) {
   // Decide the HLS path. PREFER hls.js when Hls.isSupported(): Android/desktop Chrome and
   // Firefox have NO native HLS, yet video.canPlayType('application/vnd.apple.mpegurl') can
   // return "maybe" there — a false positive. Routing those to video.src = manifest produced
-  // media error 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) on the Pixel-6 even though the .m3u8 plays
+  // media error 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) on Android Chrome even though the .m3u8 plays
   // fine when opened directly. Native HLS is kept ONLY as the fallback for genuine support
   // (iOS Safari, where hls.js lacks MSE). We NEVER set video.src to the bare v.redd.it
   // redirect (srcUrl) — it 302s, it isn't a playable file.
