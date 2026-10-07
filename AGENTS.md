@@ -117,9 +117,6 @@ via `adb backup`, **not** `adb pull`.
 - Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu
   (mobile hides `.acts` via `@media(hover:none)` → long-press).
 
-## Delegated code changes
-Use the repository's configured Bun/TypeScript tools and preserve strict types, await asynchronous calls, and validate external input at boundaries. The assigned integration owner runs the single final check pass after all edits land.
-
 ## Reddit unsave-on-Done (`reddit_unsave.ts`)
 Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Off by default,
 gated on the `settings` flag `reddit_unsave_on_done`. Full design (decoupled queue, transport, drain):
@@ -129,13 +126,13 @@ unsaving an already-unsaved item is a Reddit no-op). `merge_upsert` preserves `i
 re-imports (gotcha #2). Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it
 mutates real Reddit state).
 
-## Reddit management view (`/reddit`) — *iceboxed*
+## Reddit management view (`/reddit`)
 The RSM view folds over the generic `items` table (no schema change — Reddit fields live in
 `metadata`, flattened by `web._reddit_view`). **Full notes: `docs/reddit-management.md`.** Two
 invariants worth keeping in-reach: (1) thread trees live in the `reddit_threads` side table, *not*
 `metadata` (blobs are large, parsed every row read); (2) `migrate-rsm-threads` and `firefox_youtube`
 write via db helpers → exempt from "connectors never touch the DB" (they are NOT connectors).
-Active work paused; see `docs/reddit-management.md` + `docs/reddit-derisking.md` before resuming.
+See `docs/reddit-management.md` + `docs/reddit-derisking.md` before resuming Reddit work.
 
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.

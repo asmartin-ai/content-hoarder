@@ -16,4 +16,4 @@ labels: enhancement
 - [ ]
 
 ## Notes / references
-<!-- Links, prior art, related issue/milestone, or local history under docs/backlog/. -->
+<!-- Links, prior art, related issue/milestone, or local history. -->

@@ -118,7 +118,7 @@ When building self-contained HTML mockups with a phone-frame toggle (the v3 Gate
 ## Where design artifacts live (repo conventions)
 - **`design-ref/` is git-ignored** (root `.gitignore`) — it's LOCAL reference material (the v3 explorations,
   mockups, bulky screen-recordings/frame sets), never committed. Don't try to commit into it.
-- **Version-controlled design docs go in `docs/`** (docs-as-code) — e.g. `docs/design/<topic>/`. Commit the
+- **Version-controlled design docs go in `docs/`** (docs-as-code) — e.g. `docs/<topic>.md`. Commit the
   markdown plus only the SMALL images it embeds; keep bulky raw source (videos, full frame extractions) OUT of
   git (local in `design-ref/`, regenerable via ffmpeg; git-LFS or external storage only if it must be versioned).
 - **Gotcha: `git add <ignored-path>` adds nothing and still exits 0** (prints a hint, not an error) — a commit

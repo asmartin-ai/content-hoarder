@@ -7,8 +7,7 @@ Each story groups related checks so you don't have to jump around the app.
 Legend: 🖥 = desktop only · 📱 = mobile only · ⬛ = test on both.
 
 > **Findings → GitHub Issues, not here.** Keep this file a neutral checklist; file anything broken as
-> a GitHub issue and link it from `BACKLOG.md` / `docs/backlog/github-issues.json` if it becomes part
-> of the durable backlog.
+> a GitHub issue so it becomes part of the durable backlog.
 
 ## How to run / test
 
@@ -255,42 +254,6 @@ These already have GitHub issues:
 
 ---
 
-## Next work by model tier
-
-Use this section after a QA pass to decide what to delegate. Treat **T3** as tightly-scoped execution,
-**T2** as bounded implementation with tests, and **T1** as diagnosis/design/architecture/live-data work.
-
-### T3 candidates — safe, narrow, easy to review
-
-| Task | Why T3-safe | Done when |
-|---|---|---|
-| **Add/extend browser coverage for QA stories** | Clear oracle; use synthetic fixtures, never private `data/app.db`. | New behavior tests pass with `bun test`, and the matching story passes a desktop/mobile browser check. |
-| **App icon replacement assets** (#19) | Mechanical asset swap once the mark is approved. | `static/icon.svg`, 192/512 PNGs, and manifest assets are updated consistently. |
-| **QA/docs reconciliation after each sprint** | No app behavior risk; good cleanup work. | Checklist/backlog/delegation docs have no stale branch/staging wording. |
-| **Small CSS polish from an approved spec** | Safe only when the visual decision is already made. | One isolated CSS change, before/after screenshot, no broad refactor. |
-
-### T2 candidates — bounded implementation, needs tests/review
-
-| Task | Why T2-sized | T1 handoff needed first |
-|---|---|---|
-| **Import WL3 / Watch Later export** (#15) | Existing YouTube import path can be reused; fixture-driven tests. | Provide/export sample format and decide whether this is one-shot import or recurring workflow. |
-| **OCR search wiring after engine decision** (#26) | Once OCR text exists, FTS/search/operator plumbing is straightforward. | T1 must choose engine and image-byte source from a sample accuracy/cost check. |
-| **Keyboard shortcut implementation** (#14) | Bounded JS + cheatsheet/tests after mapping is approved. | T1/user must approve the new shortcut map first. |
-| **Text Reddit self-post media affordance fix** (#39) | Bounded rendering/classification bug with a clear repro. | Confirm repro with synthetic row, then adjust media tile selection + UI test. |
-| **Lightbox blank-space scroll-lock regression** (#35) | Clear mobile UI oracle; likely localized to lightbox scroll/pointer handling. | Dragging backdrop/blank space never changes feed scrollY. |
-
-### T1 candidates — keep with a strong model / human decision gate
-
-| Task | Why T1 | First concrete action |
-|---|---|---|
-| **Scroll-deceleration diagnosis** (#48) | Requires reproducing touch/scroll physics and separating CSS, JS, browser, and infinite-scroll effects. | Capture a real-device repro and instrument scroll handlers before editing. |
-| **Local media archiving follow-ups / live smoke** (#11) | Large storage/network design with media formats, throttling, and backup implications. | Use a DB copy; verify one representative `v.redd.it`/archive.today path before any larger pass. |
-| **At-save-time media archiving** (#11 follow-up) | Touches sync/import paths and can create network/load side effects. | Define opt-in setting, rate limits, and failure semantics. |
-| **OCR engine selection** (#26) | Needs accuracy/privacy/performance comparison across local engines. | Run a small sample with Tesseract vs local vision and record hit quality. |
-| **Mobile `/reddit` redesign** (#49) | Design/system-level UI work, not just implementation. | Produce a small spec/screenshot plan before code. |
-| **Triage visual rework + inbox-like filtering** (#57) | Design/system-level UI work across triage, gestures, settings, and reader transition. | Lock a design via `frontend-design` before code. |
-
----
 
 > Tip: capture screenshots of anything off (especially on mobile) with the viewport width noted.
 > The comfortable-density, Reddit-media, and mobile-lightbox items are the most likely to surface issues.

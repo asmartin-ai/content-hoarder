@@ -34,7 +34,7 @@ Status: **1.0.0 local release** — content-hoarder now follows [Semantic Versio
 
 ## Project tracking
 
-Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues); offline issue history is in [`docs/backlog/`](docs/backlog/README.md).
+Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues).
 
 ## Quickstart
 
