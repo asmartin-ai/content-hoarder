@@ -643,7 +643,7 @@ export function metadataWithCategoryTag(
  * in step). Pass `lastSeenUtc` only when the caller may move the
  * item in the feed; omit it to leave `last_seen_utc` untouched.
  */
-function writeItemMetadata(
+export function writeItemMetadata(
   db: Database,
   item: RawItem,
   metadata: Metadata,

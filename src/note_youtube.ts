@@ -1,15 +1,7 @@
 import type { Database } from "bun:sqlite";
-import { getItem, mergeUpsert, withTransaction } from "./db.ts";
+import { getItem, mergeUpsert, withTransaction, writeItemMetadata } from "./db.ts";
 import { appendCompanion, companionRecord } from "./consolidate.ts";
-import {
-  buildSearchText,
-  newItem,
-  parseMetadata,
-  VALID_STATUSES,
-  type ItemCore,
-  type Metadata,
-  type RawItem,
-} from "./models.ts";
+import { newItem, parseMetadata, VALID_STATUSES, type Metadata, type RawItem } from "./models.ts";
 import { youtubeId } from "./connectors/firefox.ts";
 
 export const NOTE_PROMOTE_MARKER = "note_youtube";
@@ -162,14 +154,6 @@ function promoteFromNote(note: RawItem, vid: string): RawItem {
   return { ...raw, processed_utc: note.processed_utc };
 }
 
-function writeMetadata(db: Database, item: ItemCore, metadata: Metadata): void {
-  db.query("UPDATE items SET metadata=?,search_text=? WHERE fullname=?").run(
-    JSON.stringify(metadata),
-    buildSearchText(item, metadata),
-    item.fullname,
-  );
-}
-
 export function migrate(db: Database, opts: { apply?: boolean } = {}) {
   const classified = plan(db);
   const candidates = [...classified.orphan, ...classified.companion];
@@ -210,12 +194,12 @@ export function migrate(db: Database, opts: { apply?: boolean } = {}) {
       const youtubeMetadata = parseMetadata(youtube.metadata);
 
       if (appendCompanion(youtubeMetadata, companionRecord(note, noteMetadata))) {
-        writeMetadata(db, youtube, youtubeMetadata);
+        writeItemMetadata(db, youtube, youtubeMetadata);
         result.attached++;
       }
 
       if (addPromotionTarget(noteMetadata, candidate.youtube_fullname))
-        writeMetadata(db, note, noteMetadata);
+        writeItemMetadata(db, note, noteMetadata);
     }
   });
 

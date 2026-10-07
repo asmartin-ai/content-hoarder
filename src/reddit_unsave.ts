@@ -263,10 +263,6 @@ export function enqueueExisting(database: Database): number {
   return db.enqueueExistingDone(database);
 }
 
-function retryAfter(headers: Record<string, string>): number | null {
-  return retryAfterSeconds(headers);
-}
-
 async function sendWithRetry(
   post: Post,
   url: string,
@@ -287,7 +283,7 @@ async function sendWithRetry(
       );
 
     if (statusCode === 429 && attempt < 3) {
-      await opts.sleep(retryAfter(headers) ?? delay);
+      await opts.sleep(retryAfterSeconds(headers) ?? delay);
       delay *= 2;
       continue;
     }

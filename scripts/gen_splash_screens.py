@@ -40,7 +40,7 @@ from pathlib import Path
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[1]
-STATIC = REPO / "src" / "content_hoarder" / "static"
+STATIC = REPO / "src" / "static"
 MANIFEST = STATIC / "manifest.webmanifest"
 
 # (filename, width, height) — physical pixels. Sort by descending area so

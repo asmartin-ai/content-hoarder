@@ -22,13 +22,6 @@ saved*.csv
 # Bun / Node
 node_modules/
 
-# Python test and packaging artifacts
-__pycache__/
-*.egg-info/
-.pytest_cache/
-/.pytest-tmp/
-/.pytest-review-tmp/
-
 # OS / editor
 .DS_Store
 Thumbs.db

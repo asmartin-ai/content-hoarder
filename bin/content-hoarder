@@ -2,12 +2,12 @@
 set -eu
 
 SCRIPT=$(readlink -f -- "$0")
-ROOT=$(dirname "$(dirname "$SCRIPT")")
-export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
-PYTHON="$ROOT/.venv-linux/bin/python"
-if [ ! -x "$PYTHON" ]; then
-    printf '%s\n' 'content-hoarder Linux environment missing; see README.md Linux migration setup.' >&2
+ROOT=$(dirname "$(dirname "$SCRIPT"))
+
+if ! command -v bun >/dev/null 2>&1; then
+    printf '%s\n' 'content-hoarder requires Bun; see README.md install steps.' >&2
     exit 127
 fi
+
 cd "$ROOT"
-exec "$PYTHON" -m content_hoarder "$@"
+exec bun run src/cli.ts "$@"
