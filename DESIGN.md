@@ -248,3 +248,4 @@ Recovery UI should name the external action and scope: one item, original URL, a
 - **Don't** make ambiguous destructive actions around deletes, Reddit unsave, recovery, archival, or purge flows.
 - **Don't** escape trusted source glyph SVG output from `chIcon()`; visible SVG text is a source-badge regression.
 - **Don't** reintroduce a second token file or a page-local palette; every surface reads the semantic aliases.
+- **Don't** reference a CSS variable that `static/core/tokens.css` does not define. A missing variable silently falls back to the declaration's hard-coded colour — the deck card shipped white with night-theme text because `.deck-card` asked for `--surface`, `--line`, `--mute` and `--ink` from the deleted v2 file.
