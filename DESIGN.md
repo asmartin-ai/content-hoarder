@@ -134,7 +134,7 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 - **Night Ops Background** (`#101216`): default app field for v3 browse.
 - **Panel Stack** (`#171a21`, `#20242d`, `#1b1f27`): cards, inset controls, hovered rows, sheet panels, and row bodies.
 - **Hairline Stack** (`#2a2f3a`, `#3d4452`): row dividers, control borders, and focusable shells.
-- **Readable Ink** (`#e0e5ec`, `#98a2b3`, `#636e7e`): body, metadata, and tertiary hints. Muted text must remain readable; do not fade metadata below utility.
+- **Readable Ink** (`#e0e5ec`, `#98a2b3`, `#7b8798`; light theme `#5a6875` for the dim step): body, metadata, and tertiary hints. Muted text must remain readable at AA; the dim step carries small meta and must not drop below 4.5:1 on its surface.
 - **Daylight Ops Stack** (`#e1e5ea`, `#edf0f3`, `#d6dce3`, `#17222d`): light theme for bright environments, not a separate brand.
 
 ### Named Rules
@@ -214,6 +214,14 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 
 Rows are the core unit of work. They combine source avatar, title, meta line, tags, URL/domain, optional snippet, fixed media monitor, and F/A/D action cluster. The row must answer: what is this, where did it come from, how old/long is it, is there media, and what can I do next?
 
+### Signature Component: Deck / Focus Card
+
+Deck mode (`/?deck=1`) is a focus surface, not a view of the sheet. While it is open the list chrome — status tabs, shelf, swipe hint, rail, dock shortcuts — is hidden, so the only navigation left is “← List” and the batch controls. The card carries source identity, title, meta, an excerpt, optional media, and a decision row of labelled buttons (Keep / Archive / Done + Read / Skip) that mirror the keyboard map. Keys are hints on the buttons, never the only path: every key has a visible, tappable control. On phones the card stacks to one column, the decision row becomes a 2×2 pad, and keyboard hints disappear.
+
+### Signature Component: Console and Rail
+
+The console is a single 57px row: identity, the command/search field, then the right cluster. The right cluster is quiet by default — the daily goal is a labelled bar plus a count (“765 cleared” once the goal is met), icon buttons are borderless until hover, and Triage is an outlined button rather than the loudest element on the page. The version badge is diagnostic chrome and stays faint. The rail is 210px, 32px rows, and scrolls inside its own column with a fade at the bottom; source hues appear as a dot on the avatar and a 55%-opacity source stripe, never as a filled block.
+
 ### Signature Component: Empty / Cleared State
 
 Empty states are permission states. “Page cleared,” “Draw another batch,” and “That’s enough for today” are correct because they reduce guilt and preserve agency. Empty states should teach the next useful action without implying backlog failure.
@@ -225,8 +233,8 @@ Recovery UI should name the external action and scope: one item, original URL, a
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** preserve the dark-first “night ops” identity for v3 browse and the current teal legacy identity until those pages are intentionally migrated.
-- **Do** use semantic aliases from `static/core/tokens.css` for v3 browse components and `static/tokens.css` for legacy `/triage` + `/reddit` pages.
+- **Do** preserve the dark-first “night ops” identity and the daylight alternate; both are first-class, not a theme switch bolted on.
+- **Do** consume semantic aliases from `static/core/tokens.css`; it is the only token system (the v2 teal file and its pages are gone).
 - **Do** keep Keep / Archive / Done colors fixed and visible across keyboard, pointer, swipe, and touch paths.
 - **Do** write empty states that reduce pressure and offer a next action: another batch, enough for today, adjust filters, or recover context.
 - **Do** make destructive or irreversible flows explicit, scoped, and backed by confirmation / backup language.
@@ -239,4 +247,4 @@ Recovery UI should name the external action and scope: one item, original URL, a
 - **Don't** use overstimulating neon terminal aesthetics, glassmorphism, ornamental animations, or decorative card grids.
 - **Don't** make ambiguous destructive actions around deletes, Reddit unsave, recovery, archival, or purge flows.
 - **Don't** escape trusted source glyph SVG output from `chIcon()`; visible SVG text is a source-badge regression.
-- **Don't** dedupe `static/core/tokens.css` and `static/tokens.css`; both are intentional until legacy pages migrate.
+- **Don't** reintroduce a second token file or a page-local palette; every surface reads the semantic aliases.

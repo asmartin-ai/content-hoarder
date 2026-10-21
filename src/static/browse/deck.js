@@ -5,6 +5,9 @@
    with the FAKE_DOM pattern (see tests/test_browse_deck.py). */
 
 import { esc } from "../core/util.js";
+import { itemUrl, srcAccent } from "../core/render.js";
+import { chIcon } from "../core/icons.js";
+import { thumb, mediaType } from "../core/media.js";
 
 const BATCH_SIZES = [10, 20, 30, 50];
 
@@ -68,7 +71,10 @@ function syncFromUrl(state) {
 
 async function openDeck(state) {
   if (busy) return;
+
   state.deck = true;
+
+  if (typeof document !== "undefined") document.body.classList.add("deck-mode");
   showHost();
   await fillQueue(state);
   renderDeck(state);
@@ -78,6 +84,8 @@ function closeDeck(state) {
   state.deck = false;
   queue = [];
   batchIdx = 0;
+
+  if (typeof document !== "undefined") document.body.classList.remove("deck-mode");
   hideHost();
 }
 
@@ -153,30 +161,85 @@ function deckChrome(state, it) {
   ).join("");
 
   const card = it ? deckCard(it) : emptyDeck();
+  const left = it ? `${queue.length} left` : "0 left";
 
   return `<div class="deck-bar">
-      <button type="button" class="deck-back" id="deck-back" aria-label="Back to list">✕</button>
-      <div class="deck-seg" id="deck-size">${sizes}</div>
-      <div class="deck-seg" id="deck-mode">${modes}</div>
+      <button type="button" class="deck-back" id="deck-back" aria-label="Back to list">
+        <span aria-hidden="true">←</span> List
+      </button>
+      <div class="deck-seg" id="deck-size" aria-label="Batch size">${sizes}</div>
+      <div class="deck-seg" id="deck-mode" aria-label="Draw mode">${modes}</div>
+      <span class="deck-left" id="deck-left">${left}</span>
     </div>
     <div class="deck-stage">${card}</div>`;
 }
 
+const SOURCE_LABEL = {
+  reddit: "Reddit",
+  youtube: "YouTube",
+  hackernews: "Hacker News",
+  firefox: "Firefox",
+  obsidian: "Obsidian",
+  keep: "Google Keep",
+  twitter: "X",
+};
+
 function deckCard(it) {
   const title = it.title ? esc(it.title) : "<em>(no title)</em>";
-  const src = it.source || "";
+  const src = SOURCE_LABEL[it.source] || it.source || "";
   const glyph = deps.glyph(it);
   const meta = deps.metaLine ? deps.metaLine(it) : "";
-  const body = it.body ? `<div class="deck-body">${esc(snippet(it.body, 480))}</div>` : "";
-  const sub = it.subreddit ? `<span class="deck-sub">r/${esc(it.subreddit)}</span> ` : "";
+  const body = it.body ? `<p class="deck-body">${esc(snippet(it.body, 560))}</p>` : "";
+  const sub = it.subreddit ? `<span class="deck-sub">r/${esc(it.subreddit)}</span>` : "";
+  const url = itemUrl(it);
+  const t = thumb(it, "list");
+  const mt = mediaType(it);
+  const nsfw = !!(it.metadata || {}).over_18;
+  // A text post has no picture: its "thumb" is a link preview that often 404s,
+  // so the deck shows the copy alone instead of an empty monitor.
+  const hasMedia = !!t && mt.cls !== "text" && mt.cls !== "comment" && mt.cls !== "link";
 
-  return `<div class="deck-card" data-fullname="${esc(it.fullname)}" draggable="true">
-      <div class="deck-src"><span class="deck-glyph">${glyph}</span>${esc(src)} ${sub}</div>
-      <h3 class="deck-title">${title}</h3>
-      <div class="deck-meta">${meta}</div>
-      ${body}
-      <div class="deck-hint">← done · → archive · long-← snooze · ↑ reader · ↓ skip</div>
-    </div>`;
+  const media = hasMedia
+    ? `<figure class="deck-media${nsfw ? " nsfw" : ""}">
+         <img src="${esc(t)}" alt="" loading="lazy" decoding="async" />
+         ${nsfw ? '<figcaption class="deck-nsfw">NSFW</figcaption>' : `<span class="deck-kind">${esc(mt.label)}</span>`}
+       </figure>`
+    : "";
+
+  const act = (kind, label, key, icon) =>
+    `<button type="button" class="deck-act act-${kind}" data-deck-act="${kind}">
+       <span class="da-ico" aria-hidden="true">${icon}</span>
+       <span class="da-lab">${label}</span>
+       <kbd>${key}</kbd>
+     </button>`;
+
+  const titleHtml = url
+    ? `<a href="${esc(url)}" target="_blank" rel="noopener">${title}</a>`
+    : title;
+
+  return `<article class="deck-card${media ? " has-media" : ""}" style="--src:${srcAccent(it.source)}" data-fullname="${esc(it.fullname)}" draggable="true" aria-label="Triage card">
+      <header class="deck-head">
+        <span class="deck-src"><span class="deck-glyph">${glyph}</span>${esc(src)}</span>
+        ${sub}
+      </header>
+      <div class="deck-main">
+        <div class="deck-copy">
+          <h2 class="deck-title">${titleHtml}</h2>
+          <div class="deck-meta">${meta}</div>
+          ${body}
+        </div>
+        ${media}
+      </div>
+      <div class="deck-actions" role="group" aria-label="Decide">
+        ${act("keep", "Keep", "F", chIcon("keep"))}
+        ${act("archived", "Archive", "→", chIcon("archive"))}
+        ${act("done", "Done", "←", chIcon("done"))}
+        <span class="deck-actions-spacer"></span>
+        ${act("reader", "Read", "↑", "↗")}
+        ${act("skip", "Skip", "↓", "⇥")}
+      </div>
+      <div class="deck-hint">Swipe or use the keys · hold ← to snooze · undo from the toast</div>
+    </article>`;
 }
 
 function emptyDeck() {
@@ -202,6 +265,27 @@ function mountChromeHandlers(state) {
   const back = host.querySelector("#deck-back");
 
   if (back) back.addEventListener("click", () => deps.toggleDeck(false));
+
+  host.querySelectorAll("[data-deck-act]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const it = queue[0];
+
+      if (!it || busy) return;
+
+      const action = btn.dataset.deckAct;
+
+      if (action === "skip") advance(state);
+      else if (action === "reader") deps.openReader(it);
+      else commit(state, it, action);
+    }),
+  );
+
+  // A thumb URL can be dead (archived post, missing media). Drop the frame
+  // instead of showing the browser's broken-image glyph on the card.
+  host.querySelectorAll(".deck-media img").forEach((img) => {
+    img.addEventListener("error", () => img.closest(".deck-media")?.remove());
+  });
+
   const draw = host.querySelector("#deck-draw");
 
   if (draw)

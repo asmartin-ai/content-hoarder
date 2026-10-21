@@ -22,8 +22,31 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   transaction (bulk rewrite of `tags_manual`/`tags`, FTS rebuild), delete-from-vocabulary;
   the derived vocabulary still surfaces unregistered stamps, so nothing drops out.
 
+### Changed
+
+- Browse UI overhaul (deck, console, rail, mobile header). Deck mode is now a real focus surface:
+  the list chrome (tabs, shelf, swipe hint, rail, dock shortcuts) hides while it is open, the card is
+  rebuilt on the v3 tokens with source identity, media, an excerpt and a labelled decision row
+  (Keep / Archive / Done / Read / Skip) wired to the same commit path as the keys and swipe. The card
+  previously used deleted v2 variables (`--surface`, `--line`, `--mute`, `--ink`), which rendered a
+  white card with night-theme text at ~1.1:1 contrast.
+- Console: single 57px row with a right cluster; the daily goal is a labelled bar (`765 cleared` once
+  met) instead of eight anonymous dots, icon buttons are borderless until hover, Triage is an outlined
+  button, and the version badge is de-emphasised. Desktop sheet widened to 1200px with a 210px rail.
+- Rows: 0.8rem metadata and 0.78rem snippets; section headers lose the `//` marker; the source-own
+  domain chip (`reddit.com` on a Reddit permalink) is suppressed; the source stripe is 55% opacity.
+- Tokens: `--dim` raised to `#7b8798` (dark) and `#5a6875` (light) so tertiary text meets AA; DESIGN.md
+  no longer points at the deleted legacy token file.
+- Phones: header is two rows (identity + count, then search), shelf stays on one line, the tab strip
+  fades at the edge, and deck mode stacks to one column with a 2×2 action pad.
+
 ### Fixed
 
+- Reddit autosync killed the web server on its first tick: `SyncScheduler` closes the connection
+  it opens, and `serveApp` handed it the shared request connection, so every later request answered
+  `Cannot use a closed database`. The scheduler now opens its own connection (same pattern as the
+  unsave drainer), `serveApp` exposes it for deterministic ticks, and `tests/web.test.ts` covers the
+  regression.
 - Promote row-menu action was dead UI: `promoteItem` was dispatched but never defined
   (Spec 15 §7) — handler wired, `promoteItem` wrapper added to `core/api.js`, and the
   `[hidden]` attribute now honored by the relay buttons (`browse.css`).

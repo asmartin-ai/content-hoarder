@@ -1534,9 +1534,11 @@ export interface ServeOptions {
   tls?: boolean;
 }
 
-export async function serveApp(
-  value: ServeOptions | string = {},
-): Promise<{ port: number; stop: () => Promise<void> }> {
+export async function serveApp(value: ServeOptions | string = {}): Promise<{
+  port: number;
+  scheduler: redditSync.SyncScheduler | null;
+  stop: () => Promise<void>;
+}> {
   const parsedPath = z.string().safeParse(value);
 
   const options = parsedPath.success
@@ -1552,8 +1554,12 @@ export async function serveApp(
   const intervalMs =
     numberParam(config.get("REDDIT_AUTOSYNC_INTERVAL") ?? null, 600) * 1000 || 600_000;
 
+  // SyncScheduler closes the connection it opens. Handing it the shared request
+  // connection killed the server on the first tick ("Cannot use a closed
+  // database" on every later request), so it gets its own, exactly like the
+  // unsave drainer below.
   const scheduler = redditSync.isAutosyncEnabled(connection())
-    ? new redditSync.SyncScheduler(() => connection(), intervalMs).start()
+    ? new redditSync.SyncScheduler(() => db.connect(databasePath()), intervalMs).start()
     : null;
 
   // The drainer opens its own connection per fire (never the shared request
@@ -1578,6 +1584,7 @@ export async function serveApp(
 
   return {
     port: server.port ?? port,
+    scheduler,
     stop: async () => {
       server.stop(true);
       scheduler?.stop();

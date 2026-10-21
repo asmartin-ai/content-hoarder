@@ -106,47 +106,49 @@
             </div>
           </div>
         </div>
-        <div
-          class="wins"
-          id="wins"
-          title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over."
-        >
-          <span class="wlab">TODAY</span><span class="dots" id="windots"></span
-          ><span class="wnum" id="winnum"></span>
+        <div class="con-right">
+          <div
+            class="wins"
+            id="wins"
+            title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over."
+          >
+            <span class="wlab">TODAY</span><span class="dots" id="windots"></span
+            ><span class="wnum" id="winnum"></span>
+          </div>
+          <button
+            type="button"
+            class="icon-btn"
+            id="dice"
+            title="Surprise me — one old save, no strings"
+            aria-label="Surprise me"
+          >
+            &#9860;
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
+            id="btn-sync-newest"
+            title="Sync newest saved from Reddit"
+            aria-label="Sync newest"
+          >
+            &#8635;
+          </button>
+          <span
+            class="app-ver"
+            id="app-version"
+            title="Loaded shell version — confirms what your phone has cached"
+          ></span>
+          <button
+            type="button"
+            class="icon-btn"
+            id="open-settings"
+            title="Settings"
+            aria-label="Settings"
+          >
+            &#9881;
+          </button>
+          <a class="btn-triage" href="/?deck=1">Triage <span aria-hidden="true">→</span></a>
         </div>
-        <button
-          type="button"
-          class="icon-btn"
-          id="dice"
-          title="Surprise me — one old save, no strings"
-          aria-label="Surprise me"
-        >
-          &#9860;
-        </button>
-        <button
-          type="button"
-          class="icon-btn"
-          id="btn-sync-newest"
-          title="Sync newest saved from Reddit"
-          aria-label="Sync newest"
-        >
-          &#8635;
-        </button>
-        <span
-          class="app-ver"
-          id="app-version"
-          title="Loaded shell version — confirms what your phone has cached"
-        ></span>
-        <button
-          type="button"
-          class="icon-btn"
-          id="open-settings"
-          title="Settings"
-          aria-label="Settings"
-        >
-          &#9881;
-        </button>
-        <a class="btn-triage" href="/?deck=1">TRIAGE &rarr;</a>
       </div>
     </header>
 
@@ -211,7 +213,7 @@
           <span style="color: var(--status-archive)">swipe &rarr; archive</span>
           <span style="color: var(--status-keep)">&rarr;&rarr; keep</span>
           <span style="color: var(--status-done)">&larr; done</span>
-          <span>hold to select</span>
+          <span>hold &rarr; select</span>
         </div>
 
         <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->

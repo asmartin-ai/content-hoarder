@@ -1214,7 +1214,7 @@ function paintWins() {
       { length: state.goal },
       (_, k) => "<i" + (k < n ? ' class="on"' : "") + "></i>",
     ).join("");
-    $("#winnum").textContent = n + " / " + state.goal;
+    $("#winnum").textContent = n >= state.goal ? n + " cleared" : n + " / " + state.goal;
   } else {
     dots.innerHTML = "";
     $("#winnum").textContent = n + " cleared";

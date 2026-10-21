@@ -120,11 +120,22 @@ const urlDomain = (item) => {
   }
 };
 
-/* The URL-domain chip markup, shared by logRow / ledgerRow / pinCard. */
+/* The URL-domain chip markup, shared by logRow / ledgerRow / pinCard.
+   A source's own domain ("reddit.com" on a Reddit permalink) says nothing:
+   the source badge already carries it, so the chip is only for elsewhere. */
+const OWN_DOMAIN = {
+  reddit: ["reddit.com", "old.reddit.com", "i.redd.it", "v.redd.it"],
+  youtube: ["youtube.com", "m.youtube.com", "youtu.be"],
+  hackernews: ["news.ycombinator.com"],
+  twitter: ["x.com", "twitter.com"],
+};
+
 const urlDomainHtml = (item) => {
   const d = urlDomain(item);
 
-  return d ? '<span class="url-domain">' + esc(d) + "</span>" : "";
+  if (!d || (OWN_DOMAIN[item.source] || []).includes(d)) return "";
+
+  return '<span class="url-domain">' + esc(d) + "</span>";
 };
 
 const isRedditTextPost = (item, mt) => item.source === "reddit" && mt.cls === "text";
