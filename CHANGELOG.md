@@ -39,6 +39,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   existence instead of materializing the stored row: 1k-row import 99ms → 66ms, 1k-row
   re-merge 103ms → 89ms (with the nine new indexes already included). Single-row
   `mergeUpsert` callers pay ~24µs more per new row for those indexes.
+- `reddit-sync` upserts a whole listing page in one transaction through
+  `db.mergeUpsertMany` instead of committing row by row (5 pages × 100 new saves:
+  33ms → 17ms). A stored row the merge cannot parse now lands in `SyncResult.errors`
+  instead of aborting the run, and the page's other rows still commit.
 - `subreddit:`/`author:` IN lists now carry `COLLATE NOCASE` on the operand rather than on
   the `IN` expression, which is what makes those comparisons case-insensitive and the NOCASE
   indexes usable.

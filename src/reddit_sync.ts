@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RedditReconcileResult } from "./db.ts";
+import type { RawItem } from "./models.ts";
 import type { Database } from "bun:sqlite";
 import * as db from "./db.ts";
 import * as oauth from "./reddit_oauth.ts";
@@ -87,6 +88,7 @@ export interface SyncResult {
   network_error: boolean;
   username: string | null;
   transport: "cookie" | "oauth" | null;
+  errors: string[];
   reconcile?: ReconcileStatus;
 }
 
@@ -111,6 +113,7 @@ export async function syncSaved(database: Database, opts: SyncOptions = {}): Pro
     network_error: false,
     username: null,
     transport: null,
+    errors: [],
   };
 
   const present: Record<"post" | "comment", Set<string>> = { post: new Set(), comment: new Set() };
@@ -217,6 +220,7 @@ export async function syncSaved(database: Database, opts: SyncOptions = {}): Pro
 
     result.pages++;
     let pageNew = 0;
+    const pageItems: RawItem[] = [];
 
     for (const child of children) {
       const item = childToItem(child, { savedSeenUtc: snapshotUtc });
@@ -234,12 +238,23 @@ export async function syncSaved(database: Database, opts: SyncOptions = {}): Pro
       }
 
       result.fetched++;
+      pageItems.push(item);
+    }
 
-      if (db.mergeUpsert(database, item) === "inserted") {
-        result.new++;
-        pageNew++;
-      } else result.updated++;
-      synced.push(item.fullname);
+    if (pageItems.length) {
+      // One transaction per listing page. Never-seen rows go in as a
+      // multi-row INSERT per chunk; known rows keep mergeUpsert's merge
+      // contract, and a malformed row is replayed alone so the rest of
+      // the page still lands.
+      const merged = db.withTransaction(database, () => db.mergeUpsertMany(database, pageItems));
+      const failed = new Set(merged.errors.map((error) => error.fullname));
+
+      result.new += merged.inserted;
+      result.updated += merged.updated;
+      pageNew = merged.inserted;
+      result.errors.push(...merged.errors.map((error) => `${error.fullname}: ${error.message}`));
+
+      for (const item of pageItems) if (!failed.has(item.fullname)) synced.push(item.fullname);
     }
 
     opts.progress?.(`page ${page + 1}: +${pageNew} new (${children.length} items)`);
