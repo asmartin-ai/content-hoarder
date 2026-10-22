@@ -68,6 +68,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- `src/web.ts` split into `src/web/` modules (server lifecycle, route table, item/settings/import
+  handlers, HTTP/guard/static/state helpers) and the autosync tick moved to
+  `src/sync/scheduler.ts`; every route path, status code, JSON shape, and the scheduler's
+  own-connection contract are unchanged.
 - **Runtime cutover to Bun + TypeScript.** The CLI, web app, SQLite layer, connectors, archival,
   media, and OCR paths are TypeScript on Bun (`bun run check` is the gate: tsc,
   `oxlint --deny-warnings`, oxfmt, tests). `bun:sqlite` replaces stdlib sqlite3 with the same
