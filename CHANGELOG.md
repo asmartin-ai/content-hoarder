@@ -49,6 +49,19 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- Browse shell split into ES modules (no behaviour change): `src/static/browse/main.js` (4,092
+  lines) is now the entry point only. The surface lives in `browse/shared.js` (state + DOM/storage
+  helpers + view persistence), `browse/data.js` (query params, first-page prefetch, feed loading,
+  counts, rail facets, pulse), `browse/feed.js` (render, Focus batches, infinite scroll, deck URL
+  toggle), `browse/actions.js` (triage + undo/redo, row interactions, bulk tray, next-thread
+  preload, unsave/promote), `browse/lightbox.js` (hold-to-preview, media lightbox, archive.today
+  recovery), `browse/relay.js` (long-press row menu), `browse/nav.js` (tabs, rail/chip filters,
+  drag-and-drop, search + operators, sort, keymap), `browse/drawer.js` (mobile jump drawer),
+  `browse/chrome.js` (pebbles/dateline, scroll-to-top, fast-scroll, shrink-on-scroll header,
+  version badge), `browse/ambient.js` (resurfacing card + surprise), `browse/panels.js` (sheets,
+  settings, Done retention, stats/dupes, Sync newest) and `browse/instances.js` (deck/reader/
+  tag-editor wiring). Fetched URLs, DOM ids/classes, events and keyboard shortcuts are unchanged;
+  `sw.js` precaches the new files and bumps the shell to `ch-shell-v130` (badge `v130`).
 - Browse UI overhaul (deck, console, rail, mobile header). Deck mode is now a real focus surface:
   the list chrome (tabs, shelf, swipe hint, rail, dock shortcuts) hides while it is open, the card is
   rebuilt on the v3 tokens with source identity, media, an excerpt and a labelled decision row
