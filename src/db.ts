@@ -1259,7 +1259,13 @@ export function mergeUpsertMany(db: Database, items: RawItem[]): MergeBatchResul
       `SELECT * FROM items WHERE fullname IN (${placeholders})`,
       names,
     )) {
-      stored.set(r.fullname, rowToRaw(r));
+      try {
+        stored.set(r.fullname, rowToRaw(r));
+      } catch {
+        // Unparseable stored row: leave it out so the item takes the
+        // single-item path, where the error is attributed to it alone
+        // instead of failing the whole import.
+      }
     }
   }
 
