@@ -7,7 +7,13 @@
  */
 
 import type { Database } from "bun:sqlite";
-import { allocateSavedOrder, mergeUpsert, reconcileRedditSaves, withTransaction } from "./db.ts";
+import {
+  allocateSavedOrder,
+  mergeUpsert,
+  mergeUpsertMany,
+  reconcileRedditSaves,
+  withTransaction,
+} from "./db.ts";
 import { parseMetadata, type RawItem } from "./models.ts";
 import { dispatch, get, type BaseConnector, type ImportResult } from "./connectors/registry.ts";
 
@@ -95,16 +101,19 @@ export async function importPath(
           present[item.kind].add(item.source_id);
         }
       }
-
-      try {
-        mergeUpsert(db, item);
-        result.imported += 1;
-        batch.push(item);
-      } catch (exc) {
-        result.skipped += 1;
-        result.errors.push(`${item.fullname}: ${exc instanceof Error ? exc.message : String(exc)}`);
-      }
     }
+
+    // One multi-row INSERT per chunk for never-seen rows; existing
+    // rows still take the full merge contract.
+    const merged = mergeUpsertMany(db, items);
+    const failed = new Set(merged.errors.map((error) => error.fullname));
+
+    result.imported = merged.inserted + merged.updated;
+    result.skipped = merged.errors.length;
+
+    for (const error of merged.errors) result.errors.push(`${error.fullname}: ${error.message}`);
+
+    for (const item of items) if (!failed.has(item.fullname)) batch.push(item);
 
     if (doReconcile && (present.post.size || present.comment.size)) {
       const truncated = opts.reconcileComplete ? { post: false, comment: false } : null;

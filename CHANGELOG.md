@@ -22,6 +22,27 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   transaction (bulk rewrite of `tags_manual`/`tags`, FTS rebuild), delete-from-vocabulary;
   the derived vocabulary still surfaces unregistered stamps, so nothing drops out.
 
+### Performance
+
+- Browse reads: composite and expression indexes keep the feed in scan order instead of
+  sorting a bucket per request — status/source feeds (14ms → 0.4ms), status page at offset
+  10k (82ms → 7.4ms), `sort=created_utc|saved_utc|score` (18-20ms → 0.3ms), `author:`/
+  `subreddit:` facets (10-21ms → 0.1-0.5ms), `/reddit/items` (16ms → 0.7ms) and the triage
+  deck's smart pool (25ms → 0.4ms, triage-score scan pinned now that its ORDER BY matches the
+  index expression).
+- `sort=shuffle` (mixed browse) transposes per-source previews instead of ranking every row
+  in a window function: 95ms → 1.4ms per page.
+- Imports: `db.mergeUpsertMany` inserts never-seen rows with one multi-row statement per
+  250-row chunk (per-row statement dispatch dominated the import), with per-row replay on a
+  failed chunk so one bad item still reports its own error. The `items_au` FTS trigger now
+  skips the index rewrite when none of its six mirrored columns changed, and new rows probe
+  existence instead of materializing the stored row: 1k-row import 99ms → 66ms, 1k-row
+  re-merge 103ms → 89ms (with the nine new indexes already included). Single-row
+  `mergeUpsert` callers pay ~24µs more per new row for those indexes.
+- `subreddit:`/`author:` IN lists now carry `COLLATE NOCASE` on the operand rather than on
+  the `IN` expression, which is what makes those comparisons case-insensitive and the NOCASE
+  indexes usable.
+
 ### Changed
 
 - Browse UI overhaul (deck, console, rail, mobile header). Deck mode is now a real focus surface:

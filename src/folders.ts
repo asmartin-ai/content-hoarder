@@ -68,7 +68,9 @@ function itemPredicate(query: FolderQuery): [string, (string | number)[]] {
 
   if (query.subreddit?.length) {
     filters.push(
-      `json_extract(i.metadata, '$.subreddit') IN (${query.subreddit.map(() => "?").join(",")}) COLLATE NOCASE`,
+      // COLLATE on the left operand so the NOCASE expression index
+      // applies (on the IN expression it only tags the result).
+      `json_extract(i.metadata, '$.subreddit') COLLATE NOCASE IN (${query.subreddit.map(() => "?").join(",")})`,
     );
     params.push(...query.subreddit);
   }
