@@ -211,6 +211,25 @@ CREATE INDEX IF NOT EXISTS idx_items_last_seen    ON items(last_seen_utc);
 CREATE INDEX IF NOT EXISTS idx_items_created      ON items(created_utc);
 CREATE INDEX IF NOT EXISTS idx_items_saved_status ON items(is_saved, status);
 CREATE INDEX IF NOT EXISTS idx_items_status_seen  ON items(status, first_seen_utc);
+-- Recency-ordered browse within a status/source filter: the
+-- single-column indexes forced SQLite to sort every matching row
+-- (a full pass over the status bucket) before LIMIT/OFFSET could
+-- apply. The composite keeps the scan in feed order instead.
+CREATE INDEX IF NOT EXISTS idx_items_status_last_seen ON items(status, last_seen_utc);
+CREATE INDEX IF NOT EXISTS idx_items_source_last_seen ON items(source, last_seen_utc);
+CREATE INDEX IF NOT EXISTS idx_items_source_first_seen ON items(source, first_seen_utc);
+
+-- Sort-key indexes. db.orderClause sorts by these EXPRESSIONS
+-- (NULLIF hides undated rows, CAST normalizes JSON numbers), so a
+-- plain-column index is unusable and every sorted browse used to
+-- scan+sort the whole table. Each index matches its expression
+-- exactly; keep the two in sync.
+CREATE INDEX IF NOT EXISTS idx_items_created_nz    ON items(NULLIF(created_utc, 0));
+CREATE INDEX IF NOT EXISTS idx_items_saved_nz      ON items(NULLIF(saved_utc, 0));
+CREATE INDEX IF NOT EXISTS idx_items_score         ON items(CAST(json_extract(metadata, '$.score') AS INTEGER));
+CREATE INDEX IF NOT EXISTS idx_items_triage_score  ON items(CAST(json_extract(metadata, '$.triage_score') AS REAL));
+CREATE INDEX IF NOT EXISTS idx_items_author_nocase ON items(author COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_items_subreddit_nocase ON items(json_extract(metadata, '$.subreddit') COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -286,6 +305,8 @@ CREATE TABLE IF NOT EXISTS user_tags (
  * fuzzy trigram index. The `items_ai/ad/au` triggers are the
  * durability contract — every items write stays in sync through
  * them, so no code path may write items outside these tables.
+ * (`items_au` is installed by `_ensureUpdateTrigger`, not this
+ * schema string, so an upgraded DB picks up its WHEN guard.)
  *
  * Rebuild rule (AGENTS.md #1): after ANY schema change to the
  * mirrored columns or the FTS tables themselves, rebuild via
@@ -316,7 +337,22 @@ CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
     INSERT INTO items_trgm(items_trgm, rowid, search_text) VALUES ('delete', old.rowid, old.search_text);
 END;
 
-CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
+`;
+
+// The UPDATE trigger is re-created below when an upgraded DB still
+// carries the unguarded definition (CREATE TRIGGER IF NOT EXISTS
+// would otherwise leave it in place forever).
+const _AU_TRIGGER_GUARD = "OLD.search_text IS NOT NEW.search_text";
+
+const _AU_TRIGGER_SQL = `
+CREATE TRIGGER items_au AFTER UPDATE ON items
+WHEN OLD.search_text IS NOT NEW.search_text
+  OR OLD.fullname IS NOT NEW.fullname
+  OR OLD.url IS NOT NEW.url
+  OR OLD.title IS NOT NEW.title
+  OR OLD.body IS NOT NEW.body
+  OR OLD.author IS NOT NEW.author
+BEGIN
     INSERT INTO items_fts(items_fts, rowid, fullname, title, body, author, url, search_text)
         VALUES ('delete', old.rowid, old.fullname, old.title, old.body, old.author, old.url, old.search_text);
     INSERT INTO items_trgm(items_trgm, rowid, search_text) VALUES ('delete', old.rowid, old.search_text);
@@ -447,6 +483,7 @@ export function initDb(db: Database): void {
   }
 
   db.exec(_FTS_SCHEMA);
+  _ensureUpdateTrigger(db);
   // Functional index so sorting by video length (metadata.duration)
   // stays cheap at scale.
   db.exec(
@@ -460,6 +497,25 @@ export function initDb(db: Database): void {
   // backfill must NOT live here. It runs once from the `init-db`
   // CLI command; going forward setCategory()/mergeUpsert() keep the
   // tag mirror in sync.
+}
+
+function _ensureUpdateTrigger(db: Database): void {
+  /**
+   * Install the guarded UPDATE trigger. A legacy DB carries the
+   * unguarded `items_au` that rewrote both FTS indexes on every
+   * write; `CREATE TRIGGER IF NOT EXISTS` cannot replace it, so
+   * compare the stored definition and recreate when stale.
+   * Skipping unchanged text is exact — the trigger mirrors only
+   * these six columns into the indexes.
+   */
+  const existing = row<{ sql: string | null }>(
+    db,
+    "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='items_au'",
+  );
+
+  if (existing?.sql?.includes(_AU_TRIGGER_GUARD)) return;
+  db.exec("DROP TRIGGER IF EXISTS items_au");
+  db.exec(_AU_TRIGGER_SQL);
 }
 
 // Bump when an FTS table is added/changed so upgraded DBs rebuild
@@ -591,6 +647,12 @@ function publicByFullname(db: Database, fullname: string): Item | null {
   const r = row<RawItem>(db, "SELECT * FROM items WHERE fullname=?", [fullname]);
 
   return r ? rowToPublic(r) : null;
+}
+
+function itemExists(db: Database, fullname: string): boolean {
+  return (
+    row<{ one: number }>(db, "SELECT 1 AS one FROM items WHERE fullname=?", [fullname]) !== null
+  );
 }
 
 export function getItem(db: Database, fullname: string): RawItem | null {
@@ -973,6 +1035,43 @@ const _USER_STATE_METADATA_KEYS = new Set([
 ]);
 
 /**
+ * Column values for a brand-new row: derive the category tag
+ * mirror, serialize metadata, and build the FTS search blob.
+ */
+function insertValues(
+  item: RawItem,
+  incomingMd: Metadata,
+  incomingCategory: string,
+): SQLQueryBindings[] {
+  const finalMd = incomingCategory
+    ? metadataWithCategoryTag(incomingMd, incomingCategory)
+    : incomingMd;
+
+  const toInsert: RawItem = {
+    ...item,
+    metadata: JSON.stringify(finalMd),
+    search_text: buildSearchText(item, finalMd),
+  };
+
+  return ITEM_FIELDS.map((field) => toInsert[field] ?? null);
+}
+
+/** Chunked multi-row INSERT: one JS-to-SQLite call per chunk
+ * instead of one per row. Statement dispatch and Bun's per-call
+ * parameter marshalling dominate bulk import time — the b-tree
+ * writes, FTS triggers included, are the smaller half. */
+const _INSERT_CHUNK = 250;
+
+function insertChunkSql(n: number): string {
+  const row = `(${ITEM_FIELDS.map(() => "?").join(",")})`;
+
+  return (
+    `INSERT INTO items (${ITEM_FIELDS.join(",")}) VALUES ` +
+    Array.from({ length: n }, () => row).join(",")
+  );
+}
+
+/**
  * Insert a new item, or non-destructively overlay onto an
  * existing one. Returns `"inserted"` or `"updated"`. Never
  * overwrites user/triage state (`status`, `processed_utc`,
@@ -1010,28 +1109,33 @@ const _USER_STATE_METADATA_KEYS = new Set([
 export function mergeUpsert(db: Database, item: RawItem): string {
   const incomingMd = parseMetadata(item.metadata);
   const incomingCategory = incomingMd.category ?? "";
-  const existing = getItem(db, item.fullname);
+
+  // New rows are the common case during an import, and the merge
+  // below is unreachable for them — probe existence instead of
+  // materializing + schema-validating the whole row (body,
+  // metadata, raw_json) only to throw it away.
+  const existing = itemExists(db, item.fullname) ? getItem(db, item.fullname) : null;
 
   if (existing === null) {
-    const finalMd = incomingCategory
-      ? metadataWithCategoryTag(incomingMd, incomingCategory)
-      : incomingMd;
-
-    const toInsert: RawItem = {
-      ...item,
-      metadata: JSON.stringify(finalMd),
-      search_text: buildSearchText(item, finalMd),
-    };
-
-    run(
-      db,
-      _INSERT_SQL,
-      ITEM_FIELDS.map((field) => toInsert[field] ?? null),
-    );
+    run(db, _INSERT_SQL, insertValues(item, incomingMd, incomingCategory));
 
     return "inserted";
   }
 
+  mergeOnto(db, item, incomingMd, incomingCategory, existing);
+
+  return "updated";
+}
+
+/** Non-destructive overlay of `item` onto a stored row (see the merge
+ * contract on `mergeUpsert`). */
+function mergeOnto(
+  db: Database,
+  item: RawItem,
+  incomingMd: Metadata,
+  incomingCategory: string,
+  existing: RawItem,
+): void {
   const merged: RawItem = { ...existing };
   const emd = parseMetadata(existing.metadata);
 
@@ -1112,8 +1216,121 @@ export function mergeUpsert(db: Database, item: RawItem): string {
 
   values.push(merged.fullname);
   run(db, _UPDATE_SQL, values);
+}
 
-  return "updated";
+export interface MergeBatchResult {
+  inserted: number;
+  updated: number;
+  errors: { fullname: string; message: string }[];
+}
+
+/**
+ * Batch form of `mergeUpsert` for imports. Rows the DB has never
+ * seen are inserted with one multi-row statement per chunk —
+ * per-row statement dispatch dominates a bulk import far more
+ * than the b-tree work does. Everything else (existing rows,
+ * fullnames repeated inside the batch) replays `mergeUpsert`
+ * exactly, so merge semantics stay identical.
+ *
+ * Caller owns the transaction. A chunk that fails is replayed row
+ * by row so one malformed item reports its own error without
+ * losing its neighbours.
+ */
+export function mergeUpsertMany(db: Database, items: RawItem[]): MergeBatchResult {
+  const result: MergeBatchResult = { inserted: 0, updated: 0, errors: [] };
+
+  if (!items.length) return result;
+
+  const occurrences = new Map<string, number>();
+
+  for (const item of items) {
+    occurrences.set(item.fullname, (occurrences.get(item.fullname) ?? 0) + 1);
+  }
+
+  const stored = new Map<string, RawItem>();
+  const unique = items.filter((item) => occurrences.get(item.fullname) === 1);
+
+  for (let start = 0; start < unique.length; start += _INSERT_CHUNK) {
+    const names = unique.slice(start, start + _INSERT_CHUNK).map((item) => item.fullname);
+    const placeholders = names.map(() => "?").join(",");
+
+    for (const r of rows<RawItem>(
+      db,
+      `SELECT * FROM items WHERE fullname IN (${placeholders})`,
+      names,
+    )) {
+      try {
+        stored.set(r.fullname, rowToRaw(r));
+      } catch {
+        // Unparseable stored row: leave it out so the item takes the
+        // single-item path, where the error is attributed to it alone
+        // instead of failing the whole import.
+      }
+    }
+  }
+
+  const fresh: RawItem[] = [];
+
+  for (const item of items) {
+    if (occurrences.get(item.fullname) === 1 && !stored.has(item.fullname)) {
+      fresh.push(item);
+      continue;
+    }
+
+    try {
+      const existing = stored.get(item.fullname);
+
+      if (existing) {
+        const incomingMd = parseMetadata(item.metadata);
+
+        mergeOnto(db, item, incomingMd, incomingMd.category ?? "", existing);
+        result.updated += 1;
+      } else {
+        // Repeated inside this batch (or inserted concurrently):
+        // replay the single-item sequence so the merge contract
+        // applies to the earlier copy.
+        const outcome = mergeUpsert(db, item);
+
+        result[outcome === "inserted" ? "inserted" : "updated"] += 1;
+      }
+    } catch (exc) {
+      result.errors.push({
+        fullname: item.fullname,
+        message: exc instanceof Error ? exc.message : String(exc),
+      });
+    }
+  }
+
+  for (let start = 0; start < fresh.length; start += _INSERT_CHUNK) {
+    const chunk = fresh.slice(start, start + _INSERT_CHUNK);
+    const values: SQLQueryBindings[] = [];
+
+    for (const item of chunk) {
+      const md = parseMetadata(item.metadata);
+
+      values.push(...insertValues(item, md, md.category ?? ""));
+    }
+
+    try {
+      run(db, insertChunkSql(chunk.length), values);
+      result.inserted += chunk.length;
+    } catch {
+      for (const item of chunk) {
+        try {
+          const outcome = mergeUpsert(db, item);
+
+          result[outcome === "inserted" ? "inserted" : "updated"] += 1;
+        } catch (exc) {
+          result.errors.push({
+            fullname: item.fullname,
+            message: exc instanceof Error ? exc.message : String(exc),
+          });
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 export type ItemPatch = Partial<
@@ -1468,6 +1685,9 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     if (subreddit) {
       if (Array.isArray(subreddit)) {
         const ph = subreddit.map(() => "?").join(",");
+        // COLLATE belongs on the left operand: on the IN expression
+        // it only tags the result, leaving the comparisons BINARY
+        // and the NOCASE index unusable.
         filters.push(`json_extract(${a}metadata, '$.subreddit') COLLATE NOCASE IN (${ph})`);
         params.push(...subreddit);
       } else {
@@ -1636,6 +1856,10 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
   }
 
+  if (opts.sort === "shuffle" && offset + limit <= _SHUFFLE_MERGE_MAX) {
+    return shufflePage(db, filters, params, limit, offset);
+  }
+
   const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
 
   const sql = `SELECT * FROM items${where} ${orderClause(opts.sort, opts.order)} LIMIT ? OFFSET ?`;
@@ -1643,6 +1867,94 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
   const bind: SQLQueryBindings[] = [...params, limit, offset];
 
   return rows<RawItem>(db, sql, bind).map(rowToPublic);
+}
+
+/** Page size beyond which a shuffle page re-reads more rowids per
+ * source than one full scan would (see `shufflePage`). */
+const _SHUFFLE_MERGE_MAX = 2_000;
+
+/**
+ * `sort=shuffle` interleaves the sources round-robin, each ordered
+ * by recency — a transpose of per-source sequences. The window
+ * function form makes SQLite rank every row before LIMIT can apply
+ * (full scan + two sorts, ~100ms per page); transposing instead
+ * reads only the first `offset + limit` rowids of each source and
+ * walks the diagonal. Same order, same rows.
+ *
+ * Only shallow pages merge: past `_SHUFFLE_MERGE_MAX` the per-source
+ * previews together exceed one scan, so the window query (which pays
+ * that scan once) is the cheaper way to reach the page.
+ */
+function shufflePage(
+  db: Database,
+  filters: string[],
+  params: SQLQueryBindings[],
+  limit: number,
+  offset: number,
+): Item[] {
+  const take = offset + limit;
+
+  // Source discovery ignores the filters on purpose: this is a
+  // skip-scan over the source index, and a source with no matching
+  // rows simply contributes none.
+  const sources = rows<{ source: string }>(db, "SELECT DISTINCT source FROM items")
+    .map((r) => String(r.source))
+    .sort();
+
+  const where = filters.length ? ` WHERE ${filters.join(" AND ")} AND` : " WHERE";
+  const previews = new Map<string, number[]>();
+
+  for (const source of sources) {
+    previews.set(
+      source,
+      rows<{ rowid: number }>(
+        db,
+        `SELECT rowid FROM items${where} source=? ` +
+          "ORDER BY first_seen_utc DESC, rowid DESC LIMIT ?",
+        [...params, source, take],
+      ).map((r) => Number(r.rowid)),
+    );
+  }
+
+  const picked: number[] = [];
+  let streamed = 0;
+
+  for (let nth = 0; picked.length < limit; nth += 1) {
+    let advanced = false;
+
+    for (const source of sources) {
+      const preview = previews.get(source) ?? [];
+
+      if (nth >= preview.length) continue;
+      advanced = true;
+
+      if (streamed >= offset) picked.push(preview[nth]!);
+
+      streamed += 1;
+
+      if (picked.length >= limit) break;
+    }
+
+    if (!advanced) break;
+  }
+
+  if (!picked.length) return [];
+
+  const placeholders = picked.map(() => "?").join(",");
+
+  const found = rows<RawItem & { rowid: number }>(
+    db,
+    `SELECT rowid, * FROM items WHERE rowid IN (${placeholders})`,
+    picked,
+  );
+
+  const byRowid = new Map(found.map((r) => [Number(r.rowid), r]));
+
+  return picked.flatMap((rowid) => {
+    const r = byRowid.get(rowid);
+
+    return r ? [rowToPublic(r)] : [];
+  });
 }
 
 /**
@@ -1736,10 +2048,19 @@ export function getRandomBatch(
   const scoreWhere =
     where + (where ? " AND " : " WHERE ") + "json_extract(metadata, '$.triage_score') IS NOT NULL";
 
+  // Without statistics SQLite prices the status bucket as tiny and
+  // sorts every inbox row (~25ms per deck request). Scanning the
+  // triage-score index instead stops as soon as the pool is full
+  // (~0.1ms). Only the unfiltered deck takes the hint: a narrowing
+  // filter's own index is the better entry point there.
+  const scoreScan =
+    opts.source || opts.category || opts.tags?.length ? "" : " INDEXED BY idx_items_triage_score";
+
   const scorePool = rows<RawItem>(
     db,
-    `SELECT * FROM items${scoreWhere} ` +
-      `ORDER BY json_extract(metadata, '$.triage_score') DESC LIMIT ?`,
+    `SELECT * FROM items${scoreScan}${scoreWhere} ` +
+      // CAST matches _SORT_COLUMNS.smart and the index expression.
+      `ORDER BY CAST(json_extract(metadata, '$.triage_score') AS REAL) DESC LIMIT ?`,
     [...params, kScore * 5],
   );
 
