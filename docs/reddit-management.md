@@ -2,7 +2,7 @@
 
 The former dedicated Reddit workspace is not part of the current UI. `/reddit`
 redirects to the main browse page filtered to Reddit. Its API and cached-thread
-storage remain in `src/web.ts`, `src/db.ts`, and `src/reddit_thread.ts`; this
+storage remain in `src/web/`, `src/db.ts`, and `src/reddit_thread.ts`; this
 note records the former view and behavior to preserve if it is resumed.
 
 ## Former view
@@ -16,7 +16,7 @@ note records the former view and behavior to preserve if it is resumed.
 
 - No schema change: Reddit-specific facts stay in `items.metadata`.
 - `reddit_threads` stores cached thread JSON by item fullname, outside metadata.
-- `src/web.ts` serves Reddit API routes and redirects the old `/reddit` page.
+- `src/web/` serves Reddit API routes and redirects the old `/reddit` page.
   `src/db.ts` owns SQL and row conversions; `src/reddit_thread.ts` parses
   cached thread data.
 - The current PWA is under `src/static/`; the former `templates/reddit.html`

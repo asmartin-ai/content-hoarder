@@ -31,12 +31,8 @@ import {
   backfillTitlesNetwork,
   backfillThumbnails,
 } from "./reddit_hydrate.ts";
-import {
-  isAutosyncEnabled,
-  setAutosyncEnabled,
-  sync as syncReddit,
-  RECONCILE_MAX_PAGES,
-} from "./reddit_sync.ts";
+import { sync as syncReddit, RECONCILE_MAX_PAGES } from "./reddit_sync.ts";
+import { isAutosyncEnabled, setAutosyncEnabled } from "./sync/scheduler.ts";
 import { sync as syncHn } from "./hn_sync.ts";
 import * as redditUnsave from "./reddit_unsave.ts";
 import * as redditTrickle from "./reddit_trickle.ts";

@@ -27,7 +27,9 @@ src/
   pipeline.ts     connector dispatch -> import -> merge/enrich; owns import writes
   config.ts       environment + .env configuration
   cli.ts          full command dispatch
-  web.ts          Bun HTTP server, API, PWA/static and autosync lifecycle
+  web.ts          public entry re-exporting the HTTP server
+  web/            server.ts lifecycle, routes.ts route table, handlers/, http/guard/static/state
+  sync/           scheduler.ts autosync tick lifecycle and interval settings
   search_query.ts operator parser (source:/tag:/status:/is:/has:/before:/score:> etc.)
   categorize.ts / dedup.ts / resurface.ts / triage_score.ts / tag_suggest.ts
   consolidate.ts / folders.ts / note_youtube.ts

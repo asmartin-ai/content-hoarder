@@ -6,14 +6,13 @@ import * as oauth from "./reddit_oauth.ts";
 import * as unsave from "./reddit_unsave.ts";
 import { jitteredThrottle, MIN_THROTTLE } from "./_http.ts";
 import { childToItem } from "./connectors/reddit.ts";
+import { setAutosyncEnabled } from "./sync/scheduler.ts";
 
 export const SAVED_URL = "https://www.reddit.com/user/{user}/saved.json";
 
 const MARK_KEY = "reddit_sync_newest";
 
 const MARK_DEPTH = 25;
-
-const ENABLED_KEY = "reddit_autosync_enabled";
 
 const LAST_RUN_KEY = "reddit_autosync_last_run";
 
@@ -332,14 +331,6 @@ function reconcilePresent(
   };
 }
 
-export function isAutosyncEnabled(database: Database): boolean {
-  return db.getSetting(database, ENABLED_KEY, "0") === "1";
-}
-
-export function setAutosyncEnabled(database: Database, enabled: boolean): void {
-  db.setSetting(database, ENABLED_KEY, enabled ? "1" : "0");
-}
-
 function asInt(value: string | null, fallback = 0): number {
   const parsed = Number(value);
 
@@ -414,50 +405,4 @@ export async function sync(
     stopOnKnown: opts.full ? false : opts.stopOnKnown,
     progress: progress ?? opts.progress,
   });
-}
-
-export class SyncScheduler {
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private stopped = false;
-  private running = false;
-  constructor(
-    private readonly openDatabase: () => Database,
-    private readonly interval = 600_000,
-    private readonly syncFn: (database: Database) => Promise<AutoSyncResult> = autoSync,
-  ) {}
-  start(): this {
-    this.arm();
-
-    return this;
-  }
-  stop(): void {
-    this.stopped = true;
-
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
-  }
-  private arm(): void {
-    if (!this.stopped) this.timer = setTimeout(() => void this.fire(), this.interval);
-  }
-  async fire(): Promise<AutoSyncResult | null> {
-    if (this.running) return null;
-    this.running = true;
-    let database: Database | null = null;
-
-    try {
-      database = this.openDatabase();
-
-      if (!isAutosyncEnabled(database)) return null;
-
-      return await this.syncFn(database);
-    } catch (error) {
-      console.error(`reddit autosync tick failed: ${error}`);
-
-      return null;
-    } finally {
-      database?.close();
-      this.running = false;
-      this.arm();
-    }
-  }
 }
