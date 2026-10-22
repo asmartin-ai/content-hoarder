@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v129"; // v129: PKMS promote action (Spec 15) + user_tags CLI
+const CACHE = "ch-shell-v130"; // v130: browse surface split into ES modules (browse/*.js)
 
 const SHELL = [
   "/",
@@ -22,6 +22,18 @@ const SHELL = [
   "/static/core/markdown.js", // reader dependency (browse/reader.js:20)
   "/static/browse/browse.css",
   "/static/browse/main.js",
+  "/static/browse/shared.js",
+  "/static/browse/data.js",
+  "/static/browse/feed.js",
+  "/static/browse/actions.js",
+  "/static/browse/lightbox.js",
+  "/static/browse/relay.js",
+  "/static/browse/nav.js",
+  "/static/browse/drawer.js",
+  "/static/browse/chrome.js",
+  "/static/browse/ambient.js",
+  "/static/browse/panels.js",
+  "/static/browse/instances.js",
   "/static/browse/deck.js",
   "/static/browse/render.js",
   "/static/browse/reader.js",

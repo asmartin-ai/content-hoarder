@@ -85,7 +85,7 @@ media stays veiled until tapped. No new policy.
   (full-height sheet reusing `#scrim`; depth-rail comment indentation; foot triage row).
 - **Markup**: an `<aside class="reader" id="reader">` in `index.html` alongside the existing
   sheets (same `#scrim` overlay).
-- **Wire the tap**: in `browse/main.js` the item-row tap → `openReader(fullname)` instead of
+- **Wire the tap**: in `browse/actions.js` the item-row tap → `openReader(fullname)` instead of
   following the `<a target="_blank">`; keep the `<a>` href as the "Open original" target.
   (Reddit items only in v1; other sources keep current behaviour — `source==='reddit'` guard.)
 - **Reuse, don't rebuild**: `core/media.js` lightbox for media tiles; `POST /items/<fn>` for

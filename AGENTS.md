@@ -113,7 +113,7 @@ via `adb backup`, **not** `adb pull`.
 - **Gallery lightbox = stacked images, NEVER a reddit iframe.** Populated `metadata.gallery[]` →
   `core/media.js openGallery` stacks plain `<img>`s in a `flex-direction:column` `.media-gallery`.
   **Empty/missing `gallery[]`** → a clean placeholder ("Gallery images unavailable (not archived).")
-  + "Open on Reddit ↗" link (via `lightbox.openHtml(...)` in `browse/main.js openMediaFor`) — not a
+  + "Open on Reddit ↗" link (via `lightbox.openHtml(...)` in `browse/lightbox.js openMediaFor`) — not a
   degraded embed. The iframe fallback
   (`openMedia(permalink)`) is for non-gallery permalink items only.
 - Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu

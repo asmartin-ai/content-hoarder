@@ -245,7 +245,7 @@ export const hlsManifestUrl = (srcUrl) => {
    .mp4/.webm/.mov file — or "" when the item's "video" is an external page
    (YouTube, gfycat/redgifs, …) that must open via its source link, not an inline
    <video>. Single source of truth for the reader's inline player AND the lightbox
-   (browse/reader.js + browse/main.js) so the two can't disagree about playability. */
+   (browse/reader.js + browse/lightbox.js) so the two can't disagree about playability. */
 export const playableVideoSrc = (item) => {
   if (mediaType(item).cls !== "video") return "";
   const m = item.metadata || {};
