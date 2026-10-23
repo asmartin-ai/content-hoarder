@@ -43,6 +43,13 @@ export function serviceWorkerResponse(): Response {
 
 export function templateResponse(): Response {
   return new Response(Bun.file(TEMPLATE_PATH), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      // The local triage app must never sit inside another site's iframe:
+      // a framed deck click is a same-origin POST the Host/Origin guard
+      // cannot distinguish from a real one (clickjacking).
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "X-Frame-Options": "DENY",
+    },
   });
 }

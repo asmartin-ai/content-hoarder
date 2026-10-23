@@ -39,6 +39,27 @@ test("public item API returns parsed metadata from a synthetic database", async 
   }
 });
 
+test("app HTML refuses to be framed by another site", async () => {
+  const root = mkdtempSync(join(tmpdir(), "content-hoarder-frame-"));
+  const databasePath = join(root, "app.db");
+  const connection = db.connect(databasePath);
+
+  connection.close();
+
+  const server = await serveApp({ dbPath: databasePath, host: "127.0.0.1", port: 0 });
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.port}/`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Security-Policy")).toBe("frame-ancestors 'none'");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+  } finally {
+    await server.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an autosync tick keeps the connection serving requests", async () => {
   // Regression: SyncScheduler was handed the shared request connection and
   // closed it after its first tick, so every later request answered
