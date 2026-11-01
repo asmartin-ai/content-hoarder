@@ -3254,6 +3254,19 @@ export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCo
   };
 }
 
+export function decisionDays(db: Database, sinceUtc: number): string[] {
+  return rows<{ day: string }>(
+    db,
+    "SELECT DISTINCT date(processed_utc, 'unixepoch', 'localtime') AS day FROM items " +
+      "WHERE status != 'inbox' AND processed_utc >= ? ORDER BY day",
+    [sinceUtc],
+  ).map((r) => r.day);
+}
+
+export function keptTotal(db: Database): number {
+  return scalar(db, "SELECT COUNT(*) AS c FROM items WHERE status = 'keep'");
+}
+
 function folderRow(r: FolderSqlRow): Folder {
   let queryDef: FolderQueryDefinition = {};
 

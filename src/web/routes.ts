@@ -39,6 +39,7 @@ import {
 import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import { clearPage, deal } from "./handlers/clear.ts";
+import { homePage } from "./handlers/home.ts";
 import {
   applyPile,
   dismissWhisper,
@@ -88,6 +89,8 @@ export async function handle(request: Request): Promise<Response> {
   if (method === "GET" && path === "/sw.js") return serviceWorkerResponse();
 
   if (method === "GET" && path === "/") return todayPage(request, url);
+
+  if (method === "GET" && path === "/home") return homePage(request);
 
   if (method === "GET" && path === "/clear") return clearPage();
 

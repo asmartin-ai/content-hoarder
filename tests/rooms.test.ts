@@ -184,6 +184,28 @@ test("an empty inbox deals nothing instead of failing", async () => {
   });
 });
 
+test("Home counts a decision in today's wins and marks today on the calendar", async () => {
+  await withServer(async (base) => {
+    const before = await (await fetch(`${base}/home`)).text();
+
+    expect(before).not.toContain("o-day is-on is-today");
+
+    const decided = await fetch(`${base}/items/${encodeURIComponent("reddit:t3_room_0")}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "keep" }),
+    });
+
+    expect(decided.status).toBe(200);
+
+    const after = (await (await fetch(`${base}/home`)).text()).replace(/\s+/g, " ");
+
+    expect(after).toMatch(/Cleared today <\/span> <span class="o-win-n">1</);
+    expect(after).toMatch(/Kept <\/span> <span class="o-win-n">1</);
+    expect(after).toContain("o-day is-on is-today");
+  });
+});
+
 test("letting a pile go from Today toasts a wave, and undo restores it", async () => {
   await withServer(async (base, path) => {
     const piles = await (await fetch(`${base}/hx/today/piles`)).text();

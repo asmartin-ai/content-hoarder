@@ -1,6 +1,6 @@
 import { html, raw, type SafeHtml } from "./html.ts";
 
-export type Tab = "today" | "clear";
+export type Tab = "home" | "today" | "clear";
 
 const SPLASHES: Array<[string, string]> = [
   [
@@ -55,6 +55,12 @@ const SVG_OPEN =
   'stroke-linejoin="round" aria-hidden="true">';
 
 const NAV_ICONS = {
+  home: raw(
+    `${SVG_OPEN}<path d="M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1" />` +
+      '<path d="M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1" />' +
+      '<path d="M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1" />' +
+      '<path d="M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1" /></svg>',
+  ),
   today: raw(
     `${SVG_OPEN}<path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />` +
       '<path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>',
@@ -81,6 +87,7 @@ export function moonIcon(): SafeHtml {
 }
 
 const TABS: Array<{ id: Tab | "library"; href: string; label: string }> = [
+  { id: "home", href: "/home", label: "Home" },
   { id: "today", href: "/", label: "Today" },
   { id: "clear", href: "/clear", label: "Clear" },
   { id: "library", href: "/library", label: "Library" },
@@ -138,6 +145,7 @@ const HEAD_ASSETS = raw(
 );
 
 const ROOM_CSS: Record<Tab, string> = {
+  home: "/static/home/orient.css",
   today: "/static/home/today.css",
   clear: "/static/home/clear.css",
 };
