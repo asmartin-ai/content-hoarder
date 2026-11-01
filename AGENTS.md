@@ -103,7 +103,8 @@ via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
 - **Three rooms** (v2 spec: `docs/design/clear-v2.md`; visuals: `docs/design/deck-pass.md` — card
-  `--hue` paper, Bricolage `--font-display` on Today/Clear only; v1 background: `clear-overhaul.md`). Today `/`
+  `--hue` paper, Bricolage `--font-display` on Today/Clear only; motion is transform/opacity only and
+  input never waits on animation — §3 there; v1 background: `clear-overhaul.md`). Today `/`
   and Clear `/clear` are **server-rendered** TS views (`src/web/views/*`, `handlers/today.ts`,
   `handlers/clear.ts`) using vendored htmx (`static/vendor/htmx.min.js`) for Today's partials
   (`/hx/today/*`, `/hx/sweeps/*`, `/hx/whisper/*`). Cards are rendered once, on the server, by

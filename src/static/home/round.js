@@ -24,7 +24,17 @@ const KEY = "ch.round";
 
 const SIZES = [5, 10, 25];
 
-const ANIM_MS = 200;
+/* Animation lengths the island waits on (CSS owns the curves; JS only cleans up after them). */
+const ENTER_MS = 260;
+
+const LEAVE_MS = 300;
+
+/* Card-mode gesture tuning (core/swipe.js): commit distance, flick speed (px/ms), tilt (deg/px). */
+const COMMIT_PX = 90;
+
+const FLING = 0.55;
+
+const TILT = 0.06;
 
 const COMBO_MS = 6000;
 
@@ -224,7 +234,6 @@ export function mountRound(root) {
   //   startedAt }
   let round = null;
   let state = "loading";
-  let busy = false;
   let gen = 0; // bumps per fresh fetch so a stale response can't land
   let combo = 0;
   let shownAt = 0;
@@ -283,10 +292,14 @@ export function mountRound(root) {
     cleared.hidden = s !== "done";
   }
 
+  /* Replace the stage, keeping any card still flying off (it cleans itself up). */
   function setStage(html) {
+    const ghosts = stage.querySelectorAll(":scope > .card.is-leaving");
+
     stage.innerHTML = html + COMBO_HTML;
+    stage.append(...ghosts);
     comboEl = stage.querySelector(".combo");
-    cardEl = stage.querySelector(".card");
+    cardEl = stage.querySelector(".card:not(.is-leaving)");
   }
 
   function renderProgress() {
@@ -360,42 +373,106 @@ export function mountRound(root) {
     return el;
   }
 
-  /* `enter` animates a card arriving from nowhere (first card, undo, put-back); a card promoted
-     from the peek is already on screen and skips it. */
-  function showCard(enter = true) {
-    const item = round.items[round.idx];
-    const el = cardFrom(item);
+  /* Drag feedback, once per frame from core/swipe.js: the stamp and tint follow the thumb and the
+     card underneath rises toward the top — opacity and transform only, so it stays on the
+     compositor at any refresh rate. (0, 0) = settle: hand back to the CSS resting pose. */
+  function dragFeedback(card, dx, dy) {
+    const pull = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy)) / COMMIT_PX);
+    const stamp = card.querySelector(".card-stamp");
+    const wash = card.querySelector(".card-wash");
+    const peek = stage.querySelector(":scope > .card.is-next");
 
-    if (!el) {
-      showMessage("This card didn't come through. Try a fresh round.", "again", "New round");
+    if (stamp) stamp.style.opacity = pull ? String(pull) : "";
+
+    if (wash) wash.style.opacity = pull ? String(pull * 0.18) : "";
+
+    if (!peek) return;
+
+    if (!pull) {
+      peek.style.transition = "";
+      peek.style.transform = "";
+      peek.style.opacity = "";
 
       return;
     }
 
-    if (enter) {
-      el.classList.add("enter");
-      later(() => el.classList.remove("enter"), ANIM_MS);
+    peek.style.transition = "none";
+    peek.style.transform =
+      "translateY(" +
+      (12 - 8 * pull).toFixed(1) +
+      "px) scale(" +
+      (0.94 + 0.04 * pull).toFixed(3) +
+      ")";
+    peek.style.opacity = String(0.55 + 0.35 * pull);
+  }
+
+  /* Show round.items[idx] as the current card. When the peek already holds it, the peek itself is
+     promoted (no re-render, no image re-decode: it just rises into place). Otherwise a fresh card
+     arrives — from the side it left by when `back` names the undone decision (a rewind). */
+  function showCard(back = "") {
+    const item = round.items[round.idx];
+    const peekEl = stage.querySelector(":scope > .card.is-next");
+    let el;
+
+    if (!back && peekEl && peekEl.dataset.fullname === item.fullname) {
+      el = peekEl;
+      el.classList.remove("is-next");
+      el.removeAttribute("aria-hidden");
+      el.inert = false;
+      el.style.cssText = el.style.cssText.replace(/\s*(transition|transform|opacity):[^;]*;?/g, "");
+    } else {
+      el = cardFrom(item);
+
+      if (!el) {
+        showMessage("This card didn't come through. Try a fresh round.", "again", "New round");
+
+        return;
+      }
+
+      const from = back ? "return-" + back : "enter";
+
+      el.classList.add(from);
+      later(() => el.classList.remove(from), ENTER_MS);
+      wireMedia(el);
     }
 
-    wireMedia(el);
+    // a rewound card replaces its own ghost if that is still flying
+    for (const c of stage.querySelectorAll(":scope > .card")) {
+      if (c === el) continue;
 
-    setStage("");
+      if (!c.classList.contains("is-leaving") || c.dataset.fullname === item.fullname) c.remove();
+    }
+
+    if (!comboEl || !comboEl.isConnected) {
+      stage.insertAdjacentHTML("beforeend", COMBO_HTML);
+      comboEl = stage.querySelector(".combo");
+    }
+
+    if (!el.isConnected) stage.insertBefore(el, comboEl);
     const peek = peekFor(round.items[round.idx + 1]);
 
-    if (peek) stage.insertBefore(peek, comboEl);
-    stage.insertBefore(el, comboEl);
+    if (peek) {
+      peek.classList.add("peek-in");
+      later(() => peek.classList.remove("peek-in"), ENTER_MS);
+      stage.insertBefore(peek, el);
+    }
+
     cardEl = el;
     measureBody(el);
 
     // attachSwipe slides the inner `.item-fg` (the server marks `.card-fg` with it too);
     // its listeners live on the card element and go away with it.
     attachSwipe(el, {
-      onRight: () => decide("archived"),
-      onLeft: () => decide("done"),
+      onRight: () => decide("archived", true),
+      onLeft: () => decide("done", true),
       onUp: () => openCurrent(),
-      onDown: () => decide("skip"),
+      onDown: () => decide("skip", true),
+      onDrag: (dx, dy) => dragFeedback(el, dx, dy),
       mouse: false,
-      tilt: 0.06,
+      commit: COMMIT_PX,
+      fling: FLING,
+      commitDelay: 0,
+      tilt: TILT,
     });
 
     shownAt = Date.now();
@@ -446,7 +523,6 @@ export function mountRound(root) {
     forget();
     pending.clear();
     round = null;
-    busy = false;
     combo = 0;
     setStage('<article class="card is-skeleton" aria-hidden="true"></article>');
     setState("loading");
@@ -635,12 +711,6 @@ export function mountRound(root) {
       .catch(() => {});
   }
 
-  /* After a decision: the peeked card moves up, unless a failed POST put another card back. */
-  function advance(peeked) {
-    if (round.idx >= round.items.length) finish();
-    else showCard(!peeked || round.items[round.idx] !== peeked);
-  }
-
   /* ---- decisions ---- */
 
   function send(item, result) {
@@ -692,21 +762,21 @@ export function mountRound(root) {
     save();
     toast("That didn't stick — the card is back.");
 
-    if (busy) return; // the running transition shows items[idx] — the card that came back
-
-    showCard();
+    if (state === "playing") showCard();
   }
 
-  function decide(act) {
-    if (busy || leaving || state !== "playing" || !round) return;
+  /* Decide the current card. Input never waits on animation: the card becomes a ghost that flies
+     off on its own (a flung card keeps the finger's flight; a button/key decision plays its leave
+     animation) while the next card is promoted at once, so D D D D clears four cards as fast as
+     the keys go. */
+  function decide(act, flung = false) {
+    if (leaving || state !== "playing" || !round) return;
     const item = round.items[round.idx];
 
     if (!item) return;
-    busy = true;
 
     combo = Date.now() - shownAt < COMBO_MS ? combo + 1 : 0;
     const result = { fullname: item.fullname, act };
-    const peeked = round.items[round.idx + 1];
 
     round.results.push(result);
     round.idx += 1;
@@ -715,13 +785,33 @@ export function mountRound(root) {
 
     if (act !== "skip") send(item, result);
 
-    if (cardEl) cardEl.classList.add("leave-" + act);
+    const ghost = cardEl;
+
+    if (ghost) {
+      ghost.classList.add("is-leaving", "leave-" + act);
+
+      if (flung) ghost.classList.add("is-flung");
+
+      ghost.inert = true;
+      later(() => ghost.remove(), LEAVE_MS);
+    }
+
     renderProgress();
     renderCombo();
+
+    if (round.idx < round.items.length) {
+      showCard();
+
+      return;
+    }
+
+    // the last card: let it finish flying before the stamp lands (unless undone meanwhile)
+    cardEl = null;
+    const at = round.idx;
+
     later(() => {
-      busy = false;
-      advance(peeked);
-    }, ANIM_MS);
+      if (round && state === "playing" && round.idx === at) finish();
+    }, LEAVE_MS - 60);
   }
 
   function revert(result) {
@@ -733,8 +823,7 @@ export function mountRound(root) {
   }
 
   function undo() {
-    if (busy || state !== "playing" || !round || !round.results.length) return;
-    busy = true;
+    if (state !== "playing" || !round || !round.results.length) return;
     const result = round.results.pop();
 
     round.idx -= 1;
@@ -747,14 +836,11 @@ export function mountRound(root) {
         .catch(() => toast("Undo didn't stick — try again."));
     }
 
-    showCard();
-    later(() => {
-      busy = false;
-    }, ANIM_MS);
+    showCard(result.act);
   }
 
   function openCurrent() {
-    if (busy || state !== "playing" || !round) return;
+    if (state !== "playing" || !round) return;
     const item = round.items[round.idx];
 
     if (!item) return;

@@ -295,6 +295,8 @@ export function renderCard(item: Item, opts?: { topComment?: TopComment | null }
         </header>
         ${context}${heading}${removed}${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
       </div>
+      <span class="card-wash" aria-hidden="true"></span
+      ><span class="card-stamp" aria-hidden="true"></span>
     </div>
   </article>`;
 }

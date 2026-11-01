@@ -73,9 +73,35 @@ tiles (`.pile-mosaic`, `.pile-main` over it, `.pile-acts`).
 `home/home.css` (base, toast, community paper) + one room sheet: `home/today.css` or
 `home/clear.css` (`renderPage` links the right one). Bricolage is vendored at
 `static/fonts/BricolageGrotesque-var.woff2`; `--font-display` in `core/tokens.css`. SW cache
-`ch-shell-v143`.
+`ch-shell-v144`.
 
-## 3. Open
+## 3. Motion and performance (power-user pass)
+
+The round has to keep up with a fast thumb on a 120 Hz phone and with key chains on a desktop.
+
+- **Compositor only.** Everything that moves in a round animates `transform` and `opacity`:
+  the dragged card, the stamp and tint, the peek rising underneath, leave/enter/rewind
+  animations, the orbs. No filter, shadow, size or layout animation. The blurred media backdrop is
+  blurred at a quarter size and scaled up, so its one-off raster is cheap, and it is never animated.
+  Today's hover glow is a pseudo-element whose opacity animates.
+- **One style recalc per frame while dragging.** `core/swipe.js` records pointer events and
+  paints once per animation frame. Drag feedback is written as inline `opacity`/`transform`
+  on three elements (`.card-stamp`, `.card-wash`, the peek) through `onDrag`. v2 put a
+  `--pull` custom property on the card, which invalidated the whole card subtree on every
+  pointermove. Measured in headless Chromium on a burst drag: style work went from ~1.6 ms to
+  ~0.2 ms per frame.
+- **Input never waits for animation.** A decision turns the card into a ghost (`.is-leaving`,
+  above the stage, removed after it flies) and the peek is promoted in place: it is not
+  re-rendered and its images are not re-decoded. D D D D clears four cards as fast as the keys
+  go (five presses 35 ms apart all land). v2 ignored keys for 200 ms after each decision.
+- **Gestures with momentum.** A flick faster than 0.55 px/ms commits from 24 px. The fly-out keeps
+  the finger's speed (110–240 ms). An early release springs back with a small overshoot. The
+  callback fires at once (`commitDelay: 0`).
+- **Undo is a rewind.** The card comes back from the side it left by (`.return-<act>`).
+- **Reduced motion.** tokens.css removes all animation. A decided card is hidden at once rather
+  than freezing over the next one.
+
+## 4. Open
 
 - Clips still open in the Library reader rather than playing inline.
 - Some old saves carry slug-derived titles cut mid-sentence; that is data, not layout.

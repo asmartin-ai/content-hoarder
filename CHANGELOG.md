@@ -6,6 +6,14 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **Smooth, fast rounds (`docs/design/deck-pass.md` §3).** Everything that moves in Clear animates
+  transform/opacity only. Drags paint once per frame, with no subtree-wide style invalidation (about
+  8× less style work per frame). Decisions no longer lock input: the card flies off as a ghost while
+  the next one, already rendered underneath, is promoted in place, so rapid D/A/S chains all land.
+  Flicks commit from a short drag and fly out at the finger's speed; early releases spring back;
+  the card underneath rises as you drag; Undo rewinds the card from the side it left by. The blurred
+  backdrop is rasterised at a quarter size. The Library's three `transition: all` controls now
+  name their properties.
 - **Deck pass (`docs/design/deck-pass.md`).** Today and Clear get their own look. Clear: every card
   fills the stage at one size on its community's tinted paper (stable hue per subreddit/channel);
   pictures sit whole over a blurred copy of themselves; text posts are typeset posters in Bricolage
@@ -16,7 +24,7 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   and counted-up cleared · minutes freed · time spent. Today: the day title ("Sunday evening"), the
   next round as a fanned hand of its cards over the Clear button, today's count in a pebble ring, and
   piles as memory tiles. `home.css` split into `home.css` + `today.css` + `clear.css`. Reddit's
-  literal `&#x200B;` no longer prints in card bodies. SW cache `ch-shell-v143`.
+  literal `&#x200B;` no longer prints in card bodies. SW cache `ch-shell-v144`.
 - **Clear v2 (`docs/design/clear-v2.md`).** Round cards are rich and server-rendered
   (`src/web/views/card.ts`): media hero with gallery/clip/duration badges and archived-copy
   fallback, subreddit/author/age head, self-text and saved comments rendered as markdown, the cached

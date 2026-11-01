@@ -16,10 +16,16 @@
      {haptics:false} is passed.
    - optional vertical callbacks for focus-card flows: pass {onUp, onDown}. When
      absent, vertical movement is left to native scrolling (browse behavior).
-   - optional {tilt}: degrees of rotation per px of horizontal drag (a card in the hand, Tinder-style).
-   While dragging, `--pull` on the element runs 0 → 1 as the gesture nears its commit distance, so CSS
-   can fade a stamp in with the finger.
-   Usage: attachSwipe(el, { onRight, onRightLong, onLeft, onLeftLong, onUp, onDown, edge, commit, commit2, mouse, haptics, tilt }). */
+   - frame-batched: pointer events only record the finger; the transform, classes and detents are
+     applied once per animation frame (touch screens sample at 120–240 Hz, faster than they paint),
+     so a drag costs one style recalc of the moving element per frame at any refresh rate
+   - optional card mode (focus rounds): {tilt} degrees of rotation per px of horizontal drag (a card
+     in the hand); {onDrag(dx, dy)} once per frame while dragging and (0, 0) on settle, for
+     compositor-only feedback the caller owns (stamp/peek opacity); {fling} px/ms — a flick faster
+     than this commits from a short drag and the fly-out keeps the flick's speed; {commitDelay} ms
+     between commit and the callback (default 160; 0 = decide at once, the card flies on regardless).
+     With {tilt}, a cancelled drag springs back with a little overshoot.
+   Usage: attachSwipe(el, { onRight, onRightLong, onLeft, onLeftLong, onUp, onDown, edge, commit, commit2, mouse, haptics, tilt, onDrag, fling, commitDelay }). */
 
 export function attachSwipe(el, opts) {
   opts = opts || {};
@@ -32,6 +38,13 @@ export function attachSwipe(el, opts) {
   const HAS_VERTICAL = !!(opts.onUp || opts.onDown);
   const HAPTICS = opts.haptics !== false;
   const TILT = opts.tilt || 0;
+  const FLING = opts.fling || Infinity;
+  const COMMIT_DELAY = opts.commitDelay ?? 160;
+
+  const SETTLE = TILT
+    ? "transform .42s cubic-bezier(.18, 1.35, .4, 1)"
+    : "transform .2s var(--ease)";
+
   const fg = el.querySelector(".item-fg") || el;
 
   let startX = 0,
@@ -48,10 +61,22 @@ export function attachSwipe(el, opts) {
 
   let relayCloseMode = false; // when the relay strip is open, a swipe closes it (no triage)
 
+  // latest finger position + smoothed velocity (px/ms); painted by the next animation frame
+  let curX = 0,
+    curY = 0,
+    lastX = 0,
+    lastY = 0,
+    lastT = 0,
+    vx = 0,
+    vy = 0,
+    frame = 0;
+
   fg.style.touchAction = HAS_VERTICAL ? "none" : "pan-y";
 
   function reset() {
-    fg.style.transition = "transform .2s var(--ease)"; // restrained settle
+    cancelAnimationFrame(frame);
+    frame = 0;
+    fg.style.transition = SETTLE;
     fg.style.transform = "";
     el.classList.remove(
       "swipe-arch",
@@ -62,7 +87,9 @@ export function attachSwipe(el, opts) {
       "swipe-skip",
     );
     fg.style.opacity = "";
-    el.style.removeProperty("--pull");
+
+    if (opts.onDrag) opts.onDrag(0, 0);
+
     stage2 = false;
     stage2left = false;
     armed = false;
@@ -99,6 +126,11 @@ export function attachSwipe(el, opts) {
     vertical = false;
     startX = e.clientX;
     startY = e.clientY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastT = e.timeStamp;
+    vx = 0;
+    vy = 0;
 
     if (!relayCloseMode) {
       fg.style.transition = "none"; // only disable transition when we're actually dragging the fg
@@ -143,53 +175,33 @@ export function attachSwipe(el, opts) {
     }
   });
 
-  el.addEventListener("pointermove", (e) => {
+  /* One frame's worth of drag: transform, direction classes, detents, caller feedback. */
+  function paint() {
+    frame = 0;
+
     if (!dragging) return;
 
-    const dx = e.clientX - startX,
-      dy = e.clientY - startY;
-
-    if (!decided) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      decided = true;
-      clearTimeout(lpTimer); // a real drag cancels the long-press
-      horizontal = Math.abs(dx) > Math.abs(dy);
-      vertical = !horizontal;
-
-      if (horizontal || (vertical && HAS_VERTICAL)) {
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {}
-      }
-    }
+    const dx = curX - startX,
+      dy = curY - startY;
 
     if (vertical && HAS_VERTICAL) {
-      if (e.cancelable) e.preventDefault();
       fg.style.transform = "translateY(" + dy + "px) scale(.98)";
-      el.style.setProperty("--pull", String(Math.min(1, Math.abs(dy) / COMMIT)));
       fg.style.opacity = String(Math.max(0.5, 1 - Math.abs(dy) / 360));
       el.classList.toggle("swipe-open", dy < -40);
       el.classList.toggle("swipe-skip", dy > 40);
 
-      return;
-    }
-
-    if (!horizontal) return; // vertical without callbacks → let the list scroll
-
-    // In relay-close mode, don't translate (no blank space to the right on
-    // leftward swipes); we just track the direction for the close gesture.
-    if (relayCloseMode) {
-      if (e.cancelable) e.preventDefault();
+      if (opts.onDrag) opts.onDrag(0, dy);
 
       return;
     }
 
-    if (e.cancelable) e.preventDefault(); // claim the gesture: block link activation / native drag
-    fg.style.transform = "translateX(" + dx + "px)" + (TILT ? " rotate(" + dx * TILT + "deg)" : "");
-    el.style.setProperty("--pull", String(Math.min(1, Math.abs(dx) / COMMIT)));
+    fg.style.transform =
+      "translateX(" + dx + "px)" + (TILT ? " rotate(" + (dx * TILT).toFixed(2) + "deg)" : "");
     el.classList.toggle("swipe-arch", dx > 40 && (!opts.onRightLong || dx <= COMMIT2)); // right → archive
     el.classList.toggle("swipe-done", dx < -40 && (!opts.onLeftLong || dx >= -COMMIT2)); // left → done
     el.classList.toggle("swipe-snooze", opts.onLeftLong && dx < -COMMIT2); // long-left → snooze
+
+    if (opts.onDrag) opts.onDrag(dx, 0);
 
     // Detent when an action crosses its COMMIT threshold (release-to-fire): one firm pulse per arm,
     // for done (left) AND archive (right, below the Keep stage) — was Keep-only (user 2026-06-22).
@@ -219,12 +231,65 @@ export function attachSwipe(el, opts) {
 
       if (s2left && HAPTICS && navigator.vibrate) navigator.vibrate(15); // Snooze stage detent
     }
+  }
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+
+    const dx = e.clientX - startX,
+      dy = e.clientY - startY;
+
+    if (!decided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      decided = true;
+      clearTimeout(lpTimer); // a real drag cancels the long-press
+      horizontal = Math.abs(dx) > Math.abs(dy);
+      vertical = !horizontal;
+
+      if (horizontal || (vertical && HAS_VERTICAL)) {
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {}
+      }
+    }
+
+    if (vertical && !HAS_VERTICAL) return; // vertical without callbacks → let the list scroll
+
+    // Claim the gesture (block link activation / native drag / scroll) — synchronously, per event.
+    if (e.cancelable) e.preventDefault();
+
+    // In relay-close mode, don't translate (no blank space to the right on
+    // leftward swipes); we just track the direction for the close gesture.
+    if (relayCloseMode) return;
+
+    const dt = e.timeStamp - lastT;
+
+    if (dt > 0) {
+      vx = vx * 0.4 + ((e.clientX - lastX) / dt) * 0.6;
+      vy = vy * 0.4 + ((e.clientY - lastY) / dt) * 0.6;
+    }
+
+    lastX = curX = e.clientX;
+    lastY = curY = e.clientY;
+    lastT = e.timeStamp;
+
+    if (!frame) frame = requestAnimationFrame(paint);
   });
+
+  /* Fly the card off, as fast as the finger was going (never slower than a calm exit). */
+  function flyOut(transform, remaining, speed) {
+    const ms = Math.round(Math.min(240, Math.max(110, remaining / Math.max(speed, 1.5))));
+
+    fg.style.transition = "transform " + ms + "ms cubic-bezier(.2,.7,.3,1), opacity " + ms + "ms";
+    fg.style.transform = transform;
+  }
 
   function end(e) {
     if (!dragging) return;
     dragging = false;
     clearTimeout(lpTimer);
+    cancelAnimationFrame(frame);
+    frame = 0;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
 
@@ -248,20 +313,34 @@ export function attachSwipe(el, opts) {
 
     if (horizontal || (vertical && HAS_VERTICAL)) suppressNextClick(); // owned gestures: swallow trailing click
 
-    if (vertical && HAS_VERTICAL && Math.abs(dy) >= COMMIT) {
+    const flungY = Math.abs(vy) > FLING && Math.abs(dy) > 24 && Math.sign(vy) === Math.sign(dy);
+    const flungX = Math.abs(vx) > FLING && Math.abs(dx) > 24 && Math.sign(vx) === Math.sign(dx);
+
+    if (vertical && HAS_VERTICAL && (Math.abs(dy) >= COMMIT || flungY)) {
       const dir = dy > 0 ? 1 : -1;
-      fg.style.transition = "transform .18s ease-out, opacity .18s ease-out";
-      fg.style.transform = dir > 0 ? "translateY(16%) scale(.96)" : "translateY(-16%) scale(.98)";
+
+      flyOut(
+        dir > 0 ? "translateY(16%) scale(.96)" : "translateY(-16%) scale(.98)",
+        200,
+        Math.abs(vy),
+      );
       fg.style.opacity = dir > 0 ? "0" : "1";
       const cb = dir > 0 ? opts.onDown : opts.onUp;
-      setTimeout(() => {
-        if (cb) cb();
-      }, 120);
-    } else if (horizontal && Math.abs(dx) >= COMMIT) {
+
+      setTimeout(
+        () => {
+          if (cb) cb();
+        },
+        Math.min(COMMIT_DELAY, 120),
+      );
+    } else if (horizontal && (Math.abs(dx) >= COMMIT || flungX)) {
       const dir = dx > 0 ? 1 : -1;
-      fg.style.transition = "transform .2s ease-out";
-      fg.style.transform =
-        "translateX(" + dir * 130 + "%)" + (TILT ? " rotate(" + dir * TILT * 240 + "deg)" : "");
+
+      flyOut(
+        "translateX(" + dir * 130 + "%)" + (TILT ? " rotate(" + dir * TILT * 240 + "deg)" : ""),
+        window.innerWidth * 1.3 - Math.abs(dx),
+        Math.abs(vx),
+      );
 
       const cb =
         dir > 0
@@ -272,9 +351,11 @@ export function attachSwipe(el, opts) {
             ? opts.onLeftLong
             : opts.onLeft;
 
-      setTimeout(() => {
-        if (cb) cb();
-      }, 160);
+      if (COMMIT_DELAY) {
+        setTimeout(() => {
+          if (cb) cb();
+        }, COMMIT_DELAY);
+      } else if (cb) cb();
     } else {
       reset();
     }

@@ -234,7 +234,10 @@ a:focus-visible {
   font-size: 1rem;
   cursor: pointer;
   text-decoration: none;
-  transition: all var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
 }
 .icon-btn:hover {
   color: var(--text-body);
@@ -462,7 +465,9 @@ a:focus-visible {
   height: 32px;
   cursor: pointer;
   text-align: left;
-  transition: all var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
   width: 100%;
 }
 .rnav .n {
@@ -2819,7 +2824,9 @@ kbd {
   color: var(--text-muted);
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .nd-x:hover {
   color: var(--text-body);

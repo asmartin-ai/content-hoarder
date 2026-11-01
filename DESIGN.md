@@ -187,6 +187,8 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 
 **The Shadow Has a Job Rule.** A shadow means overlay, focus, or separation. If a shadow is only decorative, remove it.
 
+**The Compositor Rule.** Anything that moves animates `transform` or `opacity` only — never a filter, shadow, size or position — so motion runs at the display's own refresh rate (120 Hz phones included). A glow that must change is a pseudo-element whose opacity animates. Per-frame feedback during a gesture is written inline on the few elements that move, never through an inherited custom property. Input never waits for an animation to finish (`docs/design/deck-pass.md` §3).
+
 ## 5. Components
 
 ### Buttons
