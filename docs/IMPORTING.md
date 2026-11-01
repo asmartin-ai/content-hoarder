@@ -171,6 +171,21 @@ titles/durations. (OneTab / `recovery.jsonlz4` remain future inputs.)
 
 ---
 
+## Bookmarks exports and pasted links  ✅ done
+
+- **Bookmarks HTML** (`bookmarks` connector): the Netscape file every browser exports. Each
+  link keeps its nearest folder name. YouTube links become YouTube items.
+- **Pasted links** (`links` connector, `.txt`/`.md`/`.csv`): one URL per line, `url | title`
+  (OneTab), `title<TAB>url`, `[title](url)`, or a title line above the URL. The Firefox "Export Tabs
+  URLs" format still goes to the Firefox connector.
+- Both land as source `bookmarks` and are deduped by URL. The **Add** page (`/add`) takes either.
+
+```bash
+bun run src/cli.ts import "path/to/bookmarks.html"
+```
+
+---
+
 ## Twitter / X bookmarks
 
 Use a browser-side bookmark exporter that writes JSON or CSV, then import the file:
