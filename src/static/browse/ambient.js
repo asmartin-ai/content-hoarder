@@ -252,11 +252,9 @@ export async function surprise() {
     ambient.hidden = false;
     ambient.scrollIntoView({ block: "nearest", behavior: "smooth" });
   } catch {
-    toast("The dice jammed — try again.");
+    toast("Couldn't pull a random save — try again.");
   }
 }
-
-$("#dice").addEventListener("click", surprise);
 
 ambient.addEventListener("click", (e) => {
   const b = e.target.closest("[data-surprise]");

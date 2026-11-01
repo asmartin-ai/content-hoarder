@@ -8,8 +8,7 @@
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 import { wireTagExpanders } from "../core/render.js";
-import { $, itemsEl, restoreView, state } from "./shared.js";
-import { paintWins } from "./chrome.js";
+import { $, itemsEl, restoreView } from "./shared.js";
 import {
   clearItemFirstPageCache,
   loadCounts,
@@ -17,9 +16,8 @@ import {
   refreshPulse,
   refreshRail,
 } from "./data.js";
-import { syncDeckToggles } from "./feed.js";
 import { loadAmbient } from "./ambient.js";
-import { deck, readerUI } from "./instances.js";
+import { readerUI } from "./instances.js";
 import { paintChips, paintTabs, qInput, sortSel, syncSortControl } from "./nav.js";
 import { initPalette } from "./palette.js";
 
@@ -29,13 +27,6 @@ import "./lightbox.js";
 import "./relay.js";
 import "./drawer.js";
 import "./panels.js";
-
-/* On initial load, if ?deck=1 is set, open the deck. Runs after every module above
-   has evaluated, so deck/state are ready. */
-if (state.deck) {
-  syncDeckToggles();
-  deck.open(state);
-}
 
 wireTagExpanders(itemsEl);
 
@@ -51,14 +42,14 @@ async function openDeepLinkedReader() {
 
   try {
     const item = await api.fetchItem(fn);
-    const fromTriage = qs.get("from") === "triage";
+    const fromClear = qs.get("from") === "clear";
     let triageEnter = false;
 
-    if (fromTriage) {
+    if (fromClear) {
       try {
         triageEnter =
-          qs.get("enter") === "up" || sessionStorage.getItem("ch_triage_reader_enter") === fn;
-        sessionStorage.removeItem("ch_triage_reader_enter");
+          qs.get("enter") === "up" || sessionStorage.getItem("ch_clear_reader_enter") === fn;
+        sessionStorage.removeItem("ch_clear_reader_enter");
       } catch {
         triageEnter = qs.get("enter") === "up";
       }
@@ -73,7 +64,7 @@ async function openDeepLinkedReader() {
       }
     }
 
-    readerUI.open(item, { from: fromTriage ? "triage" : "", triageEnter });
+    readerUI.open(item, { from: fromClear ? "clear" : "", triageEnter });
   } catch {
     toast("Couldn't open that item.");
   }
@@ -83,8 +74,6 @@ async function openDeepLinkedReader() {
 paintTabs();
 
 paintChips();
-
-paintWins();
 
 refreshRail();
 
@@ -149,9 +138,9 @@ if ("serviceWorker" in navigator)
 /* ---- command palette (locked Epic 20: ">" flips search to command mode) ---- */
 initPalette(qInput, [
   {
-    label: "Go to Triage",
+    label: "Start a round",
     hint: "page",
-    run: () => location.assign("/triage"),
+    run: () => location.assign("/clear"),
   },
   {
     label: "Go to Reddit saved",

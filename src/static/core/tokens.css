@@ -61,6 +61,16 @@
   --done-ink: #310c07;
   --done-tint: rgba(239, 117, 104, 0.13);
 
+  /* Hearth shared roles: win = celebration (cleared stamp, pebbles),
+     moss = the resurfacing question. Never used for triage verbs. */
+  --win: #8fce96;
+  --win-ink: #0b2410;
+  --win-tint: rgba(143, 206, 150, 0.13);
+  --moss: #a3bd97;
+  --moss-tint: rgba(163, 189, 151, 0.12);
+  --ember-fill: #f2a97e; /* the one lit object (Today's hero, primary round buttons) */
+  --ember-fill-ink: #2e1605;
+
   --tile-fill: #0c0e12; /* letterboxed media backdrop */
   --glowsky: radial-gradient(ellipse 80% 55% at 60% -10%, rgba(242, 169, 126, 0.05), transparent);
   --led-glow: 0 0 8px var(--accent);
@@ -94,6 +104,14 @@
   --done: #c8392c;
   --done-ink: #fff;
   --done-tint: rgba(200, 57, 44, 0.1);
+
+  --win: #22713a;
+  --win-ink: #fff;
+  --win-tint: rgba(34, 113, 58, 0.1);
+  --moss: #4d6843;
+  --moss-tint: rgba(77, 104, 67, 0.1);
+  --ember-fill: #f2a97e;
+  --ember-fill-ink: #2e1605;
 
   --tile-fill: #c8d0d8;
   --glowsky: none;
@@ -175,6 +193,7 @@
   --dur-fast: 120ms;
   --dur: 150ms;
   --dur-slow: 200ms;
+  --dur-stamp: 420ms; /* the one loud moment: the cleared stamp */
 
   /* interaction */
   --touch-min: 44px;

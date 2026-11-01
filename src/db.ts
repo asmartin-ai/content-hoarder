@@ -170,7 +170,13 @@ export interface CountByKey {
 
 type RedditCommentDedupeResult = { removed: number; status_moved: number; requeued: number };
 
-type PulseCounts = { new_today: number; cleared_today: number; swept_recent: number };
+type PulseCounts = {
+  new_today: number;
+  cleared_today: number;
+  swept_recent: number;
+  swept_today: number;
+  cleared_total: number;
+};
 // ---------------------------------------------------------------------------
 // Schema (keep in sync with models.ITEM_FIELDS)
 // ---------------------------------------------------------------------------
@@ -3030,11 +3036,45 @@ export function bankruptcy(
   return n;
 }
 
+interface DecayExclusions {
+  excludeSubreddits?: readonly string[];
+  excludeTags?: readonly string[];
+}
+
+/**
+ * AND clauses that keep knowledge content (resurface subreddits/tags)
+ * out of a decay selection. Empty lists add nothing.
+ */
+function decayExclusionClauses(ex: DecayExclusions): [string[], SQLQueryBindings[]] {
+  const clauses: string[] = [];
+  const params: SQLQueryBindings[] = [];
+  const subs = [...new Set((ex.excludeSubreddits ?? []).map((s) => s.toLowerCase()))];
+
+  if (subs.length) {
+    clauses.push(
+      `COALESCE(lower(json_extract(metadata, '$.subreddit')), '') NOT IN (${subs.map(() => "?").join(",")})`,
+    );
+    params.push(...subs);
+  }
+
+  const tags = [...new Set(ex.excludeTags ?? [])];
+
+  if (tags.length) {
+    clauses.push(
+      `NOT EXISTS (SELECT 1 FROM json_each(metadata, '$.tags') WHERE value IN (${tags.map(() => "?").join(",")}))`,
+    );
+    params.push(...tags);
+  }
+
+  return [clauses, params];
+}
+
 function decayWhere(
   tags: string[] | null,
   subreddits: string[] | null,
   beforeUtc: number | null,
   source: string,
+  exclusions: DecayExclusions = {},
 ): [string, SQLQueryBindings[]] {
   /**
    * WHERE clause + params for a decay selection: tag/subreddit
@@ -3066,10 +3106,15 @@ function decayWhere(
     params.push(Number(beforeUtc));
   }
 
+  const [exClauses, exParams] = decayExclusionClauses(exclusions);
+
+  clauses.push(...exClauses);
+  params.push(...exParams);
+
   return [clauses.join(" AND "), params];
 }
 
-export interface DecayOpts {
+export interface DecayOpts extends DecayExclusions {
   tags?: string[] | null;
   subreddits?: string[] | null;
   beforeUtc?: number | null;
@@ -3145,7 +3190,11 @@ export function decay(db: Database, opts: DecayOpts = {}): DecayResult {
     throw new Error("decay needs at least one selector (tags/subreddits/before_utc)");
   }
 
-  const [where, params] = decayWhere(tags, subreddits, beforeUtc ?? null, source);
+  const [where, params] = decayWhere(tags, subreddits, beforeUtc ?? null, source, {
+    excludeSubreddits: opts.excludeSubreddits,
+    excludeTags: opts.excludeTags,
+  });
+
   const total = scalar(db, `SELECT COUNT(*) AS c FROM items WHERE ${where}`, params);
 
   const byTag: Record<string, number> = {};
@@ -3229,6 +3278,146 @@ export function decay(db: Database, opts: DecayOpts = {}): DecayResult {
   }
 
   return res;
+}
+
+export type Sweep = {
+  id: string;
+  kind: "subreddit" | "age";
+  source: string;
+  subreddit?: string;
+  before_utc?: number;
+  label: string;
+  count: number;
+  sample: string[];
+};
+
+const SWEEP_MIN_COUNT = 10;
+
+const SWEEP_AGE_YEARS = 4;
+
+const SWEEP_SAMPLES = 3;
+
+const _SUBREDDIT_KEY_EXPR = "lower(json_extract(metadata, '$.subreddit'))";
+
+function capitalized(source: string): string {
+  return source ? `${source[0]?.toUpperCase()}${source.slice(1)}` : source;
+}
+
+function sweepSample(db: Database, where: string, params: SQLQueryBindings[]): string[] {
+  return rows<{ title: string }>(
+    db,
+    `SELECT title FROM items WHERE ${where} AND title != '' ` +
+      "ORDER BY COALESCE(json_extract(metadata, '$.score'), 0) DESC, fullname LIMIT ?",
+    [...params, SWEEP_SAMPLES],
+  ).map((r) => r.title.slice(0, 140));
+}
+
+/**
+ * One-tap "let a pile go" candidates for the Today screen.
+ *
+ * Two kinds, each counted with ONE grouped query so it stays cheap on
+ * a large hoard: subreddit piles (inbox Reddit items per
+ * case-insensitive subreddit, minus ``excludeSubreddits`` — the
+ * knowledge subreddits that resurface instead) and age piles (inbox
+ * items per source whose content is older than four years). Every
+ * ``count`` is exactly what `decay` with the matching selector would
+ * archive: the WHERE clauses are `decayWhere`'s. Mixed list, largest
+ * first, cut to ``limit``; casing and samples are only looked up for
+ * the survivors.
+ */
+export function sweepCandidates(
+  db: Database,
+  opts: {
+    limit: number;
+    excludeSubreddits: readonly string[];
+    excludeTags?: readonly string[];
+    now?: number;
+    sourceLabel?: (source: string) => string;
+  },
+): Sweep[] {
+  const now = opts.now ?? Math.floor(Date.now() / 1000);
+  const sourceLabel = opts.sourceLabel ?? capitalized;
+  const beforeUtc = now - SWEEP_AGE_YEARS * 365 * 86400;
+
+  const exclusions: DecayExclusions = {
+    excludeSubreddits: opts.excludeSubreddits,
+    excludeTags: opts.excludeTags,
+  };
+
+  type Pending = { kind: "subreddit" | "age"; key: string; count: number };
+
+  const pending: Pending[] = [];
+
+  // Same base as decay({source: "reddit", subreddits: [key]}) minus the
+  // single-subreddit pin, which the GROUP BY supplies.
+  const [subWhere, subParams] = decayWhere(null, null, null, "reddit", exclusions);
+  const subGroupWhere = `${subWhere} AND ${_SUBREDDIT_KEY_EXPR} IS NOT NULL AND ${_SUBREDDIT_KEY_EXPR} != ''`;
+
+  for (const r of rows<{ k: string; c: number }>(
+    db,
+    `SELECT ${_SUBREDDIT_KEY_EXPR} AS k, COUNT(*) AS c FROM items WHERE ${subGroupWhere} ` +
+      "GROUP BY k HAVING c >= ? ORDER BY c DESC LIMIT ?",
+    [...subParams, SWEEP_MIN_COUNT, opts.limit],
+  )) {
+    pending.push({ kind: "subreddit", key: String(r.k), count: Number(r.c) });
+  }
+
+  // decayWhere(null, null, beforeUtc, source, exclusions) grouped over every source.
+  const [ageExClauses, ageExParams] = decayExclusionClauses(exclusions);
+  const ageWhere = ["status='inbox'", `${_AGE_EXPR} < ?`, ...ageExClauses].join(" AND ");
+
+  for (const r of rows<{ source: string; c: number }>(
+    db,
+    `SELECT source, COUNT(*) AS c FROM items WHERE ${ageWhere} ` +
+      "GROUP BY source HAVING c >= ? ORDER BY c DESC",
+    [beforeUtc, ...ageExParams, SWEEP_MIN_COUNT],
+  )) {
+    pending.push({ kind: "age", key: String(r.source), count: Number(r.c) });
+  }
+
+  pending.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+
+  const cutoffMonth = new Date(beforeUtc * 1000).toLocaleString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+
+  return pending.slice(0, Math.max(0, opts.limit)).map((p): Sweep => {
+    if (p.kind === "subreddit") {
+      const [where, params] = decayWhere(null, [p.key], null, "reddit", exclusions);
+
+      const casing = row<{ s: string }>(
+        db,
+        `SELECT json_extract(metadata, '$.subreddit') AS s, COUNT(*) AS c FROM items ` +
+          `WHERE ${where} GROUP BY s ORDER BY c DESC, s LIMIT 1`,
+        params,
+      );
+
+      const subreddit = casing?.s ? String(casing.s) : p.key;
+
+      return {
+        id: `subreddit:${p.key}`,
+        kind: "subreddit",
+        source: "reddit",
+        subreddit,
+        label: `r/${subreddit}`,
+        count: p.count,
+        sample: sweepSample(db, where, params),
+      };
+    }
+
+    const [where, params] = decayWhere(null, null, beforeUtc, p.key, exclusions);
+
+    return {
+      id: `age:${p.key}:${SWEEP_AGE_YEARS}y`,
+      kind: "age",
+      source: p.key,
+      before_utc: beforeUtc,
+      label: `${sourceLabel(p.key)} saves from before ${cutoffMonth}`,
+      count: p.count,
+      sample: sweepSample(db, where, params),
+    };
+  });
 }
 
 /**
@@ -3776,10 +3965,20 @@ export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCo
     [now - 30 * 86400],
   );
 
+  const sweptToday = scalar(
+    db,
+    "SELECT COUNT(*) AS c FROM items WHERE json_extract(metadata, '$.decayed_at') >= ?",
+    [midnight],
+  );
+
+  const clearedTotal = scalar(db, "SELECT COUNT(*) AS c FROM items WHERE status != 'inbox'");
+
   return {
     new_today: newToday,
     cleared_today: clearedToday,
     swept_recent: sweptRecent,
+    swept_today: sweptToday,
+    cleared_total: clearedTotal,
   };
 }
 

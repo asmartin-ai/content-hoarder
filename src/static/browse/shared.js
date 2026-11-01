@@ -18,7 +18,6 @@ export const state = {
   exact: false,
   sort: localStorage.chSort || "first_seen_utc:desc",
   density: localStorage.chDensity || "comfortable",
-  focus: localStorage.chFocus === "1",
   safe: localStorage.chSafe !== "0", // default ON: hide NSFW unless the user opted into "Show all"
   archiveMedia: localStorage.chArchiveMedia === "1", // default OFF: prefer local /media copies (Epic 4 P1)
   goal: localStorage.chGoal === undefined ? 8 : parseInt(localStorage.chGoal, 10) || 0,
@@ -26,15 +25,9 @@ export const state = {
   hasMore: false,
   loading: false,
   items: [],
-  batchTotal: 0, // Focus: size of the dealt batch
-  batchCleared: 0, // Focus: cleared from THIS batch (session-local)
-  stamped: false, // Focus: celebration shown for this batch
   curated: new Set(),
-  pulse: { new_today: 0, cleared_today: 0, swept_recent: 0 },
-  deck: new URLSearchParams(location.search).get("deck") === "1",
+  pulse: { new_today: 0, swept_recent: 0 },
 };
-
-export const FOCUS_BATCH = 25;
 
 /* Per-tab sort memory (Epic 10 / item 412): each status tab remembers its own sort, and the
    "All" view (status "") defaults to the learned easy-to-triage "smart" sort. Falls back to the
@@ -62,8 +55,6 @@ export const nsfwRevealed = new Set();
 export const selected = new Set();
 
 export const itemsEl = $("#items");
-
-export const deckHostEl = $("#deck-host");
 
 export const doneRetention = {
   loaded: false,
@@ -118,7 +109,7 @@ export const isPhone = () => window.matchMedia("(max-width:700px)").matches;
 
 /* persist the active view (status/source/tags) across reloads — sessionStorage so it survives a
    refresh/return within the session but a fresh app launch still starts clean at the inbox.
-   (sort/density/focus/goal/nsfw already persist via localStorage.) */
+   (sort/density/goal/nsfw already persist via localStorage.) */
 const VIEW_KEY = "ch_view";
 
 export function saveView() {

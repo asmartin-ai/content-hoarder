@@ -1,32 +1,12 @@
-/* browse/chrome.js — page chrome: the win pebbles + dateline + decay line, the
+/* browse/chrome.js — page chrome: the "· N new" + dateline + decay line, the
    floating scroll-to-top affordance and its programmatic-scroll state machine, the
-   fast-scroll handle, the shrink-on-scroll top bar, and the loaded-version badge. */
+   fast-scroll handle, the shrink-on-scroll top bar, and the settings-sheet version line. */
 
 import { esc } from "../core/util.js";
 import { $, state, itemsEl } from "./shared.js";
 import { installFastScroll } from "./fastscroll.js";
 
-/* ---- pulse: pebbles, "· N new", dateline, decay line (locked #1/#2/#3/#12) ---- */
-export function bumpPulse(d) {
-  state.pulse.cleared_today = Math.max(0, state.pulse.cleared_today + d);
-  paintWins();
-}
-
-export function paintWins() {
-  const dots = $("#windots"),
-    n = state.pulse.cleared_today;
-
-  if (state.goal > 0) {
-    dots.innerHTML = Array.from(
-      { length: state.goal },
-      (_, k) => "<i" + (k < n ? ' class="on"' : "") + "></i>",
-    ).join("");
-    $("#winnum").textContent = n >= state.goal ? n + " cleared" : n + " / " + state.goal;
-  } else {
-    dots.innerHTML = "";
-    $("#winnum").textContent = n + " cleared";
-  }
-}
+/* ---- pulse: "· N new", dateline, decay line (locked #2/#3/#12) ---- */
 
 export function paintPulse() {
   const p = state.pulse;
@@ -48,7 +28,6 @@ export function paintPulse() {
   $("#dateline").innerHTML = esc(day) + " — " + freshLine + '<em class="norush">No rush.</em>';
   $("#decayline").hidden = !p.swept_recent;
   $("#decay-n").textContent = p.swept_recent.toLocaleString();
-  paintWins();
 }
 
 /* ---- mobile floating scroll-to-top (Epic 13 / 16) ---- */
@@ -178,13 +157,13 @@ gotop.addEventListener("click", scrollToBrowseTop);
 /* ---- #46 mobile fast-scroll handle (right-edge scrub) ---- */
 installFastScroll(itemsEl);
 
-/* ---- loaded-version badge + Relay-style shrink-on-scroll top bar ----
-   APP_VERSION is baked into THIS (cached) chrome.js, so the badge shows what your phone is actually
-   running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
-const APP_VERSION = "v130";
+/* ---- loaded version (settings sheet) + Relay-style shrink-on-scroll top bar ----
+   APP_VERSION is baked into THIS (cached) chrome.js, so the settings line shows what your phone is
+   actually running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
+const APP_VERSION = "v140";
 
 (() => {
-  const ver = $("#app-version");
+  const ver = $("#set-version");
 
   if (ver) ver.textContent = APP_VERSION;
   const head = $(".console");

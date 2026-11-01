@@ -102,6 +102,18 @@ live in **`docs/IMPORTING.md`**. One gotcha worth keeping here: Materialistic `M
 via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
+- **Three rooms** (spec + DOM contract: `docs/design/clear-overhaul.md`): Today `/` and Clear `/clear`
+  are one page (`templates/home.html`, `static/home/*`: `main.js` routes, `today.js`, `round.js`,
+  `card.js`); Library `/library` is `templates/index.html` + `static/browse/*`. `/triage` and
+  `/?deck=1` land on `/clear`. The shared nav is `static/core/nav.css` and its markup is duplicated in
+  both templates — keep them identical. The Library has no deck, focus batches, stamp or wins bar any
+  more; do not re-add a second triage system there.
+- **Rounds persist** in `sessionStorage["ch.round"]`; the reader opened from a round
+  (`/library?open=<fn>&from=clear&enter=up`) returns to `/clear`, which resumes and records a decision
+  made in the reader. `localStorage["ch.lastRound"]` feeds Today's re-entry line.
+- **Sweeps** (`GET /sweeps`, `POST /sweeps/apply|undo`) are `decay()` waves labelled `sweep`; they
+  exclude `RESURFACE_SUBREDDITS`/`RESURFACE_TAGS` so knowledge is never swept, and never enqueue
+  Reddit unsaves. Counts must equal what `decay()` archives.
 - Target: **Chrome on Android (OnePlus 15)**. Chrome fires `beforeinstallprompt`, so a custom "Install"
   button is viable (capture the event, call `prompt()` on tap) rather than a menu-hint fallback.
   (The `firefox` *connector* — tab imports, `migrate-firefox-tabs`, `firefox_youtube` — is unrelated.)

@@ -109,3 +109,32 @@ export const undoRedditUnsave = (fullname) =>
    not contacted until /drain runs. */
 export const unsaveByTag = (tag, { apply = false } = {}) =>
   postJSON("/reddit/unsave/enqueue-by-tag", apply ? { tag, apply: true, yes: true } : { tag });
+
+/* ---- Today: wins pulse, sweeps, resurface whisper ---- */
+export const fetchPulse = () => getJSON("/pulse");
+
+export const fetchSweeps = (limit) =>
+  getJSON("/sweeps" + (limit ? "?limit=" + encodeURIComponent(limit) : ""));
+
+/* body: {kind, source, subreddit?, before_utc?} → {total, wave} */
+export const applySweep = (body) => postJSON("/sweeps/apply", body);
+
+export const undoSweep = (wave) => postJSON("/sweeps/undo", { wave });
+
+/* GET /resurface answers 204 (no body) when nothing is due → resolve null. */
+export const fetchResurface = () =>
+  fetch("/resurface").then((r) => (r.status === 204 ? null : r.ok ? r.json() : rejectResponse(r)));
+
+/* /resurface/dismiss answers 204 — no JSON body to parse. */
+export const dismissResurface = (cluster) =>
+  fetch("/resurface/dismiss", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cluster }),
+  }).then((r) => (r.ok ? null : rejectResponse(r)));
+
+/* → {cluster, total, decayed_at}; decayed_at is the wave stamp the undo needs. */
+export const letgoResurface = (cluster) => postJSON("/resurface/letgo", { cluster });
+
+export const undoLetgoResurface = (cluster, wave) =>
+  postJSON("/resurface/letgo/undo", { cluster, decayed_at: wave });

@@ -119,23 +119,29 @@ Opening items, the inline reader, triaging from inside it.
       toggle. ⬛
 - [ ] **Open original ↗** + **Share** in the reader header work. ⬛
 
-## Story 6 — "I use the triage deck" (`/triage`)
+## Story 6 — "I open the app and clear a round" (`/` Today → `/clear`)
 
-The focused Tinder-style triage flow.
+The front door and the one-card-at-a-time round (spec: `docs/design/clear-overhaul.md`).
 
-- [ ] **Swipe card** left/right shows the stamp and commits keep/archive/done. ⬛
-- [ ] **4-directional swipe:** ↑ opens the reader/thread, ↓ skips (no-decision pass), ←/→ = Done/Archive
-      + Keep, long-← = Snooze. 📱
-- [ ] **Action bar** shows Keep / Archive / Done icons in semantic colors, each with a `<kbd>` hint. ⬛
-- [ ] **Keyboard:** `S` keep · `E`/`→` archive · `Y`/`←` done. 🖥
-- [ ] **Undo toast** appears after an action, reverts it, sits above the action bar (no overlap). ⬛
-- [ ] **Snooze** (long-left swipe or button) hides the item for 7 days; repeat snoozes escalate to
-      decay (reversible). 📱
-- [ ] **Direct-entry back guard:** launching/refreshing directly onto `/triage` then pressing back
-      navigates to `/` (inbox), not exit the PWA. 📱
-- [ ] **Recover** button on `[removed]`/`[deleted]` Reddit cards patches title/body in place. ⬛
-- [ ] **Category re-tag chips** (YouTube items) change the processing area + persist. ⬛
-- [ ] **`?`** opens the shortcut cheatsheet; `Esc`/backdrop closes; ignored while typing. ⬛
+- [ ] **Today** shows the date, the "Clear 10" hero, the 5/10/25 picker, pebbles + wins line (no
+      remaining-inbox count), up to three sweeps, and the Library link. Enter starts a round. ⬛
+- [ ] **Re-entry line** after a round ("Last round 2m ago — 10 cleared."); after 3+ days away it
+      reads "Welcome back. Nothing is owed — start small." ⬛
+- [ ] **Let go** on a sweep rests the pile, the snackbar names it, Undo restores every item; the list
+      refills with fresh counts. Knowledge subreddits (r/ADHD etc.) never appear as sweeps. ⬛
+- [ ] **Peek** opens a round over that pile only. ⬛
+- [ ] **Round pad:** big Done / Archive, small Keep / Not now / Skip / Open / Undo; keyboard hints
+      on desktop only. 📱 pad sits in the thumb zone, clear of the gesture bar. ⬛
+- [ ] **Keyboard:** `D`/`←` done · `A`/`→` archive · `K`/`F` keep · `N` not now · `S`/`↓` skip ·
+      `Enter`/`↑` open · `Z` undo · `Esc` leave. 🖥
+- [ ] **Swipe:** ← done, → archive, ↑ open, ↓ skip; no swipe starts within ~30px of a screen edge
+      (system back stays system back). 📱
+- [ ] **Undo** walks back one decision per press, including Not now. ⬛
+- [ ] **Open** goes to the reader; F/A/D/S in the reader decides and returns to the same round. ⬛
+- [ ] **Leave and resume:** × or Esc returns to Today, whose hero reads "Resume round · N cards
+      left". ⬛
+- [ ] **Cleared:** the green CLEARED stamp, summary, today's pebbles, One more round / Let a pile go /
+      That's enough for today. Haptic double-tap on phones. 📱
 
 ## Story 7 — "I look at media" (lightbox / gallery / video)
 

@@ -37,6 +37,7 @@ import {
   prepareImport,
 } from "./handlers/imports.ts";
 import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
+import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import {
   ClusterBody,
   ClusterUndoBody,
@@ -63,16 +64,20 @@ export async function handle(request: Request): Promise<Response> {
   const path = url.pathname;
   const method = request.method;
 
-  if (method === "GET" && path === "/triage") return Response.redirect("/?deck=1", 302);
+  if (method === "GET" && path === "/triage") return Response.redirect("/clear", 302);
 
-  if (method === "GET" && path === "/reddit") return Response.redirect("/?source=reddit", 302);
+  if (method === "GET" && path === "/reddit")
+    return Response.redirect("/library?source=reddit", 302);
 
   if (method === "GET" && (path.startsWith("/static/") || path === "/manifest.webmanifest"))
     return staticResponse(path);
 
   if (method === "GET" && path === "/sw.js") return serviceWorkerResponse();
 
-  if (method === "GET" && (path === "/" || path === "/browse")) return templateResponse();
+  if (method === "GET" && (path === "/" || path === "/clear")) return templateResponse("home");
+
+  if (method === "GET" && (path === "/library" || path === "/browse"))
+    return templateResponse("library");
 
   try {
     if (method === "GET" && path === "/items") {
@@ -203,6 +208,12 @@ export async function handle(request: Request): Promise<Response> {
       );
 
     if (method === "GET" && path === "/pulse") return json(db.pulse(connection()));
+
+    if (method === "GET" && path === "/sweeps") return listSweeps(url);
+
+    if (method === "POST" && path === "/sweeps/apply") return await applySweep(request);
+
+    if (method === "POST" && path === "/sweeps/undo") return await undoSweep(request);
 
     if (method === "GET" && path === "/resurface") {
       const card = resurface.candidate(connection());

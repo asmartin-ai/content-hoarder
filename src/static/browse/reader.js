@@ -1637,7 +1637,7 @@ export function initReader({
 
     item = it;
     fullname = nextFullname;
-    returnTo = opts.from === "triage" ? "/triage" : "";
+    returnTo = opts.from === "clear" ? "/clear" : "";
     comments = [];
     collapsed = new Set();
     opAuthor = "";
@@ -1732,7 +1732,7 @@ export function initReader({
     reader.classList.remove("show", "from-triage");
 
     if (wasTriageEnter) {
-      // Slide back down to the deck the way it came up (issue #40): keep
+      // Slide back down to the round the way it came up (issue #40): keep
       // .triage-enter so removing .show transitions transform to translateY(100%).
       // No inline transition here — the base .reader rule (transform +
       // visibility 0s var(--dur-slow)) applies once .show is gone, keeping the
@@ -1776,6 +1776,18 @@ export function initReader({
     else if (!fromPop) settleTop();
   }
 
+  /* Decide on the reader's OWN item, then close. Opened from a Clear round, the status
+     POST must land before we navigate back to /clear, so hold the return until it settles. */
+  async function decideAndClose(run) {
+    const fn = fullname;
+    const dest = returnTo;
+    returnTo = "";
+    closeReader(false);
+    await run(fn);
+
+    if (dest) location.replace(dest);
+  }
+
   document.addEventListener(
     "keydown",
     (e) => {
@@ -1802,10 +1814,7 @@ export function initReader({
       if (status) {
         e.stopPropagation();
         e.preventDefault();
-        const fn = fullname;
-        closeReader(false);
-
-        onTriage?.(fn, status);
+        decideAndClose((fn) => onTriage?.(fn, status));
 
         return;
       }
@@ -1813,10 +1822,7 @@ export function initReader({
       if (k === "s") {
         e.stopPropagation();
         e.preventDefault();
-        const fn = fullname;
-        closeReader(false);
-
-        onSnooze?.(fn);
+        decideAndClose((fn) => onSnooze?.(fn));
 
         return;
       }

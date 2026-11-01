@@ -103,7 +103,7 @@ components:
 
 **Creative North Star: "The Local Log Book"**
 
-content-hoarder should feel like a personal operations log for reducing a messy backlog: dense enough to move quickly, calm enough to keep the user from bouncing, and tactile enough that each decision feels confirmed. The v3 browse surface is the primary expression: a dark “night ops” default with a daylight alternate, Lexend for human-readable scanning, JetBrains Mono for instrument readouts, fixed action colors, and source badges that identify content without turning the app into confetti.
+content-hoarder should feel like a personal operations log for reducing a messy backlog: calm enough to keep the user from bouncing, fast enough that a decision costs one tap, and tactile enough that each decision feels confirmed. It has three rooms (see `docs/design/clear-overhaul.md`): **Today** (`/`, lamp mode — one lit object, "Clear 10"), **Clear** (`/clear`, focus mode — one card at a time in a finite round), and **Library** (`/library`, bench mode — search, filters, the reader). A dark “night ops” default with a daylight alternate, Lexend for human-readable scanning, JetBrains Mono for instrument readouts, fixed action colors, and source badges that identify content without turning the app into confetti.
 
 The system rejects generic SaaS polish, decorative hero language, and any UI that celebrates hoarding more content. Visual decisions serve search, filtering, triage, media review, recovery, and error recovery. Empty states should feel like permission to stop; error states should be specific and non-blaming.
 
@@ -112,7 +112,7 @@ The system rejects generic SaaS polish, decorative hero language, and any UI tha
 - Restrained dark-first palette with one warm phosphor action accent and a stable status triad.
 - Tactile controls: pills, pebbles, command bars, row actions, and sheet panels with short state transitions.
 - Media previews and source glyphs that help decide quickly without stealing the whole hierarchy.
-- Copy that reduces guilt: “Page cleared”, “That’s enough for today”, “nothing carries over”.
+- Copy that reduces guilt: “Cleared”, “That’s enough for today”, “Nothing is deleted; undo any time”, “nothing carries over”.
 
 ## 2. Colors
 
@@ -120,7 +120,7 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 
 ### Primary
 - **Apricot Phosphor** (`#f2a97e`): the active product accent on v3 browse for focus rings, command prompt, current selection, and “inbox/current work” emphasis. It should remain rare; if more than roughly 10% of a screen is accent, the interface is shouting.
-- **Deep Teal Legacy Accent** (`#2dd4bf` / light `#2a9d8f`): retained on legacy `/triage` and `/reddit` surfaces through `static/tokens.css`. Do not blend the teal and apricot systems on the same surface unless intentionally migrating that page.
+- **Ember Fill** (`--ember-fill` `#f2a97e` with `--ember-fill-ink` `#2e1605`, both themes): the one lit object — Today's “Clear 10” hero and the primary button on the cleared screen. Only lamp-mode surfaces get the soft glow.
 
 ### Secondary
 - **Keep Blue** (`#7da4f5`): “worth revisiting” status, Keep actions, and keep-tinted feedback.
@@ -129,6 +129,8 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 
 ### Tertiary
 - **Source Badges** (`#ff5722`, `#ff3b30`, `#ff8a3d`, `#a78bfa`, `#fbbc04`, `#4a9df8`, `#1d9bf0`): source identity only. They belong in avatars, glyphs, rails, and small source marks, not in structural controls.
+- **Win Green** (`--win` `#8fce96` / light `#22713a`): celebration only — pebbles, the CLEARED stamp. Archive-green is a triage verb and keeps its own token.
+- **Moss** (`--moss` `#a3bd97` / light `#4d6843`): the resurfacing question (“Still curious about …?”) on Today.
 
 ### Neutral
 - **Night Ops Background** (`#101216`): default app field for v3 browse.
@@ -148,7 +150,7 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 ## 3. Typography
 
 **Display Font:** Lexend with system sans fallback.  
-**Body Font:** Lexend with system sans fallback on v3 browse; system-ui on legacy `/triage` and `/reddit` until migrated.  
+**Body Font:** Lexend with system sans fallback on every surface.
 **Label/Mono Font:** JetBrains Mono for instrument labels, counts, keyboard hints, indexes, and command syntax.
 
 **Character:** Lexend’s open letterforms support quick scanning across messy saved-content titles. JetBrains Mono marks the “instrument panel” layer: counts, operators, keyboard shortcuts, and batch readouts.
@@ -184,8 +186,8 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 ## 5. Components
 
 ### Buttons
-- **Shape:** tactile rectangles or pills depending on context (`8px` for normal buttons, `999px` for command/dock/pill controls).
-- **Primary:** filled with the current surface accent (`#f2a97e` on v3 browse, teal on legacy pages), high-contrast ink, medium weight, and short state transitions.
+- **Shape:** tactile rectangles or pills depending on context (`8px` for normal buttons, `999px` for command/pill controls; `20px` for the hero and the round's big Done/Archive pad).
+- **Primary:** filled with the accent (`--ember-fill` for the one lit object, `--accent` elsewhere), high-contrast ink, medium weight, and short state transitions.
 - **Hover / Focus:** border or fill shifts plus a visible `2px` focus ring using the accent. Active states may move `translateY(1px)`; avoid dramatic motion.
 - **Status actions:** Keep / Archive / Done controls carry their fixed semantic colors and must keep text/icon labels available, especially on touch.
 
@@ -206,7 +208,7 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 - **Error / Disabled:** errors should state the recovery path (“Couldn’t load — is the server up?”) and disabled destructive controls should explain what confirmation is missing.
 
 ### Navigation
-- **Style:** desktop uses sticky console, status folders, rail facets, sheet panels, and row actions; mobile uses status pills, bottom dock, drawer, tap actions, and long-press menus.
+- **Style:** one shared nav (`static/core/nav.css`, `.ch-nav`) with three tabs — Today · Clear · Library. Desktop (> 700px): a sticky 56px top bar. Phone (≤ 700px): a fixed bottom tab bar with labels under icons. A running round hides the nav (focus mode). Inside the Library: sticky console, status folders, rail facets, sheet panels, row actions; on phones status pills, drawer, tap actions, and long-press menus.
 - **States:** current status is visibly selected; counts are instrument readouts; source/category/tag filters must be reversible and visible as chips.
 - **Mobile:** every swipe has a tap equivalent, edge-deadzone constraints remain, and the PWA shell must avoid system gesture conflicts.
 
@@ -214,17 +216,25 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 
 Rows are the core unit of work. They combine source avatar, title, meta line, tags, URL/domain, optional snippet, fixed media monitor, and F/A/D action cluster. The row must answer: what is this, where did it come from, how old/long is it, is there media, and what can I do next?
 
-### Signature Component: Deck / Focus Card
+### Signature Component: Today Hero
 
-Deck mode (`/?deck=1`) is a focus surface, not a view of the sheet. While it is open the list chrome — status tabs, shelf, swipe hint, rail, dock shortcuts — is hidden, so the only navigation left is “← List” and the batch controls. The card carries source identity, title, meta, an excerpt, optional media, and a decision row of labelled buttons (Keep / Archive / Done + Read / Skip) that mirror the keyboard map. Keys are hints on the buttons, never the only path: every key has a visible, tappable control. On phones the card stacks to one column, the decision row becomes a 2×2 pad, and keyboard hints disappear.
+Today is a lamp-mode room: one lit object. The hero button reads “Clear 10” (or “Resume round · N cards left”) with a cost line (“about 2 minutes · smart picks”), a 5/10/25 size picker under it, and Enter starts it. Below it, quiet: today's pebbles and wins line (“12 cleared today · 2,107 all-time” — wins only, never the remaining inbox size), the sweeps, an optional moss resurfacing whisper, and a link to the Library. A re-entry line says what happened last time; after a long gap it says “Welcome back. Nothing is owed — start small.”
+
+### Signature Component: Sweep Row
+
+“Let a pile go” offers up to three piles the machine can rest in one tap: an entertainment subreddit, or a source's saves older than four years. Knowledge subreddits and resurface tags are never offered — they resurface instead (one machine fate per content class). Each row shows label, two sample titles, count, Peek (a round over that pile) and Let go (archive-green, because it archives). Let go is a reversible, wave-stamped decay that never touches Reddit; the snackbar names what rested and carries Undo.
+
+### Signature Component: Round Card (Clear)
+
+A round is a finite batch (5/10/25) of single cards on a focus surface with no app nav. The top bar has × (leave; the round is kept and resumable), progress beads that fill with the colour of each decision, and a clock. The card carries a source chip, title, a provenance line (“r/ADHD · 3y ago · 4.2k points · example.com”), a cost pill when the cost is known (“12 min video”, “3 min read”, “a glance”), an optional thumbnail and excerpt. The pad prices gestures: Done and Archive are the two big buttons (reduce the pile — cheapest), Keep and Not now are small (preserve and defer cost more), Skip and Open sit beside them, Undo walks back one decision at a time. Swipe left = Done, right = Archive, up = Open, down = Skip; Keep and Not now are deliberately tap-only. On phones the pad lives in the thumb zone at the bottom; keyboard hints show only with a fine pointer. A quiet “on a roll · N” appears after three quick decisions; it never persists.
 
 ### Signature Component: Console and Rail
 
-The console is a single 57px row: identity, the command/search field, then the right cluster. The right cluster is quiet by default — the daily goal is a labelled bar plus a count (“765 cleared” once the goal is met), icon buttons are borderless until hover, and Triage is an outlined button rather than the loudest element on the page. The version badge is diagnostic chrome and stays faint. The rail is 210px, 32px rows, and scrolls inside its own column with a fade at the bottom; source hues appear as a dot on the avatar and a 55%-opacity source stripe, never as a filled block.
+The Library console sits under the shared nav: the search field (placeholder teaches an operator: “try subreddit:adhd”), then a quiet right cluster of borderless SVG icon buttons (sync, search on phones, settings). No goal bar, no triage button, no version badge — wins live on Today, triage lives in Clear, and the shell version is in the settings sheet footer. The rail is 210px, 32px rows, and scrolls inside its own column with a fade at the bottom; source hues appear as a dot on the avatar, never as a filled block or a row stripe.
 
 ### Signature Component: Empty / Cleared State
 
-Empty states are permission states. “Page cleared,” “Draw another batch,” and “That’s enough for today” are correct because they reduce guilt and preserve agency. Empty states should teach the next useful action without implying backlog failure.
+Empty states are permission states. The round ends on the CLEARED stamp — the one loud moment, win-green — with a summary (“10 in 1:42 — 6 done · 3 archived · 1 kept”), today's pebbles, and three equal exits: One more round, Let a pile go, That's enough for today. Empty states should teach the next useful action without implying backlog failure.
 
 ### Signature Component: Recovery / Error State
 
@@ -238,7 +248,7 @@ Recovery UI should name the external action and scope: one item, original URL, a
 - **Do** keep Keep / Archive / Done colors fixed and visible across keyboard, pointer, swipe, and touch paths.
 - **Do** write empty states that reduce pressure and offer a next action: another batch, enough for today, adjust filters, or recover context.
 - **Do** make destructive or irreversible flows explicit, scoped, and backed by confirmation / backup language.
-- **Do** verify mobile/PWA behavior when changing browse, triage, media, drawer, dock, swipe, or install-related UI.
+- **Do** verify mobile/PWA behavior when changing Today, rounds, browse, media, drawer, tab bar, swipe, or install-related UI.
 
 ### Don't:
 - **Don't** use generic SaaS dashboards with decorative metrics, hero gradients, and marketing-page polish.

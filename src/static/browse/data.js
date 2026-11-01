@@ -5,7 +5,7 @@
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
-import { $, $$, state, facets, itemsEl, FOCUS_BATCH, saveView } from "./shared.js";
+import { $, $$, state, facets, itemsEl, saveView } from "./shared.js";
 import { paintPulse } from "./chrome.js";
 import { render } from "./feed.js";
 import { renderDrawer } from "./drawer.js";
@@ -66,7 +66,6 @@ function warmItemFirstPages() {
       q: state.q,
       exact: state.exact,
       safe: state.safe,
-      focus: state.focus,
       sort: state.sort,
     },
     topSourceIds(),
@@ -102,8 +101,6 @@ export async function loadItems(reset) {
   if (reset) {
     state.offset = 0;
     state.items = [];
-    state.batchCleared = 0;
-    state.stamped = false;
     saveView(); // persist the active view so a reload/return keeps your place
 
     // keep the current rows on screen (dimmed) during a refetch — only blank to the skeleton on a
@@ -113,7 +110,7 @@ export async function loadItems(reset) {
   }
 
   try {
-    const limit = state.focus ? FOCUS_BATCH : 50;
+    const limit = 50;
     const offset = state.offset;
     const query = params({ limit, offset });
     let r = itemFirstPageCache.get(query);
@@ -127,10 +124,8 @@ export async function loadItems(reset) {
 
     if (!fromCache) itemFirstPageCache.set(query, r);
     state.items = state.items.concat(r.items);
-    state.hasMore = state.focus ? false : r.has_more;
+    state.hasMore = r.has_more;
     state.offset += r.items.length;
-
-    if (reset && state.focus) state.batchTotal = r.items.length;
     render();
 
     if (reset) warmItemFirstPages();

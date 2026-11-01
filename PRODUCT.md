@@ -29,7 +29,7 @@ Focused, forgiving, and instrumented. The voice should feel like a calm cockpit 
 1. **Triage first.** Every screen should help the user decide, defer intentionally, recover missing context, or get back to the next item.
 2. **Local trust is visible.** Use copy and interaction states that make data locality, offline behavior, backups, and irreversible operations understandable.
 3. **Cognitive load stays low.** Favor dense but legible hierarchy, predictable controls, discoverable operators, and short explanations over novelty.
-4. **Progress is gentle.** Celebrate cleared pages and focus batches without implying debt, failure, or obligation.
+4. **Progress is gentle.** Celebrate cleared rounds and rested piles without implying debt, failure, or obligation; count wins, never the remaining pile.
 5. **Media and metadata serve decisions.** Thumbnails, source badges, tags, durations, archive status, and recovery affordances should answer “is this worth processing?” quickly.
 
 ## Accessibility & Inclusion

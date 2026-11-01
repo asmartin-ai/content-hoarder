@@ -154,7 +154,7 @@ export function buildFirstPageWarmParams(
 ) {
   const lim = withLimits(limits);
 
-  if ((context.q || "").trim() || context.exact || context.focus) return [];
+  if ((context.q || "").trim() || context.exact) return [];
 
   const sourceChoices = context.source
     ? [context.source]

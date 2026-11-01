@@ -68,10 +68,80 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/core/tokens.css" />
+    <link rel="stylesheet" href="/static/core/nav.css" />
     <link rel="stylesheet" href="/static/browse/browse.css" />
     <script src="/static/theme.js"></script>
   </head>
-  <body data-page="browse">
+  <body data-page="browse" class="has-tabbar">
+    <nav class="ch-nav" aria-label="Main">
+      <a class="ch-brand" href="/"><span class="ch-led"></span><span>content-hoarder</span></a>
+      <div class="ch-tabs">
+        <a class="ch-tab" data-tab="today" href="/"
+          ><svg
+            class="ch-ico"
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+            <path
+              d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"
+            /></svg
+          ><span>Today</span></a
+        >
+        <a class="ch-tab" data-tab="clear" href="/clear"
+          ><svg
+            class="ch-ico"
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 4l-8 4l8 4l8 -4l-8 -4" />
+            <path d="M4 12l8 4l8 -4" />
+            <path d="M4 16l8 4l8 -4" /></svg
+          ><span>Clear</span></a
+        >
+        <a class="ch-tab" data-tab="library" href="/library" aria-current="page"
+          ><svg
+            class="ch-ico"
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+            <path d="M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
+            <path d="M5 8h4" />
+            <path d="M9 16h4" />
+            <path
+              d="M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z"
+            />
+            <path d="M14 9l4 -1" />
+            <path d="M16 16l3.923 -.98" /></svg
+          ><span>Library</span></a
+        >
+      </div>
+    </nav>
     <header class="console">
       <div class="con-row">
         <button
@@ -81,7 +151,22 @@
           aria-controls="navdrawer"
           aria-label="Jump to a source, category, or tag"
         >
-          &#9776;
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 6l16 0" />
+            <path d="M4 12l16 0" />
+            <path d="M4 18l16 0" />
+          </svg>
         </button>
         <h1 class="brand"><span class="led"></span>content&#8209;hoarder</h1>
         <div class="cmd">
@@ -89,7 +174,7 @@
           <input
             id="q"
             type="search"
-            placeholder="search &middot; fuzzy by default &middot; &gt; commands"
+            placeholder="Search titles, tags, sources — try subreddit:adhd"
             autocomplete="off"
             aria-label="Search"
           />
@@ -107,23 +192,6 @@
           </div>
         </div>
         <div class="con-right">
-          <div
-            class="wins"
-            id="wins"
-            title="Today's clears. The goal is yours — change it or drop it in Settings. It resets quietly every day; nothing carries over."
-          >
-            <span class="wlab">TODAY</span><span class="dots" id="windots"></span
-            ><span class="wnum" id="winnum"></span>
-          </div>
-          <button
-            type="button"
-            class="icon-btn"
-            id="dice"
-            title="Surprise me — one old save, no strings"
-            aria-label="Surprise me"
-          >
-            &#9860;
-          </button>
           <button
             type="button"
             class="icon-btn"
@@ -131,13 +199,45 @@
             title="Sync newest saved from Reddit"
             aria-label="Sync newest"
           >
-            &#8635;
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+              <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+            </svg>
           </button>
-          <span
-            class="app-ver"
-            id="app-version"
-            title="Loaded shell version — confirms what your phone has cached"
-          ></span>
+          <button
+            type="button"
+            class="icon-btn"
+            id="open-search"
+            aria-label="Search"
+            title="Search"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="10" cy="10" r="7" />
+              <path d="M21 21l-6 -6" />
+            </svg>
+          </button>
           <button
             type="button"
             class="icon-btn"
@@ -145,9 +245,24 @@
             title="Settings"
             aria-label="Settings"
           >
-            &#9881;
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
+              />
+              <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+            </svg>
           </button>
-          <a class="btn-triage" href="/?deck=1">Triage <span aria-hidden="true">→</span></a>
         </div>
       </div>
     </header>
@@ -209,24 +324,10 @@
             </select>
           </div>
         </div>
-        <div class="swipehint">
-          <span style="color: var(--status-archive)">swipe &rarr; archive</span>
-          <span style="color: var(--status-keep)">&rarr;&rarr; keep</span>
-          <span style="color: var(--status-done)">&larr; done</span>
-          <span>hold &rarr; select</span>
-        </div>
-
         <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->
         <div class="ambient" id="ambient" hidden></div>
 
-        <div class="batchstrip" id="batchstrip">
-          <span>FOCUS BATCH</span>
-          <div class="segs" id="segs"></div>
-          <span id="batchn"></span>
-        </div>
-
         <div class="items density-comfortable" id="items"></div>
-        <section id="deck-host" class="deck-host" hidden></section>
         <div id="sentinel" aria-hidden="true"></div>
 
         <div class="decayline" id="decayline" hidden>
@@ -256,42 +357,9 @@
       </button>
     </div>
 
-    <nav class="dock" aria-label="Navigation">
-      <button type="button" id="dock-inbox" aria-pressed="true" aria-label="Return to Inbox">
-        <span class="g">&#9636;</span>INBOX
-      </button>
-      <button type="button" aria-pressed="false" id="dock-focus">
-        <span class="g">&#9678;</span>FOCUS
-      </button>
-      <button
-        type="button"
-        aria-pressed="false"
-        id="dock-deck"
-        aria-label="Toggle deck mode"
-        title="Deck mode (one card at a time)"
-      >
-        <span class="g">&#127137;</span>DECK
-      </button>
-      <a class="fab" href="/?deck=1">TRIAGE &rarr;</a>
-      <button type="button" aria-pressed="false" id="dock-search">
-        <span class="g">&#8981;</span>SEARCH
-      </button>
-      <button type="button" aria-pressed="false" id="dock-settings">
-        <span class="g">&#9881;</span>MORE
-      </button>
-    </nav>
-
     <button type="button" class="gotop" id="gotop" aria-label="Scroll to top">&#8593;</button>
 
     <div id="toast" hidden aria-live="polite"></div>
-
-    <div class="stampwrap" id="stamp">
-      <div class="stamp">PAGE CLEARED<small id="stampsub"></small></div>
-      <div class="stamp-acts">
-        <button type="button" class="ambbtn primary" id="drawagain">Draw another batch</button>
-        <button type="button" class="ambbtn" id="enough">That's enough for today</button>
-      </div>
-    </div>
 
     <div class="scrim" id="scrim"></div>
 
@@ -313,22 +381,6 @@
         </div>
       </div>
       <div class="set-group">
-        <div class="lab">DECK</div>
-        <div class="seg" id="set-deck">
-          <button type="button" id="set-deck-enter" aria-pressed="false">Enter deck mode</button>
-        </div>
-      </div>
-      <div class="set-group">
-        <div class="lab">LOADING</div>
-        <div class="seg" id="set-loading">
-          <button type="button" data-focus="0" aria-pressed="true">Infinite scroll</button>
-          <button type="button" data-focus="1" aria-pressed="false">Focus batches</button>
-        </div>
-        <p class="set-note">
-          Focus deals you 25 at a time &mdash; clear the page, take the stamp, draw again.
-        </p>
-      </div>
-      <div class="set-group">
         <div class="lab">DAILY GOAL</div>
         <div class="seg" id="set-goal">
           <button type="button" data-g="4" aria-pressed="false">4</button>
@@ -337,8 +389,8 @@
           <button type="button" data-g="0" aria-pressed="false">no goal</button>
         </div>
         <p class="set-note">
-          Pebbles in the top bar. Resets quietly each day &mdash; nothing carries over, nothing is
-          owed.
+          Pebbles on the Today screen. Resets quietly each day &mdash; nothing carries over, nothing
+          is owed.
         </p>
       </div>
       <div class="set-group">
@@ -403,6 +455,7 @@
         </button>
       </div>
       <p class="set-note">The panel stays put while you fiddle. Esc closes.</p>
+      <p class="set-version" id="set-version"></p>
     </aside>
 
     <aside class="sheetpanel" id="statsheet" aria-label="Stats">

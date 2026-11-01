@@ -4,11 +4,30 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+
+- **Three-room UI ("Clear" overhaul, `docs/design/clear-overhaul.md`).** `/` is now **Today**: one
+  lit "Clear 10" button (5/10/25), wins-only counting (today + all-time, pebbles toward the daily
+  goal), a re-entry line, up to three sweeps, and the resurfacing whisper — no remaining-inbox count.
+  `/clear` is a **round**: one card at a time, big Done/Archive pad in the thumb zone, smaller
+  Keep/Not now/Skip/Open, multi-step Undo, swipe ←/→/↑/↓, progress beads, a quiet in-round streak,
+  resumable via `sessionStorage`, and a CLEARED stamp with today's pebbles. The browse page moved to
+  `/library` (`/browse` alias) and lost its second triage system: deck mode, focus batches, the PAGE
+  CLEARED stamp, the console goal bar, dice, Triage button, version badge (now in settings), swipe
+  legend, and the mobile dock. One shared nav (Today · Clear · Library): top bar on desktop, bottom
+  tab bar on phones. `/triage` and `/?deck=1` land on `/clear`; the reader returns to `/clear`.
+  Service-worker cache `ch-shell-v140`.
+
 ### Added
 
-- Drag-and-drop to status buckets on desktop (issue #13): rows and deck cards drag onto the
-  Inbox/Keep/Archived/Done folders, reusing the existing status path (haptics, undo snackbar);
-  deck drops advance the deck queue. Vanilla HTML5 DnD — no new runtime dependency.
+- **Sweeps** — `GET /sweeps`, `POST /sweeps/apply`, `POST /sweeps/undo`: one-tap reversible rest
+  of an entertainment subreddit pile or a source's saves older than four years, via `decay()` waves
+  labelled `sweep`. Knowledge subreddits and resurface tags are excluded; never enqueues Reddit
+  unsaves. `/pulse` gains `swept_today` and `cleared_total`.
+- Hearth tokens `--win*`, `--moss*`, `--ember-fill*`, `--dur-stamp` in `static/core/tokens.css`.
+- Drag-and-drop to status buckets on desktop (issue #13): Library rows drag onto the
+  Inbox/Keep/Archived/Done folders, reusing the existing status path (haptics, undo snackbar).
+  Vanilla HTML5 DnD — no new runtime dependency.
 - `assist-auto-archive` CLI (issue #25): lists high-skip subreddit buckets from the learned
   triage model with live inbox counts, and (with `--apply`) archives each via the reversible,
   wave-stamped decay path (`label='auto-archive'`, queryable via `is:decayed`).

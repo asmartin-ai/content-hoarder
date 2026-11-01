@@ -12,7 +12,6 @@ import { clearItemFirstPageCache } from "./data.js";
 import { render, rowEl } from "./feed.js";
 import { openMediaFor } from "./lightbox.js";
 import { readerUI, tagEditor } from "./instances.js";
-import { bumpPulse } from "./chrome.js";
 
 /* ---- actions: live clear + undo/redo (locked #11) ---- */
 /* Single-level redo buffer: the last single-item action that was undone, so it can
@@ -42,16 +41,11 @@ export async function act(fullname, status, opts = {}) {
 
     if (item) item.status = status;
 
-    if (state.focus) state.batchCleared += 1;
-    bumpPulse(status === "inbox" ? 0 : 1);
     snackbar(COPY[status] || "Logged.", async () => {
       if (window.chHaptic) window.chHaptic("undo");
 
       try {
         await api.undoItem(fullname);
-        bumpPulse(status === "inbox" ? 0 : -1);
-
-        if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
 
         if (item) item.status = prevStatus;
       } catch {
@@ -84,8 +78,6 @@ export async function act(fullname, status, opts = {}) {
   const undoItem = undoIdx >= 0 ? state.items[undoIdx] : null;
   state.items = state.items.filter((it) => it.fullname !== fullname);
 
-  if (state.focus) state.batchCleared += 1;
-  bumpPulse(status === "inbox" ? 0 : 1);
   render();
   snackbar(COPY[status] || "Logged.", async () => {
     if (window.chHaptic) window.chHaptic("undo");
@@ -93,9 +85,6 @@ export async function act(fullname, status, opts = {}) {
     try {
       await api.undoItem(fullname);
       clearItemFirstPageCache();
-      bumpPulse(status === "inbox" ? 0 : -1);
-
-      if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
 
       // restore the row in place — no full refetch/skeleton, keeps the scroll position
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
@@ -134,9 +123,6 @@ export async function snooze(fullname, opts = {}) {
 
     if (item && escalated) item.status = "archived";
 
-    if (state.focus) state.batchCleared += 1;
-
-    if (escalated) bumpPulse(1);
     snackbar(escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.", async () => {
       try {
         const undoBody =
@@ -145,10 +131,6 @@ export async function snooze(fullname, opts = {}) {
             : { decayed_at: res.decayed_at };
 
         await api.undoSnooze(undoBody);
-
-        if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
-
-        if (escalated) bumpPulse(-1);
 
         if (item) item.status = prevStatus;
       } catch {
@@ -184,9 +166,6 @@ export async function snooze(fullname, opts = {}) {
   state.items = state.items.filter((it) => it.fullname !== fullname);
   const escalated = !!(res && res.decayed_at);
 
-  if (state.focus) state.batchCleared += 1;
-
-  if (escalated) bumpPulse(1);
   render();
   snackbar(escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.", async () => {
     try {
@@ -197,10 +176,6 @@ export async function snooze(fullname, opts = {}) {
 
       await api.undoSnooze(undoBody);
       clearItemFirstPageCache();
-
-      if (state.focus) state.batchCleared = Math.max(0, state.batchCleared - 1);
-
-      if (escalated) bumpPulse(-1);
 
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
         state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
@@ -460,13 +435,10 @@ $$("#bulktray [data-bulk]").forEach((b) =>
 
     state.items = state.items.filter((it) => !fns.includes(it.fullname));
 
-    if (state.focus) state.batchCleared += fns.length;
-    bumpPulse(status === "inbox" ? 0 : fns.length);
     render();
     snackbar(fns.length + " — " + (COPY[status] || "logged.").toLowerCase(), async () => {
-      const r = await api.bulkUndo(fns);
+      await api.bulkUndo(fns);
       clearItemFirstPageCache();
-      bumpPulse(status === "inbox" ? 0 : -r.ok);
       // restore the rows in place (ascending index) — no full refetch/skeleton
       bulkRemoved
         .sort((a, b) => a.i - b.i)

@@ -399,7 +399,7 @@ export function listHtml(items, state, opts) {
     return items.map((it) => pinCard(it, o)).join("");
   }
 
-  const grouped = state.sort === "first_seen_utc:desc" && !state.focus;
+  const grouped = state.sort === "first_seen_utc:desc";
 
   let html = "",
     last = null,
@@ -420,20 +420,14 @@ export function listHtml(items, state, opts) {
     html += state.density === "comfortable" ? logRow(it, o) : ledgerRow(it, n, o);
   }
 
-  if (state.focus && items.length) {
-    html = '<div class="grouphead">FOCUS BATCH — JUST THESE</div>' + html;
-  }
-
   return html;
 }
 
 /* empty state — an invitation, not a scoreboard (locked #10) */
-export const emptyHtml = (focus) =>
+export const emptyHtml = () =>
   '<div class="emptystate"><div class="es-mark">✓</div>' +
   "<h3>The page is clear.</h3><p>Nothing here is waiting on you.</p>" +
   '<div class="amb-acts">' +
-  '<button type="button" class="ambbtn primary" id="empty-draw">' +
-  (focus ? "Draw another batch" : "Draw a Focus batch") +
-  "</button>" +
+  '<a class="ambbtn primary" href="/clear">Start a round</a>' +
   '<button type="button" class="ambbtn" id="empty-surprise">⚄ Surprise me</button>' +
   "</div></div>";

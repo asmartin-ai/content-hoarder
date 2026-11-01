@@ -73,19 +73,6 @@ a:focus-visible {
   background: var(--accent);
   box-shadow: var(--led-glow);
 }
-/* loaded-version badge (right of the bar) — set by main.js APP_VERSION so you can tell what your phone cached */
-.app-ver {
-  flex: none;
-  font: var(--fw-medium) 0.62rem/1 var(--font-mono);
-  color: var(--text-dim);
-  letter-spacing: 0.02em;
-  padding: 2px 6px;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-pill);
-}
-.app-ver:empty {
-  display: none;
-}
 .cmd {
   flex: 1;
   display: flex;
@@ -234,43 +221,6 @@ a:focus-visible {
   color: var(--text-muted);
 }
 
-/* win pebbles (locked #1) — a goal bar, not a row of dots: it has to read at a glance */
-.wins {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font: var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
-  color: var(--text-muted);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.wins .wlab {
-  font-size: 0.6rem;
-  letter-spacing: 0.14em;
-  color: var(--text-dim);
-}
-.wins .dots {
-  display: flex;
-  gap: 3px;
-  width: 62px;
-}
-.wins .dots i {
-  flex: 1;
-  height: 6px;
-  border-radius: 2px;
-  background: var(--surface-inset);
-  border: none;
-}
-.wins .dots i.on {
-  background: var(--status-archive);
-}
-.wins .wnum {
-  color: var(--text-body);
-  font-weight: var(--fw-semibold);
-  min-width: 2.2em;
-  text-align: right;
-}
-
 .icon-btn {
   min-width: 34px;
   height: 34px;
@@ -290,26 +240,13 @@ a:focus-visible {
   color: var(--text-body);
   background: var(--surface-hover);
   border-color: transparent;
+  border-color: transparent;
 }
-.btn-triage {
-  font: var(--fw-semibold) var(--fs-xs)/1 var(--font-sans);
-  background: transparent;
-  color: var(--text-body);
-  border: 1px solid var(--border-control);
-  border-radius: var(--r-pill);
-  padding: 0 15px;
-  height: 34px;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.btn-triage:hover {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-  background: var(--accent-tint);
+.icon-btn svg {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
 }
 
 /* ===================== folder tabs / status pills ===================== */
@@ -478,6 +415,10 @@ a:focus-visible {
 .nav-burger {
   display: none;
 }
+/* mobile-only search entry: re-opens the collapsed command bar (see the tab bar block below) */
+#open-search {
+  display: none;
+}
 
 /* ===================== desk: rail + sheet ===================== */
 .desk {
@@ -595,7 +536,6 @@ a:focus-visible {
   background: var(--surface-card);
   border: 1px solid var(--border-control);
   border-radius: 0 var(--r-md) var(--r-md) var(--r-md);
-  box-shadow: var(--shadow-pop);
   min-width: 0;
 }
 .shelf {
@@ -678,17 +618,6 @@ a:focus-visible {
   cursor: pointer;
   text-decoration: underline;
   padding: 4px;
-}
-
-.swipehint {
-  display: none;
-  gap: 10px;
-  align-items: center;
-  padding: 9px var(--sp-4) 0;
-  font: var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-  flex-wrap: wrap;
 }
 
 /* ===================== ambient slot (locked #4/#5) ===================== */
@@ -1057,41 +986,6 @@ a:focus-visible {
   }
 }
 
-/* ===================== Focus batch strip (locked #10) ===================== */
-.batchstrip {
-  display: none;
-  margin: var(--sp-3) var(--sp-4) 0;
-  padding: 10px 14px;
-  background: var(--accent-tint);
-  border: 1px solid var(--accent);
-  border-radius: var(--r-md);
-  font: var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
-  letter-spacing: 0.08em;
-  color: var(--accent-strong);
-  align-items: center;
-  gap: 12px;
-}
-body.focus .batchstrip {
-  display: flex;
-}
-.segs {
-  display: flex;
-  gap: 4px;
-  flex: 1;
-  min-width: 80px;
-}
-.segs i {
-  height: 6px;
-  flex: 1;
-  border-radius: 3px;
-  background: var(--surface-inset);
-  border: 1px solid var(--border-hairline);
-}
-.segs i.on {
-  background: var(--status-archive);
-  border-color: var(--status-archive);
-}
-
 /* ===================== groups + rows ===================== */
 .grouphead {
   display: flex;
@@ -1129,7 +1023,7 @@ body.focus .batchstrip {
   grid-template-columns: 40px 30px minmax(0, 1fr) auto;
   gap: var(--sp-3);
   align-items: center;
-  padding: 10px var(--sp-4);
+  padding: 8px var(--sp-4);
   background: var(--surface-card);
   position: relative;
   z-index: 1;
@@ -1503,21 +1397,15 @@ body.focus .batchstrip {
   }
 } /* touch: avatar selection owns tap actions; swipe + long-press stay accelerators */
 
-/* ===================== LOG (comfortable, fixed 100px) ===================== */
+/* ===================== LOG (comfortable, compact 64px floor) ===================== */
 .items.density-comfortable .item-fg {
-  grid-template-columns: 4px 30px minmax(0, 1fr) auto;
-  height: 100px;
-  padding: 0 var(--sp-4) 0 0;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  min-height: 64px;
+  padding: 8px var(--sp-4);
   gap: var(--sp-3);
 }
 .items.density-comfortable .idx {
-  width: 4px;
-  height: 100%;
-  background: var(--src, var(--border-hairline));
-  opacity: 0.55;
-  font-size: 0;
-  padding: 0;
-  border-radius: 0;
+  display: none;
 }
 .items.density-comfortable .title {
   white-space: normal;
@@ -1559,6 +1447,14 @@ body.focus .batchstrip {
    letterboxing narrow thumbs — the row height is fixed, so cover (crop) reads better */
 .items.density-comfortable .monitor img {
   object-fit: cover;
+}
+.items.density-comfortable .monitor {
+  width: 96px;
+  height: 56px;
+}
+/* the empty slot keeps its width (actions never move) but must not set row height */
+.items.density-comfortable .monitor.empty {
+  height: 0;
 }
 .monitor .dur {
   position: absolute;
@@ -2195,56 +2091,7 @@ body.focus .batchstrip {
   letter-spacing: 0.1em;
 }
 
-/* PAGE CLEARED stamp — the ONE celebration */
-.stampwrap {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 20px;
-  background: color-mix(in srgb, var(--surface-app) 55%, transparent);
-  backdrop-filter: blur(3px);
-}
-.stampwrap.show {
-  display: flex;
-}
-.stamp {
-  font: 800 1.9rem/1.15 var(--font-mono);
-  letter-spacing: 0.14em;
-  color: var(--status-archive);
-  border: 4px dashed var(--status-archive);
-  border-radius: var(--r-md);
-  padding: 24px 36px;
-  transform: rotate(-7deg);
-  text-align: center;
-  background: var(--surface-card);
-  box-shadow: var(--shadow-pop);
-  animation: stampin 240ms var(--ease);
-}
-.stamp small {
-  display: block;
-  font: var(--fw-semibold) 0.78rem/1 var(--font-mono);
-  letter-spacing: 0.2em;
-  color: var(--text-muted);
-  margin-top: 12px;
-}
-@keyframes stampin {
-  from {
-    transform: rotate(-7deg) scale(1.55);
-    opacity: 0;
-  }
-}
-.stamp-acts {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-/* ===================== bulk opsbar + dock ===================== */
+/* ===================== bulk opsbar ===================== */
 .opsbar {
   position: fixed;
   left: 50%;
@@ -2309,60 +2156,6 @@ body.focus .batchstrip {
   color: inherit;
 }
 
-.dock {
-  display: none;
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 39;
-  height: 60px;
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-control);
-  border-radius: var(--r-pill);
-  box-shadow: var(--shadow-pop);
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 8px;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.dock button,
-.dock a {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font: var(--fw-medium) 0.6rem/1 var(--font-mono);
-  cursor: pointer;
-  min-width: 50px;
-  height: 46px;
-  border-radius: var(--r-pill);
-  text-decoration: none;
-  transition: transform var(--dur) var(--ease);
-}
-.dock button:active {
-  transform: scale(0.9);
-}
-.dock .g {
-  font-size: 1.1rem;
-}
-.dock button[aria-pressed="true"] {
-  color: var(--accent);
-}
-.dock .fab {
-  background: var(--accent);
-  color: var(--accent-ink);
-  min-width: 84px;
-  height: 44px;
-  font: var(--fw-bold) 0.68rem/1 var(--font-mono);
-  letter-spacing: 0.05em;
-}
-
 /* #46 mobile fast-scroll bar — Nova Launcher–style track + proportional handle
    (see fastscroll.js). Always visible while the list scrolls; fades shortly
    after scroll stops. Desktop keeps the native scrollbar. */
@@ -2425,8 +2218,8 @@ body.focus .batchstrip {
   }
 }
 
-/* mobile floating scroll-to-top (Epic 13) — sits just above the dock on the right,
-   matches the dock's glass/border language, clears the dock height + safe-area inset.
+/* mobile floating scroll-to-top (Epic 13) — sits just above the bottom tab bar on the right,
+   clears the tab bar height + safe-area inset.
    Appears (.show, toggled by main.js) only after the feed is scrolled down. */
 .gotop {
   display: none;
@@ -2435,7 +2228,7 @@ body.focus .batchstrip {
   z-index: 38;
   width: 46px;
   height: 46px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(56px + 14px + env(safe-area-inset-bottom));
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--surface-card) 94%, transparent);
   backdrop-filter: blur(12px);
@@ -2590,6 +2383,15 @@ body.focus .batchstrip {
   font: var(--fw-regular) var(--fs-xs)/1.55 var(--font-sans);
   color: var(--text-dim);
   margin-top: var(--sp-2);
+}
+.set-version {
+  margin: var(--sp-3) 0 0;
+  font: var(--fw-regular) 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+.set-version:empty {
+  display: none;
 }
 .set-card {
   margin-top: var(--sp-2);
@@ -3314,19 +3116,6 @@ kbd {
     border-color: transparent;
     pointer-events: none;
   }
-  .wins {
-    margin-left: auto;
-    opacity: max(0.35, var(--console-open));
-    transform: translateY(calc(-4px * var(--console-collapse)));
-  }
-  /* Phone header stays two rows: identity + count, then search. The goal bar
-     and the dev badge are desktop instruments; the count alone is the signal. */
-  .wins .wlab,
-  .wins .dots,
-  #dice,
-  .app-ver {
-    display: none;
-  }
   .con-right {
     margin-left: auto;
     gap: 2px;
@@ -3362,28 +3151,12 @@ kbd {
     padding: 0 9px;
     font-size: 0.62rem;
   }
-  .swipehint {
-    font-size: 0.62rem;
-    gap: 8px;
-    padding: 7px var(--sp-3) 0;
-    line-height: 1.2;
-  }
-  .console.compact .wins {
-    pointer-events: none;
-  }
   @media (prefers-reduced-motion: reduce) {
     .con-row,
-    .cmd,
-    .wins {
+    .cmd {
       transition-duration: 1ms !important;
     }
   }
-  .btn-triage {
-    display: none;
-  } /* the dock FAB owns triage */
-  #open-settings {
-    display: none;
-  } /* dock MORE owns settings */
   .nav-burger {
     display: inline-flex;
   } /* top-left Jump trigger (mobile only) */
@@ -3403,16 +3176,6 @@ kbd {
   .fclear {
     min-height: var(--touch-min);
   }
-  .dock {
-    display: flex;
-  }
-  .opsbar {
-    bottom: 86px;
-  }
-  #toast {
-    bottom: 86px;
-    max-width: 92%;
-  }
   .desk {
     grid-template-columns: minmax(0, 1fr);
     padding: 0 var(--sp-3);
@@ -3424,18 +3187,17 @@ kbd {
   .sheet {
     border-radius: var(--r-md);
   }
-  body {
-    padding-bottom: 120px;
-  }
   .items .acts {
     display: none;
   } /* swipe owns the actions */
-  .swipehint {
-    display: flex;
-  }
   .item-fg {
-    grid-template-columns: 30px minmax(0, 1fr) auto;
-    padding: 10px var(--sp-3);
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+    padding: 11px var(--sp-3);
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
   }
   .row .idx {
     display: none;
@@ -3443,20 +3205,11 @@ kbd {
   .ambient {
     margin: var(--sp-3) var(--sp-3) 0;
   }
-  .batchstrip {
-    margin: var(--sp-3) var(--sp-3) 0;
-  }
   .items.density-comfortable .item-fg {
-    grid-template-columns: 4px minmax(0, 1fr) auto;
-    min-height: 120px;
-    height: auto;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    min-height: 0;
+    padding: 11px var(--sp-3);
     align-items: center;
-  }
-  .items.density-comfortable .item-fg .idx {
-    display: block;
-  }
-  .items.density-comfortable .avatar {
-    display: none;
   }
   .items.density-comfortable .trail {
     flex-direction: column;
@@ -3471,8 +3224,8 @@ kbd {
     height: 64px;
   }
   .items.density-comfortable .monitor {
-    width: 88px;
-    height: 56px;
+    width: 72px;
+    height: 48px;
   }
   .monitor.empty {
     display: none;
@@ -3510,6 +3263,38 @@ kbd {
     border-radius: 3px;
     background: var(--border-control);
     margin: 0 auto 14px;
+  }
+}
+
+/* ===================== shared tab bar clearance =====================
+   At 700px and below .ch-nav (core/nav.css) is a fixed bottom tab bar, 56px + safe-area.
+   Everything fixed to the bottom sits above it; the page pads past it. */
+@media (max-width: 700px) {
+  body.has-tabbar {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  }
+  .opsbar {
+    bottom: calc(56px + 12px + env(safe-area-inset-bottom));
+  }
+  #toast {
+    bottom: calc(56px + 14px + env(safe-area-inset-bottom));
+    max-width: 92%;
+  }
+  #open-search {
+    display: inline-flex;
+  }
+}
+/* Desktop: .ch-nav is a sticky 56px top bar carrying the brand; the console sits below it. */
+@media (min-width: 701px) {
+  .console {
+    top: 56px;
+  }
+  .console .brand {
+    display: none;
+  }
+  .rail {
+    top: calc(56px + 70px);
+    max-height: calc(100vh - 56px - 92px);
   }
 }
 
@@ -3573,7 +3358,7 @@ kbd {
 /* Full-screen sheet over the feed: post + collapsible comment thread, in-reader
    triage, "open original" escape. Slides in from the right; swipe-right / the
    system back-gesture returns to the feed. Built from core tokens. z-index 53
-   sits above the sheets/dock (51) but below the media lightbox (#media-modal, 55)
+   sits above the sheets (51) and the tab bar (40) but below the media lightbox (#media-modal, 55)
    so tapping post media still opens the lightbox over the reader. */
 html.reader-lock {
   overflow: hidden;
@@ -4546,363 +4331,6 @@ a.rd-au:hover {
   }
 }
 
-/* Focus mode: wider content column on desktop (Epic 14 P3) */
-@media (min-width: 701px) {
-  body.focus .desk,
-  body.focus .con-row,
-  body.focus .folders {
-    max-width: 1500px;
-  }
-}
-
-/* ---- Deck mode (?deck=1) ----
-   One card at a time, /random-driven. The host sits beside #items; main.js
-   toggles itemsEl.hidden + deckHost.hidden so only one is visible at a time.
-   Focus layout: a single wide card with the decision row attached, so the eye
-   stays on one item and every key has a visible button. */
-.deck-host {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--sp-4) var(--sp-5) var(--sp-5);
-}
-.deck-host[hidden] {
-  display: none;
-}
-
-/* Deck mode is a focus surface: list chrome (tabs, shelf, hint, rail) would
-   put ~300px of navigation between the user and the one decision on screen. */
-body.deck-mode .folders,
-body.deck-mode .statuspills,
-body.deck-mode .shelf,
-body.deck-mode .swipehint,
-body.deck-mode .rail,
-body.deck-mode #ambient,
-body.deck-mode #batchstrip,
-body.deck-mode #decayline,
-body.deck-mode #dock-inbox,
-body.deck-mode #dock-focus,
-body.deck-mode #dock-search {
-  display: none !important;
-}
-body.deck-mode .desk {
-  grid-template-columns: minmax(0, 1fr);
-  padding-top: var(--sp-4);
-}
-
-.deck-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
-  flex-wrap: wrap;
-}
-.deck-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px 0 11px;
-  background: var(--surface-card);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-pill);
-  color: var(--text-muted);
-  font: var(--fw-medium) var(--fs-xs)/1 var(--font-sans);
-  cursor: pointer;
-}
-.deck-back:hover {
-  background: var(--surface-hover);
-  color: var(--text-body);
-}
-.deck-left {
-  margin-left: auto;
-  font: var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-}
-.deck-seg {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--surface-inset);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-pill);
-}
-.deck-seg button {
-  min-width: 34px;
-  height: 28px;
-  padding: 0 10px;
-  background: transparent;
-  border: none;
-  border-radius: var(--r-pill);
-  color: var(--text-muted);
-  font: var(--fw-medium) var(--fs-xs)/1 var(--font-sans);
-  cursor: pointer;
-}
-.deck-seg button:hover {
-  color: var(--text-body);
-}
-.deck-seg button[aria-pressed="true"] {
-  background: var(--surface-card);
-  color: var(--text-body);
-  box-shadow: var(--shadow-row);
-}
-
-.deck-stage {
-  display: flex;
-  justify-content: center;
-}
-.deck-card {
-  width: 100%;
-  display: grid;
-  gap: var(--sp-4);
-  background: var(--surface-card);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-lg);
-  padding: var(--sp-5) var(--sp-5) var(--sp-4);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
-  transition:
-    transform 160ms var(--ease),
-    opacity 160ms var(--ease);
-  will-change: transform, opacity;
-  touch-action: pan-y;
-}
-.deck-card.leaving {
-  opacity: 0;
-}
-.deck-card.lv-archived {
-  transform: translateX(140%);
-}
-.deck-card.lv-done {
-  transform: translateX(-140%);
-}
-.deck-card.lv-keep {
-  transform: translateY(-30%) scale(0.95);
-}
-.deck-card.lv-inbox {
-  transform: translateY(30%) scale(0.95);
-}
-
-.deck-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-.deck-src {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text-muted);
-  font: var(--fw-semibold) var(--fs-xs)/1 var(--font-sans);
-  text-transform: capitalize;
-}
-.deck-glyph {
-  display: inline-grid;
-  place-items: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--src, var(--accent)) 16%, transparent);
-  color: var(--src, var(--accent));
-  font: var(--fw-bold) 0.72rem/1 var(--font-sans);
-  text-transform: none;
-}
-.deck-sub {
-  font: var(--fw-regular) var(--fs-xs)/1 var(--font-sans);
-  color: var(--text-dim);
-}
-.deck-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sp-5);
-  align-items: start;
-}
-.deck-card:not(.has-media) .deck-main {
-  grid-template-columns: minmax(0, 1fr);
-}
-.deck-copy {
-  min-width: 0;
-}
-.deck-title {
-  margin: 0 0 var(--sp-2);
-  font: var(--fw-bold) 1.6rem/1.22 var(--font-disp);
-  letter-spacing: -0.015em;
-  color: var(--text-body);
-  text-wrap: balance;
-}
-.deck-title a {
-  color: inherit;
-  text-decoration: none;
-}
-.deck-title a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.deck-meta {
-  color: var(--text-muted);
-  font: var(--fw-regular) var(--fs-sm)/1.5 var(--font-sans);
-  margin-bottom: var(--sp-3);
-}
-.deck-meta a {
-  color: inherit;
-}
-.deck-body {
-  margin: 0;
-  color: var(--text-muted);
-  font: var(--fw-regular) var(--fs-md)/1.65 var(--font-sans);
-  max-height: 34vh;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, #000 82%, transparent);
-  mask-image: linear-gradient(180deg, #000 82%, transparent);
-}
-.deck-media {
-  position: relative;
-  width: 300px;
-  aspect-ratio: 16 / 10;
-  margin: 0;
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--tile-fill);
-  border: 1px solid var(--border-hairline);
-}
-.deck-media img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: top center;
-}
-.deck-media.nsfw img {
-  filter: blur(18px);
-  transform: scale(1.08);
-}
-.deck-nsfw {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(16, 18, 22, 0.45);
-  color: #fff;
-  font: var(--fw-bold) 0.72rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-}
-.deck-kind {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  padding: 3px 8px;
-  border-radius: var(--r-pill);
-  background: rgba(12, 14, 18, 0.72);
-  color: #e8ecf1;
-  font: var(--fw-semibold) 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.deck-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border-hairline);
-}
-.deck-actions-spacer {
-  flex: 1;
-}
-.deck-act {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font: var(--fw-medium) var(--fs-sm)/1 var(--font-sans);
-  cursor: pointer;
-}
-.deck-act:hover {
-  background: var(--surface-hover);
-  color: var(--text-body);
-}
-.deck-act .da-ico {
-  display: inline-flex;
-  align-items: center;
-}
-.deck-act .da-ico svg {
-  width: 16px;
-  height: 16px;
-}
-.deck-act kbd {
-  font: var(--fw-semibold) 0.62rem/1 var(--font-mono);
-  color: var(--text-dim);
-  padding: 3px 5px;
-  border: 1px solid var(--border-hairline);
-  border-radius: 5px;
-}
-.deck-act.act-keep {
-  background: var(--keep-tint);
-  border-color: color-mix(in srgb, var(--keep) 34%, transparent);
-  color: var(--keep);
-}
-.deck-act.act-archived {
-  background: var(--archive-tint);
-  border-color: color-mix(in srgb, var(--archive) 34%, transparent);
-  color: var(--archive);
-}
-.deck-act.act-done {
-  background: var(--done-tint);
-  border-color: color-mix(in srgb, var(--done) 34%, transparent);
-  color: var(--done);
-}
-.deck-act.act-keep:hover {
-  background: color-mix(in srgb, var(--keep) 20%, transparent);
-}
-.deck-act.act-archived:hover {
-  background: color-mix(in srgb, var(--archive) 20%, transparent);
-}
-.deck-act.act-done:hover {
-  background: color-mix(in srgb, var(--done) 20%, transparent);
-}
-.deck-act.act-keep kbd,
-.deck-act.act-archived kbd,
-.deck-act.act-done kbd {
-  color: currentColor;
-  border-color: color-mix(in srgb, currentColor 30%, transparent);
-}
-.deck-hint {
-  color: var(--text-dim);
-  font: var(--fw-regular) var(--fs-xs)/1.5 var(--font-sans);
-  text-align: center;
-}
-.deck-empty {
-  text-align: center;
-  padding: var(--sp-5) var(--sp-4);
-  color: var(--text-muted);
-  border: 1px dashed var(--border-hairline);
-  border-radius: var(--r-lg);
-}
-.deck-empty h3 {
-  margin: 0 0 var(--sp-2);
-  font: var(--fw-bold) var(--fs-lg)/1.3 var(--font-disp);
-  color: var(--text-body);
-}
-.deck-draw {
-  margin-top: var(--sp-3);
-  height: 38px;
-  padding: 0 18px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: none;
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  font: var(--fw-semibold) var(--fs-sm)/1 var(--font-sans);
-}
-
 /* ---- P3.3: subreddit facet (second-tier rail under reddit source) ---- */
 .rail-sub {
   margin-top: var(--sp-1);
@@ -4920,78 +4348,4 @@ body.deck-mode .desk {
 .rnav-sub {
   font-size: 0.85rem;
   padding-left: var(--sp-2);
-}
-
-/* ===================== phone: deck (kept last so it wins over the base rules) ===================== */
-@media (max-width: 700px) {
-  .deck-host {
-    padding: var(--sp-3) var(--sp-3) 110px;
-  }
-  .deck-bar {
-    gap: 6px;
-  }
-  .deck-back {
-    height: 30px;
-    padding: 0 10px;
-  }
-  .deck-seg button {
-    height: 26px;
-    min-width: 30px;
-    padding: 0 7px;
-    font-size: 0.68rem;
-  }
-  .deck-left {
-    flex-basis: 100%;
-    margin-left: 0;
-    text-align: right;
-  }
-  /* Deck mode on a phone gives the card the whole screen: the search row and
-     the keyboard hint are not part of the decision. */
-  body.deck-mode .cmd,
-  .deck-hint {
-    display: none;
-  }
-  .deck-media img {
-    object-fit: cover;
-  }
-  .deck-card {
-    padding: 18px 16px 14px;
-    border-radius: var(--r-md);
-    gap: 14px;
-  }
-  .deck-title {
-    font-size: 1.25rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .deck-main {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-3);
-  }
-  .deck-media {
-    width: 100%;
-    aspect-ratio: 2 / 1;
-  }
-  .deck-body {
-    max-height: 20vh;
-  }
-  .deck-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .deck-actions-spacer,
-  .deck-act kbd {
-    display: none;
-  }
-  .deck-act {
-    justify-content: center;
-  }
-  /* swipe-down still skips; the pad keeps four thumb targets instead of six */
-  .deck-act.act-skip {
-    display: none;
-  }
 }

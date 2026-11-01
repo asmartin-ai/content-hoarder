@@ -139,3 +139,18 @@ export const PrepareImportBody = z.object({
 });
 
 export const CommitImportBody = z.object({ token: z.string().optional() });
+
+export const SweepApplyBody = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("subreddit"),
+    source: z.literal("reddit"),
+    subreddit: z.string().trim().min(1),
+  }),
+  z.object({
+    kind: z.literal("age"),
+    source: z.string().trim().min(1),
+    before_utc: z.number().int().positive(),
+  }),
+]);
+
+export const SweepUndoBody = z.object({ wave: z.number().int().positive() });

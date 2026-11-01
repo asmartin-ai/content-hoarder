@@ -1,57 +1,17 @@
-/* browse/instances.js — the three injected sub-surfaces the browse page owns: deck
-   mode, the in-app reader, and the per-item tag editor. Each is built once here with
-   the callbacks the rest of the browse modules provide, so every module can import the
-   instance instead of threading it through a parameter list. */
+/* browse/instances.js — the two injected sub-surfaces the browse page owns: the in-app
+   reader and the per-item tag editor. Each is built once here with the callbacks the
+   rest of the browse modules provide, so every module can import the instance instead
+   of threading it through a parameter list. */
 
-import * as api from "../core/api.js";
-import { toast, snackbar } from "../core/toast.js";
-import { attachSwipe } from "../core/swipe.js";
 import { debounce } from "../core/util.js";
-import { metaLine } from "../core/render.js";
-import { COPY, deckHostEl, facets, state } from "./shared.js";
-import { initDeck, setHost as setDeckHost } from "./deck.js";
-import { canOpenInReader, initReader } from "./reader.js";
+import { facets, state } from "./shared.js";
+import { initReader } from "./reader.js";
 import { initTagEditor } from "./tagedit.js";
-import { bumpPulse } from "./chrome.js";
 import { refreshRail } from "./data.js";
-import { render, reblur, toggleDeck } from "./feed.js";
+import { render, reblur } from "./feed.js";
 import { lightbox, openMediaFor } from "./lightbox.js";
 import { closeSheets } from "./panels.js";
 import { act, snooze } from "./actions.js";
-
-/* v3 deck mode (?deck=1) — one card at a time, /random-driven, with swipe
-   + decision keys + Undo. Body in ./deck.js. */
-export const deck = initDeck({
-  api,
-  toast,
-  snackbar,
-  attachSwipe,
-  COPY: {
-    get keep() {
-      return COPY.keep;
-    },
-    get archived() {
-      return COPY.archived;
-    },
-    get done() {
-      return COPY.done;
-    },
-    get inbox() {
-      return COPY.inbox;
-    },
-  },
-  glyph: (it) => (it.source ? it.source[0] || "·" : "·"),
-  metaLine,
-  snooze: (fn) => snooze(fn),
-  openReader: (it) => {
-    if (canOpenInReader(it)) readerUI.open(it, { triageEnter: true });
-    else if (it.url) window.open(it.url, "_blank", "noopener");
-  },
-  bumpPulse,
-  toggleDeck: (on) => toggleDeck(on),
-});
-
-if (deckHostEl) setDeckHost(deckHostEl);
 
 /* the in-app thread reader — replaces external handoff for Reddit/HN discussion
    threads. act/openMediaFor/closeSheets are hoisted function declarations. */

@@ -3,7 +3,9 @@ import { extname, join, normalize, resolve } from "node:path";
 
 const STATIC_DIR = join(import.meta.dir, "..", "static");
 
-const TEMPLATE_PATH = join(import.meta.dir, "..", "templates", "index.html");
+const TEMPLATE_DIR = join(import.meta.dir, "..", "templates");
+
+const TEMPLATES = { home: "home.html", library: "index.html" } as const;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -41,8 +43,8 @@ export function serviceWorkerResponse(): Response {
   });
 }
 
-export function templateResponse(): Response {
-  return new Response(Bun.file(TEMPLATE_PATH), {
+export function templateResponse(name: keyof typeof TEMPLATES): Response {
+  return new Response(Bun.file(join(TEMPLATE_DIR, TEMPLATES[name])), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       // The local triage app must never sit inside another site's iframe:

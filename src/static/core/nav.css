@@ -1,0 +1,178 @@
+/* ============================================================
+   core/nav.css — the shared room switcher: Today · Clear · Library.
+   Loaded by home.html (Today + Clear) and index.html (Library).
+   Desktop (≥ 701px): slim sticky top bar.
+   Phone (≤ 700px): fixed bottom tab bar in the thumb zone; the
+   page adds body.has-tabbar so content clears it.
+   Consumes core/tokens.css semantic aliases only.
+   ============================================================ */
+
+.ch-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  height: 56px;
+  padding: 0 max(var(--sp-5), env(safe-area-inset-right)) 0
+    max(var(--sp-5), env(safe-area-inset-left));
+  background: var(--surface-app);
+  border-bottom: 1px solid var(--border-hairline);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ch-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--touch-min);
+  color: var(--text-body);
+  text-decoration: none;
+  font: var(--fw-semibold) var(--fs-sm) / 1 var(--font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.ch-led {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ch-tabs {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  gap: var(--sp-1);
+}
+
+.ch-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  color: var(--text-muted);
+  text-decoration: none;
+  font: var(--fw-medium) var(--fs-sm) / 1 var(--font-sans);
+  transition: color var(--dur) var(--ease);
+}
+
+.ch-tab svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.ch-tab[aria-current="page"] {
+  color: var(--text-body);
+}
+
+.ch-tab[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.ch-tab:focus-visible,
+.ch-brand:focus-visible,
+.ch-iconbtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -4px;
+  border-radius: var(--r-sm);
+}
+
+.ch-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.ch-iconbtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (hover: hover) {
+  .ch-tab:hover,
+  .ch-iconbtn:hover {
+    color: var(--text-body);
+  }
+
+  .ch-iconbtn:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---------- phone: bottom tab bar ---------- */
+@media (max-width: 700px) {
+  .ch-nav {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    gap: 0;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    border-bottom: 0;
+    border-top: 1px solid var(--border-hairline);
+  }
+
+  .ch-brand,
+  #theme-toggle {
+    display: none;
+  }
+
+  .ch-tabs {
+    flex: 1;
+    gap: 0;
+    height: 56px;
+  }
+
+  .ch-tab {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    font-size: var(--fs-xs);
+    letter-spacing: 0.01em;
+  }
+
+  .ch-tab svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ch-tab[aria-current="page"]::after {
+    top: -1px;
+    bottom: auto;
+    left: 32%;
+    right: 32%;
+  }
+
+  body.has-tabbar {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}

@@ -9,29 +9,15 @@ import { loadCounts, loadItems, refreshRail } from "./data.js";
 import { rowEl } from "./feed.js";
 import { act, redo, toggleSelect } from "./actions.js";
 import { openMediaFor } from "./lightbox.js";
-import { deck, tagEditor } from "./instances.js";
+import { tagEditor } from "./instances.js";
 import { closeSheets, toggleKbd } from "./panels.js";
 import { initOperators } from "./operators.js";
 
 /* ---- tabs / rail / chips (locked #2/#7) ---- */
-function isInboxHome() {
-  return (
-    state.status === "inbox" &&
-    !state.source &&
-    !state.category &&
-    !state.tags.length &&
-    !state.q &&
-    !state.exact
-  );
-}
-
 export function paintTabs() {
   $$(".folder, .spill").forEach((t) => {
     t.setAttribute("aria-selected", String((t.dataset.status ?? "") === state.status));
   });
-  const home = $("#dock-inbox");
-
-  if (home) home.setAttribute("aria-pressed", String(isInboxHome()));
 }
 
 $$(".folder, .spill").forEach((t) =>
@@ -47,11 +33,10 @@ $$(".folder, .spill").forEach((t) =>
   }),
 );
 
-/* Drag-and-drop to status buckets (desktop). Rows + deck cards are draggable
-   (native HTML5 DnD — no library; mobile keeps swipe, the friction-asymmetry
-   cheapest gesture). Drop targets are the four real status buckets (the "All"
-   tab has data-status="" and is not a bucket). List drops reuse act(); deck
-   drops route through deck.commit so the queue advances and undo works. */
+/* Drag-and-drop to status buckets (desktop). Rows are draggable (native HTML5 DnD —
+   no library; mobile keeps swipe, the friction-asymmetry cheapest gesture). Drop
+   targets are the four real status buckets (the "All" tab has data-status="" and is
+   not a bucket). Drops reuse act(). */
 let dragFullname = null;
 
 function dropTargetFrom(e) {
@@ -112,12 +97,7 @@ document.addEventListener("drop", (e) => {
   if (status === (state.status || "")) return; // dropping onto the active bucket = no-op
   setDropTargets(false);
 
-  if (state.deck) {
-    // Deck mode has its own commit path: leave-anim, queue advance, undo.
-    deck.commit(state, { fullname: dragFullname }, status);
-  } else {
-    act(dragFullname, status);
-  }
+  act(dragFullname, status);
 
   dragFullname = null;
 });
@@ -272,7 +252,7 @@ $("#exact").addEventListener("change", (e) => {
   loadItems(true);
 });
 
-$("#dock-search").addEventListener("click", () => {
+$("#open-search")?.addEventListener("click", () => {
   focusSearchBox();
 });
 
@@ -303,31 +283,6 @@ export function syncSortControl() {
   sortSel.value = state.sort; // apply the tab's sort once the view restores
 }
 
-export function goInboxHome() {
-  state.status = "inbox";
-  state.source = "";
-  state.category = "";
-  state.tags = [];
-  state.q = "";
-  state.exact = false;
-  qInput.value = "";
-  const exact = $("#exact");
-
-  if (exact) exact.checked = false;
-  state.sort = sortForTab(state.status);
-  sortSel.value = state.sort;
-  paintTabs();
-  paintChips();
-  refreshRail();
-  loadItems(true);
-  loadCounts();
-  window.scrollTo({ top: 0 });
-}
-
-const dockInbox = $("#dock-inbox");
-
-if (dockInbox) dockInbox.addEventListener("click", goInboxHome);
-
 /* ---- keyboard: the one-hand map (locked at Gate 1) ---- */
 
 let cursor = -1;
@@ -355,10 +310,6 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (isTypingTarget(e.target)) return;
-
-  /* Deck-mode keymap (s/e/y/u/z/space) — only when state.deck is active.
-     List-mode s/e/y are unchanged because deckKey returns false then. */
-  if (state.deck && deck.key(e, state)) return;
 
   if (e.ctrlKey || e.metaKey) {
     // undo/redo chords; other modifier combos pass through to the browser

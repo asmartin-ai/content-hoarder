@@ -2,11 +2,20 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v130"; // v130: browse surface split into ES modules (browse/*.js)
+const CACHE = "ch-shell-v140"; // v140: Today/Clear/Library overhaul
 
 const SHELL = [
   "/",
-  // v3 browse shell (what "/" actually loads)
+  "/clear",
+  "/library",
+  "/static/core/nav.css",
+  // Today + Clear shell ("/" and "/clear")
+  "/static/home/home.css",
+  "/static/home/main.js",
+  "/static/home/today.js",
+  "/static/home/round.js",
+  "/static/home/card.js",
+  // Library browse shell ("/library")
   "/static/theme.js",
   "/static/haptics.js",
   "/static/core/tokens.css",
@@ -34,7 +43,6 @@ const SHELL = [
   "/static/browse/ambient.js",
   "/static/browse/panels.js",
   "/static/browse/instances.js",
-  "/static/browse/deck.js",
   "/static/browse/render.js",
   "/static/browse/reader.js",
   "/static/browse/tagedit.js",
@@ -119,9 +127,21 @@ self.addEventListener("fetch", (e) => {
 
           return res;
         })
-        // Cache miss + offline: fall back to the cached app shell so the user
-        // sees the PWA instead of the browser's raw network-error page.
-        .catch(() => caches.match(req).then((m) => m || caches.match("/"))),
+        // Cache miss + offline: fall back to this page's own cached shell (ignoring the
+        // query, e.g. /library?open=…), then "/", so the user sees the PWA instead of the
+        // browser's raw network-error page.
+        .catch(() =>
+          caches
+            .match(req, { ignoreSearch: true })
+            .then(
+              (m) =>
+                m ||
+                caches.match(
+                  url.pathname === "/clear" || url.pathname === "/library" ? url.pathname : "/",
+                ),
+            )
+            .then((m) => m || caches.match("/")),
+        ),
     );
 
     return;

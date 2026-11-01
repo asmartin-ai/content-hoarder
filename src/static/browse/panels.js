@@ -7,7 +7,6 @@ import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
 import { setArchivePref } from "../core/media.js";
 import { $, $$, state, itemsEl, drawer, doneRetention } from "./shared.js";
-import { paintWins } from "./chrome.js";
 import {
   clearItemFirstPageCache,
   loadCounts,
@@ -15,7 +14,7 @@ import {
   refreshPulse,
   refreshRail,
 } from "./data.js";
-import { render, setFocus } from "./feed.js";
+import { render } from "./feed.js";
 import { closeRelay } from "./relay.js";
 
 /* ---- sheets / settings panel ---- */
@@ -180,11 +179,6 @@ export function toggleKbd() {
 scrim.addEventListener("click", closeSheets);
 
 $("#open-settings").addEventListener("click", () => {
-  openPanel("#settings");
-  loadDoneRetention(true);
-});
-
-$("#dock-settings").addEventListener("click", () => {
   openPanel("#settings");
   loadDoneRetention(true);
 });
@@ -470,18 +464,11 @@ $$("#set-density button").forEach((b) =>
   }),
 );
 
-$$("#set-loading button").forEach((b) =>
-  b.addEventListener("click", () => {
-    setFocus(b.dataset.focus === "1");
-  }),
-);
-
 $$("#set-goal button").forEach((b) =>
   b.addEventListener("click", () => {
     state.goal = parseInt(b.dataset.g, 10) || 0;
     localStorage.chGoal = String(state.goal);
     $$("#set-goal button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    paintWins();
   }),
 );
 
@@ -624,10 +611,6 @@ if (syncHeaderBtn) syncHeaderBtn.addEventListener("click", () => runSyncNewest(s
 /* reflect persisted settings into the panel */
 $$("#set-density button").forEach((b) =>
   b.setAttribute("aria-pressed", String(b.dataset.d === state.density)),
-);
-
-$$("#set-loading button").forEach((b) =>
-  b.setAttribute("aria-pressed", String((b.dataset.focus === "1") === state.focus)),
 );
 
 $$("#set-goal button").forEach((b) =>
