@@ -49,6 +49,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Sanitized demo (`docs/DEMO.md`).** `scripts/demo.sh` starts a fresh library in a new temp folder
+  with 24 invented saves (`docs/demo/demo-saves.json`). It runs from that folder, so it loads no
+  `.env` and never opens `data/app.db`. The doc has the walkthrough, verified vs unverified steps
+  and a safety checklist.
 - **Sweeps** — `GET /sweeps`, `POST /sweeps/apply`, `POST /sweeps/undo`: one-tap reversible rest
   of an entertainment subreddit pile or a source's saves older than four years, via `decay()` waves
   labelled `sweep`. Knowledge subreddits and resurface tags are excluded; never enqueues Reddit
@@ -69,6 +73,14 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   pre-create empty tags (stable id + display name), rename across the whole vocabulary in one
   transaction (bulk rewrite of `tags_manual`/`tags`, FTS rebuild), delete-from-vocabulary;
   the derived vocabulary still surfaces unregistered stamps, so nothing drops out.
+
+### Fixed
+
+- An empty inbox (nothing imported yet, or everything decided or snoozed) no longer breaks the
+  deal query. Before, Today showed a blank card and Clear said "Couldn't reach the server" while
+  the server was running; now both say "Nothing waiting here".
+- `import` on a path that doesn't exist now says `Nothing found at "<path>"`, instead of asking
+  for `--source`.
 
 ### Performance
 

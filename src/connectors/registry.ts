@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import type { BaseConnector } from "./base.ts";
 import { FirefoxConnector } from "./firefox.ts";
 import { HackerNewsConnector } from "./hackernews.ts";
@@ -36,6 +37,8 @@ export function allConnectors(): BaseConnector[] {
 }
 
 export function dispatch(path: string): BaseConnector {
+  if (!existsSync(path)) throw new Error(`Nothing found at ${JSON.stringify(path)}`);
+
   for (const connector of CONNECTORS) {
     try {
       if (connector.canImport(path)) return connector;

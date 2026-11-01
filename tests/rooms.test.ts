@@ -167,6 +167,25 @@ test("/clear/deal skips an id that left the inbox", async () => {
   });
 });
 
+test("an empty inbox deals nothing instead of failing", async () => {
+  await withServer(async (base, path) => {
+    const connection = db.connect(path);
+
+    connection.run("UPDATE items SET status = 'done'");
+    connection.close();
+
+    const dealt = await fetch(`${base}/clear/deal?n=10`);
+
+    expect(dealt.status).toBe(200);
+    expect(DealSchema.parse(await dealt.json()).items).toEqual([]);
+
+    const upnext = await fetch(`${base}/hx/today/upnext?n=10`);
+
+    expect(upnext.status).toBe(200);
+    expect(await upnext.text()).toContain('class="upnext-empty"');
+  });
+});
+
 test("letting a pile go from Today toasts a wave, and undo restores it", async () => {
   await withServer(async (base, path) => {
     const piles = await (await fetch(`${base}/hx/today/piles`)).text();

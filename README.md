@@ -48,6 +48,9 @@ bun run src/cli.ts import <path>   # a file or directory; detects the source
 bun run start                      # http://127.0.0.1:8788
 ```
 
+To try it on invented data without touching your own library, run `./scripts/demo.sh`
+(walkthrough and safety checklist: [`docs/DEMO.md`](docs/DEMO.md)).
+
 The default database path is `data/app.db` under the current working directory.
 Set `CONTENT_HOARDER_DB` to use a different path. The CLI loads `.env` from the
 working directory; existing shell environment values take precedence.

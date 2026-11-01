@@ -1,0 +1,439 @@
+{
+ "kind": "Listing",
+ "data": {
+  "children": [
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo01",
+     "id": "demo01",
+     "title": "How I finally got crispy roast potatoes every time (parboil + shake)",
+     "subreddit": "cooking",
+     "permalink": "/r/cooking/comments/demo01/how_i_finally_got_crispy_roast_potatoes/",
+     "author": "sample_author_1",
+     "created_utc": 1788264000,
+     "score": 40,
+     "num_comments": 5,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Parboil 8 minutes in salted water with a pinch of baking soda, drain, shake hard in the pot to rough the edges, then roast at 220C in hot fat. Turn once at 25 minutes.",
+     "url": "https://www.reddit.com/r/cooking/comments/demo01/how_i_finally_got_crispy_roast_potatoes/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo02",
+     "id": "demo02",
+     "title": "Weekend project: a tiny backup checklist for a home server",
+     "subreddit": "selfhosted",
+     "permalink": "/r/selfhosted/comments/demo02/weekend_project_a_tiny_backup_checklist/",
+     "author": "sample_author_2",
+     "created_utc": 1787659200,
+     "score": 77,
+     "num_comments": 8,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "1. Test a restore, not just a backup.\n2. Keep one copy off-site.\n3. Write down where the keys are.\nThat's it. Most of us skip step 1.",
+     "url": "https://www.reddit.com/r/selfhosted/comments/demo02/weekend_project_a_tiny_backup_checklist/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo03",
+     "id": "demo03",
+     "title": "Why did medieval cities close their gates at night?",
+     "subreddit": "AskHistorians",
+     "permalink": "/r/AskHistorians/comments/demo03/why_did_medieval_cities_close_their_gate/",
+     "author": "sample_author_3",
+     "created_utc": 1787054400,
+     "score": 114,
+     "num_comments": 11,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Long answer, with sources, about tolls, curfews, fire risk and policing in walled towns.",
+     "url": "https://www.reddit.com/r/AskHistorians/comments/demo03/why_did_medieval_cities_close_their_gate/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo04",
+     "id": "demo04",
+     "title": "The one spreadsheet column that changed how I budget",
+     "subreddit": "personalfinance",
+     "permalink": "/r/personalfinance/comments/demo04/the_one_spreadsheet_column_that_changed/",
+     "author": "sample_author_4",
+     "created_utc": 1786449600,
+     "score": 151,
+     "num_comments": 14,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Add a column called 'would I buy this again?' and fill it in a week later.",
+     "url": "https://www.reddit.com/r/personalfinance/comments/demo04/the_one_spreadsheet_column_that_changed/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo05",
+     "id": "demo05",
+     "title": "An illustrated guide to how SQLite stores a table on disk",
+     "subreddit": "programming",
+     "permalink": "/r/programming/comments/demo05/an_illustrated_guide_to_how_sqlite_store/",
+     "author": "sample_author_5",
+     "created_utc": 1785844800,
+     "score": 188,
+     "num_comments": 17,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/sqlite-pages"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo06",
+     "id": "demo06",
+     "title": "Beginner routine that fits in 20 minutes, three days a week",
+     "subreddit": "Fitness",
+     "permalink": "/r/Fitness/comments/demo06/beginner_routine_that_fits_in_20_minutes/",
+     "author": "sample_author_1",
+     "created_utc": 1785240000,
+     "score": 225,
+     "num_comments": 20,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Squat, push-up, row, plank. Three rounds. Add reps before adding weight.",
+     "url": "https://www.reddit.com/r/Fitness/comments/demo06/beginner_routine_that_fits_in_20_minutes/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo07",
+     "id": "demo07",
+     "title": "Cutting board finish: mineral oil vs board butter, a year later",
+     "subreddit": "woodworking",
+     "permalink": "/r/woodworking/comments/demo07/cutting_board_finish_mineral_oil_vs_boar/",
+     "author": "sample_author_2",
+     "created_utc": 1784635200,
+     "score": 262,
+     "num_comments": 23,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/board-finish"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo08",
+     "id": "demo08",
+     "title": "LPT: put the thing you need tomorrow in front of the door tonight",
+     "subreddit": "LifeProTips",
+     "permalink": "/r/LifeProTips/comments/demo08/lpt_put_the_thing_you_need_tomorrow_in_f/",
+     "author": "sample_author_3",
+     "created_utc": 1784030400,
+     "score": 299,
+     "num_comments": 26,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Keys, bag, the parcel to return. If it blocks the door you can't forget it.",
+     "url": "https://www.reddit.com/r/LifeProTips/comments/demo08/lpt_put_the_thing_you_need_tomorrow_in_f/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo09",
+     "id": "demo09",
+     "title": "Paper notes: why small models still need good evaluation sets",
+     "subreddit": "MachineLearning",
+     "permalink": "/r/MachineLearning/comments/demo09/paper_notes_why_small_models_still_need/",
+     "author": "sample_author_4",
+     "created_utc": 1783425600,
+     "score": 336,
+     "num_comments": 29,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/eval-sets"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo10",
+     "id": "demo10",
+     "title": "Tomatoes split after rain? Here is what is happening",
+     "subreddit": "gardening",
+     "permalink": "/r/gardening/comments/demo10/tomatoes_split_after_rain_here_is_what_i/",
+     "author": "sample_author_5",
+     "created_utc": 1782820800,
+     "score": 373,
+     "num_comments": 32,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Uneven watering makes the fruit swell faster than the skin can stretch. Mulch and water deeply, less often.",
+     "url": "https://www.reddit.com/r/gardening/comments/demo10/tomatoes_split_after_rain_here_is_what_i/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo11",
+     "id": "demo11",
+     "title": "YSK: most libraries lend more than books",
+     "subreddit": "YouShouldKnow",
+     "permalink": "/r/YouShouldKnow/comments/demo11/ysk_most_libraries_lend_more_than_books/",
+     "author": "sample_author_1",
+     "created_utc": 1782216000,
+     "score": 410,
+     "num_comments": 35,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Tools, museum passes, seeds, instruments. Ask at the desk.",
+     "url": "https://www.reddit.com/r/YouShouldKnow/comments/demo11/ysk_most_libraries_lend_more_than_books/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo12",
+     "id": "demo12",
+     "title": "A gentle intro to systemd timers instead of cron",
+     "subreddit": "linux",
+     "permalink": "/r/linux/comments/demo12/a_gentle_intro_to_systemd_timers_instead/",
+     "author": "sample_author_2",
+     "created_utc": 1781611200,
+     "score": 447,
+     "num_comments": 38,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/systemd-timers"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo13",
+     "id": "demo13",
+     "title": "Freezer-friendly lentil soup that tastes better on day three",
+     "subreddit": "cooking",
+     "permalink": "/r/cooking/comments/demo13/freezer_friendly_lentil_soup_that_tastes/",
+     "author": "sample_author_3",
+     "created_utc": 1781006400,
+     "score": 484,
+     "num_comments": 41,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Onion, carrot, celery, red lentils, cumin, lemon at the end. Freeze flat in bags.",
+     "url": "https://www.reddit.com/r/cooking/comments/demo13/freezer_friendly_lentil_soup_that_tastes/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo14",
+     "id": "demo14",
+     "title": "The exposure triangle explained with one diagram",
+     "subreddit": "photography",
+     "permalink": "/r/photography/comments/demo14/the_exposure_triangle_explained_with_one/",
+     "author": "sample_author_4",
+     "created_utc": 1780401600,
+     "score": 521,
+     "num_comments": 44,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/exposure"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo15",
+     "id": "demo15",
+     "title": "How did people tell time at sea before reliable clocks?",
+     "subreddit": "AskHistorians",
+     "permalink": "/r/AskHistorians/comments/demo15/how_did_people_tell_time_at_sea_before_r/",
+     "author": "sample_author_5",
+     "created_utc": 1779796800,
+     "score": 558,
+     "num_comments": 47,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Dead reckoning, the log line, noon sights and the long road to marine chronometers.",
+     "url": "https://www.reddit.com/r/AskHistorians/comments/demo15/how_did_people_tell_time_at_sea_before_r/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo16",
+     "id": "demo16",
+     "title": "Which reverse proxy should a beginner pick in 2026?",
+     "subreddit": "selfhosted",
+     "permalink": "/r/selfhosted/comments/demo16/which_reverse_proxy_should_a_beginner_pi/",
+     "author": "sample_author_1",
+     "created_utc": 1779192000,
+     "score": 595,
+     "num_comments": 50,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Thread comparing three popular options for a first home lab.",
+     "url": "https://www.reddit.com/r/selfhosted/comments/demo16/which_reverse_proxy_should_a_beginner_pi/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo17",
+     "id": "demo17",
+     "title": "What to do with a small windfall: a calm order of operations",
+     "subreddit": "personalfinance",
+     "permalink": "/r/personalfinance/comments/demo17/what_to_do_with_a_small_windfall_a_calm/",
+     "author": "sample_author_2",
+     "created_utc": 1778587200,
+     "score": 632,
+     "num_comments": 53,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Emergency fund, high-interest debt, retirement match, then everything else.",
+     "url": "https://www.reddit.com/r/personalfinance/comments/demo17/what_to_do_with_a_small_windfall_a_calm/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo18",
+     "id": "demo18",
+     "title": "Ten small habits that make code reviews kinder",
+     "subreddit": "programming",
+     "permalink": "/r/programming/comments/demo18/ten_small_habits_that_make_code_reviews/",
+     "author": "sample_author_3",
+     "created_utc": 1777982400,
+     "score": 669,
+     "num_comments": 56,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/kind-reviews"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo19",
+     "id": "demo19",
+     "title": "Is walking enough? A summary of what the guidelines say",
+     "subreddit": "Fitness",
+     "permalink": "/r/Fitness/comments/demo19/is_walking_enough_a_summary_of_what_the/",
+     "author": "sample_author_4",
+     "created_utc": 1777377600,
+     "score": 706,
+     "num_comments": 59,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/walking"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo20",
+     "id": "demo20",
+     "title": "First dovetails: what I would tell myself a year ago",
+     "subreddit": "woodworking",
+     "permalink": "/r/woodworking/comments/demo20/first_dovetails_what_i_would_tell_myself/",
+     "author": "sample_author_5",
+     "created_utc": 1776772800,
+     "score": 743,
+     "num_comments": 62,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Mark with a knife, saw on the waste side, and accept that the first ten will be ugly.",
+     "url": "https://www.reddit.com/r/woodworking/comments/demo20/first_dovetails_what_i_would_tell_myself/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo21",
+     "id": "demo21",
+     "title": "LPT: name your files with the date first",
+     "subreddit": "LifeProTips",
+     "permalink": "/r/LifeProTips/comments/demo21/lpt_name_your_files_with_the_date_first/",
+     "author": "sample_author_1",
+     "created_utc": 1776168000,
+     "score": 780,
+     "num_comments": 65,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "2026-11-01-invoice.pdf sorts itself. Future you will thank you.",
+     "url": "https://www.reddit.com/r/LifeProTips/comments/demo21/lpt_name_your_files_with_the_date_first/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo22",
+     "id": "demo22",
+     "title": "How I keep a language streak-free and still practise most days",
+     "subreddit": "languagelearning",
+     "permalink": "/r/languagelearning/comments/demo22/how_i_keep_a_language_streak_free_and_st/",
+     "author": "sample_author_2",
+     "created_utc": 1775563200,
+     "score": 817,
+     "num_comments": 68,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Short sessions, no streak counter, and a list of easy wins for low-energy days.",
+     "url": "https://www.reddit.com/r/languagelearning/comments/demo22/how_i_keep_a_language_streak_free_and_st/"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo23",
+     "id": "demo23",
+     "title": "Overwintering chillies indoors: a short guide",
+     "subreddit": "gardening",
+     "permalink": "/r/gardening/comments/demo23/overwintering_chillies_indoors_a_short_g/",
+     "author": "sample_author_3",
+     "created_utc": 1774958400,
+     "score": 854,
+     "num_comments": 71,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/chillies"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo24",
+     "id": "demo24",
+     "title": "Your first shell script: a five-minute walkthrough",
+     "subreddit": "linux",
+     "permalink": "/r/linux/comments/demo24/your_first_shell_script_a_five_minute_wa/",
+     "author": "sample_author_4",
+     "created_utc": 1774353600,
+     "score": 891,
+     "num_comments": 74,
+     "over_18": false,
+     "is_self": true,
+     "selftext": "Start with set -euo pipefail, one function, and an echo. Then grow it.",
+     "url": "https://www.reddit.com/r/linux/comments/demo24/your_first_shell_script_a_five_minute_wa/"
+    }
+   }
+  ]
+ }
+}

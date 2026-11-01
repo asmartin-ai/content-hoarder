@@ -2093,11 +2093,8 @@ export function getRandomBatch(
     // Top up randomly (small inboxes, missing scores).
     const ph = [...picked.keys()].map(() => "?").join(",");
 
-    const sql =
-      `SELECT * FROM items${where}` +
-      (where ? " AND " : " WHERE ") +
-      (ph ? `fullname NOT IN (${ph}) ` : "") +
-      `ORDER BY RANDOM() LIMIT ?`;
+    const notPicked = ph ? `${where ? " AND" : " WHERE"} fullname NOT IN (${ph})` : "";
+    const sql = `SELECT * FROM items${where}${notPicked} ORDER BY RANDOM() LIMIT ?`;
 
     const extra = rows<RawItem>(db, sql, [...params, ...picked.keys(), count - picked.size]);
 
