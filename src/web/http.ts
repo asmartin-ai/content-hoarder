@@ -113,7 +113,7 @@ export function redditView(item: Item) {
 
 export function requestItem(path: string): { fullname: string; action: string | null } | null {
   const match =
-    /^\/(?:api\/)?(?:reddit\/)?items\/(.+?)(?:\/(status|snooze|promote|undo|suggest|body|recover|category|tags|folder|hydrate|hydrate-gallery))?$/.exec(
+    /^\/(?:api\/)?(?:reddit\/)?items\/(.+?)(?:\/(status|snooze|promote|undo|suggest|body|recover|category|tags|folder|hydrate|hydrate-gallery|thread))?$/.exec(
       path,
     );
 

@@ -52,13 +52,13 @@ content-hoarder exists to process and reduce saved content, not merely aggregate
 | **Done** (swipe left, `D`) | I used it, or I'm finished with it | Top-bar undo, or the Done tab in the Library |
 | **Archive** (swipe right, `A`) | Not for me now. Out of sight, still searchable | Top-bar undo, or the Archived tab |
 | **Keep** (`F`) | Worth keeping. It goes to Keep (and can be exported as a note) | Top-bar undo, or the Keep tab |
-| **Not now** (`N`) | Ask me again in 7 days | Top-bar undo |
+| **Not now** (`N`) | Ask me again in 7 days. Not counted as cleared | Top-bar undo |
 | **Skip** (swipe down, `S`) | No decision. It stays where it was | Nothing to undo |
 | **Let a pile go** (Today) | Archive a whole group at once. Nothing is deleted | The toast's undo, any time |
 
 **Never without explicit approval:** unsave or change anything on Reddit (unsave-on-done is off by default); run network sync (autosync is off by default); permanently delete (`delete` and `purge-done` need both `--apply` and `--yes`, and take a backup); push items to Karakeep or PKMS (`promote` needs configuring first).
 
-**What leaves the device.** The library is one local SQLite file. Cards load thumbnails and media from the sites they came from. Opening a Reddit item in the reader fetches its comment thread from Reddit (then public archives) unless it is already cached. Opt-in commands (recovery, enrichment, hydration, promote) send individual item links or IDs to the services they name. So "local-first" is accurate; "nothing leaves the device" is not.
+**What leaves the device.** The library is one local SQLite file. Cards load thumbnails and media from the sites they came from. Opening a Reddit item in the reader fetches its comment thread from Reddit (then public archives) unless it is already cached; this is on purpose (the owner, 2026-11-01). Opt-in commands (recovery, enrichment, hydration, promote) send individual item links or IDs to the services they name. `CONTENT_HOARDER_OFFLINE=1` turns all of it off for demos and tests. So "local-first" is accurate; "nothing leaves the device" is not.
 
 ## Brand Personality
 

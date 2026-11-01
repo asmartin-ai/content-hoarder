@@ -118,6 +118,10 @@ export function threadEmptyMessage(res, opts) {
     return "Network error loading the thread. Try again." + openLink;
   }
 
+  if (st === "offline") {
+    return "Offline mode: this thread wasn't fetched." + openLink;
+  }
+
   if (st === "unavailable") {
     return "Couldn’t find this thread (it may be deleted)." + openLink;
   }
@@ -1542,7 +1546,11 @@ export function initReader({
     } catch (e) {
       if (e && e.name === "AbortError") return; // superseded by a newer open
 
-      if (fullname === fn) failState({ cached: false, hydrate_status: "network_error" });
+      if (fullname === fn)
+        failState({
+          cached: false,
+          hydrate_status: (e && e.data && e.data.hydrate_status) || "network_error",
+        });
 
       return;
     }
@@ -1558,7 +1566,9 @@ export function initReader({
     // Cache miss: surface hydrate_status from the same GET (lazy hydrate already ran server-side).
     if (res && res.hydrate_status && res.hydrate_status !== "cached") {
       // auth/network/unavailable — don't claim "no comments"
-      if (/auth_|network_error|unavailable|no_permalink|not_found/.test(res.hydrate_status)) {
+      if (
+        /auth_|network_error|offline|unavailable|no_permalink|not_found/.test(res.hydrate_status)
+      ) {
         failState(res);
 
         return;

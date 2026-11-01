@@ -12,7 +12,8 @@ headless Chromium at 412×915). **⚠ unverified** = not exercised. **✋ manual
 ./scripts/demo.sh            # fresh temp library, 24 synthetic saves, http://127.0.0.1:8791/
 ```
 
-It creates a new temp folder, runs from it (so no `.env` and no credentials load), and never
+It creates a new temp folder, runs from it (so no `.env` and no credentials load), sets
+`CONTENT_HOARDER_OFFLINE=1` (the server makes no request to anything but itself), and never
 opens `data/app.db`. The data is `docs/demo/demo-saves.json`: invented posts in a Reddit
 listing format, with links to `example.com` and no images.
 
@@ -23,11 +24,11 @@ listing format, with links to `example.com` and no images.
 | 1 | Run `./scripts/demo.sh` in a terminal | `imported=24 skipped=0 errors=0` | ✅ |
 | 2 | Open Today (`/`) | A day title, five cards fanned under **Clear 10 · about 2 minutes**, 5/10/25 sizes, "0 cleared today" | ✅ |
 | 3 | Pick **5**, tap **Clear 5** | One full-size card. A dot row on top tracks the round | ✅ |
-| 4 | Read the card. Don't tap ↗ during the demo (see the safety checklist) | Title, community, body text | ✅ card · ✋ the reader on demo data shows "Network error loading the thread" |
+| 4 | Read the card; tap ↗ to open it in the reader | Title, community, body text. The reader says "Offline mode: this thread wasn't fetched." | ✅ |
 | 5 | **Done**, **Archive**, **Keep**, **Not now** (keys `D` `A` `F` `N`, or swipes) | The card flies off, the next one is already there | ✅ |
 | 6 | Undo (top-right ↶ or `U`) | The last card comes back; the database reverts (checked: the snoozed item returned to the inbox) | ✅ |
 | 7 | Finish the round | "Cleared" stamp, receipt tiles, count, time, a line like "2 done · 1 archived · 1 kept · 1 for later" | ✅ |
-| 8 | Back to Today | "Last round 1m ago — 5 cleared", ring shows today's wins | ✅ |
+| 8 | Back to Today | "Last round 1m ago — N cleared" (Not now isn't counted), ring shows today's wins | ✅ |
 | 9 | Restart the server, open Library → **Keep** | The kept item is still there after the restart | ✅ |
 | 10 | `bun run src/cli.ts export-obsidian --vault <dir> --status keep` (with `CONTENT_HOARDER_DB` set to the demo DB) | One Markdown note with title, URL, date and tag | ✅ ✋ (CLI) |
 | 11 | Today → **Let a pile go** → undo from the toast | A whole community is archived, then restored | ⚠ not on demo data: no pile is offered for 24 mixed saves (checked: `#piles` hidden) |
@@ -63,7 +64,7 @@ instead of failing".
 - [ ] Started with `scripts/demo.sh`. Never `bun run start` in the repo folder (that opens `data/app.db`).
 - [ ] The terminal shows the temp folder path, not `data/`.
 - [ ] The browser profile is clean: no personal tabs, bookmarks bar, notifications or autofill in frame.
-- [ ] Don't press **Sync newest** in the Library, and don't open a card in the reader (↗, `Enter` or swipe up). Both make live requests: sync to Reddit, the reader to Reddit and then public archives for the thread. In the 2026-11-01 check the reader was opened once on an invented post and showed "Network error loading the thread". Sync was not tested.
+- [ ] Don't press **Sync newest** in the Library. `scripts/demo.sh` sets `CONTENT_HOARDER_OFFLINE=1`, so the server refuses every non-local request (sync, reader threads, archives), but don't show a failing button. If you start the server any other way, set that variable yourself.
 - [ ] Nothing is hosted, tunnelled or port-forwarded. The server binds to `127.0.0.1`.
 - [ ] The recording says the data is synthetic and import is a CLI step.
 - [ ] Afterwards, delete the temp folder the script printed.

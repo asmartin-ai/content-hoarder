@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v144"; // v144: compositor-only round motion, non-blocking decisions
+const CACHE = "ch-shell-v145";
 
 const SHELL = [
   "/",

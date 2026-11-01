@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { request, safeFetchUrl } from "../src/_http.ts";
+import { withOnline } from "./network.ts";
 
 test("local LLM transport opt-in permits only exact HTTP loopback origins", () => {
   expect(safeFetchUrl("http://localhost:1234/v1", { allowLoopback: true })).toEqual([true, "ok"]);
@@ -12,6 +13,17 @@ test("local LLM transport opt-in permits only exact HTTP loopback origins", () =
   expect(safeFetchUrl("http://localhost./", { allowLoopback: true })[0]).toBe(false);
   expect(safeFetchUrl("http://sub.localhost./")[0]).toBe(false);
 });
+
+test("tests run offline: public hosts are refused, opted-in loopback still works", () => {
+  expect(safeFetchUrl("https://www.reddit.com/r/x/comments/abc/.json")).toEqual([false, "offline"]);
+  expect(safeFetchUrl("https://api.pullpush.io/reddit/search")[0]).toBe(false);
+  expect(safeFetchUrl("http://127.0.0.1:1234/v1", { allowLoopback: true })).toEqual([true, "ok"]);
+});
+
+test("online mode lets public hosts through the guard again", () =>
+  withOnline(() => {
+    expect(safeFetchUrl("https://www.reddit.com/r/x/comments/abc/.json")).toEqual([true, "ok"]);
+  }));
 
 test("canonical IPv6 and mapped special ranges remain blocked", () => {
   for (const url of [

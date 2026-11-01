@@ -16,8 +16,8 @@ Offline PWA (service worker + manifest) ships.
 - Media archival, scans, YouTube recovery use native TypeScript/HTTP/ffmpeg integrations; do not add a Python sidecar or yt-dlp dependency.
 - Run: `bun run src/cli.ts <cmd>` (or `bun run start -- <cmd>`). Full command set + flags: see the README CLI table. Web default `127.0.0.1:8788`.
 - Install: `bun install --frozen-lockfile`. Checks: `bun run check` (typecheck, lint, format check, offline Bun tests).
-- Tests use synthetic data, temporary/in-memory SQLite, and loopback fixtures; keep them offline and deterministic. Never contact live sync/unsave/archive/publish services or write to the user's database.
-- Browser/PWA acceptance uses a synthetic database copy and local server. Never point browser smoke tests at the user's database or enable autosync.
+- Tests use synthetic data, temporary/in-memory SQLite, and loopback fixtures; keep them offline and deterministic. Never contact live sync/unsave/archive/publish services or write to the user's database. `bunfig.toml` preloads `tests/preload.ts`, which sets `CONTENT_HOARDER_OFFLINE=1`; a test that needs the URL guard to pass a public host wraps that part in `withOnline` from `tests/network.ts` and injects its transport.
+- Browser/PWA acceptance uses a synthetic database and local server: start it with `scripts/demo.sh`, which sets `CONTENT_HOARDER_OFFLINE=1`. With that set, `safeFetchUrl` refuses every non-loopback host and Reddit hydration returns `offline` before any request. Never point browser smoke tests at the user's database, run them without offline mode, or enable autosync.
 
 ## Layout
 ```

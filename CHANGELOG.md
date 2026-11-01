@@ -53,6 +53,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   with 24 invented saves (`docs/demo/demo-saves.json`). It runs from that folder, so it loads no
   `.env` and never opens `data/app.db`. The doc has the walkthrough, verified vs unverified steps
   and a safety checklist.
+- **Offline mode.** `CONTENT_HOARDER_OFFLINE=1` makes `safeFetchUrl` refuse every non-loopback
+  host, and Reddit hydration returns `offline` (the reader says so) without stamping a failure.
+  `scripts/demo.sh` and the test preload (`bunfig.toml` → `tests/preload.ts`) set it, so demos,
+  smoke runs and tests can't reach Reddit or archives by accident. SW cache `ch-shell-v145`.
 - **Sweeps** — `GET /sweeps`, `POST /sweeps/apply`, `POST /sweeps/undo`: one-tap reversible rest
   of an entertainment subreddit pile or a source's saves older than four years, via `decay()` waves
   labelled `sweep`. Knowledge subreddits and resurface tags are excluded; never enqueues Reddit
@@ -81,6 +85,10 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   the server was running; now both say "Nothing waiting here".
 - `import` on a path that doesn't exist now says `Nothing found at "<path>"`, instead of asking
   for `--source`.
+- The reader's Reddit comment threads load again. Since the web split (2026-10-21), the generic
+  item route swallowed `/reddit/items/<id>/thread`, so every thread answered 404 and the reader
+  said "Network error". Regression test in `tests/web.test.ts`.
+- "Not now" no longer counts as cleared in the round, so the round and Today agree.
 
 ### Performance
 

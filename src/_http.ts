@@ -7,6 +7,7 @@
  */
 
 import { BlockList, isIP } from "node:net";
+import { offline } from "./config.ts";
 
 const _RETRY_JITTER_CAP = 60.0; // seconds; full-jitter backoff never waits longer than this
 
@@ -95,6 +96,8 @@ export function safeFetchUrl(
       (host === "::1" && rawHost === "[::1]"))
   )
     return [true, "ok"];
+
+  if (offline()) return [false, "offline"];
   const hostWithoutDot = host.endsWith(".") ? host.slice(0, -1) : host;
 
   if (

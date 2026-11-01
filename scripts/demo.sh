@@ -11,6 +11,7 @@ dir="$(mktemp -d -t content-hoarder-demo.XXXXXX)"
 
 cd "$dir"
 export CONTENT_HOARDER_DB="$dir/app.db"
+export CONTENT_HOARDER_OFFLINE=1
 
 bun run "$repo/src/cli.ts" init-db
 bun run "$repo/src/cli.ts" import "$repo/docs/demo/demo-saves.json"

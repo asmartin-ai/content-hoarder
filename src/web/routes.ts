@@ -345,7 +345,7 @@ export async function handle(request: Request): Promise<Response> {
 
       const result = redditThread.getThread(database, fullname, sort);
 
-      if (!result) return json({ error: "not found" }, 404);
+      if (!result) return json({ error: "not found", hydrate_status: hydrated?.status }, 404);
 
       return hydrated ? json({ ...result, hydrate_status: hydrated.status }) : json(result);
     }

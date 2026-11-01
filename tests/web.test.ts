@@ -39,6 +39,47 @@ test("public item API returns parsed metadata from a synthetic database", async 
   }
 });
 
+test("the reader's thread path serves a cached Reddit thread", async () => {
+  const root = mkdtempSync(join(tmpdir(), "content-hoarder-thread-"));
+  const databasePath = join(root, "app.db");
+  const connection = db.connect(databasePath);
+
+  const item = newItem({
+    source: "reddit",
+    source_id: "t3_cached",
+    title: "Cached thread",
+    metadata: { subreddit: "test", permalink: "/r/test/comments/cached/x/" },
+  });
+
+  db.mergeUpsert(connection, item);
+  db.setRedditThread(
+    connection,
+    item.fullname,
+    JSON.stringify([
+      { kind: "Listing", data: { children: [{ kind: "t3", data: { title: "Cached thread" } }] } },
+      {
+        kind: "Listing",
+        data: { children: [{ kind: "t1", data: { id: "c1", author: "a", body: "first reply" } }] },
+      },
+    ]),
+  );
+  connection.close();
+
+  const server = await serveApp({ dbPath: databasePath, host: "127.0.0.1", port: 0 });
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${server.port}/reddit/items/${encodeURIComponent(item.fullname)}/thread?sort=best`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(await response.json())).toContain("first reply");
+  } finally {
+    await server.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("app HTML refuses to be framed by another site", async () => {
   const root = mkdtempSync(join(tmpdir(), "content-hoarder-frame-"));
   const databasePath = join(root, "app.db");

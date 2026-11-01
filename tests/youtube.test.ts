@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { withOnline } from "./network.ts";
 import {
   guardedPreconnect,
   mapYouTubePlaylist,
@@ -103,6 +104,8 @@ test("the YouTube preconnect guard refuses reserved targets and forwards safe on
 
   expect(calls).toEqual([]);
 
-  guardedPreconnect("https://www.youtube.com/", { dns: true, tcp: true }, spy);
-  expect(calls).toEqual([["https://www.youtube.com/", { dns: true, tcp: true }]]);
+  return withOnline(() => {
+    guardedPreconnect("https://www.youtube.com/", { dns: true, tcp: true }, spy);
+    expect(calls).toEqual([["https://www.youtube.com/", { dns: true, tcp: true }]]);
+  });
 });

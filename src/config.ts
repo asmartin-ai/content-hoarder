@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 
 const _DEFAULTS = {
+  CONTENT_HOARDER_OFFLINE: "",
   CONTENT_HOARDER_DB: "data/app.db",
   CONTENT_HOARDER_NSFW_RULES: "nsfw_rules.json",
   CONTENT_HOARDER_HOST: "127.0.0.1",
@@ -89,6 +90,10 @@ export function get(key: string): string {
 
 export function dbPath(): string {
   return get("CONTENT_HOARDER_DB");
+}
+
+export function offline(): boolean {
+  return get("CONTENT_HOARDER_OFFLINE") === "1";
 }
 
 export function host(): string {

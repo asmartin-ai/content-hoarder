@@ -656,7 +656,7 @@ export function mountRound(root) {
     const count = { done: 0, archived: 0, keep: 0, snooze: 0, skip: 0 };
 
     for (const r of round.results) if (r.act in count) count[r.act] += 1;
-    const n = count.done + count.archived + count.keep + count.snooze;
+    const n = count.done + count.archived + count.keep;
 
     const parts = [
       count.done ? count.done + " done" : "",

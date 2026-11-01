@@ -632,6 +632,8 @@ export async function hydrateIfMissing(
   } = {},
 ): Promise<HydrateResult> {
   if (db.getRedditThread(database, fullname)?.thread_json) return { status: "cached", fullname };
+
+  if (config.offline()) return { status: "offline", fullname };
   const item = db.getItem(database, fullname);
   const metadata = parseMetadata(item?.metadata);
   const postFullname = submissionFullname(metadata.permalink);
