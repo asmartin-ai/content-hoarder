@@ -1,11 +1,3 @@
-/**
- * Search-bar operator parsing.
- *
- * Mirrors the Python parser token-for-token: unknown operators and
- * malformed known operators degrade to free-text tokens (they are not
- * dropped and do not error).
- */
-
 import { NSFW_TAGS } from "./models.ts";
 
 export interface ParsedQuery {
@@ -18,45 +10,34 @@ export interface ParsedQuery {
   author: string | string[] | null;
 
   tags: string[];
-  // When true: tags are AND-ed (one required-membership check per tag).
-  // When false: tags are OR-ed (any tag matches).
   tagsAll: boolean;
 
-  isSaved: number | null; // 1/0 (SQLite-friendly)
+  isSaved: number | null;
   nsfw: boolean;
-  decayed: boolean; // is:decayed — carries a decay-wave stamp (db.decay)
-  swept: boolean; // is:swept — decayed in the labeled initial backfill pass
-  snoozed: boolean; // is:snoozed — currently hidden by metadata.snoozed_until
-  openInFirefox: boolean; // is:firefox-tab — metadata.open_in_firefox (incl. promoted YT tabs)
-  deleted: boolean; // is:deleted — metadata.media_status='gone' (durable SSOT; the `deleted` tag is fragile)
-  has: string | string[] | null; // has:video|image|gallery — metadata.media_type facet
-  ocr: boolean; // is:ocr — items carrying non-empty metadata.ocr_text
+  decayed: boolean;
+  swept: boolean;
+  snoozed: boolean;
+  openInFirefox: boolean;
+  deleted: boolean;
+  has: string | string[] | null;
+  ocr: boolean;
 
-  before: number | null; // unix seconds (UTC)
+  before: number | null;
   after: number | null;
 
   scoreMin: number | null;
   scoreMax: number | null;
 
-  exclude: string[]; // -term tokens
-  exact: string[]; // "quoted phrases"
+  exclude: string[];
+  exact: string[];
 }
 
 const _OP_RE = /^(?<neg>-?)(?<key>\w+):(?<val>.+)$/;
 
 const _R_SUB_RE = /^r\/(\w+)$/;
 
-// Reddit usernames are [A-Za-z0-9_-]; anchored so a bare `u/<name>`
-// token is the author-operator shorthand but a reddit profile URL
-// token is NOT captured.
 const _U_USER_RE = /^u\/([\w-]+)$/;
 
-/**
- * Split on whitespace, respecting double-quoted phrases.
- *
- * Returns `[token, quoted]` where `quoted=true` means the token came
- * from inside a balanced pair of double quotes.
- */
 function tokenize(q: string): Array<[string, boolean]> {
   const s = q || "";
   const out: Array<[string, boolean]> = [];
@@ -78,7 +59,6 @@ function tokenize(q: string): Array<[string, boolean]> {
         i = j + 1;
         continue;
       }
-      // Unbalanced quote -> degrade to a normal token (keep the quote).
     }
 
     let j = i;
@@ -113,7 +93,6 @@ function dedupePreserveOrder(xs: string[]): string[] {
   return out;
 }
 
-/** Inclusive `(min, max)` bounds for `score:`, or `null` on parse failure. */
 function parseScore(value: string): [number | null, number | null] | null {
   const s = (value || "").trim();
 
@@ -142,17 +121,9 @@ function parseScore(value: string): [number | null, number | null] | null {
 
   if (op === "<=") return [null, n];
 
-  // '=' or no explicit op
   return [n, n];
 }
 
-/**
- * Parse a query string into structured operators + leftover free text.
- *
- * Unknown operators (unknown `key:value`) and malformed known
- * operators degrade to free-text tokens (they are not dropped and do
- * not error).
- */
 export function parse(q: string): ParsedQuery {
   const textTerms: string[] = [];
   const exclude: string[] = [];
@@ -163,7 +134,7 @@ export function parse(q: string): ParsedQuery {
   const statusGroups: string[][] = [];
   const subredditGroups: string[][] = [];
   const authorGroups: string[][] = [];
-  const tagsGroups: string[][] = []; // each token's group; later collapsed
+  const tagsGroups: string[][] = [];
   let isSaved: number | null = null;
   let nsfw = false;
   let decayed = false;
@@ -217,7 +188,6 @@ export function parse(q: string): ParsedQuery {
     }
 
     if (m.groups?.neg === "-") {
-      // Operator negation isn't in-scope yet; degrade to free text.
       textTerms.push(t);
       continue;
     }
@@ -243,10 +213,6 @@ export function parse(q: string): ParsedQuery {
         continue;
       }
 
-      // source/kind/status are stored canonical-lowercase, so normalize the
-      // typed value (e.g. `source:YouTube` -> `youtube`) or it would
-      // silently match nothing. subreddit/author are left as-typed
-      // (searchItems matches them COLLATE NOCASE).
       if (key === "source") {
         sourceGroups.push(parts.map((p) => p.toLowerCase()));
       } else if (key === "kind") {
@@ -332,9 +298,6 @@ export function parse(q: string): ParsedQuery {
     }
 
     if (key === "has") {
-      // Media facet over metadata.media_type (populated by the reddit
-      // connector + archive refinement). Unknown values degrade to free
-      // text like any operator.
       const parts = val
         .split(/[,|]/)
         .values()
@@ -381,12 +344,9 @@ export function parse(q: string): ParsedQuery {
       continue;
     }
 
-    // Unknown operator -> free text
     textTerms.push(t);
   }
 
-  // Collapse per-key groups for source/kind/status/subreddit/has.
-  // Empty → None, single value → str, multiple → deduped list.
   const collapse = (groups: string[][]): string | string[] | null => {
     if (!groups.length) return null;
     const flat = dedupePreserveOrder(groups.flat());
@@ -405,15 +365,6 @@ export function parse(q: string): ParsedQuery {
   const author = collapse(authorGroups);
   const has = collapse(hasGroups);
 
-  // Collapse tag groups into the simple API shape.
-  //
-  // Supported forms (per docs/search-operators-spec.md):
-  // - repeated tag:foo tag:bar => AND (tagsAll=true)
-  // - tag:foo,bar or tag:foo|bar => OR within that token
-  //
-  // Mixed AND+OR grouping (e.g. tag:a,b tag:c) is intentionally not
-  // represented by this v1 shape; we degrade to a global OR when any
-  // OR-group is present.
   let tagsAll = false;
   let tags: string[] = [];
 
@@ -468,7 +419,6 @@ export function parse(q: string): ParsedQuery {
   };
 }
 
-/** Expose the NSFW tag vocabulary for callers/tests. */
 export function nsfwTags(): readonly string[] {
   return NSFW_TAGS;
 }

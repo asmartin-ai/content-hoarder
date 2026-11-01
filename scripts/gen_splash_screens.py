@@ -43,20 +43,18 @@ REPO = Path(__file__).resolve().parents[1]
 STATIC = REPO / "src" / "static"
 MANIFEST = STATIC / "manifest.webmanifest"
 
-# (filename, width, height) — physical pixels. Sort by descending area so
-# the largest (iPhone Pro Max) comes first in the SHELL.
 SIZES: list[tuple[str, int, int]] = [
-    ("apple-touch-startup-image-1290x2796.png", 1290, 2796),  # iPhone 16/15/14 Pro Max, 16/15 Plus
-    ("apple-touch-startup-image-1179x2556.png", 1179, 2556),  # iPhone 16/15/14 Pro
-    ("apple-touch-startup-image-1170x2532.png", 1170, 2532),  # iPhone 14/13/13 Pro/12/12 Pro
-    ("apple-touch-startup-image-1080x2340.png", 1080, 2340),  # iPhone 13/12 mini
-    ("apple-touch-startup-image-750x1334.png",    750, 1334),  # iPhone SE3 / 8 / 7 / 6s
-    ("apple-touch-startup-image-640x1136.png",    640, 1136),  # iPhone 5 / SE1 / iPod touch 5+
-    ("apple-touch-startup-image-2048x2732.png", 2048, 2732),  # iPad Pro 12.9 (3rd-6th)
-    ("apple-touch-startup-image-1668x2388.png", 1668, 2388),  # iPad Pro 11 (1st-4th)
-    ("apple-touch-startup-image-1668x2224.png", 1668, 2224),  # iPad Pro 10.5
-    ("apple-touch-startup-image-1536x2048.png", 1536, 2048),  # iPad Air 10.9/10.5/9.7
-    ("apple-touch-startup-image-1488x2266.png", 1488, 2266),  # iPad mini 5/6
+    ("apple-touch-startup-image-1290x2796.png", 1290, 2796),
+    ("apple-touch-startup-image-1179x2556.png", 1179, 2556),
+    ("apple-touch-startup-image-1170x2532.png", 1170, 2532),
+    ("apple-touch-startup-image-1080x2340.png", 1080, 2340),
+    ("apple-touch-startup-image-750x1334.png",    750, 1334),
+    ("apple-touch-startup-image-640x1136.png",    640, 1136),
+    ("apple-touch-startup-image-2048x2732.png", 2048, 2732),
+    ("apple-touch-startup-image-1668x2388.png", 1668, 2388),
+    ("apple-touch-startup-image-1668x2224.png", 1668, 2224),
+    ("apple-touch-startup-image-1536x2048.png", 1536, 2048),
+    ("apple-touch-startup-image-1488x2266.png", 1488, 2266),
 ]
 def _bg_color() -> tuple[int, int, int]:
     """Read `background_color` from manifest.webmanifest and parse as RGB.
@@ -73,7 +71,6 @@ def _bg_color() -> tuple[int, int, int]:
         raise ValueError(f"background_color must be 6-digit hex, got {raw_obj!r}")
     return (int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16))
 
-
 def main() -> int:
     bg = _bg_color()
     print(f"background_color from manifest: #{bg[0]:02x}{bg[1]:02x}{bg[2]:02x}")
@@ -87,7 +84,6 @@ def main() -> int:
         print(f"  {name}: {w}x{h} -> {size:,} bytes")
     print(f"\nTotal: {len(SIZES)} images, {total_bytes:,} bytes ({total_bytes / 1024:.1f} KB)")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

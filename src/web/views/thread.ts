@@ -1,8 +1,3 @@
-/**
- * The cached top comment for a Reddit card. Reads only the `reddit_threads`
- * cache (never the network); any miss or odd shape yields null.
- */
-
 import type { Database } from "bun:sqlite";
 import * as z from "zod";
 import * as db from "../../db.ts";
@@ -14,7 +9,6 @@ export type TopComment = { author: string; score: number; body: string };
 
 const BODY_LIMIT = 600;
 
-// A Reddit thread listing: [postListing, commentsListing].
 const ListingSchema = z.object({
   data: z.object({
     children: z.array(z.object({ kind: z.string().optional().catch(undefined), data: z.json() })),
@@ -33,8 +27,6 @@ const CommentSchema = z.object({
 });
 
 function cachedThread(database: Database, item: Item): string | null {
-  // A saved comment's own key may hold only its permalink subtree; the
-  // submission (`t3_`) key holds the whole post thread (AGENTS.md gotcha #9).
   const keys =
     item.kind === "comment"
       ? [submissionFullname(item.metadata.permalink), item.fullname]
@@ -54,7 +46,6 @@ function decodeEntities(text: string): string {
   return text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
-/** Highest-score visible top-level comment from the cached thread, or null. */
 export function topComment(database: Database, item: Item): TopComment | null {
   if (item.source !== "reddit") return null;
   let threadJson: string | null;

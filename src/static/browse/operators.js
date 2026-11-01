@@ -1,13 +1,3 @@
-/* operators.js — Gmail/Discord-style search-operator discovery (Epic 12).
-
-   Makes the (previously invisible) search operators discoverable: as you type it
-   suggests operator KEYS, and after "key:" it suggests VALUES (e.g. after `source:`
-   it lists the sources). Applied operators render as removable chips. Keyboard-
-   navigable (↑/↓ + Enter/Tab to complete, Esc to dismiss); mouse too. The fuzzy hint
-   + Exact checkbox in the popover are left untouched.
-
-   The operator vocabulary mirrors search_query.py — keep them in sync. */
-
 import { esc } from "../core/util.js";
 
 const KEYS = [
@@ -34,7 +24,6 @@ const KEYS = [
 
 const KEYSET = new Set(KEYS.map((k) => k.key));
 
-/* the token under the cursor, plus the text up to the caret (what we complete on) */
 function activeToken(input) {
   const v = input.value;
   const c = input.selectionStart ?? v.length;
@@ -48,7 +37,6 @@ function activeToken(input) {
   return { start: s, end: e, typed: v.slice(s, c) };
 }
 
-/* context-aware suggestion list for the active token */
 function suggestFor(typed, getDyn) {
   const ci = typed.indexOf(":");
 
@@ -73,7 +61,6 @@ function suggestFor(typed, getDyn) {
     .map((k) => ({ complete: k.key, label: k.key, hint: k.hint }));
 }
 
-/* applied operators in the whole query → chips (value-keys + is:/has: + -excl + "exact") */
 function appliedOps(value) {
   const out = [];
   const re = /"[^"]*"|\S+/g;
@@ -172,7 +159,7 @@ export function initOperators(input, pop, opts = {}) {
     const tok = activeToken(input);
     const v = input.value;
     const ins = rows[i].complete;
-    const trailing = ins.endsWith(":") ? "" : " "; // keys keep the caret to type a value
+    const trailing = ins.endsWith(":") ? "" : " ";
     const before = v.slice(0, tok.start);
     const after = v.slice(tok.end);
     const head = before + ins + trailing;
@@ -181,11 +168,10 @@ export function initOperators(input, pop, opts = {}) {
     input.setSelectionRange(caret, caret);
     input.focus();
     onApply();
-    render(); // after a key, immediately surface its values
+    render();
   }
 
   function removeOp(raw) {
-    // remove the exact operator token (first occurrence) from the query
     const toks = input.value.match(/"[^"]*"|\S+/g) || [];
     const idx = toks.indexOf(raw);
 
@@ -196,16 +182,8 @@ export function initOperators(input, pop, opts = {}) {
     render();
   }
 
-  // Close the popover only when focus truly leaves the search UI. The Exact-only
-  // checkbox (and fuzzy hint) live INSIDE #oppop, so clicking them blurs the input —
-  // guard on relatedTarget so toggling Exact keeps the suggestions open. focusout on
-  // the popover handles the reverse (focus leaving the checkbox to somewhere outside).
   const stillInside = (el) => el && (pop.contains(el) || el === input);
 
-  // Re-check focus when the timer fires: clicking the in-popover Exact checkbox via its
-  // <label> blurs the input BEFORE focus lands on the checkbox, so relatedTarget is null
-  // at blur time; by the time this runs, document.activeElement is the checkbox (inside
-  // the popover), so the suggestions stay open.
   const scheduleClose = () =>
     setTimeout(() => {
       if (stillInside(document.activeElement)) return;
@@ -256,7 +234,6 @@ export function initOperators(input, pop, opts = {}) {
     }
   });
 
-  // pointerdown + preventDefault keeps focus on the input (mirrors palette.js)
   opsEl.addEventListener("pointerdown", (e) => {
     const x = e.target.closest(".opx");
 

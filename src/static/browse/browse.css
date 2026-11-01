@@ -1,12 +1,3 @@
-/* ============================================================
-   browse.css — the v3 browse page ("Log Book II · ADHD round")
-   Spec: design-ref/v3-explorations/05-log-book-2.html (anatomy,
-   densities, phone) + 06-adhd-round.html (the 12 locked additions).
-   Consumes core/tokens.css SEMANTIC ALIASES wherever one exists;
-   raw tokens only where no alias is defined (accent/status tints).
-   app.css stays triage-only — nothing here leaks to other pages.
-   ============================================================ */
-
 * {
   box-sizing: border-box;
 }
@@ -33,7 +24,6 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-/* ===================== console ===================== */
 .console {
   position: sticky;
   top: 0;
@@ -110,7 +100,6 @@ a:focus-visible {
   margin-left: auto;
 }
 
-/* operator-discovery popover (locked #6) */
 .oppop {
   position: absolute;
   top: calc(100% + 8px);
@@ -139,7 +128,6 @@ a:focus-visible {
 .oppop .ops:empty {
   margin-bottom: 0;
 }
-/* applied-operator chips (removable) */
 .opapplied {
   display: flex;
   gap: 6px;
@@ -170,7 +158,6 @@ a:focus-visible {
   color: var(--accent-strong);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
-/* live suggestion rows (key + hint), keyboard-navigable like the palette */
 .opsug {
   display: flex;
   align-items: center;
@@ -252,7 +239,6 @@ a:focus-visible {
   height: 20px;
 }
 
-/* ===================== folder tabs / status pills ===================== */
 .folders {
   max-width: 1200px;
   margin: var(--sp-4) auto 0;
@@ -291,7 +277,7 @@ a:focus-visible {
 }
 .folder .n.new {
   color: var(--accent);
-} /* "· N new" — never a backlog total (locked #2) */
+}
 .folder[aria-selected="true"] {
   background: var(--surface-card);
   color: var(--text-body);
@@ -311,8 +297,6 @@ a:focus-visible {
   background: var(--surface-card);
 }
 
-/* Drag-and-drop: status folders light up while an item is being dragged.
-   A ring + accent text reads as "drop target" without a full fill swap. */
 .folder.drop-armed {
   box-shadow: 0 0 0 2px var(--focus-ring);
   color: var(--text-body);
@@ -357,9 +341,6 @@ a:focus-visible {
   opacity: 0.75;
 }
 
-/* per-status color accents so the active section reads at a glance — reuse the
-   triage status tokens; Inbox = brand accent, All = solid neutral (distinct when
-   active without adding a clashing 5th hue to the catch-all view) */
 .folder[data-status="inbox"],
 .spill[data-status="inbox"] {
   --tab: var(--accent);
@@ -380,15 +361,12 @@ a:focus-visible {
 .spill[data-status=""] {
   --tab: var(--text-body);
 }
-/* desktop tabs: a top accent bar + status-tinted count when active (inset shadow
-   so the tab doesn't shift) */
 .folder[aria-selected="true"] {
   box-shadow: inset 0 2px 0 var(--tab);
 }
 .folder[aria-selected="true"] .n {
   color: var(--tab);
 }
-/* mobile pills: status-tinted fill when active */
 .spill[data-status="keep"][aria-selected="true"] {
   background: var(--status-keep);
   border-color: var(--status-keep);
@@ -414,16 +392,13 @@ a:focus-visible {
   opacity: 0.75;
 }
 
-/* the Jump drawer's trigger lives top-left in the header on mobile (desktop uses the rail) */
 .nav-burger {
   display: none;
 }
-/* mobile-only search entry: re-opens the collapsed command bar (see the tab bar block below) */
 #open-search {
   display: none;
 }
 
-/* ===================== desk: rail + sheet ===================== */
 .desk {
   max-width: 1200px;
   margin: 0 auto var(--sp-5);
@@ -499,7 +474,6 @@ a:focus-visible {
   font-size: var(--fs-xs);
 }
 
-/* ---- parent/child tag grouping in the rail (Epic 26 P2) ---- */
 .rail-group {
   display: flex;
   flex-direction: column;
@@ -513,7 +487,6 @@ a:focus-visible {
 .rail-ghead .dot {
   background: var(--text-dim);
 }
-/* partial selection: some children on but not all — accent the dot, don't fill the row */
 .rail-ghead[data-sel="some"] {
   color: var(--text-body);
 }
@@ -527,7 +500,6 @@ a:focus-visible {
   padding: var(--sp-2) 12px var(--sp-1);
   cursor: default;
 }
-/* indented child tags under their parent — the indent (not a dot) conveys the hierarchy */
 .rail-group .rnav[data-tag] {
   padding-left: 30px;
   height: 34px;
@@ -568,7 +540,7 @@ a:focus-visible {
 .shelf .norush {
   font-style: italic;
   color: var(--accent-strong);
-} /* locked #3 */
+}
 .minibtn,
 .shelf select {
   font: var(--fw-medium) var(--fs-xs)/1 var(--font-mono);
@@ -590,7 +562,6 @@ a:focus-visible {
   -webkit-appearance: none;
 }
 
-/* active-filter chips (locked #7) */
 .fchips {
   display: flex;
   gap: 6px;
@@ -625,7 +596,6 @@ a:focus-visible {
   padding: 4px;
 }
 
-/* ===================== ambient slot (locked #4/#5) ===================== */
 .ambient {
   margin: var(--sp-3) var(--sp-4) 0;
   background: color-mix(in srgb, var(--accent) 6%, var(--surface-inset));
@@ -721,11 +691,7 @@ a:focus-visible {
   border-color: var(--status-archive);
 }
 
-/* ===================== surprise-me card (E3) — a pin-card-shaped deal =====================
-   Lives in the ambient slot; visually belongs in the feed (same weight as a
-   .pin). Hero image + title/meta + a Keep/Archive/Done/Snooze + Open row. */
 .ambient:has(.surp-card) {
-  /* the surprise card is its own shape — drop the ambient inset/rail treatment */
   background: none;
   border: none;
   border-left: none;
@@ -758,7 +724,6 @@ a:focus-visible {
     0 1px 0 rgba(0, 0, 0, 0.28),
     0 10px 28px rgba(0, 0, 0, 0.18);
 }
-/* dismiss ✕ in the corner */
 .surp-x {
   position: absolute;
   top: 10px;
@@ -784,7 +749,6 @@ a:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-/* hero image — fills width, capped, cover */
 .surp-hero {
   display: block;
   width: 100%;
@@ -884,7 +848,6 @@ a:focus-visible {
 .surp-metabits :is(a, b) {
   color: var(--text-body);
 }
-/* action row — mirrors inbox affordances */
 .surp-acts {
   display: flex;
   gap: var(--sp-2);
@@ -937,7 +900,7 @@ a:focus-visible {
 .surp-act.k {
   color: var(--keep);
   border-color: var(--keep);
-} /* no fill — Keep deliberate */
+}
 .surp-act.a {
   color: var(--archive);
   border-color: var(--archive);
@@ -965,7 +928,6 @@ a:focus-visible {
 .surp-act.surp-open:hover {
   background: var(--accent-strong);
 }
-/* leave animation — matches the inbox row .leaving language */
 .surp-card.leaving {
   opacity: 0;
 }
@@ -991,7 +953,6 @@ a:focus-visible {
   }
 }
 
-/* ===================== groups + rows ===================== */
 .grouphead {
   display: flex;
   align-items: center;
@@ -1014,7 +975,7 @@ a:focus-visible {
 .items.loading {
   opacity: 0.45;
   transition: opacity 0.12s var(--ease);
-} /* refetch: dim in place, no skeleton flash */
+}
 .row {
   position: relative;
   border-bottom: 1px solid var(--border-hairline);
@@ -1054,7 +1015,6 @@ a:focus-visible {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* live clear: the row leaves in its status color (locked #11) */
 .row.leaving {
   transition: opacity var(--dur-slow) var(--ease);
   opacity: 0;
@@ -1085,7 +1045,6 @@ a:focus-visible {
   background: var(--accent-tint);
 }
 
-/* swipe underlay (touch): archive | keep (stage 2) | done */
 .item-bg {
   position: absolute;
   inset: 0;
@@ -1163,7 +1122,7 @@ a:focus-visible {
 }
 .avatar:hover {
   box-shadow: inset 0 0 0 20px rgba(0, 0, 0, 0.28);
-} /* shade, not checkbox-swap */
+}
 .avatar:active {
   transform: scale(0.88);
 }
@@ -1225,9 +1184,6 @@ a:focus-visible {
 .meta a:hover {
   color: var(--accent-strong);
 }
-/* HN "Article ↗" outbound chip — a pill distinct from the title (which opens the
-   discussion). Selector outweighs `.meta a` so the pill chrome + HN-orange hover
-   win. (app.css carries the equivalent for the legacy triage page.) */
 .meta .art-chip {
   display: inline-flex;
   align-items: center;
@@ -1254,7 +1210,6 @@ a:focus-visible {
   margin-right: 6px;
   vertical-align: 1px;
 }
-/* URL domain label (Relay-style: i.redd.it, youtube.com, etc.) */
 .url-domain {
   display: block;
   font: var(--fw-regular) 0.65rem/1 var(--font-mono);
@@ -1267,7 +1222,6 @@ a:focus-visible {
   letter-spacing: -0.01em;
 }
 
-/* consume-cost pill (locked #8) — core consumeMeta emits .consume.read|watch|listen */
 .consume {
   display: inline-flex;
   gap: 4px;
@@ -1311,7 +1265,6 @@ a:focus-visible {
   background: var(--surface-2, rgba(255, 255, 255, 0.06));
 }
 
-/* action icons — always visible on pointer devices; chIcon glyphs via currentColor */
 .acts {
   display: flex;
   gap: 5px;
@@ -1400,9 +1353,8 @@ a:focus-visible {
   .items .row .acts {
     display: none;
   }
-} /* touch: avatar selection owns tap actions; swipe + long-press stay accelerators */
+}
 
-/* ===================== LOG (comfortable, compact 64px floor) ===================== */
 .items.density-comfortable .item-fg {
   grid-template-columns: 30px minmax(0, 1fr) auto;
   min-height: 64px;
@@ -1448,8 +1400,6 @@ a:focus-visible {
   object-fit: contain;
   display: block;
 }
-/* comfortable/log density: fill the fixed monitor box edge-to-edge instead of
-   letterboxing narrow thumbs — the row height is fixed, so cover (crop) reads better */
 .items.density-comfortable .monitor img {
   object-fit: cover;
 }
@@ -1457,7 +1407,6 @@ a:focus-visible {
   width: 96px;
   height: 56px;
 }
-/* the empty slot keeps its width (actions never move) but must not set row height */
 .items.density-comfortable .monitor.empty {
   height: 0;
 }
@@ -1480,7 +1429,6 @@ a:focus-visible {
   border-radius: 5px;
   padding: 2px 4px;
 }
-/* reddit-style NSFW blur, constrained to the thumb box */
 .monitor.nsfw img,
 .pin .screen.nsfw img {
   filter: blur(16px) saturate(0.6);
@@ -1499,19 +1447,15 @@ a:focus-visible {
   background: rgba(12, 8, 14, 0.4);
   z-index: 2;
 }
-/* tap-reveal removes .nsfw (img unblurs); hide the veil then, and re-blur by re-adding
-   .nsfw when the reader/lightbox opened for the item closes (Epic 13 P2) */
 .monitor:not(.nsfw) .veil,
 .pin .screen:not(.nsfw) .veil {
   display: none;
 }
-/* media-less rows reserve the slot invisibly — actions never move (v2 invariant) */
 .monitor.empty {
   background: transparent;
   border-color: transparent;
   cursor: default;
 }
-/* video/gallery with no stored thumbnail — a centered play glyph IS the tap target */
 .monitor.noimg {
   display: flex;
   align-items: center;
@@ -1525,7 +1469,6 @@ a:focus-visible {
   opacity: 0.85;
 }
 
-/* ===================== PINBOARD ===================== */
 .items.density-card {
   columns: 2;
   column-gap: var(--sp-4);
@@ -1551,12 +1494,6 @@ a:focus-visible {
   transition: opacity var(--dur-slow) var(--ease);
   opacity: 0;
 }
-/* Cap the height on the CONTAINER (not the img) + clip: with max-height on the <img>
-   itself a portrait image shrinks its WIDTH too (to keep aspect), leaving pillarbox
-   gutters in the column. Capping .screen and overflow:hidden keeps the image at full
-   column width and crops the overflow at the top. Trade-off (user decision 2026-06-20):
-   very tall images are cropped rather than shrunk-to-fit. Landscape/short images stay
-   under the cap and show fully. */
 .pin .screen {
   position: relative;
   background: var(--tile-fill);
@@ -1572,7 +1509,6 @@ a:focus-visible {
   position: relative;
   z-index: 1;
 }
-/* poster-less video/gallery: centered play glyph instead of a collapsed (zero-height) tile */
 .pin .screen.noimg {
   display: flex;
   align-items: center;
@@ -1650,7 +1586,6 @@ a:focus-visible {
   margin-left: auto;
 }
 
-/* tag chips (core tagChips markup) */
 .tag-chips {
   display: inline-flex;
   gap: 5px;
@@ -1670,8 +1605,6 @@ a:focus-visible {
   color: var(--accent);
   border-style: dashed;
 }
-/* inline chips on log/ledger meta lines (Epic 13: chips in every density) —
-   compact enough not to grow the fixed-height rows; overflow clips with the meta */
 .row .meta .tag-chips {
   margin-left: 8px;
   flex-wrap: nowrap;
@@ -1688,7 +1621,6 @@ a:focus-visible {
   cursor: default;
 }
 
-/* ---- per-item tag editor (browse/tagedit.js): the ＋ trigger + the popover ---- */
 .tag-cluster {
   display: inline-flex;
   gap: 5px;
@@ -1724,8 +1656,6 @@ a:focus-visible {
   height: 32px;
   font-size: var(--fs-sm);
 }
-/* row tags on their own line (tagging is now via long-press) — clips within the text column,
-   so chips never run under / get cut off by the thumbnail */
 .rowtags {
   margin-top: 3px;
   overflow: hidden;
@@ -1743,13 +1673,10 @@ a:focus-visible {
   background: var(--surface-inset);
   flex: none;
 }
-/* ---- Relay-style inline long-press strip (Epic 16 B3) ----
-   Right-click / long-press overlays an action strip in the row's own space.
-   Keep it clipped to the sheet — the row foreground must never slide under the rail. */
 .relay-scrim {
   position: fixed;
   inset: 0;
-  z-index: 49; /* below #scrim (50) and sheets, above rows */
+  z-index: 49;
   background: transparent;
   opacity: 0;
   pointer-events: none;
@@ -1765,11 +1692,9 @@ a:focus-visible {
   }
 }
 
-/* The row stays in flow and clipped. The action strip sits over the dimmed row,
-   so the original content cannot leak outside the feed when the menu opens. */
 .row.relay-open {
   overflow: clip;
-  z-index: 50; /* above .relay-scrim (49) so strip buttons are clickable */
+  z-index: 50;
 }
 .row.relay-open .item-fg {
   opacity: 0.18;
@@ -1777,7 +1702,6 @@ a:focus-visible {
   transition: opacity var(--dur-slow) var(--ease);
 }
 
-/* the strip — a horizontal row of icon+label buttons that appears in the row's place */
 .relay-strip {
   position: absolute;
   inset: 0;
@@ -1908,8 +1832,6 @@ a:focus-visible {
   flex-direction: column;
   gap: 10px;
 }
-/* the base .tagpop display:flex overrides the [hidden] UA rule, so close() (pop.hidden=true) left an
-   empty sheet pinned at bottom:0, clipping into the mobile bottom bar — restore real hiding. */
 .tagpop[hidden] {
   display: none;
 }
@@ -2033,7 +1955,6 @@ a:focus-visible {
   margin-right: 6px;
 }
 
-/* ===================== decay line + empty state (locked #10/#12) ===================== */
 .decayline {
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
   font: var(--fw-regular) var(--fs-xs)/1.55 var(--font-sans);
@@ -2096,7 +2017,6 @@ a:focus-visible {
   letter-spacing: 0.1em;
 }
 
-/* ===================== bulk opsbar ===================== */
 .opsbar {
   position: fixed;
   left: 50%;
@@ -2161,15 +2081,12 @@ a:focus-visible {
   color: inherit;
 }
 
-/* #46 mobile fast-scroll bar — Nova Launcher–style track + proportional handle
-   (see fastscroll.js). Always visible while the list scrolls; fades shortly
-   after scroll stops. Desktop keeps the native scrollbar. */
 .fastscroll-bar {
   position: fixed;
   right: max(2px, env(safe-area-inset-right, 2px));
   top: 0;
   height: 100vh;
-  width: 22px; /* touch target; visuals are the thin track/handle inside */
+  width: 22px;
   z-index: 50;
   display: flex;
   justify-content: center;
@@ -2216,16 +2133,12 @@ a:focus-visible {
     transition: none;
   }
 }
-/* Desktop keeps native scrollbar — hide the bar entirely. */
 @media (hover: hover) and (pointer: fine) {
   .fastscroll-bar {
     display: none;
   }
 }
 
-/* mobile floating scroll-to-top (Epic 13) — sits just above the bottom tab bar on the right,
-   clears the tab bar height + safe-area inset.
-   Appears (.show, toggled by main.js) only after the feed is scrolled down. */
 .gotop {
   display: none;
   position: fixed;
@@ -2266,7 +2179,6 @@ a:focus-visible {
   }
 }
 
-/* ===================== toast (core/toast owns #toast) ===================== */
 #toast {
   position: fixed;
   left: 50%;
@@ -2295,7 +2207,6 @@ a:focus-visible {
   padding: 6px;
 }
 
-/* ===================== sheets / modals ===================== */
 .scrim {
   position: fixed;
   inset: 0;
@@ -2311,9 +2222,6 @@ a:focus-visible {
   pointer-events: auto;
 }
 
-/* overscroll-behavior on the panels that scroll internally. Prevents scroll
-   chaining: when the user reaches the edge of the panel's content, the scroll
-   does NOT pass through to the underlying page. */
 .navdrawer,
 #statsheet,
 #dupesheet,
@@ -2435,7 +2343,6 @@ a:focus-visible {
   cursor: default;
 }
 
-/* settings: plain action button + the stats sheet (Epic 14) */
 .setbtn {
   display: block;
   width: 100%;
@@ -2623,7 +2530,6 @@ kbd {
   font-weight: var(--fw-semibold);
 }
 
-/* media lightbox (core/media createLightbox) */
 #media-modal {
   position: fixed;
   inset: 0;
@@ -2696,7 +2602,7 @@ kbd {
   transform-origin: center center;
   transition: transform 120ms var(--ease);
   touch-action: pan-y;
-} /* stacked gallery: swipe scrolls; tap=full-res */
+}
 #media-body .media-img.zoomed,
 #media-body .gallery-img.zoomed {
   touch-action: none;
@@ -2762,9 +2668,6 @@ kbd {
   }
 }
 
-/* ===================== mobile "Jump" drawer ===================== */
-/* The phone expression of the desktop .rail: a left slide-in over the shared
-   #scrim. Built from core tokens; reuses the .sheetpanel slide mechanism. */
 .navdrawer {
   position: fixed;
   top: 0;
@@ -3054,7 +2957,6 @@ kbd {
   color: var(--accent-strong);
 }
 
-/* section-visibility chips (the ⚙ "sections" manage strip) */
 .nd-managebar {
   display: flex;
   flex-wrap: wrap;
@@ -3089,7 +2991,6 @@ kbd {
   text-decoration: line-through;
 }
 
-/* ===================== phone layout ===================== */
 @media (max-width: 700px) {
   .console {
     --console-collapse: 0;
@@ -3117,8 +3018,6 @@ kbd {
     transition: border-color 90ms var(--ease);
     will-change: opacity, transform;
   }
-  /* Relay-style shrink: scrolling down tracks a continuous collapse amount from main.js.
-     .compact is only the fully-collapsed semantic state for pointer behavior/tests. */
   .console.compact .cmd {
     border-color: transparent;
     pointer-events: none;
@@ -3166,7 +3065,7 @@ kbd {
   }
   .nav-burger {
     display: inline-flex;
-  } /* top-left Jump trigger (mobile only) */
+  }
   .folders {
     display: none;
   }
@@ -3196,7 +3095,7 @@ kbd {
   }
   .items .acts {
     display: none;
-  } /* swipe owns the actions */
+  }
   .item-fg {
     grid-template-columns: 32px minmax(0, 1fr) auto;
     gap: var(--sp-3);
@@ -3273,9 +3172,6 @@ kbd {
   }
 }
 
-/* ===================== shared tab bar clearance =====================
-   At 700px and below .ch-nav (core/nav.css) is a fixed bottom tab bar, 56px + safe-area.
-   Everything fixed to the bottom sits above it; the page pads past it. */
 @media (max-width: 700px) {
   body.has-tabbar {
     padding-bottom: calc(120px + env(safe-area-inset-bottom));
@@ -3291,7 +3187,6 @@ kbd {
     display: inline-flex;
   }
 }
-/* Desktop: .ch-nav is a sticky 56px top bar carrying the brand; the console sits below it. */
 @media (min-width: 701px) {
   .console {
     top: 56px;
@@ -3305,7 +3200,6 @@ kbd {
   }
 }
 
-/* command palette (locked Epic 20: ">" flips search to command mode) */
 .palette {
   position: absolute;
   top: calc(100% + 8px);
@@ -3361,12 +3255,6 @@ kbd {
   border-color: var(--accent);
 }
 
-/* ===================== inline Reddit reader ===================== */
-/* Full-screen sheet over the feed: post + collapsible comment thread, in-reader
-   triage, "open original" escape. Slides in from the right; swipe-right / the
-   system back-gesture returns to the feed. Built from core tokens. z-index 53
-   sits above the sheets (51) and the tab bar (40) but below the media lightbox (#media-modal, 55)
-   so tapping post media still opens the lightbox over the reader. */
 html.reader-lock {
   overflow: hidden;
 }
@@ -3422,7 +3310,7 @@ html.reader-lock {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-} /* shrink/truncate so "open original" + share + close stay on-screen (mobile) */
+}
 .rd-oo {
   margin-left: auto;
   flex: none;
@@ -3470,8 +3358,6 @@ html.reader-lock {
   color: var(--text-body);
   border-color: var(--accent);
 }
-/* markdown pipe tables (reader post selftext + comment bodies) — scroll horizontally on
-   narrow screens so a wide table never blows out the layout */
 .reader .md-table {
   border-collapse: collapse;
   display: block;
@@ -3492,8 +3378,6 @@ html.reader-lock {
   background: var(--panel-2, rgba(255, 255, 255, 0.04));
   font-weight: var(--fw-semibold);
 }
-/* mobile: compact the reader header so "share" (second from right) never gets pushed off-screen —
-   "open original" collapses to just its ↗ glyph, freeing room for share + close. */
 @media (max-width: 480px) {
   .rd-oo-txt {
     display: none;
@@ -3513,7 +3397,6 @@ html.reader-lock {
   padding: var(--sp-3) 0 env(safe-area-inset-bottom);
 }
 
-/* ---- post ---- */
 .rd-post {
   width: min(calc(100% - var(--sp-5) - var(--sp-5)), var(--reader-max));
   margin: 0 auto;
@@ -3763,7 +3646,6 @@ html.reader-lock {
   max-height: 42vh;
   object-fit: contain;
 }
-/* markdown subset rendered in the reader (post self-text + comment bodies, Epic 15) */
 .rd-body a,
 .rd-ctext a,
 .rd-body-preview a {
@@ -3837,7 +3719,6 @@ html.reader-lock {
 .rd-ctext pre:last-child {
   margin-bottom: 0;
 }
-/* inline embedded images in selftext + comment bodies (Epic 15) — tap opens the lightbox */
 .rd-body .md-img,
 .rd-ctext .md-img {
   display: block;
@@ -3985,7 +3866,6 @@ html.reader-lock {
   color: var(--text-muted);
   text-decoration: line-through;
 }
-/* poster-less video/gallery in the reader — a centered play glyph IS the tap target */
 .rd-media.noimg {
   display: flex;
   align-items: center;
@@ -4026,7 +3906,6 @@ html.reader-lock {
   background: var(--accent-tint);
 }
 
-/* ---- comments ---- */
 .rd-comments {
   width: min(calc(100% - var(--sp-5) - var(--sp-5)), var(--reader-max));
   margin: 0 auto;
@@ -4070,7 +3949,6 @@ html.reader-lock {
 .rd-cmtstate.err {
   color: var(--text-muted);
 }
-/* #74: saved-comment seed while thread loads / on miss */
 .rd-cmtseed {
   margin: 8px 10px 4px;
   padding: 10px 12px;
@@ -4163,14 +4041,14 @@ html.reader-lock {
   color: var(--text-dim);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-} /* tap the byline to collapse the thread */
+}
 .rd-cby .rd-au {
   color: var(--text-muted);
   font-weight: var(--fw-medium);
 }
 a.rd-au {
   text-decoration: none;
-} /* author → profile link, but keep the byline look */
+}
 a.rd-au:hover {
   color: var(--accent);
   text-decoration: underline;
@@ -4203,18 +4081,12 @@ a.rd-au:hover {
 .rd-cmt.collapsed .rd-cmain {
   opacity: 0.82;
 }
-/* the original poster's own comments stand out — an accent rail + faint tint
-   (matches the OP badge already in the byline; :has keys off it, no JS change) */
 .rd-cmt:has(.rd-op) {
   border-left: 2px solid var(--accent);
   padding-left: 10px;
   background: var(--accent-tint);
 }
 
-/* ---- manual tag editor (reader header/meta area; browse/reader.js) ----
-   Mirror of the triage card editor's .tcard-tags* rules: current tags as removable
-   chips + a "＋ tag" affordance. Lives here (not injected at runtime) because the
-   reader is part of index.html, which loads this stylesheet. */
 .rd-tags {
   display: flex;
   align-items: flex-start;
@@ -4338,7 +4210,6 @@ a.rd-au:hover {
   }
 }
 
-/* ---- P3.3: subreddit facet (second-tier rail under reddit source) ---- */
 .rail-sub {
   margin-top: var(--sp-1);
   border-left: 2px solid var(--line, #eee);

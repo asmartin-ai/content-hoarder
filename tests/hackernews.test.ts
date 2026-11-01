@@ -27,12 +27,8 @@ test("the HN og:image fetch refuses loopback and reserved article targets", asyn
     ])
       expect(await fetchOgImage(url)).toBe("");
 
-    // The guard refused before any socket was opened.
     expect(hits).toBe(0);
 
-    // Same server, same URL shape, loopback explicitly allowed: the article is
-    // fetched and parsed, so the refusals above are the guard's doing and not
-    // a dead server or a parse failure.
     const [, , raw] = await request(`http://127.0.0.1:${server.port}/article`, {
       allowLoopback: true,
       timeout: 5,

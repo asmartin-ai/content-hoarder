@@ -1,7 +1,3 @@
-/* The document shell for the server-rendered rooms (Today, Clear): <head>, shared nav, #toast.
-   Contract: docs/design/clear-v2.md §3, clear-overhaul.md §4.1. The Library template keeps its
-   own copy of the nav markup; keep the two identical. */
-
 import { html, raw, type SafeHtml } from "./html.ts";
 
 export type Tab = "today" | "clear";
@@ -80,7 +76,6 @@ const MOON = raw(
   `${SVG_OPEN}<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>`,
 );
 
-/** The theme-toggle moon, shared with Today's footer. */
 export function moonIcon(): SafeHtml {
   return MOON;
 }
@@ -91,7 +86,6 @@ const TABS: Array<{ id: Tab | "library"; href: string; label: string }> = [
   { id: "library", href: "/library", label: "Library" },
 ];
 
-/** Shared top bar / bottom tab bar (clear-overhaul.md §4.1); the current tab gets aria-current. */
 export function navHtml(tab: Tab | "library"): SafeHtml {
   const tabs = TABS.map(
     (entry) =>
@@ -148,7 +142,6 @@ const ROOM_CSS: Record<Tab, string> = {
   clear: "/static/home/clear.css",
 };
 
-/** A full server-rendered room. `round` = focus mode (nav hidden via body.is-round). */
 export function renderPage(opts: {
   title: string;
   tab: Tab;

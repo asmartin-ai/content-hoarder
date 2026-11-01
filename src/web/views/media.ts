@@ -1,10 +1,3 @@
-/**
- * Server-side media decisions for cards: hero media, small thumbnails, the
- * "cost" pill and number/domain formatting. Typed port of the decision logic in
- * src/static/core/media.js (thumb, _galleryThumb, _usableThumb, imageUrl,
- * mediaType, localUrl). Pure: never touches the network or the database.
- */
-
 import * as z from "zod";
 import type { Item } from "../../models.ts";
 import { isRemovedText } from "../../static/core/util.js";
@@ -16,7 +9,6 @@ export type CardMedia = {
   badge?: string;
 };
 
-// Connector facts that live in the metadata catchall (not in MetadataSchema's known keys).
 const ExtraMetaSchema = z.object({
   media_url: z.string().optional().catch(undefined),
   media_urls: z.array(z.string()).optional().catch(undefined),
@@ -27,7 +19,6 @@ const ExtraMetaSchema = z.object({
 
 export type ExtraMeta = z.infer<typeof ExtraMetaSchema>;
 
-/** Parse the catchall metadata keys the card needs; `{}` when the blob is odd. */
 export function extraMeta(item: Item): ExtraMeta {
   const parsed = ExtraMetaSchema.safeParse(item.metadata);
 
@@ -42,7 +33,6 @@ const THUMB_SENTINEL = /^(self|default|nsfw|spoiler|image)$/i;
 
 const YT_ID = /(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/;
 
-/** Only http(s) or root-relative URLs are allowed (blocks javascript:/data:). */
 function safeUrl(url: string | undefined): string {
   const value = (url ?? "").trim();
 
@@ -68,7 +58,6 @@ function galleryThumb(item: Item): string {
   return safeUrl(md.gallery?.[0]);
 }
 
-/** `/media/<blob>` for an archived copy of `url`: exact key, else the lone archived value. */
 function archivedUrl(item: Item, url: string): string {
   const archived = extraMeta(item).archived_media;
 
@@ -105,7 +94,6 @@ function youtubeId(item: Item): string {
 
 export type MediaEvidence = "video" | "gallery" | "image" | "youtube" | "text" | "link";
 
-/** Content evidence, ported from media.js mediaType (comments classified by their metadata). */
 export function mediaEvidence(item: Item): MediaEvidence {
   const md = item.metadata;
   const extra = extraMeta(item);
@@ -146,7 +134,6 @@ export function mediaEvidence(item: Item): MediaEvidence {
   return "link";
 }
 
-/** `m:ss`, or `h:mm:ss` from an hour up. */
 function clock(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
   const h = Math.floor(total / 3600);
@@ -169,7 +156,6 @@ function withFallback(item: Item, media: CardMedia): CardMedia {
   return fallback && fallback !== media.src ? { ...media, fallback } : media;
 }
 
-/** The card's hero media, or null when nothing usable exists. */
 export function cardMedia(item: Item): CardMedia | null {
   const md = item.metadata;
   const evidence = mediaEvidence(item);
@@ -245,13 +231,11 @@ export function cardMedia(item: Item): CardMedia | null {
     return withFallback(item, media);
   }
 
-  // Text posts: a real (non-sentinel) thumbnail is still worth showing.
   const thumb = usableThumb(md.thumbnail);
 
   return thumb ? withFallback(item, { kind: "image", src: thumb }) : null;
 }
 
-/** Best small preview URL (list density, like media.js `thumb`), or "". */
 export function thumbFor(item: Item): string {
   const md = item.metadata;
   let thumb = usableThumb(md.thumbnail);
@@ -281,7 +265,6 @@ const GLANCE_MINUTES = 0.1;
 
 const CLIP_MINUTES = 0.5;
 
-/** The same estimate as costLabel, in minutes (0 when unknown): what clearing it frees. */
 export function costMinutes(item: Item): number {
   const evidence = mediaEvidence(item);
   const duration = durationOf(item);
@@ -302,7 +285,6 @@ export function costMinutes(item: Item): number {
   return 0;
 }
 
-/** The community a card belongs to: subreddit, else channel, else source. */
 export function communityOf(item: Item): string {
   const md = item.metadata;
   const sub = md.subreddit || /^\/r\/([^/]+)\//.exec(md.permalink ?? "")?.[1] || "";
@@ -312,7 +294,6 @@ export function communityOf(item: Item): string {
 
 const HUE_TURN = 360;
 
-/** Stable hue (0–359) for a name (FNV-1a): every community gets its own paper tint. */
 export function hueOf(key: string): number {
   let hash = 0x81_1c_9d_c5;
 
@@ -324,7 +305,6 @@ export function hueOf(key: string): number {
   return (hash >>> 0) % HUE_TURN;
 }
 
-/** A calm effort estimate: "12 min video" | "3 min read" | "a glance" | "clip" | "". */
 export function costLabel(item: Item): string {
   const evidence = mediaEvidence(item);
   const duration = durationOf(item);
@@ -351,7 +331,6 @@ export function costLabel(item: Item): string {
   return "";
 }
 
-/** Compact count: 950 → "950", 4200 → "4.2k", 12345 → "12k", 1_200_000 → "1.2M". */
 export function compact(n: number): string {
   if (!Number.isFinite(n)) return "";
   const sign = n < 0 ? "-" : "";
@@ -372,7 +351,6 @@ export function compact(n: number): string {
   return sign + scaled(abs / 1_000_000_000, "B");
 }
 
-/** Hostname without `www.`; "" for non-http(s) or unparsable URLs. */
 export function domainOf(url: string): string {
   try {
     const parsed = new URL(url);

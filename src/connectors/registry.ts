@@ -42,9 +42,7 @@ export function dispatch(path: string): BaseConnector {
   for (const connector of CONNECTORS) {
     try {
       if (connector.canImport(path)) return connector;
-    } catch {
-      /* a failed sniff must not block later parsers */
-    }
+    } catch {}
   }
 
   throw new Error(`No connector recognizes ${JSON.stringify(path)}; pass --source explicitly`);

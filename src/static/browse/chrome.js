@@ -1,12 +1,6 @@
-/* browse/chrome.js — page chrome: the "· N new" + dateline + decay line, the
-   floating scroll-to-top affordance and its programmatic-scroll state machine, the
-   fast-scroll handle, the shrink-on-scroll top bar, and the settings-sheet version line. */
-
 import { esc } from "../core/util.js";
 import { $, state, itemsEl } from "./shared.js";
 import { installFastScroll } from "./fastscroll.js";
-
-/* ---- pulse: "· N new", dateline, decay line (locked #2/#3/#12) ---- */
 
 export function paintPulse() {
   const p = state.pulse;
@@ -30,10 +24,9 @@ export function paintPulse() {
   $("#decay-n").textContent = p.swept_recent.toLocaleString();
 }
 
-/* ---- mobile floating scroll-to-top (Epic 13 / 16) ---- */
 const gotop = $("#gotop");
 
-const GOTOP_AT = 700; // px scrolled before the affordance appears
+const GOTOP_AT = 700;
 
 const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
@@ -131,7 +124,6 @@ function scrollToBrowseTop() {
 window.addEventListener(
   "scroll",
   () => {
-    // rAF-throttled (60fps lane)
     browseTopScroll.noteScroll();
 
     if (!gotopTick) {
@@ -154,12 +146,8 @@ if ("onscrollend" in window)
 
 gotop.addEventListener("click", scrollToBrowseTop);
 
-/* ---- #46 mobile fast-scroll handle (right-edge scrub) ---- */
 installFastScroll(itemsEl);
 
-/* ---- loaded version (settings sheet) + Relay-style shrink-on-scroll top bar ----
-   APP_VERSION is baked into THIS (cached) chrome.js, so the settings line shows what your phone is
-   actually running — not the server's latest. Bump it together with sw.js CACHE on every shippable change. */
 const APP_VERSION = "v140";
 
 (() => {
@@ -169,10 +157,6 @@ const APP_VERSION = "v140";
   const head = $(".console");
 
   if (!head) return;
-  // Relay-style chrome tracks the near-top scroll position instead of waiting for
-  // an idle timeout and then flipping open. A 0..1 collapse amount lets repeated
-  // small swipes near the top smoothly scrub the search row between expanded and
-  // compact, while the .compact class remains only the fully-collapsed semantic state.
   const COLLAPSE_AT = 110;
   const COMPACT_AT = 0.96;
   const UNCOMPACT_AT = 0.82;
@@ -259,7 +243,6 @@ const APP_VERSION = "v140";
   writeHeaderCollapse(currentCollapse);
 })();
 
-/* ---- wheel from the side gutters scrolls the list (13:385) ---- */
 document.addEventListener(
   "wheel",
   (e) => {

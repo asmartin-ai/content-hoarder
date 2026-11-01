@@ -1,6 +1,3 @@
-/* browse/lightbox.js — the media layer: hold-to-preview, the image/video/gallery
-   lightbox, on-demand gallery hydration, and the archive.today recovery affordance. */
-
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
@@ -21,11 +18,8 @@ import { $, state, itemsEl } from "./shared.js";
 import { reblur } from "./feed.js";
 import { readerUI } from "./instances.js";
 
-setArchivePref(state.archiveMedia); // tell core/media.js whether to prefer local /media copies
+setArchivePref(state.archiveMedia);
 
-/* ---- hold-to-preview (Relay-style press-and-hold media peek) ----
-   Long-press opens a temporary lightbox while the pointer stays down. Release closes
-   it and swallows the trailing synthetic click so it does not reopen persistently. */
 let mediaPressStart = null;
 
 let mediaHoldTimer = null;
@@ -130,10 +124,9 @@ itemsEl.addEventListener(
   true,
 );
 
-/* ---- media lightbox ---- */
-let lastMediaFn = null; // item whose media is open in the lightbox → re-blurred on close
+let lastMediaFn = null;
 
-let mediaOpenSeq = 0; // invalidates async replacements when the lightbox closes/reopens
+let mediaOpenSeq = 0;
 
 export const lightbox = createLightbox({
   modal: "#media-modal",
@@ -169,7 +162,6 @@ export function openMediaFor(item, opts) {
   lastMediaFn = item.fullname;
   const m = item.metadata || {};
 
-  // #32: caption under image/gallery lightbox (skip for hold-to-peek)
   const withCap = (base) => {
     const o = Object.assign({}, base || opts || {});
 
@@ -186,7 +178,6 @@ export function openMediaFor(item, opts) {
     return lightbox.openHtml(archiveTodayPlaceholderHtml(item), opts);
 
   if (Array.isArray(m.gallery) && m.gallery.length)
-    // sized variants load first (Epic 13 P2); prefer locally-archived copies when present (Epic 4 P1)
     return lightbox.openGallery(
       m.gallery.map((u) => localUrl(item, u)),
       (m.gallery_preview || []).map((u) => localUrl(item, u)),
@@ -195,19 +186,14 @@ export function openMediaFor(item, opts) {
   const imgs = imageUrls(item);
 
   if (imgs.length > 1) return lightbox.openGallery(imgs, imgs, withCap(opts));
-  const vsrc = playableVideoSrc(item); // shared playability test (same as the reader's inline player)
+  const vsrc = playableVideoSrc(item);
 
   if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
   const img = imageUrl(item);
 
-  // Spec 05: reddit image posts open the comments thread (reader), not the bare
-  // image. Non-reddit images and reddit images without a permalink still open
-  // the image. Raw image remains reachable via the reader / Open on Reddit.
   if (img && !(item.source === "reddit" && m.permalink))
     return lightbox.openImage(img, withCap(opts));
 
-  /* Gallery without captured image URLs — hydrate one item on demand via the existing
-     OAuth/cached-thread backend, then fall back to the local thumbnail + Reddit link. */
   if (m.media_type === "gallery" || /\/gallery\//i.test(item.url || "")) {
     const fallbackHtml = (msg) => {
       const url = redditUrl(m.permalink || item.url);
@@ -273,8 +259,6 @@ export function openMediaFor(item, opts) {
     return;
   }
 
-  /* Permalink-only item (no lightboxable media) — reddit text/post thread.
-     Open the reader instead of the reddit iframe (user preference 2026-06-26). */
   if (m.permalink && item.source === "reddit") return readerUI.open(item);
 
   if (m.permalink) return lightbox.openMedia(m.permalink, opts);

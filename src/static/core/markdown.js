@@ -1,22 +1,7 @@
-/* core/markdown.js — safe Reddit-flavoured markdown subset for the inline reader.
-
-   Renders post self-text + comment bodies (Epic 15). Reddit bodies are markdown
-   (links, bold/italic, quotes, lists, inline code, bare URLs incl. giphy); the
-   reader used to print them as plain escaped text.
-
-   XSS-safe BY CONSTRUCTION: the raw text is HTML-escaped FIRST (via core esc), then a
-   small set of inline + block transforms run on the *escaped* text and only ever INSERT
-   a known-safe tag set (<p>/<br>/<a>/<strong>/<em>/<code>/<pre>/<blockquote>/<ul>/<ol>/
-   <li>/<table>/<thead>/<tbody>/<tr>/<th>/<td>). User text can never introduce a tag, and every <a href> is gated through
-   safeUrl (http(s)/root-relative only — blocks javascript:/data: sinks). Pure +
-   dependency-light so it stays node-testable like the other reader helpers. */
-
 import { esc, safeUrl } from "./util.js";
 
 const A_MID = '" target="_blank" rel="noopener nofollow">';
 
-/* Peel trailing sentence punctuation / escaped quotes a bare URL shouldn't swallow
-   (e.g. the ")" in "(see https://x.com)"). Keeps &amp; — it's a real query separator. */
 function splitUrlTail(url) {
   let u = url,
     tail = "";
@@ -34,9 +19,6 @@ function splitUrlTail(url) {
 
 const link = (href, text) => '<a href="' + href + A_MID + text + "</a>";
 
-/* Hosts whose images we render INLINE (Reddit-native + the two that actually show up in comments).
-   Everything else degrades to a click-through link — loading an <img> leaks the viewer's IP/referrer
-   to its host, so non-allowlisted images stay opt-in. */
 const IMG_HOST = /(?:^|\.)redd\.it$|(?:^|\.)redditmedia\.com$|^i\.imgur\.com$|(?:^|\.)giphy\.com$/i;
 
 const imgHost = (u) => {
@@ -49,10 +31,6 @@ const imgHost = (u) => {
 
 const isImgExt = (u) => /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(u);
 
-/* Build an <img>. `src` + `alt` are ALREADY HTML-escaped (the renderer escapes everything up
-   front; media-id URLs are esc()'d by the caller). No event attributes are ever emitted, so an
-   attacker-supplied URL/alt can't introduce script — only a (host-allowlisted) image load. The
-   data-img lets the reader open the same URL in the lightbox on tap. */
 const imgTag = (src, alt) =>
   '<img class="md-img" loading="lazy" decoding="async" referrerpolicy="no-referrer" src="' +
   src +
@@ -62,18 +40,11 @@ const imgTag = (src, alt) =>
   src +
   '">';
 
-/* Inline transforms on an already-escaped string. Code spans and links are stashed as
-   placeholders so the later bold/italic passes can't corrupt their contents/hrefs. */
 function inline(s, media) {
   const stash = [];
   const hold = (html) => "\uE000" + (stash.push(html) - 1) + "\uE000";
 
-  // 1. inline code `code`
   s = s.replace(/`([^`\n]+)`/g, (_, c) => hold("<code>" + c + "</code>"));
-  // 2. images ![alt](target) — BEFORE links so the leading "!" isn't dropped. `target` is either a
-  //    Reddit media-id (a key in `media`, e.g. native comment images / emotes / giphy) or a URL; an
-  //    <img> renders only for a resolved media-id OR an allowlisted image host, else it degrades to
-  //    a safe link / the alt text.
   s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (_, alt, target) => {
     const m = media[target];
     const url = m ? esc(m.u) : imgHost(target) ? safeUrl(target) || "" : "";
@@ -83,14 +54,11 @@ function inline(s, media) {
 
     return safe ? hold(link(safe, alt || safe)) : alt;
   });
-  // 3. markdown links [text](url) — drop an unsafe href, keep the visible text
   s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_, text, url) => {
     const safe = safeUrl(url);
 
     return safe ? hold(link(safe, text)) : text;
   });
-  // 4. bare URLs (placeheld code/links/images are already invisible to this). An allowlisted bare
-  //    image URL renders inline; any other bare URL becomes a link.
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, (_, pre, url) => {
     const [clean, tail] = splitUrlTail(url);
 
@@ -98,7 +66,6 @@ function inline(s, media) {
 
     return pre + hold(link(clean, clean)) + tail;
   });
-  // 4. bold then italic (bold first so **x** isn't eaten by the * italic rule)
   s = s
     .replace(/\*\*(\S[^*]*?)\*\*/g, "<strong>$1</strong>")
     .replace(/__(\S[^_]*?)__/g, "<strong>$1</strong>");
@@ -106,7 +73,6 @@ function inline(s, media) {
     .replace(/\*(\S[^*]*?)\*/g, "<em>$1</em>")
     .replace(/(^|[^\w])_(\S[^_]*?)_(?!\w)/g, "$1<em>$2</em>");
 
-  // restore stashed code/links
   return s.replace(/\uE000(\d+)\uE000/g, (_, i) => stash[+i]);
 }
 
@@ -114,7 +80,7 @@ const isBlank = (l) => /^\s*$/.test(l);
 
 const isFence = (l) => /^\s*```/.test(l);
 
-const isQuote = (l) => /^\s*&gt;/.test(l); // ">" is escaped to &gt; before this runs
+const isQuote = (l) => /^\s*&gt;/.test(l);
 
 const isUl = (l) => /^\s*[-*+]\s+/.test(l);
 
@@ -122,8 +88,6 @@ const isOl = (l) => /^\s*\d+\.\s+/.test(l);
 
 const startsBlock = (l) => isFence(l) || isQuote(l) || isUl(l) || isOl(l);
 
-/* GFM pipe table: a header row (`| a | b |`) immediately followed by a separator row of
-   dashes/colons (`| --- | :-: |`). Detected by the separator + a piped line above it. */
 const TABLE_SEP = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 
 const isTableAt = (lines, i) =>
@@ -137,9 +101,6 @@ const splitRow = (line) =>
     .split("|")
     .map((c) => c.trim());
 
-/* Render a safe markdown subset to an HTML string. Empty/blank input → "".
-   `opts.media` is the comment/post media map ({id: {u, kind, w, h}}) the server resolved from
-   media_metadata — used to turn Reddit's native ![img](media-id) refs into inline images. */
 export function renderMarkdown(src, opts) {
   const media = (opts && opts.media) || {};
 
@@ -148,7 +109,7 @@ export function renderMarkdown(src, opts) {
     .trim();
 
   if (!text) return "";
-  const lines = esc(text).split("\n"); // escape EVERYTHING up front
+  const lines = esc(text).split("\n");
   const out = [];
   let i = 0;
 
@@ -161,7 +122,6 @@ export function renderMarkdown(src, opts) {
     }
 
     if (isFence(line)) {
-      // fenced code block — no inline transforms
       const buf = [];
       i++;
 
@@ -170,7 +130,7 @@ export function renderMarkdown(src, opts) {
         i++;
       }
 
-      i++; // consume the closing fence (if present)
+      i++;
       out.push("<pre><code>" + buf.join("\n") + "</code></pre>");
     } else if (isQuote(line)) {
       const buf = [];
@@ -200,9 +160,8 @@ export function renderMarkdown(src, opts) {
 
       out.push("<ol>" + items.join("") + "</ol>");
     } else if (isTableAt(lines, i)) {
-      // GFM pipe table → <table> (header row + dashes separator)
       const head = splitRow(line);
-      i += 2; // consume the header + separator rows
+      i += 2;
       const rows = [];
 
       while (
@@ -230,7 +189,6 @@ export function renderMarkdown(src, opts) {
 
       out.push(t + "</tbody></table>");
     } else {
-      // paragraph: run of plain lines, \n → <br>
       const buf = [];
 
       while (

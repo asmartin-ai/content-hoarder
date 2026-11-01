@@ -1,6 +1,3 @@
-/* browse/feed.js — the list surface: rendering the feed, row lookup + NSFW re-blur,
-   and infinite scroll. */
-
 import { $, $$, state, itemsEl, nsfwRevealed, selected } from "./shared.js";
 import { attachSwipe } from "../core/swipe.js";
 import { listHtml, emptyHtml, isNsfw } from "./render.js";
@@ -27,7 +24,6 @@ export function render() {
     curated: state.curated,
     nsfwRevealed: false,
   });
-  // re-apply transient row state + attach swipe per row (touch-only inside attachSwipe)
   $$(".row, .pin").forEach((row) => {
     const fn = row.dataset.fullname;
 
@@ -58,9 +54,6 @@ export function rowEl(fullname) {
   return itemsEl.querySelector('[data-fullname="' + CSS.escape(fullname) + '"]');
 }
 
-/* Re-blur an NSFW item's feed thumbnail — the reverse of the tap-reveal. Called when
-   the reader/lightbox opened for it closes, so a reveal doesn't persist across close
-   (Epic 13 P2). Idempotent and a no-op for non-NSFW items. */
 export function reblur(fn) {
   if (!fn) return;
   nsfwRevealed.delete(fn);
@@ -76,22 +69,14 @@ itemsEl.addEventListener("click", (e) => {
   if (e.target.closest("#empty-surprise")) surprise();
 });
 
-/* ---- infinite scroll ---- */
 new IntersectionObserver(
   (entries) => {
-    if (
-      entries[0].isIntersecting &&
-      state.hasMore &&
-      !state.loading &&
-      !isFastScrollScrubbing() // pause page loads mid-scrub (#46 follow-up)
-    )
+    if (entries[0].isIntersecting && state.hasMore && !state.loading && !isFastScrollScrubbing())
       loadItems(false);
   },
   { rootMargin: "600px" },
 ).observe($("#sentinel"));
 
-// A load suppressed mid-scrub never re-fires the observer (it only reports
-// intersection CHANGES), so re-check once when the scrub settles.
 window.addEventListener("fastscroll:settle", () => {
   if (!state.hasMore || state.loading) return;
   const s = $("#sentinel").getBoundingClientRect();

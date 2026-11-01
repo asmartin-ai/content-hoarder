@@ -68,8 +68,6 @@ function itemPredicate(query: FolderQuery): [string, (string | number)[]] {
 
   if (query.subreddit?.length) {
     filters.push(
-      // COLLATE on the left operand so the NOCASE expression index
-      // applies (on the IN expression it only tags the result).
       `json_extract(i.metadata, '$.subreddit') COLLATE NOCASE IN (${query.subreddit.map(() => "?").join(",")})`,
     );
     params.push(...query.subreddit);
@@ -103,10 +101,6 @@ function itemPredicate(query: FolderQuery): [string, (string | number)[]] {
     params.push(query.is_saved ? 1 : 0);
   }
 
-  // Presence, not truthiness: a folder saved with `before: 0` means "before the
-  // epoch", not "no filter". `created_utc = 0` means "unknown date" on sparse
-  // imports, so date filters drop undated rows instead of reading them as
-  // ancient — the same guard db.searchItems applies.
   const before = query.before ?? undefined;
   const after = query.after ?? undefined;
 

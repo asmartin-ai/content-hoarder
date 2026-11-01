@@ -1,11 +1,6 @@
-/* core/ring.js — WinPebbles drawn as a ring: one arc per pebble of the daily goal, lit in win
-   green as the day's clears land (Apple's rings, minus the debt — it resets, never nags).
-   Shared by the server (web/views/today.ts) and the round island (home/round.js); the output is
-   numbers-only SVG, safe to inline. */
-
 const R = 44;
 
-const GAP_DEG = 17; // wide enough that the round caps never touch: separate pebbles
+const GAP_DEG = 17;
 
 const point = (deg) => {
   const rad = ((deg - 90) * Math.PI) / 180;
@@ -13,7 +8,6 @@ const point = (deg) => {
   return (50 + R * Math.cos(rad)).toFixed(2) + " " + (50 + R * Math.sin(rad)).toFixed(2);
 };
 
-/** `<svg class="ring">` with `goal` arcs, the first `n` lit; "" when there is no goal. */
 export function ringSvg(n, goal) {
   if (!(goal > 0)) return "";
   const seg = 360 / goal;

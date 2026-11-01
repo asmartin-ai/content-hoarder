@@ -1,8 +1,3 @@
-/* browse/render.js — row/card builders for the v3 browse page.
-   Layout per the locked spec (05 + 06 mockups): log rows reserve a fixed 128px
-   monitor slot even when empty so the pinned action column never moves; the
-   chIcon action set is status-colored at rest with key letters in tooltips. */
-
 import { esc } from "../core/util.js";
 import { chIcon } from "../core/icons.js";
 import {
@@ -24,15 +19,11 @@ const glyph = (item) => {
 
   if (!m) return "?";
 
-  // firefox uses a full SVG icon (registered in core/icons.js); others use a 1-char glyph.
   if (m.icon) return chIcon(m.icon);
 
   return m.glyph || item.source[0];
 };
 
-/* the F/A/D (+ X off-inbox) action cluster — tooltips carry the key letters.
-   Share is NOT here on desktop (use the right-click row menu). Touch users select
-   through the source avatar; swipe/long-press stay accelerators. */
 const actsHtml = (status) =>
   '<div class="acts">' +
   '<button type="button" class="act k" data-act="keep" title="Keep — F" aria-label="Keep">' +
@@ -73,7 +64,6 @@ const metaHtml = (item) => {
   else if (m.channel) bits.push("<b>" + esc(m.channel) + "</b>");
   else if (item.source === "hackernews") bits.push("<b>HN</b>");
 
-  // HN author → profile (spec 04A); mirrors core/render.js metaLine.
   if (item.source === "hackernews" && item.author)
     bits.push(
       "by " +
@@ -97,13 +87,11 @@ const metaHtml = (item) => {
 };
 
 const snippet = (item) => {
-  // #31 non-AI preview blurb (body for text/comments; caption teaser for image+selftext)
   const body = itemPreviewBlurb(item, 140);
 
   return body ? '<div class="snippet">' + esc(body) + "</div>" : "";
 };
 
-/* Extract and format the URL domain for display (Relay-style: i.redd.it, youtube.com, etc.) */
 const urlDomain = (item) => {
   const url = itemUrl(item) || "";
 
@@ -112,17 +100,12 @@ const urlDomain = (item) => {
   try {
     const d = new URL(url).hostname;
 
-    // Strip www. for readability, keep the rest
     return d.replace(/^www\./, "");
   } catch {
-    // Not a valid URL, might be a relative path or empty
     return "";
   }
 };
 
-/* The URL-domain chip markup, shared by logRow / ledgerRow / pinCard.
-   A source's own domain ("reddit.com" on a Reddit permalink) says nothing:
-   the source badge already carries it, so the chip is only for elsewhere. */
 const OWN_DOMAIN = {
   reddit: ["reddit.com", "old.reddit.com", "i.redd.it", "v.redd.it"],
   youtube: ["youtube.com", "m.youtube.com", "youtu.be"],
@@ -140,14 +123,11 @@ const urlDomainHtml = (item) => {
 
 const isRedditTextPost = (item, mt) => item.source === "reddit" && mt.cls === "text";
 
-/* monitor: the fixed thumb slot. NSFW gets the box-constrained blur + veil. */
 const monitorHtml = (item, nsfwRevealed) => {
   const t = thumb(item, "list");
   const mt = mediaType(item);
 
   if (!t) {
-    // playable media with no stored preview (many v.redd.it videos have no thumbnail)
-    // still needs a tap target — a glyph-only play tile instead of a dead empty box.
     if (mt.cls === "video" || mt.cls === "gallery")
       return (
         '<button type="button" class="monitor noimg" data-media="1" aria-label="' +
@@ -202,17 +182,9 @@ const fmtDur = (secs) => {
     : m + ":" + String(s % 60).padStart(2, "0");
 };
 
-/* ---- per-density builders ---- */
-
-/* The card (.pin) keeps the inline "+" tag trigger — cards have no swipe/long-press attached
-   (attachSwipe targets `.row` only). Log/ledger rows drop it in favour of the long-press menu. */
 const tagEditBtn =
   '<button type="button" class="tag-edit" data-tagedit="1" title="Edit tags" aria-label="Edit tags">+</button>';
 
-/* Row tags on their OWN line (Epic 16, 2026-06-22): tagging moved to the long-press action menu,
-   so the "+" trigger is gone from log/ledger rows and tags no longer share the meta line — where,
-   at the end of a nowrap+ellipsis run, they used to get truncated away / clipped by the thumbnail
-   on mobile. "" when the item has no tags (the long-press menu adds the first one). */
 const rowTags = (item, o) => {
   const chips = tagChips(item, { curated: o.curated, max: 3, expand: false });
 
@@ -260,7 +232,6 @@ export const ledgerRow = (item, n, opts) => {
   const o = opts || {};
   const mt = mediaType(item);
 
-  // #39: text/self posts must not get a media playpill (only real media classes).
   const play =
     !isRedditTextPost(item, mt) &&
     (mt.cls === "video" || mt.cls === "image" || mt.cls === "gallery")
@@ -335,9 +306,7 @@ export const pinCard = (item, opts) => {
           : "") +
         (blur ? '<span class="veil">NSFW · REVEAL</span>' : "") +
         "</button>"
-      : // poster-less video/gallery (e.g. thumbnail-less v.redd.it) still gets a glyph-only
-        // play tile so it's tappable — matching the list (monitorHtml) + reader (Epic 13 P2)
-        mt.cls === "video" || mt.cls === "gallery"
+      : mt.cls === "video" || mt.cls === "gallery"
         ? '<button type="button" class="screen noimg" data-media="1" aria-label="' +
           esc(mt.label) +
           '"><span class="mglyph" aria-hidden="true">' +
@@ -374,10 +343,6 @@ export const pinCard = (item, opts) => {
   );
 };
 
-/* ---- list assembly with recency group headers (log/ledger only) ---- */
-
-/* group on the SORTED field (arrival recency) so labels stay monotonic down the
-   page — grouping on a different timestamp than the sort interleaves headers */
 const groupLabel = (item, now) => {
   const ts = item.first_seen_utc || item.created_utc || 0;
   const d = (now - ts) / 86400;
@@ -423,7 +388,6 @@ export function listHtml(items, state, opts) {
   return html;
 }
 
-/* empty state — an invitation, not a scoreboard (locked #10) */
 export const emptyHtml = () =>
   '<div class="emptystate"><div class="es-mark">✓</div>' +
   "<h3>The page is clear.</h3><p>Nothing here is waiting on you.</p>" +

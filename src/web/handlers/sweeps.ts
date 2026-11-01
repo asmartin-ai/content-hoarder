@@ -6,7 +6,6 @@ import { clamp, json, numberParam, objectBody } from "../http.ts";
 import { connection } from "../state.ts";
 import { SweepApplyBody, SweepUndoBody } from "../schemas.ts";
 
-/** Knowledge is never swept: those piles resurface instead. */
 export const SWEEP_EXCLUSIONS = {
   excludeSubreddits: RESURFACE_SUBREDDITS,
   excludeTags: RESURFACE_TAGS,
@@ -24,10 +23,6 @@ export function listSweeps(url: URL): Response {
   return json({ sweeps: sweepList(clamp(numberParam(url.searchParams.get("limit"), 6), 1, 12)) });
 }
 
-/**
- * Rest a whole pile with one reversible, wave-stamped `decay` (never
- * routed through bulkSetStatus, so it cannot enqueue Reddit unsaves).
- */
 export function restPile(body: z.infer<typeof SweepApplyBody>): db.DecayResult {
   return body.kind === "subreddit"
     ? db.decay(connection(), {
@@ -46,9 +41,7 @@ export function restPile(body: z.infer<typeof SweepApplyBody>): db.DecayResult {
       });
 }
 
-/** Return one sweep wave to the inbox; the restored count. */
 export function restorePile(wave: number): number {
-  // undecay's upper bound is exclusive; one wave id is one integer.
   return db.undecay(connection(), {
     decayedAfter: wave,
     decayedBefore: wave + 1,

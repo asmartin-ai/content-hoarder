@@ -1,8 +1,3 @@
-/**
- * The rich triage card (docs/design/clear-v2.md §4). Class names are a contract
- * with home.css and the round island (static/home/round.js).
- */
-
 import type { Item } from "../../models.ts";
 import { chIcon } from "../../static/core/icons.js";
 import { renderMarkdown } from "../../static/core/markdown.js";
@@ -27,7 +22,6 @@ const BODY_CAP = 6000;
 
 const STAT_ICON = 16;
 
-// Same glyph table as static/core/render.js CH_SOURCES.
 const SOURCES = {
   reddit: { glyph: "r/", label: "Reddit" },
   youtube: { glyph: "▶", label: "YouTube" },
@@ -57,10 +51,8 @@ function cardKind(item: Item): CardKind {
 }
 
 function glyph(source: string): SafeHtml {
-  // chIcon returns trusted SVG markup (AGENTS.md source-badge contract: never escape it).
   if (source === "firefox") return raw(chIcon("firefox", { size: "1em" }));
 
-  // SAFETY: SOURCES is a finite known map
   return html`${Object.hasOwn(SOURCES, source) ? (SOURCES[source as keyof typeof SOURCES]?.glyph ?? source.charAt(0).toUpperCase()) : source.charAt(0).toUpperCase()}`;
 }
 
@@ -87,7 +79,6 @@ function where(item: Item): SafeHtml {
 
   if (item.source === "twitter") return html`<b>Twitter</b>${by(item.author, "@")}`;
 
-  // SAFETY: SOURCES is a finite known map, guarded by Object.hasOwn above
   return html`<b
     >${Object.hasOwn(SOURCES, item.source) ? (SOURCES[item.source as keyof typeof SOURCES]?.label ?? item.source) : item.source}</b
   >`;
@@ -106,7 +97,6 @@ function age(item: Item): SafeHtml {
 
 const MISSING_LABEL = { gallery: "A gallery", image: "An image", video: "A clip" } as const;
 
-/** Media the card knows exists but has no picture for (dead gallery, unthumbed clip). */
 function missingFigure(item: Item): SafeHtml {
   const evidence = mediaEvidence(item);
 
@@ -118,8 +108,6 @@ function missingFigure(item: Item): SafeHtml {
   </figure>`;
 }
 
-/* The picture sits contained over a blurred, darkened copy of itself (no crop, no letterbox
-   bars). round.js wires .media-img (fallback, dead-image removal) and mirrors it into .media-bg. */
 function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
   const media = cardMedia(item);
 
@@ -143,7 +131,6 @@ function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
   </figure>`;
 }
 
-// Reddit pads empty paragraphs with a literal "&#x200B;" that would print as text once escaped.
 const ZERO_WIDTH = /&#x200b;/gi;
 
 function bodyText(item: Item): string {
@@ -156,7 +143,6 @@ function bodyText(item: Item): string {
 function reply(top: TopComment | null | undefined): SafeHtml {
   if (!top) return html``;
 
-  // renderMarkdown escapes its input first and only emits a fixed safe tag set.
   return html`<aside class="card-reply">
     <p class="reply-who">Top comment · u/${top.author} · ▲ ${compact(top.score)}</p>
     <div class="reply-body md">${raw(renderMarkdown(top.body))}</div>
@@ -205,7 +191,6 @@ function stats(item: Item, nsfw: boolean): SafeHtml {
   return parts.length ? html`<footer class="card-stats">${parts}</footer>` : html``;
 }
 
-/** Title (or, for a saved comment, body) length class: the shorter, the bigger the type. */
 function lengthClass(text: string, short: number, medium: number): "s" | "m" | "l" {
   if (text.length <= short) return "s";
 
@@ -220,12 +205,6 @@ const COMMENT_SHORT = 160;
 
 const COMMENT_MEDIUM = 420;
 
-/**
- * Server-rendered rich card for any source. Every interpolation is escaped.
- * `data-layout`: "media" (picture on top, words below) or "text" (a typeset poster).
- * `--hue`: the community's paper tint. `data-cost` (minutes) and `data-thumb` feed the
- * round's receipt on the cleared screen.
- */
 export function renderCard(item: Item, opts?: { topComment?: TopComment | null }): SafeHtml {
   const kind = cardKind(item);
   const nsfw = Boolean(item.metadata.over_18);
@@ -249,7 +228,6 @@ export function renderCard(item: Item, opts?: { topComment?: TopComment | null }
 
   const heading = !isComment && title ? html`<h2 class="card-title">${title}</h2>` : html``;
 
-  // renderMarkdown escapes its input first and only emits a fixed safe tag set.
   const bodyHtml = body
     ? html`<div class="card-body md${isComment ? " is-comment" : ""}">
           ${raw(renderMarkdown(body))}

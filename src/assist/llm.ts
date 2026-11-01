@@ -135,7 +135,6 @@ async function chat(
   return content;
 }
 
-/** The first `{...}` in a model reply, parsed through `schema`; null if absent or invalid. */
 function extractJson<T>(text: string, schema: z.ZodType<T>): T | null {
   const match = /\{.*\}/s.exec(text);
 

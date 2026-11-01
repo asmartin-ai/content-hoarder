@@ -115,7 +115,6 @@ export function candidate(
     if ((state[key]?.dismissed_until ?? 0) > now) continue;
     const [predicate, params] = where(tag, subreddit);
 
-    // SAFETY: This aggregate query aliases and selects exactly the declared columns.
     const aggregate = db
       .query(
         `SELECT COUNT(*) AS count,MAX(first_seen_utc) AS last_added,AVG(json_extract(metadata,'$.triage_score')) AS mean_score FROM items WHERE status='inbox' AND ${predicate}`,
@@ -126,7 +125,6 @@ export function candidate(
 
     if (aggregate.count < MIN_CLUSTER) continue;
 
-    // SAFETY: MAX(first_seen_utc) is the sole selected nullable column.
     const priorRow = db
       .query(
         `SELECT MAX(first_seen_utc) AS prior FROM items WHERE status='inbox' AND ${predicate} AND first_seen_utc<?`,
@@ -163,7 +161,6 @@ export function candidate(
 
   const [predicate, params] = where(picked.tag, picked.subreddit);
 
-  // SAFETY: The SELECT aliases match the sample row contract.
   const sample = db
     .query(
       `SELECT fullname,title,json_extract(metadata,'$.thumbnail') AS thumbnail FROM items WHERE status='inbox' AND ${predicate} ORDER BY first_seen_utc DESC LIMIT 3`,
@@ -260,7 +257,6 @@ export function escalateSnoozed(
   const limit = opts.limit === undefined ? "" : " LIMIT ?";
   const params: number[] = opts.limit === undefined ? [threshold] : [threshold, opts.limit];
 
-  // SAFETY: The query selects only the two declared item columns.
   const rows = db
     .query(
       `SELECT fullname,title FROM items WHERE status='inbox' AND CAST(COALESCE(json_extract(metadata,'$.snooze_count'),0) AS INTEGER)>=? ORDER BY first_seen_utc ASC,fullname ASC${limit}`,

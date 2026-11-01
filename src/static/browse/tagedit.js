@@ -1,14 +1,3 @@
-/* browse/tagedit.js — per-item manual tag editor (Epic 5/26 P2, browse surface).
-
-   A single reusable popover: shows an item's current tags as removable chips and an
-   autocomplete input that adds an existing tag OR creates a new one on the fly. Posts
-   to the (already-merged) POST /items/<fn>/tags endpoint, which stamps adds in
-   metadata.tags_manual so a re-categorize / re-import can't clobber them.
-
-   Display of tags stays in core/render.js `tagChips()` (shared with the triage/reader
-   surfaces GLM owns) — this module only EDITS, so the two never collide. Desktop:
-   anchored popover. Mobile (≤700px): bottom sheet. Own backdrop catches outside-clicks. */
-
 import { esc } from "../core/util.js";
 import { normTag, suggestTags } from "../core/tags.js";
 import * as api from "../core/api.js";
@@ -66,17 +55,14 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
   pop.setAttribute("aria-label", "Edit tags");
   document.body.append(scrim, pop);
 
-  let curFn = null; // the item being edited
-  let curTags = []; // local working copy (kept in sync with the server's returned list)
-  let manualSet = new Set(); // normTag()'d editable tags: metadata.tags_manual + ones added here
-  let selIdx = 0; // highlighted suggestion option
-  let busy = false; // single-flight guard so a double-tap can't double-post (UI also goes pointer-events:none)
+  let curFn = null;
+  let curTags = [];
+  let manualSet = new Set();
+  let selIdx = 0;
+  let busy = false;
 
   const isOpen = () => !pop.hidden;
 
-  /* Close on a DESKTOP window resize (the anchor moved). IGNORE mobile resizes: the
-     on-screen keyboard fires a resize, and the bottom-sheet is CSS-pinned, so closing there
-     would dismiss the editor the instant the user taps the input to type. */
   const onResize = () => {
     if (!isPhone()) close();
   };
@@ -104,9 +90,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     }
   }
 
-  /* the visible suggestion options: recent categories + tags when input is empty,
-     matching known tags + "create new" when the user types a query.
-     On mobile, the empty-input suggestions are: last 2 categories + 1 recent tag. */
   function options() {
     const input = pop.querySelector(".tp-input");
     const q = normTag(input ? input.value : "");
@@ -119,7 +102,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
         .slice(0, 2)
         .map((t) => ({ tag: t, create: false, kind: "category" }));
 
-      // Always aim for 3 total: backfill with recent tags when fewer than 2 categories.
       const tagsNeeded = Math.max(0, 3 - cats.length);
 
       const tags = _recentTags()
@@ -182,10 +164,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
       .join("");
   }
 
-  /* What the editor shows + lets you remove: the item's CURATED tags plus tags the user
-     added manually (metadata.tags_manual + adds made here). Raw enrich keywords (e.g. a
-     YouTube item's dozens of yt-dlp keywords) are hidden, so the editor stays about MANUAL
-     tagging and a stray click can't strip a pipeline keyword out of search. */
   function editableTags() {
     const known = new Set(getKnownTags().map(normTag));
 
@@ -237,18 +215,16 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
         _pushRecent(t);
       });
       (body.remove || []).forEach((t) => manualSet.delete(normTag(t)));
-      onChange(curFn, curTags); // let the page sync state + rail
+      onChange(curFn, curTags);
 
-      // mobile: single-tag flow — close after any add/remove (no keyboard flicker)
       if (isPhone()) {
         close();
 
         return;
       }
 
-      // desktop: keep the editor open for multi-tagging
       const fn = curFn;
-      render(); // rebuild chips + suggestions
+      render();
 
       if (focus) {
         const input = pop.querySelector(".tp-input");
@@ -286,7 +262,7 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     const opt = e.target.closest(".tp-opt");
 
     if (opt) {
-      add(opt.dataset.opt, { focus: false }); // tap → don't reopen keyboard
+      add(opt.dataset.opt, { focus: false });
       const input = pop.querySelector(".tp-input");
 
       if (input) input.value = "";
@@ -318,7 +294,7 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
       if (pick) {
         add(pick.tag);
         e.target.value = "";
-      } else add(e.target.value); // no suggestions (e.g. exact dup typed) → try the raw text
+      } else add(e.target.value);
     }
   });
   scrim.addEventListener("click", close);
@@ -332,7 +308,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
       return;
     }
 
-    // desktop: anchor below the trigger, clamped to the viewport
     const r =
       anchor && anchor.getBoundingClientRect
         ? anchor.getBoundingClientRect()
@@ -355,7 +330,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     curFn = fullname;
     curTags = ((item.metadata || {}).tags || []).slice();
     manualSet = new Set(((item.metadata || {}).tags_manual || []).map(normTag));
-    // seed the recent-categories store so empty-input suggestions surface categories
     const cat = (item.metadata || {}).category;
 
     if (cat) _pushRecentCategory(cat);
@@ -365,7 +339,6 @@ export function initTagEditor({ getItem, getKnownTags, onChange }) {
     position(anchor);
     document.addEventListener("keydown", onKeydown, true);
     window.addEventListener("resize", onResize);
-    // on mobile the keyboard stays closed until the user taps the input (D2)
     setTimeout(() => {
       const i = pop.querySelector(".tp-input");
 

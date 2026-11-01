@@ -1,6 +1,3 @@
-/* Today (lamp mode), server-rendered with htmx partials. Contract: docs/design/clear-v2.md §6.
-   Wins-only copy: never a remaining-backlog total. */
-
 import { NSFW_TAGS, type Item } from "../../models.ts";
 import type { ResurfaceCard } from "../../resurface.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
@@ -26,9 +23,7 @@ const SOURCE_TOKENS = {
   twitter: true,
 } as const;
 
-/** `--src` accent for a source, from core/tokens.css. */
 export function sourceAccent(source: string): string {
-  // SAFETY: SOURCE_TOKENS is a finite known map
   return Object.hasOwn(SOURCE_TOKENS, source)
     ? `--src: var(--source-${source})`
     : "--src: var(--accent)";
@@ -42,7 +37,6 @@ function plural(n: number, one: string, many: string): string {
   return `${fmt(n)} ${n === 1 ? one : many}`;
 }
 
-/** "1 November" */
 export function dateLine(now: Date): string {
   return now.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 }
@@ -55,7 +49,6 @@ const EVENING = 17;
 
 const NIGHT = 22;
 
-/** "Sunday evening": the page names the day and the part of it (orientation, not a greeting). */
 export function dayTitle(now: Date): string {
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
   const hour = now.getHours();
@@ -77,10 +70,6 @@ function agoText(seconds: number): string {
   return `${Math.floor(seconds / 86_400)}d`;
 }
 
-/**
- * Re-entry line from cookie `ch_last_round=<at_ms>.<cleared>` (written by the round):
- * "Last round 2h ago — 10 cleared."; after three days a no-debt welcome; "" when unknown.
- */
 export function reentryLine(cookie: string | null, nowMs: number): string {
   const match = /^(\d+)\.(\d+)$/.exec(cookie ?? "");
 
@@ -92,14 +81,12 @@ export function reentryLine(cookie: string | null, nowMs: number): string {
   return `Last round ${agoText(elapsed)} ago — ${fmt(Number(match[2]))} cleared.`;
 }
 
-/** Display minutes for a whole-round estimate ("about 2 minutes"). */
 function aboutMinutes(seconds: number): string {
   const minutes = Math.max(1, Math.round(seconds / 60));
 
   return `about ${plural(minutes, "minute", "minutes")}`;
 }
 
-/** The lit object. Without ids the round deals its own smart batch. */
 export function renderHeroGo(opts: { n: number; ids?: string[]; oob?: boolean }): SafeHtml {
   const params = new URLSearchParams({ n: String(opts.n) });
 
@@ -201,7 +188,6 @@ function caption(item: Item): string {
   return item.source;
 }
 
-/** Same rule as db.searchItems' hideNsfw: an NSFW tag bucket or Reddit's over_18 flag. */
 export function isNsfw(item: Item): boolean {
   const flagged = item.metadata.over_18 === true || item.metadata.over_18 === 1;
 
@@ -210,15 +196,12 @@ export function isNsfw(item: Item): boolean {
   );
 }
 
-/** Fan slot for the k-th card: 0 in the middle on top, then +1, -1, +2, -2. */
 function fanSlot(index: number): number {
   const side = Math.ceil(index / 2);
 
   return index % 2 ? side : -side;
 }
 
-/** One card of the Today deck: its picture, else a typeset title on the community's paper.
-    The title is always present so a dead thumbnail (main.js) falls back to it. */
 function deckCard(item: Item, index: number): SafeHtml {
   const thumb = thumbFor(item);
   const slot = fanSlot(index);
@@ -234,14 +217,12 @@ function deckCard(item: Item, index: number): SafeHtml {
   </li>`;
 }
 
-/** "N min …" from costLabel, or null when the cost is not in minutes. */
 function knownMinutes(item: Item): number | null {
   const match = /^(\d+) min\b/.exec(costLabel(item));
 
   return match ? Number(match[1]) : null;
 }
 
-/** "3 images · 4 videos (15 min) · 1 long read" */
 export function mixLine(items: Item[]): string {
   let images = 0;
   let videos = 0;
@@ -276,8 +257,6 @@ export function mixLine(items: Item[]): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Up next: the actual next round as a fanned hand of cards (tap it to play), plus OOB hero +
-    sizes. The first card dealt sits on top in the middle. */
 export function renderUpNext(items: Item[], n: number): SafeHtml {
   const ids = items.map((item) => item.fullname);
   const oob = html`${renderHeroGo({ n, ids, oob: true })}${renderSizes(n, true)}`;
@@ -302,12 +281,9 @@ export function renderUpNext(items: Item[], n: number): SafeHtml {
     ${oob}`;
 }
 
-/** Inner content of #wins: today's count inside the pebble ring (0 = no goal), then the
-    all-time line. Wins only: never what is left. */
 export function renderWins(opts: { today: number; total: number; goal: number }): SafeHtml {
   const met = opts.goal > 0 && opts.today >= opts.goal;
 
-  // ringSvg emits numbers-only SVG (core/ring.js).
   return html`<div class="wins-dial${opts.goal > 0 ? "" : " no-goal"}">
       ${raw(ringSvg(opts.today, opts.goal))}<span
         class="wins-n"
@@ -346,7 +322,6 @@ function pileMeta(pile: PileView): string {
   return `${saves} · ${pile.firstYear} – ${pile.lastYear}`;
 }
 
-/** A pile as a memory tile (Google Photos): its pictures as the cover, its name over them. */
 function pileRow(pile: PileView): SafeHtml {
   const mosaic = pile.thumbs.length
     ? html`<div class="pile-mosaic" aria-hidden="true" data-glyph="${pile.glyph}">
@@ -384,7 +359,6 @@ function pileRow(pile: PileView): SafeHtml {
   </li>`;
 }
 
-/** The whole #piles section; hidden when there is nothing to let go. */
 export function renderPiles(piles: PileView[]): SafeHtml {
   if (!piles.length) return html`<section class="piles" id="piles" hidden></section>`;
 
@@ -397,7 +371,6 @@ export function renderPiles(piles: PileView[]): SafeHtml {
   </section>`;
 }
 
-/** Resurface whisper (moss): one knowledge cluster worth a peek, or an empty hidden aside. */
 export function renderWhisper(card: ResurfaceCard | null): SafeHtml {
   if (!card) return html`<aside class="whisper" id="whisper" hidden></aside>`;
 

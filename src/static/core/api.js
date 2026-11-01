@@ -1,7 +1,3 @@
-/* core/api.js — fetch layer + thin endpoint wrappers used by 2+ pages.
-   All wrappers reject on !r.ok (reddit.js's raw fetch().json() chains lacked this).
-   UI reactions (toasts, count bumps, reloads) stay page-side. */
-
 const rejectResponse = (r) =>
   r
     .clone()
@@ -27,7 +23,6 @@ export const postJSON = (url, body) =>
         },
   );
 
-/* ---- item actions ---- */
 export const setStatus = (fullname, status) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/status", { status });
 
@@ -55,18 +50,12 @@ export const setBody = (fullname, body) =>
 
 export const bulkStatus = (fullnames, status) => postJSON("/bulk/status", { fullnames, status });
 
-/* Bulk undo (Epic 13:369): /bulk/status has no server-side undo, so replay the
-   per-item undo for every affected fullname. Resolves with {ok, failed[]}. */
 export const bulkUndo = (fullnames) =>
   Promise.allSettled((fullnames || []).map((f) => undoItem(f))).then((rs) => ({
     ok: rs.filter((r) => r.status === "fulfilled").length,
     failed: rs.map((r, i) => (r.status === "rejected" ? fullnames[i] : null)).filter(Boolean),
   }));
 
-/* Promote to PKMS (Spec 15): POSTs the bridge route; the server stamps
-   metadata.promotion and returns {status, response, receipt} — the PKMS
-   capture answer is the snackbar text. 400 (unconfigured) / 502 (transport)
-   bodies carry `error` for the toast. */
 export const promoteItem = (fullname) =>
   postJSON("/items/" + encodeURIComponent(fullname) + "/promote");
 
@@ -78,7 +67,6 @@ export const resolveDuplicates = (keep, archive) =>
 
 export const undoDuplicates = (fullnames) => postJSON("/duplicates/undo", { fullnames });
 
-/* ---- lists / counts ---- */
 export const fetchItems = (params) =>
   getJSON("/items" + (params ? "?" + new URLSearchParams(params) : ""));
 
@@ -88,44 +76,33 @@ export const fetchSources = (status) =>
 export const fetchStats = (params) =>
   getJSON("/stats" + (params ? "?" + new URLSearchParams(params) : ""));
 
-/* ---- reddit sync + unsave queue ---- */
 export const redditSync = (body) => postJSON("/reddit/sync", body || {});
 
 export const unsaveStatus = () => getJSON("/reddit/unsave/status");
 
 export const unsaveDrain = (body) => postJSON("/reddit/unsave/drain", body || { dry_run: true });
 
-/* Queue one reddit item for unsave (no Reddit contact until /drain runs).
-   Optimistically flips is_saved=0; the row stays until drain. */
 export const unsaveItem = (fullname) =>
   postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/unsave");
 
-/* Cancel a still-pending per-item unsave (no Reddit call). */
 export const undoRedditUnsave = (fullname) =>
   postJSON("/reddit/items/" + encodeURIComponent(fullname) + "/undo");
 
-/* Bulk enqueue unsaves for every reddit saved item under a tag (preview
-   when apply=false; commits the local queue when apply=true). Reddit is
-   not contacted until /drain runs. */
 export const unsaveByTag = (tag, { apply = false } = {}) =>
   postJSON("/reddit/unsave/enqueue-by-tag", apply ? { tag, apply: true, yes: true } : { tag });
 
-/* ---- Today: wins pulse, sweeps, resurface whisper ---- */
 export const fetchPulse = () => getJSON("/pulse");
 
 export const fetchSweeps = (limit) =>
   getJSON("/sweeps" + (limit ? "?limit=" + encodeURIComponent(limit) : ""));
 
-/* body: {kind, source, subreddit?, before_utc?} → {total, wave} */
 export const applySweep = (body) => postJSON("/sweeps/apply", body);
 
 export const undoSweep = (wave) => postJSON("/sweeps/undo", { wave });
 
-/* GET /resurface answers 204 (no body) when nothing is due → resolve null. */
 export const fetchResurface = () =>
   fetch("/resurface").then((r) => (r.status === 204 ? null : r.ok ? r.json() : rejectResponse(r)));
 
-/* /resurface/dismiss answers 204 — no JSON body to parse. */
 export const dismissResurface = (cluster) =>
   fetch("/resurface/dismiss", {
     method: "POST",
@@ -133,7 +110,6 @@ export const dismissResurface = (cluster) =>
     body: JSON.stringify({ cluster }),
   }).then((r) => (r.ok ? null : rejectResponse(r)));
 
-/* → {cluster, total, decayed_at}; decayed_at is the wave stamp the undo needs. */
 export const letgoResurface = (cluster) => postJSON("/resurface/letgo", { cluster });
 
 export const undoLetgoResurface = (cluster, wave) =>

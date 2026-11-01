@@ -268,11 +268,6 @@ export async function refreshAccessToken(
   return TokenResponseSchema.parse(response);
 }
 
-/**
- * Reddit GET + JSON decode, shared by the cookie and bearer callers: 401/403
- * degrade to `{}` (logged out), 404 raises RedditNotFoundError, everything
- * else raises RedditNetworkError after the retry/backoff budget is spent.
- */
 export async function redditJsonGet(
   url: string,
   opts: { headers: Record<string, string>; sleep?: (ms: number) => Promise<void> | void },
@@ -310,7 +305,6 @@ export async function redditJsonGet(
   }
 }
 
-/** Reddit form POST that reports the status instead of raising on HTTP errors. */
 export async function redditFormPost(
   url: string,
   fields: Record<string, string>,

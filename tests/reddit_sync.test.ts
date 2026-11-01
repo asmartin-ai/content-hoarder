@@ -13,13 +13,10 @@ function open(): Database {
   return db;
 }
 
-/** Count `db.transaction(...)` calls: `syncSaved` runs one per listing page. */
 function countTransactions(db: Database): () => number {
   const original = db.transaction.bind(db);
   let calls = 0;
 
-  // SAFETY: Bun's `transaction` is a plain instance method; the wrapper
-  // takes the same callable and returns its result unchanged.
   db.transaction = (<A extends unknown[], R>(fn: (...args: A) => R) => {
     calls += 1;
 
@@ -93,8 +90,6 @@ describe("syncSaved batching", () => {
     try {
       const now = Math.floor(Date.now() / 1000);
 
-      // A stored row the item schema cannot parse: the incoming copy
-      // replays through mergeUpsert and fails alone.
       database
         .query(
           "INSERT INTO items(fullname, source, source_id, kind, status, first_seen_utc, last_seen_utc) VALUES(?,?,?,?,?,?,?)",

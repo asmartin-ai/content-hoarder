@@ -1,9 +1,3 @@
-/**
- * SQLite data layer: schema, FTS5 search, non-destructive upserts, and triage.
- * Multi-statement writes use `withTransaction`; single-statement writes use
- * SQLite autocommit. Queries use positional `?` bindings.
- */
-
 import * as z from "zod";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -177,16 +171,7 @@ type PulseCounts = {
   swept_today: number;
   cleared_total: number;
 };
-// ---------------------------------------------------------------------------
-// Schema (keep in sync with models.ITEM_FIELDS)
-// ---------------------------------------------------------------------------
 
-/**
- * SQLite schema. All per-source facts that are not first-class
- * columns (score, over_18, duration, permalink, media_status,
- * subreddit, …) live in the `metadata` JSON blob — the items
- * table itself is deliberately lean.
- */
 const _SCHEMA = `
 CREATE TABLE IF NOT EXISTS items (
     fullname        TEXT PRIMARY KEY,
@@ -305,21 +290,6 @@ CREATE TABLE IF NOT EXISTS user_tags (
 );
 `;
 
-/**
- * FTS5 external-content indexes over `items`. `items_fts` is the
- * strict-match index (default tokenizer); `items_trgm` is the
- * fuzzy trigram index. The `items_ai/ad/au` triggers are the
- * durability contract — every items write stays in sync through
- * them, so no code path may write items outside these tables.
- * (`items_au` is installed by `_ensureUpdateTrigger`, not this
- * schema string, so an upgraded DB picks up its WHEN guard.)
- *
- * Rebuild rule (AGENTS.md #1): after ANY schema change to the
- * mirrored columns or the FTS tables themselves, rebuild via
- * `INSERT INTO tbl(tbl) VALUES('rebuild')` — NEVER
- * INSERT…SELECT — gated by the `fts_built` settings marker
- * (bump `_FTS_VERSION`).
- */
 const _FTS_SCHEMA = `
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
     fullname, title, body, author, url, search_text,
@@ -345,9 +315,6 @@ END;
 
 `;
 
-// The UPDATE trigger is re-created below when an upgraded DB still
-// carries the unguarded definition (CREATE TRIGGER IF NOT EXISTS
-// would otherwise leave it in place forever).
 const _AU_TRIGGER_GUARD = "OLD.search_text IS NOT NEW.search_text";
 
 const _AU_TRIGGER_SQL = `
@@ -374,35 +341,25 @@ const _UPDATE_SQL = `UPDATE items SET ${ITEM_FIELDS.filter((f) => f !== "fullnam
   .map((f) => `${f}=?`)
   .join(", ")} WHERE fullname=?`;
 
-// Sort keys allowed for search/browse (whitelist; rowid tiebreaker
-// added by `orderClause`). Values may be a bare column or a SQL
-// expression (e.g. json_extract for a metadata field).
 const _SORT_COLUMNS = {
   last_seen_utc: "last_seen_utc",
   first_seen_utc: "first_seen_utc",
-  // NULLIF(...,0): undated items (created_utc/saved_utc == 0,
-  // common for sparse Reddit imports) are treated as unknown and
-  // sorted LAST in either direction.
   created_utc: "NULLIF(created_utc, 0)",
   saved_utc: "NULLIF(saved_utc, 0)",
   title: "title",
   status: "status",
   source: "source",
   duration: "CAST(json_extract(metadata, '$.duration') AS INTEGER)",
-  position: "CAST(json_extract(metadata, '$.position') AS INTEGER)", // YouTube playlist order
-  score: "CAST(json_extract(metadata, '$.score') AS INTEGER)", // Reddit upvotes
-  smart: "CAST(json_extract(metadata, '$.triage_score') AS REAL)", // learned likely-to-process (Epic 10)
-  subreddit: "json_extract(metadata, '$.subreddit')", // Reddit subreddit (A–Z)
+  position: "CAST(json_extract(metadata, '$.position') AS INTEGER)",
+  score: "CAST(json_extract(metadata, '$.score') AS INTEGER)",
+  smart: "CAST(json_extract(metadata, '$.triage_score') AS REAL)",
+  subreddit: "json_extract(metadata, '$.subreddit')",
   kind: "kind",
 } satisfies Record<string, string>;
 
 function isSortKey(value: string): value is keyof typeof _SORT_COLUMNS {
   return Object.hasOwn(_SORT_COLUMNS, value);
 }
-
-// ---------------------------------------------------------------------------
-// Statement helpers
-// ---------------------------------------------------------------------------
 
 function rows<T extends object>(db: Database, sql: string, params: SQLQueryBindings[] = []): T[] {
   return db.query<T, SQLQueryBindings[]>(sql).all(...params);
@@ -420,27 +377,17 @@ function run(db: Database, sql: string, params: SQLQueryBindings[] = []): number
   return Number(db.query(sql).run(...params).changes);
 }
 
-/** Scalar `SELECT COUNT(*)`-style result (aliased `AS c`). */
 function scalar(db: Database, sql: string, params: SQLQueryBindings[] = []): number {
   const result = row<CountRow>(db, sql, params);
 
   return Number(result?.c ?? 0);
 }
 
-/**
- * Preserve all-or-nothing writes; Bun's transaction wrapper uses savepoints
- * for nested calls, so a higher-level transition can include these helpers.
- */
 export function withTransaction<T>(db: Database, fn: () => T): T {
   return db.transaction(fn)();
 }
 
-// ---------------------------------------------------------------------------
-// Connection / init
-// ---------------------------------------------------------------------------
-
 export function connect(path?: string): Database {
-  /** Open (creating dirs as needed), configure, and initialize the database. */
   const p = path ?? config.dbPath();
 
   if (p !== ":memory:") {
@@ -450,14 +397,6 @@ export function connect(path?: string): Database {
   }
 
   const db = new Database(p);
-  // A scheduled `reddit-unsave --drain` writes the same DB as a
-  // running `serve`; wait out a brief writer lock instead of
-  // failing with "database is locked". Must precede the WAL
-  // switch: the one-time rollback->WAL upgrade on a brand-new DB
-  // takes a brief exclusive lock, so concurrent first-connects
-  // (e.g. a service worker prefetching / + /triage + /pulse)
-  // would otherwise 500 here without a busy_timeout to wait it
-  // out.
   db.exec("PRAGMA busy_timeout=5000");
   db.exec("PRAGMA journal_mode=WAL");
   db.exec("PRAGMA foreign_keys=ON");
@@ -467,7 +406,6 @@ export function connect(path?: string): Database {
 }
 
 export function initDb(db: Database): void {
-  /** Create tables, FTS indexes, and triggers (idempotent). */
   db.exec(_SCHEMA);
   const userTagColumns = rows<{ name: string }>(db, "PRAGMA table_info(user_tags)");
 
@@ -490,30 +428,14 @@ export function initDb(db: Database): void {
 
   db.exec(_FTS_SCHEMA);
   _ensureUpdateTrigger(db);
-  // Functional index so sorting by video length (metadata.duration)
-  // stays cheap at scale.
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_items_duration " +
       "ON items(CAST(json_extract(metadata, '$.duration') AS INTEGER))",
   );
   _ensureFtsBuilt(db);
-  // NOTE: normalizeProcessingTags() is a one-time legacy backfill —
-  // it scans every category-tagged item (~120ms on the live DB).
-  // initDb() runs on EVERY connection (see connect()), so the
-  // backfill must NOT live here. It runs once from the `init-db`
-  // CLI command; going forward setCategory()/mergeUpsert() keep the
-  // tag mirror in sync.
 }
 
 function _ensureUpdateTrigger(db: Database): void {
-  /**
-   * Install the guarded UPDATE trigger. A legacy DB carries the
-   * unguarded `items_au` that rewrote both FTS indexes on every
-   * write; `CREATE TRIGGER IF NOT EXISTS` cannot replace it, so
-   * compare the stored definition and recreate when stale.
-   * Skipping unchanged text is exact — the trigger mirrors only
-   * these six columns into the indexes.
-   */
   const existing = row<{ sql: string | null }>(
     db,
     "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='items_au'",
@@ -524,20 +446,9 @@ function _ensureUpdateTrigger(db: Database): void {
   db.exec(_AU_TRIGGER_SQL);
 }
 
-// Bump when an FTS table is added/changed so upgraded DBs rebuild
-// once — a boolean marker could never re-trigger (items_trgm
-// arrived after some DBs set it, silently leaving their fuzzy
-// index empty).
 const _FTS_VERSION = 2;
 
 function _ensureFtsBuilt(db: Database): void {
-  /**
-   * One-time rebuild of the external-content FTS indexes, gated by
-   * a version marker. The marker stores the version last built;
-   * legacy boolean-'1' DBs rebuild exactly once after upgrade
-   * (populating any FTS table added since), then store
-   * _FTS_VERSION.
-   */
   const markerRow = row<{ value: string | null }>(
     db,
     "SELECT value FROM settings WHERE key='fts_built'",
@@ -558,10 +469,6 @@ function _ensureFtsBuilt(db: Database): void {
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Settings
-// ---------------------------------------------------------------------------
-
 export function getSetting(db: Database, key: string, dflt: string | null = null): string | null {
   const r = row<{ value: string | null }>(db, "SELECT value FROM settings WHERE key=?", [key]);
 
@@ -572,22 +479,8 @@ export function setSetting(db: Database, key: string, value: string): void {
   run(db, "INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", [key, String(value)]);
 }
 
-const _SAVED_ORDER_KEY = "reddit_saved_order_top" satisfies string; // highest synthetic saved_utc rank allocated so far
+const _SAVED_ORDER_KEY = "reddit_saved_order_top" satisfies string;
 
-/**
- * Reserve a contiguous block of `n` synthetic `saved_utc` ranks
- * ABOVE every block allocated before, and return the block's TOP
- * value; callers assign `top, top-1, …, top-(n-1)` in
- * newest-saved-first order.
- *
- * Reddit exposes no real per-item save time, so saved_utc is
- * synthesized from export/listing ROW ORDER. A persistent
- * monotonic anchor — `max(now, last_top + n)` — keeps "sort by
- * saved newest" coherent across imports AND cookie syncs made at
- * different times (no disjoint bands), while staying ~wall-clock
- * (it only rises above `now` when ingests cluster), so the "saved
- * Xd ago" display stays sane.
- */
 export function allocateSavedOrder(db: Database, n: number): number {
   const lastTop = Number(getSetting(db, _SAVED_ORDER_KEY, "0") || 0);
   const top = Math.max(Math.floor(Date.now() / 1000), lastTop + Math.max(n, 0));
@@ -596,21 +489,10 @@ export function allocateSavedOrder(db: Database, n: number): number {
   return top;
 }
 
-const _DECAY_WAVE_KEY = "decay_wave_seq"; // highest decay-wave id allocated so far (monotonic)
+const _DECAY_WAVE_KEY = "decay_wave_seq";
 
-const _SNOOZE_WAVE_KEY = "snooze_wave_seq"; // highest snooze-wave id allocated so far (monotonic)
+const _SNOOZE_WAVE_KEY = "snooze_wave_seq";
 
-/**
- * Reserve a UNIQUE monotonic decay-wave id and return it (mirrors
- * `allocateSavedOrder`). Each `decay` apply gets a distinct id
- * even when two calls land in the same wall-clock second —
- * `max(now, last + 1)` guarantees a strictly increasing value —
- * so a per-wave UNDO selects exactly one wave instead of every
- * wave sharing that second (the same-second collision bug).
- * Stays ~wall-clock (only rises above `now` when waves cluster
- * within a second), so the value is still usable as a "~when
- * decayed" stamp for `is:decayed` / `swept_recent`.
- */
 export function allocateDecayWave(db: Database, now: number): number {
   const last = Number(getSetting(db, _DECAY_WAVE_KEY, "0") || 0);
   const wave = Math.max(now, last + 1);
@@ -619,12 +501,6 @@ export function allocateDecayWave(db: Database, now: number): number {
   return wave;
 }
 
-/**
- * Reserve a UNIQUE monotonic snooze-wave id. Mirrors
- * `allocateDecayWave` so an undo can target exactly one snooze
- * wave even when multiple snoozes happen in the same wall-clock
- * second.
- */
 export function allocateSnoozeWave(db: Database, now: number): number {
   const last = Number(getSetting(db, _SNOOZE_WAVE_KEY, "0") || 0);
   const wave = Math.max(now, last + 1);
@@ -633,16 +509,10 @@ export function allocateSnoozeWave(db: Database, now: number): number {
   return wave;
 }
 
-// ---------------------------------------------------------------------------
-// Row helpers
-// ---------------------------------------------------------------------------
-
-/** Validate a SQLite items row and retain its serialized JSON columns. */
 function rowToRaw(r: RawItem): RawItem {
   return RawItemSchema.parse(r);
 }
 
-/** Validate a SQLite items row and parse metadata for API consumers. */
 function rowToPublic(r: RawItem): Item {
   const raw = rowToRaw(r);
 
@@ -671,20 +541,12 @@ export function getPublicItem(db: Database, fullname: string): Item | null {
   return publicByFullname(db, fullname);
 }
 
-/** Coerce metadata.tags to a stable, de-duplicated string list. */
 function tagList(value: JsonValue | undefined): string[] {
   const result = _TAG_LIST_SCHEMA.safeParse(value);
 
   return result.success ? [...new Set(result.data)] : [];
 }
 
-/**
- * Dual-write: mirror `category` into `metadata.tags` so
- * single-select processing areas filter through the multi-label
- * tag rail. This is the **intended bridge** (see the categorize
- * module docstring), not a legacy shim. Preserves unrelated
- * (non-processing) tags.
- */
 export function metadataWithCategoryTag(
   metadata: Metadata | string | null | undefined,
   category: string,
@@ -704,13 +566,6 @@ export function metadataWithCategoryTag(
   return md;
 }
 
-/**
- * The ONLY write path for `items.metadata` plus the `search_text`
- * mirror the external-content FTS indexes read (AGENTS.md rebuild
- * rule: no code path may write items without keeping both columns
- * in step). Pass `lastSeenUtc` only when the caller may move the
- * item in the feed; omit it to leave `last_seen_utc` untouched.
- */
 export function writeItemMetadata(
   db: Database,
   item: RawItem,
@@ -741,13 +596,6 @@ function updateMetadata(db: Database, item: RawItem, metadata: Metadata): void {
   writeItemMetadata(db, item, metadata, lastSeen);
 }
 
-/**
- * Shallow-merge `updates` into an item's metadata (+ rebuild
- * search_text) WITHOUT touching last_seen_utc, so a background
- * backfill (e.g. lazy thumbnail capture) never reorders the
- * feed. Skips falsy values; `onlyIfMissing` skips keys already
- * set truthy. Returns true iff a write happened. Caller commits.
- */
 export function patchItemMetadata(
   db: Database,
   fullname: string,
@@ -787,12 +635,6 @@ export function patchItemMetadata(
   return true;
 }
 
-/**
- * Set `metadata.category` (single-select) and keep the
- * dual-write tag mirror in sync. See `metadataWithCategoryTag`
- * and the categorize module docstring for the three-system
- * taxonomy model.
- */
 export function setCategory(db: Database, fullname: string, category: string): boolean {
   const item = getItem(db, fullname);
 
@@ -804,28 +646,9 @@ export function setCategory(db: Database, fullname: string, category: string): b
 }
 
 function normUserTag(tag: string): string {
-  /**
-   * Normalize a user-entered tag: stripped + lowercased (to
-   * match the curated vocabulary and avoid case-duplicate tags),
-   * capped to a sane length.
-   */
   return tag.trim().toLowerCase().slice(0, 40);
 }
 
-/**
- * Add/remove **user** tags on an item, non-destructively.
- *
- * Manual tags live in `metadata.tags` (the displayed list) AND
- * are stamped in `metadata.tags_manual` so the pipeline
- * (`categorize` re-tag / `mergeUpsert` re-import) can't clobber
- * them — the stamp is re-unioned wherever tags get rewritten.
- * Heuristic/programmatic tags are stamped separately in
- * `metadata.tags_auto` by `setAutoTags`, so future
- * sorting/filtering can distinguish human vs auto tags. Rebuilds
- * `search_text` but does NOT move `last_seen_utc` (a tag edit
- * shouldn't reorder the feed). Returns the resulting tag list, or
- * `null` if the item is missing. Caller commits.
- */
 export function setTags(
   db: Database,
   fullname: string,
@@ -879,18 +702,6 @@ export function setTags(
   return tags;
 }
 
-/**
- * Replace an item's programmatic/heuristic tag stamp.
- *
- * `metadata.tags_auto` records the auto-generated subset, while
- * `metadata.tags` remains the displayed/searchable union of
- * preserved base tags + auto + manual tags. Clearing auto tags
- * (`tags=[]`) removes `tags_auto` and leaves any preserved tags
- * and `tags_manual` entries visible. This is intentionally
- * separate from `setTags`, which is the human edit path.
- * Returns the resulting displayed tag list, or `null` if the
- * item is missing. Caller commits.
- */
 export function setAutoTags(
   db: Database,
   fullname: string,
@@ -923,13 +734,6 @@ export function setAutoTags(
   return final;
 }
 
-/**
- * One-time backfill: ensure the category→tag dual-write is
- * populated for rows that have a `metadata.category` but may be
- * missing the tag mirror. Idempotent — safe to re-run. Runs once
- * from the `init-db` CLI command (NOT per-connection — see
- * `initDb`).
- */
 export function normalizeProcessingTags(db: Database): number {
   return withTransaction(db, () => {
     const candidates = rows<RawItem>(
@@ -955,17 +759,10 @@ export function normalizeProcessingTags(db: Database): number {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Body / Obsidian-derived metadata
-// ---------------------------------------------------------------------------
-
 const _WIKILINK_RE = /\[\[([^\]]+)\]\]/g;
 
-// A leading ':' (namespaced tag), '/' or word char before '#'
-// means the '#' is part of a URL/path/mention, not an inline tag.
 const _INLINE_TAG_RE = /(?<![:/\w])#([\w-/]+)/g;
 
-/** Metadata derived from an Obsidian note body. */
 function obsidianBodyMetadata(body: string): Metadata {
   const wikilinks: string[] = [];
 
@@ -986,12 +783,6 @@ function obsidianBodyMetadata(body: string): Metadata {
   return { tags, wikilinks };
 }
 
-/**
- * Set an item's body, update search text, and mark it as
- * user-edited. Direct UPDATE mirrors the user-state helpers:
- * callers commit, and the existing items_au trigger keeps FTS in
- * sync.
- */
 export function setBody(db: Database, fullname: string, body: string): Item | null {
   const prev = getItem(db, fullname);
 
@@ -1023,9 +814,6 @@ export function setBody(db: Database, fullname: string, body: string): Item | nu
 
   return publicByFullname(db, fullname);
 }
-// ---------------------------------------------------------------------------
-// Upsert (non-destructive overlay)
-// ---------------------------------------------------------------------------
 
 const _OVERLAY_FIELDS = ["title", "body", "url", "author"] as const;
 
@@ -1040,10 +828,6 @@ const _USER_STATE_METADATA_KEYS = new Set([
   "snooze_count",
 ]);
 
-/**
- * Column values for a brand-new row: derive the category tag
- * mirror, serialize metadata, and build the FTS search blob.
- */
 function insertValues(
   item: RawItem,
   incomingMd: Metadata,
@@ -1062,10 +846,6 @@ function insertValues(
   return ITEM_FIELDS.map((field) => toInsert[field] ?? null);
 }
 
-/** Chunked multi-row INSERT: one JS-to-SQLite call per chunk
- * instead of one per row. Statement dispatch and Bun's per-call
- * parameter marshalling dominate bulk import time — the b-tree
- * writes, FTS triggers included, are the smaller half. */
 const _INSERT_CHUNK = 250;
 
 function insertChunkSql(n: number): string {
@@ -1077,49 +857,10 @@ function insertChunkSql(n: number): string {
   );
 }
 
-/**
- * Insert a new item, or non-destructively overlay onto an
- * existing one. Returns `"inserted"` or `"updated"`. Never
- * overwrites user/triage state (`status`, `processed_utc`,
- * `status_prev`, `is_saved`, `metadata.karakeep_id`) and
- * never moves `first_seen_utc` forward.
- *
- * Merge contract (pinned by test_merge_upsert_tags_semantics
- * — port exactly):
- *
- * - title/body/url/author overlay ONLY when the incoming
- *   value is truthy, and body NEVER overlays when
- *   `metadata.body_edited_at` is set (user edits are
- *   durable);
- * - created_utc/saved_utc update only when the incoming
- *   value is truthy;
- * - kind upgrades from ""/"item"/null, never downgrades;
- * - metadata shallow-merges (incoming non-empty values
- *   win; prior keys kept), but USER_STATE_METADATA_KEYS
- *   on the stored row are preserved (decay/snooze/karakeep
- *   state is local user state, not re-importable);
- * - tags UNION-merge ONLY when the incoming item carries a
- *   category (the category mirror needs prior tags kept);
- *   otherwise incoming tags REPLACE existing ones wholesale
- *   — re-tag passes recompute from scratch and rely on
- *   this. A future partial-tags caller would clobber e.g.
- *   NSFW tags: change deliberately (with tests) or send
- *   category alongside;
- * - after the merge the category mirror is (re)derived and
- *   stamped tags_auto/tags_manual are re-unioned into
- *   `tags`, so any tag rewrite above can't drop them;
- * - first_seen_utc/status/processed_utc/status_prev/is_saved
- *   are preserved (local triage state); last_seen_utc
- *   follows the incoming row or now.
- */
 export function mergeUpsert(db: Database, item: RawItem): string {
   const incomingMd = parseMetadata(item.metadata);
   const incomingCategory = incomingMd.category ?? "";
 
-  // New rows are the common case during an import, and the merge
-  // below is unreachable for them — probe existence instead of
-  // materializing + schema-validating the whole row (body,
-  // metadata, raw_json) only to throw it away.
   const existing = itemExists(db, item.fullname) ? getItem(db, item.fullname) : null;
 
   if (existing === null) {
@@ -1133,8 +874,6 @@ export function mergeUpsert(db: Database, item: RawItem): string {
   return "updated";
 }
 
-/** Non-destructive overlay of `item` onto a stored row (see the merge
- * contract on `mergeUpsert`). */
 function mergeOnto(
   db: Database,
   item: RawItem,
@@ -1230,18 +969,6 @@ export interface MergeBatchResult {
   errors: { fullname: string; message: string }[];
 }
 
-/**
- * Batch form of `mergeUpsert` for imports. Rows the DB has never
- * seen are inserted with one multi-row statement per chunk —
- * per-row statement dispatch dominates a bulk import far more
- * than the b-tree work does. Everything else (existing rows,
- * fullnames repeated inside the batch) replays `mergeUpsert`
- * exactly, so merge semantics stay identical.
- *
- * Caller owns the transaction. A chunk that fails is replayed row
- * by row so one malformed item reports its own error without
- * losing its neighbours.
- */
 export function mergeUpsertMany(db: Database, items: RawItem[]): MergeBatchResult {
   const result: MergeBatchResult = { inserted: 0, updated: 0, errors: [] };
 
@@ -1267,11 +994,7 @@ export function mergeUpsertMany(db: Database, items: RawItem[]): MergeBatchResul
     )) {
       try {
         stored.set(r.fullname, rowToRaw(r));
-      } catch {
-        // Unparseable stored row: leave it out so the item takes the
-        // single-item path, where the error is attributed to it alone
-        // instead of failing the whole import.
-      }
+      } catch {}
     }
   }
 
@@ -1292,9 +1015,6 @@ export function mergeUpsertMany(db: Database, items: RawItem[]): MergeBatchResul
         mergeOnto(db, item, incomingMd, incomingMd.category ?? "", existing);
         result.updated += 1;
       } else {
-        // Repeated inside this batch (or inserted concurrently):
-        // replay the single-item sequence so the merge contract
-        // applies to the earlier copy.
         const outcome = mergeUpsert(db, item);
 
         result[outcome === "inserted" ? "inserted" : "updated"] += 1;
@@ -1356,23 +1076,6 @@ export function patchItem(db: Database, fullname: string, patch: ItemPatch): boo
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Search
-// ---------------------------------------------------------------------------
-
-/**
- * Build a safe FTS5 MATCH expression.
- *
- * - Each bare token is quoted so FTS5 operator keywords
- *   (OR/AND/NOT/NEAR) are treated as literals, not syntax.
- * - `exact` phrases are added as FTS5 phrase terms (also
- *   quoted, inner quotes doubled).
- * - `exclude` terms are appended as `NOT "term"` clauses.
- *
- * IMPORTANT: the caller must ensure there is at least one
- * *positive* term (either `q` tokens or `exact`). FTS5
- * rejects queries that contain only NOTs.
- */
 function ftsQuery(q: string, opts: { exact?: string[]; exclude?: string[] } = {}): string {
   const exact = opts.exact ?? [];
   const exclude = opts.exclude ?? [];
@@ -1400,19 +1103,6 @@ function ftsQuery(q: string, opts: { exact?: string[]; exclude?: string[] } = {}
   return out;
 }
 
-/**
- * (AND, OR) expressions over the query's overlapping
- * 3-grams; ("", "") if < 3 chars.
- *
- * AND ≈ "contains the typed string" — the tight default
- * for fuzzy search (partial words and trailing typos still
- * match via substring). OR matches ANY single gram and is
- * junk unless rank-ordered — it exists only as the
- * typo-rescue fallback when the tight pass finds nothing
- * (became user-visible when fuzzy went default-on: an
- * OR-only match made every bare search return one-gram
- * noise in recency order).
- */
 function trigramExprs(q: string): [string, string] {
   const s = (q || "").trim().toLowerCase();
 
@@ -1430,11 +1120,6 @@ function orderClause(sort: string | undefined, order: string | undefined, alias 
   const a = alias ? `${alias}.` : "";
 
   if (sort === "shuffle") {
-    // "Mixed-content" browse (Epic 10): interleave sources
-    // round-robin so a page is a varied MIX instead of
-    // grouped/recency. Deterministic (nth-item-of-each-source,
-    // then source) so infinite-scroll pages don't dup/skip —
-    // unlike ORDER BY RANDOM().
     return (
       `ORDER BY row_number() OVER (PARTITION BY ${a}source ` +
       `ORDER BY ${a}first_seen_utc DESC, ${a}rowid), ${a}source`
@@ -1444,9 +1129,6 @@ function orderClause(sort: string | undefined, order: string | undefined, alias 
   const sortKey = sort ?? "";
   const col = isSortKey(sortKey) ? _SORT_COLUMNS[sortKey] : _SORT_COLUMNS.last_seen_utc;
   const direction = (order || "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
-  // Expression sort keys (json_extract/CAST) must not be
-  // table-alias-prefixed, and NULLs (e.g. videos with no
-  // duration) should sort last in either direction.
   const isExpr = col.includes("(");
   const colSql = isExpr ? col : `${a}${col}`;
   const nulls = isExpr ? " NULLS LAST" : "";
@@ -1488,22 +1170,6 @@ export interface SearchOpts {
   offset?: number;
 }
 
-/**
- * Search/browse items. Empty `q` => filtered recency list.
- *
- * FTS path (positive term present): MATCH on items_fts (or
- * items_trgm when `fuzzy` with no exact/exclude), all other
- * filters applied in SQL on the joined items row. When the
- * tight trigram pass is empty ON PAGE ONE, an OR-of-grams
- * rescue runs rank-ordered (bm25) so near-misses surface —
- * gated to offset 0: on deeper pages an empty tight result
- * means the real matches are simply exhausted.
- *
- * No positive term (operator-only or `-exclude`-only
- * query): plain filtered SELECT; excludes become
- * `LOWER(search_text) NOT LIKE` scans so they are never
- * silently dropped.
- */
 export function searchItems(db: Database, q: string = "", opts: SearchOpts = {}): Item[] {
   const filters: string[] = [];
   const params: SQLQueryBindings[] = [];
@@ -1586,13 +1252,11 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
 
     if (tags?.length) {
       if (tagsAll) {
-        // AND: require membership for every tag.
         for (const t of tags) {
           filters.push(`EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value = ?)`);
           params.push(t);
         }
       } else {
-        // OR: match any selected tag.
         const ph = tags.map(() => "?").join(",");
         filters.push(
           `EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value IN (${ph}))`,
@@ -1601,15 +1265,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
       }
     }
 
-    // An item is NSFW if it carries an NSFW tag OR Reddit
-    // flagged it over_18. The UI blurs/badges on over_18
-    // alone (render.js isNsfw), but the over_18 flag is too
-    // sparse for categorize to reliably tag (gitignored
-    // subreddit rules), so a tag-only filter left
-    // over_18-but-untagged items visible under "Hide NSFW"
-    // (Epic 13 P2). COALESCE keeps an absent over_18 from
-    // NULL-propagating through `NOT (… OR …)` and hiding
-    // SFW rows.
     let nsfwPred = "";
 
     if (nsfw || hideNsfw) {
@@ -1625,14 +1280,11 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if (hideNsfw) {
-      filters.push(`NOT ${nsfwPred}`); // exact inverse of the include filter above
+      filters.push(`NOT ${nsfwPred}`);
       params.push(...NSFW_TAGS);
     }
 
     if (hasMedia) {
-      // has:video|image|gallery — facet over metadata.media_type.
-      // "video" means reddit-hosted video ('reddit_video');
-      // external embeds keep media_type='link'.
       if (Array.isArray(hasMedia)) {
         const mapped = hasMedia.map((h) => (h === "video" ? "reddit_video" : h));
         const ph = mapped.map(() => "?").join(",");
@@ -1646,17 +1298,14 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if (decayed) {
-      // decayed (is:decayed): the item carries a decay-wave stamp (see decay).
       filters.push(`json_extract(${a}metadata, '$.decayed_at') IS NOT NULL`);
     }
 
     if (swept) {
-      // swept (is:swept): decayed in the labeled initial backfill pass specifically.
       filters.push(`json_extract(${a}metadata, '$.decay_label') = 'swept'`);
     }
 
     if (snoozed) {
-      // snoozed (is:snoozed): currently hidden from triage until a future UTC.
       filters.push(`json_extract(${a}metadata, '$.snoozed_until') > ?`);
       params.push(Math.floor(Date.now() / 1000));
     }
@@ -1670,18 +1319,10 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if (deleted) {
-      // deleted (is:deleted): media probed gone (scan-deleted-media).
-      // media_status is the durable SSOT — the mirrored `deleted`
-      // tag is wiped by a categorize retag.
       filters.push(`json_extract(${a}metadata, '$.media_status') = 'gone'`);
     }
 
     if (ocr) {
-      // ocr (is:ocr): items carrying non-empty metadata.ocr_text.
-      // Matches by truthy non-empty string (SQLite's json_extract
-      // returns NULL for missing keys, so a plain `<> ''` filter
-      // would match every row with no ocr_text key — the explicit
-      // IS NOT NULL gate keeps ocr-less rows out of the result).
       filters.push(
         `json_extract(${a}metadata, '$.ocr_text') IS NOT NULL ` +
           `AND CAST(json_extract(${a}metadata, '$.ocr_text') AS TEXT) <> ''`,
@@ -1691,9 +1332,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     if (subreddit) {
       if (Array.isArray(subreddit)) {
         const ph = subreddit.map(() => "?").join(",");
-        // COLLATE belongs on the left operand: on the IN expression
-        // it only tags the result, leaving the comparisons BINARY
-        // and the NOCASE index unusable.
         filters.push(`json_extract(${a}metadata, '$.subreddit') COLLATE NOCASE IN (${ph})`);
         params.push(...subreddit);
       } else {
@@ -1703,9 +1341,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if (author) {
-      // author is a first-class column (filled for reddit/HN);
-      // matched case-insensitively to mirror subreddit. Drives the
-      // `author:` operator + the bare `u/<user>` shorthand.
       if (Array.isArray(author)) {
         const ph = author.map(() => "?").join(",");
         filters.push(`${a}author COLLATE NOCASE IN (${ph})`);
@@ -1717,8 +1352,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if ((before !== undefined && before !== null) || (after !== undefined && after !== null)) {
-      // created_utc=0 means "unknown" for many sparse imports;
-      // avoid treating 0 as "ancient" when date filters are active.
       filters.push(`${a}created_utc > 0`);
     }
 
@@ -1736,7 +1369,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
       (scoreMin !== undefined && scoreMin !== null) ||
       (scoreMax !== undefined && scoreMax !== null)
     ) {
-      // Exclude NULL scores when a score filter is active.
       filters.push(`json_extract(${a}metadata, '$.score') IS NOT NULL`);
       const scoreExpr = `CAST(json_extract(${a}metadata, '$.score') AS INTEGER)`;
 
@@ -1757,7 +1389,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     }
 
     if (openInFirefox) {
-      // the "📑 Firefox tabs" batch (json true -> json_extract returns 1)
       filters.push(`json_extract(${a}metadata, '$.open_in_firefox') = 1`);
     }
 
@@ -1772,11 +1403,8 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
 
   let matchExpr = "";
   let ftsTable = "";
-  let fuzzyRescue = ""; // OR-of-trigrams typo fallback; only ever run rank-ordered
+  let fuzzyRescue = "";
 
-  // FTS5 requires at least one positive term; if the query is
-  // only operators/negations, fall back to the plain filtered
-  // SELECT path.
   const hasPositive = Boolean(query) || Boolean(exact);
 
   if (hasPositive) {
@@ -1788,14 +1416,12 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
         ftsTable = "items_trgm";
 
         if (orExpr !== andExpr) {
-          // >1 gram, a rescue pass is meaningful
           fuzzyRescue = orExpr;
         }
       }
     }
 
     if (!matchExpr) {
-      // exact (or fuzzy fell back for short queries)
       matchExpr = ftsQuery(query, { exact, exclude });
       ftsTable = "items_fts";
     }
@@ -1824,13 +1450,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
     );
 
     if (!result.length && fuzzyRescue && !offset) {
-      // Tight pass empty ON PAGE ONE -> genuine typo territory:
-      // match any gram, best trigram overlap first (bm25 rank),
-      // so near-misses surface and junk sinks. Gated to offset 0:
-      // on deeper pages an empty tight result means the real
-      // matches are simply exhausted — rescuing there would append
-      // unrelated one-gram noise after the genuine results
-      // (pagination/infinite-scroll bug).
       bind[0] = fuzzyRescue;
       result = rows<RawItem>(
         db,
@@ -1844,11 +1463,6 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
 
   addFilters("");
 
-  // No positive FTS term to hang a NOT off of (e.g. a
-  // `-term`-only query), so apply the negations as plain
-  // search_text exclusions instead — otherwise they'd be
-  // silently dropped. (`\W+` tokens are word-chars only, so
-  // escape just LIKE's `_`.)
   for (const term of exclude) {
     for (const tk of (term || "").split(/\W+/u).filter((t) => t)) {
       const esc = tk
@@ -1875,22 +1489,8 @@ export function searchItems(db: Database, q: string = "", opts: SearchOpts = {})
   return rows<RawItem>(db, sql, bind).map(rowToPublic);
 }
 
-/** Page size beyond which a shuffle page re-reads more rowids per
- * source than one full scan would (see `shufflePage`). */
 const _SHUFFLE_MERGE_MAX = 2_000;
 
-/**
- * `sort=shuffle` interleaves the sources round-robin, each ordered
- * by recency — a transpose of per-source sequences. The window
- * function form makes SQLite rank every row before LIMIT can apply
- * (full scan + two sorts, ~100ms per page); transposing instead
- * reads only the first `offset + limit` rowids of each source and
- * walks the diagonal. Same order, same rows.
- *
- * Only shallow pages merge: past `_SHUFFLE_MERGE_MAX` the per-source
- * previews together exceed one scan, so the window query (which pays
- * that scan once) is the cheaper way to reach the page.
- */
 function shufflePage(
   db: Database,
   filters: string[],
@@ -1900,9 +1500,6 @@ function shufflePage(
 ): Item[] {
   const take = offset + limit;
 
-  // Source discovery ignores the filters on purpose: this is a
-  // skip-scan over the source index, and a source with no matching
-  // rows simply contributes none.
   const sources = rows<{ source: string }>(db, "SELECT DISTINCT source FROM items")
     .map((r) => String(r.source))
     .sort();
@@ -1963,19 +1560,6 @@ function shufflePage(
   });
 }
 
-/**
- * Return up to `n` items — the triage batch (default: smart
- * inbox).
- *
- * `mode='smart'` (Epic 10) interleaves likely-to-be-processed
- * items with recent ones instead of a flat shuffle: ~`smartMix`
- * of the batch is sampled from the top of `metadata.triage_score`
- * (written by triage_score.learn), the rest from the
- * newest-synced, topped up randomly when either pool runs short.
- * Sampling from a pool (5x oversample) rather than taking the
- * strict top keeps repeat batches varied. Falls back to pure
- * random when no scores exist yet.
- */
 export function getRandomBatch(
   db: Database,
   n = 20,
@@ -2054,18 +1638,12 @@ export function getRandomBatch(
   const scoreWhere =
     where + (where ? " AND " : " WHERE ") + "json_extract(metadata, '$.triage_score') IS NOT NULL";
 
-  // Without statistics SQLite prices the status bucket as tiny and
-  // sorts every inbox row (~25ms per deck request). Scanning the
-  // triage-score index instead stops as soon as the pool is full
-  // (~0.1ms). Only the unfiltered deck takes the hint: a narrowing
-  // filter's own index is the better entry point there.
   const scoreScan =
     opts.source || opts.category || opts.tags?.length ? "" : " INDEXED BY idx_items_triage_score";
 
   const scorePool = rows<RawItem>(
     db,
     `SELECT * FROM items${scoreScan}${scoreWhere} ` +
-      // CAST matches _SORT_COLUMNS.smart and the index expression.
       `ORDER BY CAST(json_extract(metadata, '$.triage_score') AS REAL) DESC LIMIT ?`,
     [...params, kScore * 5],
   );
@@ -2090,7 +1668,6 @@ export function getRandomBatch(
   }
 
   if (picked.size < count) {
-    // Top up randomly (small inboxes, missing scores).
     const ph = [...picked.keys()].map(() => "?").join(",");
 
     const notPicked = ph ? `${where ? " AND" : " WHERE"} fullname NOT IN (${ph})` : "";
@@ -2107,7 +1684,6 @@ export function getRandomBatch(
   return out.slice(0, count).map(rowToPublic);
 }
 
-/** Random sample without replacement (mirrors random.sample). */
 function sample<T>(xs: T[], k: number): T[] {
   const copy = [...xs];
 
@@ -2119,30 +1695,17 @@ function sample<T>(xs: T[], k: number): T[] {
   return copy.slice(0, Math.min(k, xs.length));
 }
 
-/** In-place Fisher-Yates (mirrors random.shuffle). */
 function shuffle<T>(xs: T[]): void {
   for (let i = xs.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [xs[i], xs[j]] = [xs[j]!, xs[i]!];
   }
 }
-// ---------------------------------------------------------------------------
-// Reddit unsave queue
-// ---------------------------------------------------------------------------
 
-/** Whether marking a reddit item 'done' should queue it for unsaving on Reddit. */
 export function unsaveEnabled(db: Database): boolean {
   return getSetting(db, "reddit_unsave_on_done", "0") === "1";
 }
 
-/**
- * Queue a reddit post/comment for unsaving (idempotent).
- * No-op for non-reddit items.
- *
- * The reddit_id stored is items.source_id, which already
- * carries the t3_/t1_ prefix the Reddit API wants. Does
- * NOT commit — the caller commits with the status change.
- */
 export function enqueueUnsave(db: Database, fullname: string): void {
   const r = row<{ source: string; source_id: string }>(
     db,
@@ -2159,27 +1722,16 @@ export function enqueueUnsave(db: Database, fullname: string): void {
     db,
     "INSERT INTO reddit_unsave(fullname, reddit_id, state, enqueued_utc) " +
       "VALUES(?, ?, 'pending', ?) " +
-      // attempts/last_error reset: a re-Done item gets a fresh chance even if a prior
-      // run exhausted its MAX_ATTEMPTS and parked it as 'failed'.
       "ON CONFLICT(fullname) DO UPDATE SET state='pending', attempts=0, last_error=NULL, " +
       "updated_utc=excluded.enqueued_utc",
     [fullname, sid, now],
   );
 }
 
-/** Drop a still-pending unsave (a 'done' undone before the drain ran). Caller commits. */
 export function dequeueUnsave(db: Database, fullname: string): void {
   run(db, "DELETE FROM reddit_unsave WHERE fullname=? AND state='pending'", [fullname]);
 }
 
-/**
- * Backfill: queue every reddit post/comment already marked 'done'
- * for unsaving.
- *
- * Enabling the feature does not retroactively enqueue past Dones;
- * this is the opt-in one-time seed. Items already queued are left
- * untouched. Returns the number added.
- */
 export function enqueueExistingDone(db: Database): number {
   const now = Math.floor(Date.now() / 1000);
   const before = scalar(db, "SELECT COUNT(*) AS c FROM reddit_unsave");
@@ -2197,25 +1749,6 @@ export function enqueueExistingDone(db: Database): number {
   return after - before;
 }
 
-/**
- * Heal saved COMMENTS that were ingested (pre-fix) with a ``t3_``
- * (link) prefix instead of ``t1_`` (comment). Reddit's write endpoints
- * 400 on the wrong thing-type, so an unsave of such a row fails forever
- * and parks as ``state='failed'``.
- *
- * The correct id is derived from the item's permalink (a comment
- * permalink carries a second id segment:
- * ``/comments/<post>/<slug>/<comment>/``) via the SAME parser the
- * importer uses, so this can't disagree with ingest. Rewrites every
- * place the wrong id lives so a later re-sync can't re-insert a ``t1_``
- * duplicate of the same comment: ``items.source_id`` **and** the
- * ``fullname`` primary key (``reddit:t3_x`` -> ``reddit:t1_x``), plus
- * the dependent ``reddit_unsave`` (fullname + reddit_id) and
- * ``reddit_threads`` (fullname) rows. ``items_fts`` is kept in sync by
- * the items AFTER UPDATE trigger. A row whose corrected fullname already
- * exists is skipped (no PK collision). Idempotent (fixed rows no longer
- * match ``t3_``). Returns the number of items corrected; commits.
- */
 export function repairRedditCommentPrefixes(db: Database): number {
   return withTransaction(db, () => {
     const candidates = rows<{ fullname: string; source_id: string; permalink: string | null }>(
@@ -2228,9 +1761,6 @@ export function repairRedditCommentPrefixes(db: Database): number {
 
     for (const candidate of candidates) {
       const correct = sidFromPermalink(String(candidate.permalink || ""));
-      // Only act when the permalink resolves to a COMMENT for this exact
-      // id (same bare base36, t1_ prefix). A real link/post
-      // (correct[:3]=='t3_') or a mismatch is left untouched.
       const sourceId = String(candidate.source_id);
 
       if (!(correct.startsWith("t1_") && correct.slice(3) === sourceId.slice(3))) {
@@ -2243,7 +1773,7 @@ export function repairRedditCommentPrefixes(db: Database): number {
       if (
         row<{ exists: number }>(db, "SELECT 1 AS exists FROM items WHERE fullname=?", [newFullname])
       ) {
-        continue; // corrected row already exists — don't collide the PK
+        continue;
       }
 
       run(db, "UPDATE items SET source_id=?, fullname=? WHERE fullname=?", [
@@ -2264,30 +1794,6 @@ export function repairRedditCommentPrefixes(db: Database): number {
   });
 }
 
-/**
- * Remove phantom ``t3_`` duplicates of saved COMMENTS that ALSO
- * exist (correctly) as ``t1_``.
- *
- * A pre-fix ingest recorded some saved comments under BOTH the right
- * id (``reddit:t1_x``) and a wrong link-typed id (``reddit:t3_x``). The
- * ``t3_`` twin is bogus: it shows as a duplicate inbox item and 400s on
- * unsave (Reddit rejects the wrong thing-type). This collapses each pair
- * onto the canonical ``t1_`` row:
- *
- * - if the canonical row is still ``inbox`` and the phantom carries a
- *   real triage decision, that decision is moved to the canonical row
- *   (`setStatus`) so a done/archived made on the duplicate isn't lost;
- * - if the phantom was queued for unsave, the REAL comment is queued
- *   instead (so the originally intended unsave finally targets a valid
- *   id);
- * - the phantom's ``items`` row (``items_fts`` auto-cleaned by the
- *   AFTER DELETE trigger), ``reddit_unsave`` row, and ``reddit_threads``
- *   row are deleted.
- *
- * Distinct from `repairRedditCommentPrefixes`, which RENAMES a t3_
- * comment that has NO t1_ twin. Idempotent. Returns
- * `{removed, status_moved, requeued}`; commits.
- */
 export function dedupeRedditCommentTwins(db: Database): RedditCommentDedupeResult {
   const candidates = rows<{
     fullname: string;
@@ -2319,13 +1825,13 @@ export function dedupeRedditCommentTwins(db: Database): RedditCommentDedupeResul
     ]);
 
     if (!twin) {
-      continue; // no twin -> a true orphan; repair_reddit_comment_prefixes
+      continue;
     }
 
     const phantom = String(r.fullname);
 
     if (twin.status === "inbox" && r.status !== "inbox") {
-      setStatus(db, twinFullname, String(r.status)); // move the only triage signal onto the real row
+      setStatus(db, twinFullname, String(r.status));
       statusMoved += 1;
     }
 
@@ -2334,7 +1840,7 @@ export function dedupeRedditCommentTwins(db: Database): RedditCommentDedupeResul
         phantom,
       ])
     ) {
-      enqueueUnsave(db, twinFullname); // queue the REAL comment (valid id)
+      enqueueUnsave(db, twinFullname);
       requeued += 1;
     }
 
@@ -2347,14 +1853,6 @@ export function dedupeRedditCommentTwins(db: Database): RedditCommentDedupeResul
   return { removed, status_moved: statusMoved, requeued };
 }
 
-/**
- * Preview local unsave queueing for still-saved reddit items carrying
- * *tag*.
- *
- * No network calls and no writes. The skip buckets are mutually
- * exclusive and ordered so the `eligible` count is exactly the number
- * a confirmed enqueue can add.
- */
 export function previewUnsaveByTag(db: Database, tag: string): TagUnsavePreview {
   const clean = String(tag || "").trim();
 
@@ -2448,14 +1946,6 @@ export function previewUnsaveByTag(db: Database, tag: string): TagUnsavePreview 
   return summary;
 }
 
-/**
- * Queue every still-saved reddit item carrying *tag* for unsaving.
- *
- * Idempotent and local-only: existing ``reddit_unsave`` rows are left
- * untouched, and Reddit is contacted only by the separate drain
- * operation. Returns a preview/apply summary with ``enqueued`` set to
- * the number newly inserted.
- */
 export function enqueueUnsaveByTag(
   db: Database,
   tag: string,
@@ -2486,49 +1976,6 @@ export function enqueueUnsaveByTag(
   return result;
 }
 
-/**
- * Flip ``is_saved`` to 0 for reddit items missing from a fresh saved-list
- * export.
- *
- * ``presentByKind`` maps ``"post"``/``"comment"`` -> the set of
- * ``source_id``s (``t3_``/``t1_`` ids) seen in the export. A DB item
- * still marked saved but absent from the export was un-saved on
- * reddit.com, so we clear ``is_saved`` locally (we do NOT enqueue an
- * unsave — it's already gone server-side).
- *
- * DELTA RECONCILE (the only safe design) — this NEVER touches a row
- * that wasn't itself previously confirmed in a saved-list snapshot.
- * ``is_saved=1`` in this DB is the ``new_item`` default for *every*
- * imported reddit row (bulk Karakeep/GDPR/JSON dumps), not "currently
- * saved on reddit", so a single export can't tell un-saved from
- * never-a-real-save. We therefore only consider rows carrying the
- * ``metadata.saved_seen_utc`` provenance marker (stamped by the
- * saveddit import / a saved-list sync). Consequence: the FIRST snapshot
- * just establishes the baseline (marks rows, un-saves nothing); later
- * snapshots detect genuine drop-outs among previously-seen items.
- * Bulk-imported rows are never reconciled.
- *
- * SAFETY — also Reddit's saved listing caps at ~``cap`` items PER TYPE
- * (links vs comments fetched separately). A type whose export count
- * reaches the cap may be *truncated*, so a missing item could be merely
- * beyond the cap; that type is SKIPPED. Zero-row types are skipped.
- *
- * ``truncatedByKind`` lets the SYNC/IMPORT layer — which actually knows
- * whether the listing was exhausted (walked ``after`` to the end / a
- * complete GDPR export) vs. stopped at a page cap — override the
- * row-count inference (B2). When a kind appears in it, its bool
- * governs: ``true`` skips that type (``skipped='source_truncated'``)
- * regardless of count; ``false`` reconciles even AT/above ``cap`` (so a
- * *complete* export of exactly ``cap`` items is no longer mistaken for
- * a truncated one). When ``null`` or a kind is absent, the legacy
- * ``len(present) >= cap`` inference is used — existing callers are
- * unchanged.
- *
- * Returns ``{kind: {present, capped, skipped, unsaved, fullnames}}``.
- * ``dryRun=true`` previews (computes the would-unsave set) without
- * writing. This is a non-additive, destructive write — back up the DB
- * first.
- */
 export interface RedditReconcileKindResult {
   present: number;
   capped: boolean;
@@ -2604,40 +2051,16 @@ export function reconcileRedditSaves(
   return summary;
 }
 
-// ---------------------------------------------------------------------------
-// Triage operations
-// ---------------------------------------------------------------------------
-
-// Any MANUAL status transition exits transient triage states (see
-// decay/undecay and snooze/unsnooze): strip wave marks so
-// "stamped == currently decayed/snoozed" holds. ``snooze_count``
-// deliberately survives as cumulative history; a manual decision only
-// clears the active deferral. One definition for every status writer —
-// a future writer that forgets this breaks the invariant silently. No
-// json_valid guard needed: the functional duration index makes SQLite
-// validate metadata JSON on every write, so a malformed row can never
-// exist here (pinned by test_malformed_metadata_cannot_enter_the_db).
 const _STRIP_DECAY_SQL =
   "json_remove(metadata, '$.decayed_at', '$.decay_label', " +
   "'$.snoozed_until', '$.snoozed_wave')";
 
-/** Reject a status outside the models-owned domain before any status write. */
 function assertStatus(status: string): void {
   if (!VALID_STATUSES.some((validStatus) => validStatus === status)) {
     throw new Error(`invalid status: ${JSON.stringify(status)}`);
   }
 }
 
-/**
- * Set an item's triage status; record the previous one for undo.
- *
- * ``queueUnsave`` (default true) controls whether a transition to
- * ``done`` enqueues a Reddit unsave when the opt-in is on. The
- * reconcile path passes false: an item promoted to done *because it
- * was already unsaved on Reddit* must not trigger a redundant no-op
- * unsave write (mirrors `reconcileRedditSaves` — it's already gone
- * server-side).
- */
 export function setStatus(
   db: Database,
   fullname: string,
@@ -2654,7 +2077,7 @@ export function setStatus(
   const old = String(r.status);
 
   if (status === old) {
-    return publicByFullname(db, fullname); // idempotent; don't clobber status_prev
+    return publicByFullname(db, fullname);
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -2670,18 +2093,14 @@ export function setStatus(
 
     if (status === "done" && queueUnsave && unsaveEnabled(db)) {
       try {
-        // best-effort, local-only — an enqueue hiccup must never fail the status write
         enqueueUnsave(db, fullname);
-      } catch {
-        // best-effort
-      }
+      } catch {}
     }
 
     return publicByFullname(db, fullname);
   });
 }
 
-/** Revert the most recent status change (single step). */
 export function undoStatus(db: Database, fullname: string): Item | null {
   const r = row<{ status_prev: string | null; status: string }>(
     db,
@@ -2706,19 +2125,13 @@ export function undoStatus(db: Database, fullname: string): Item | null {
     );
 
     if (r.status === "done") {
-      // a Done undone before the drain ran is never sent to Reddit
       dequeueUnsave(db, fullname);
-      // NOTE: if the unsave already drained (queue state 'done'), the
-      // item is genuinely gone from Reddit Saved — this layer stays
-      // offline; the web /undo route attempts the live re-save
-      // (reddit_unsave.resave) and surfaces a warning when it fails.
     }
 
     return publicByFullname(db, fullname);
   });
 }
 
-/** Apply a status to many items; returns the number updated. */
 export function bulkSetStatus(db: Database, fullnames: string[], status: string): number {
   assertStatus(status);
 
@@ -2730,8 +2143,6 @@ export function bulkSetStatus(db: Database, fullnames: string[], status: string)
 
   return withTransaction(db, () => {
     for (const fn of fullnames) {
-      // `AND status<>?` skips no-op updates so status_prev (single-step
-      // undo) is never clobbered by re-applying the same status.
       const n = run(
         db,
         `UPDATE items SET status_prev=status, status=?, processed_utc=?, ` +
@@ -2745,12 +2156,9 @@ export function bulkSetStatus(db: Database, fullnames: string[], status: string)
     }
 
     for (const fn of changed) {
-      // enqueueUnsave no-ops for non-reddit; best-effort, local-only
       try {
         enqueueUnsave(db, fn);
-      } catch {
-        // best-effort
-      }
+      } catch {}
     }
 
     return count;
@@ -2812,18 +2220,6 @@ function inboxRowsForFullnames(db: Database, fullnames: string[]): RawItem[] {
   return found;
 }
 
-/**
- * Stamp inbox items as snoozed without changing status.
- *
- * ``metadata.snoozed_until`` hides the item from triage batches until
- * that UTC, and ``metadata.snoozed_wave`` makes one snooze wave
- * reversible via `unsnooze`. ``metadata.snooze_count`` is cumulative:
- * unsnooze and manual decisions do not decrement it. When a snooze
- * would make the count reach ``escalateAfter``, the item silently
- * follows the decay path instead (archived with
- * ``decay_label='snooze-escalated'``), still by direct UPDATE and
- * never via `bulkSetStatus`.
- */
 export function snooze(
   db: Database,
   opts: {
@@ -2875,8 +2271,6 @@ export function snooze(
     const now = Math.floor(Date.now() / 1000);
     let appliedTotal = 0;
 
-    // SAFETY: no search_text rewrite — snoozed_until, snooze_count and
-    // snoozed_wave are absent from models._META_SEARCH_KEYS.
     if (toSnooze.length) {
       const wave = allocateSnoozeWave(db, now);
       const placeholders = toSnooze.map(() => "?").join(",");
@@ -2920,13 +2314,6 @@ export function snooze(
   return res;
 }
 
-/**
- * Clear active snooze marks for one wave or explicit inbox items.
- *
- * ``snooze_count`` is intentionally not decremented; it is a
- * cumulative signal used for repeat-snooze escalation. This function
- * never changes status and never touches the Reddit unsave queue.
- */
 export function unsnooze(
   db: Database,
   opts: {
@@ -2974,9 +2361,6 @@ export function unsnooze(
     sample: sampleItems(list, samples),
   };
 
-  // SAFETY: no search_text rewrite — none of the keys this touches
-  // (snoozed_until, snoozed_wave) appear in models._META_SEARCH_KEYS, so
-  // buildSearchText is unchanged. Matches the Python oracle's UPDATE.
   if (opts.apply) {
     res.applied = true;
 
@@ -2995,18 +2379,8 @@ export function unsnooze(
   return res;
 }
 
-// Item age: content creation time when known, else when we first synced
-// it. (Reddit/YouTube expose no save timestamps, so this is a content-age
-// proxy — see the decay docstring.)
 const _AGE_EXPR = "(CASE WHEN created_utc > 0 THEN created_utc ELSE first_seen_utc END)";
 
-/**
- * Reversibly bulk-archive inbox items older than ``beforeUtc``.
- *
- * Age uses ``created_utc`` when known, else ``first_seen_utc``.
- * Returns the count affected (or that *would* be affected when
- * ``dryRun``).
- */
 export function bankruptcy(
   db: Database,
   beforeUtc: number,
@@ -3038,10 +2412,6 @@ interface DecayExclusions {
   excludeTags?: readonly string[];
 }
 
-/**
- * AND clauses that keep knowledge content (resurface subreddits/tags)
- * out of a decay selection. Empty lists add nothing.
- */
 function decayExclusionClauses(ex: DecayExclusions): [string[], SQLQueryBindings[]] {
   const clauses: string[] = [];
   const params: SQLQueryBindings[] = [];
@@ -3073,11 +2443,6 @@ function decayWhere(
   source: string,
   exclusions: DecayExclusions = {},
 ): [string, SQLQueryBindings[]] {
-  /**
-   * WHERE clause + params for a decay selection: tag/subreddit
-   * selectors UNION, age cutoff and source AND. Tag SQL mirrors
-   * searchItems' json_each filter.
-   */
   const clauses = ["status='inbox'", "source=?"];
   const params: SQLQueryBindings[] = [source];
   const sel: string[] = [];
@@ -3123,11 +2488,6 @@ export interface DecayOpts extends DecayExclusions {
   samples?: number;
 }
 
-/**
- * Random `r/<sub>: title` preview of the rows a bulk triage
- * operation selected — the dry-run sample `decay`, `undecay` and
- * `deleteItems` all show before anything is applied.
- */
 function randomSubredditSamples(
   db: Database,
   where: string,
@@ -3144,35 +2504,6 @@ function randomSubredditSamples(
   return list.map((r) => `r/${r.subreddit ?? "?"}: ${r.title.slice(0, 60)}`);
 }
 
-/**
- * Guilt-free bulk decay: archive inbox items by tag/subreddit/age,
- * stamped for reversal.
- *
- * The tag-aware successor to `bankruptcy` (PKMS-research adoption,
- * Epic 21): selects ``status='inbox'`` items of ``source`` matching
- * ANY of ``tags``/``subreddits`` (union), optionally older than
- * ``beforeUtc`` (content age — Reddit exposes no save timestamps),
- * and archives them stamping ``metadata.decayed_at``. The stamp is a
- * UNIQUE monotonic wave id (`allocateDecayWave`), not bare ``now`` —
- * so two decays in the same wall-clock second still get distinct
- * stamps and each is one independently reversible "wave" (see
- * `undecay`); it stays ~wall-clock for ``is:decayed``/``swept_recent``.
- * Refuses an unselected decay.
- * ``label`` additionally writes ``metadata.decay_label`` — e.g. the
- * supervised initial backfill uses ``label='swept'`` so its items stay
- * distinguishable from any future rolling decay (queryable via the
- * ``is:swept`` search operator; ``is:decayed`` matches any wave). A
- * label is a marker, NOT a tag: tags get wholesale-replaced by
- * categorize retags, while metadata keys survive both retags and syncs.
- *
- * Deliberately a direct UPDATE like `bankruptcy` — never routed
- * through `bulkSetStatus` — so a mass decay can never enqueue live
- * Reddit unsaves. Dry-run (default) and apply return the same shape;
- * breakdowns are computed before the UPDATE. ``by_tag`` counts
- * membership per selected tag and overlaps by design (an anime+memes
- * item counts under both) — ``total`` is the authoritative distinct-row
- * count, never ``sum(by_tag)``.
- */
 export function decay(db: Database, opts: DecayOpts = {}): DecayResult {
   const tags = opts.tags ?? null;
   const subreddits = opts.subreddits ?? null;
@@ -3309,19 +2640,6 @@ function sweepSample(db: Database, where: string, params: SQLQueryBindings[]): s
   ).map((r) => r.title.slice(0, 140));
 }
 
-/**
- * One-tap "let a pile go" candidates for the Today screen.
- *
- * Two kinds, each counted with ONE grouped query so it stays cheap on
- * a large hoard: subreddit piles (inbox Reddit items per
- * case-insensitive subreddit, minus ``excludeSubreddits`` — the
- * knowledge subreddits that resurface instead) and age piles (inbox
- * items per source whose content is older than four years). Every
- * ``count`` is exactly what `decay` with the matching selector would
- * archive: the WHERE clauses are `decayWhere`'s. Mixed list, largest
- * first, cut to ``limit``; casing and samples are only looked up for
- * the survivors.
- */
 export function sweepCandidates(
   db: Database,
   opts: {
@@ -3345,8 +2663,6 @@ export function sweepCandidates(
 
   const pending: Pending[] = [];
 
-  // Same base as decay({source: "reddit", subreddits: [key]}) minus the
-  // single-subreddit pin, which the GROUP BY supplies.
   const [subWhere, subParams] = decayWhere(null, null, null, "reddit", exclusions);
   const subGroupWhere = `${subWhere} AND ${_SUBREDDIT_KEY_EXPR} IS NOT NULL AND ${_SUBREDDIT_KEY_EXPR} != ''`;
 
@@ -3359,7 +2675,6 @@ export function sweepCandidates(
     pending.push({ kind: "subreddit", key: String(r.k), count: Number(r.c) });
   }
 
-  // decayWhere(null, null, beforeUtc, source, exclusions) grouped over every source.
   const [ageExClauses, ageExParams] = decayExclusionClauses(exclusions);
   const ageWhere = ["status='inbox'", `${_AGE_EXPR} < ?`, ...ageExClauses].join(" AND ");
 
@@ -3372,7 +2687,6 @@ export function sweepCandidates(
     pending.push({ kind: "age", key: String(r.source), count: Number(r.c) });
   }
 
-  // Subreddit piles (one-tap amnesty) before age piles (filler); each by count desc.
   pending.sort(
     (a, b) =>
       Number(a.kind === "age") - Number(b.kind === "age") ||
@@ -3431,10 +2745,6 @@ function sweepSelectorWhere(sweep: SweepSelector, exclusions: DecayExclusions) {
     : decayWhere(null, null, sweep.before_utc ?? 0, sweep.source, exclusions);
 }
 
-/**
- * Up to ``limit`` inbox items of one sweep pile (the exact rows `decay`
- * would rest), items with preview media first — Today's pile mosaic.
- */
 export function sweepSampleItems(
   db: Database,
   sweep: SweepSelector,
@@ -3456,7 +2766,6 @@ export function sweepSampleItems(
   ).map(rowToPublic);
 }
 
-/** Oldest and newest content age (unix seconds) in one sweep pile; null when empty. */
 export function sweepSpan(
   db: Database,
   sweep: SweepSelector,
@@ -3473,14 +2782,6 @@ export function sweepSpan(
   return span?.first && span.last ? { first: span.first, last: span.last } : null;
 }
 
-/**
- * Decay explicit inbox items by fullname, using the same reversible
- * stamp shape.
- *
- * This is the exact-selection hook for repeat-snooze escalation. It
- * deliberately uses a direct UPDATE like `decay` and never routes
- * through `bulkSetStatus`, so it cannot enqueue Reddit unsaves.
- */
 export function decayFullnames(
   db: Database,
   opts: {
@@ -3551,18 +2852,6 @@ export function decayFullnames(
   return res;
 }
 
-/**
- * Reverse `decay`: return stamped-archived items to the inbox.
- *
- * Selects by the ``metadata.decayed_at`` stamp (the wave id) — NOT
- * ``status_prev``, which is single-step and may have been clobbered
- * since. Items manually re-statused after a decay (e.g. to keep) are
- * skipped by the ``status='archived'`` guard; their stale stamp is
- * harmless (undecay never touches non-archived rows, and a later
- * decay re-stamps). The stamp AND the decay label are REMOVED on
- * restore so the invariant "stamped == currently decayed" holds;
- * ``processed_utc`` returns to NULL (inbox semantics, as setStatus).
- */
 export function undecay(
   db: Database,
   opts: {
@@ -3628,15 +2917,6 @@ export interface DeleteItemsOpts {
   maxRows?: number;
 }
 
-/**
- * Chunked hard-delete of selected `victims` and their dependent rows:
- * cached `reddit_threads` first, then the pending `reddit_unsave`
- * queue (skipped when `clearPendingUnsave` is false because the caller
- * just queued real unsaves for these items), then the item itself.
- * 500 fullnames per statement keeps the binding count well under
- * SQLite's variable limit. Caller owns the transaction; returns the
- * number of `reddit_threads` rows removed.
- */
 function deleteVictims(db: Database, victims: string[], clearPendingUnsave: boolean): number {
   let threads = 0;
 
@@ -3659,29 +2939,6 @@ function deleteVictims(db: Database, victims: string[], clearPendingUnsave: bool
   return threads;
 }
 
-/**
- * PERMANENTLY delete matching items (and their cached reddit_threads
- * rows).
- *
- * The destructive endpoint of the triage-then-delete flow (Epic 21):
- * e.g. after the swept/ephemeral pass is triaged, ``swept=true,
- * tags=['ephemeral']`` removes the rest for good. Unlike decay this is
- * IRREVERSIBLE at the DB layer — the CLI wraps it in a dry-run-default
- * + double-confirmation + auto-backup + audit-log gate; this function
- * additionally refuses to apply above ``maxRows`` (blast-radius cap).
- *
- * Selector semantics: ``tags``/``subreddits`` union with each other and
- * AND with every other selector (status/swept/decayed/age/fullnames).
- * At least one selector is required — a bare source-wide delete is
- * refused.
- *
- * ``alsoUnsave=true`` enqueues each deleted reddit item into the
- * existing ``reddit_unsave`` queue BEFORE the row vanishes (the queue
- * stores reddit_id, so draining works without the item). Without it,
- * PENDING queue rows for deleted items are removed so a later drain
- * can't unsave something the user only deleted locally; drained
- * history rows are kept as audit.
- */
 export function deleteItems(db: Database, opts: DeleteItemsOpts = {}): DeleteItemsResult {
   const tags = opts.tags ?? null;
   const subreddits = opts.subreddits ?? null;
@@ -3809,28 +3066,6 @@ export function deleteItems(db: Database, opts: DeleteItemsOpts = {}): DeleteIte
   return res;
 }
 
-/**
- * Permanently purge ``status='done'`` items older than a retention
- * window (Gmail-trash; F15).
- *
- * Items left Done longer than ``done_retention_days`` (setting, default
- * 30) are permanently deleted. Age is measured from ``processed_utc``
- * (when the item entered Done — there is no separate done_at column):
- * an item qualifies when ``processed_utc < now - retention*86400``.
- * ``processed_utc IS NULL`` rows are excluded so an undated Done item is
- * never purged.
- *
- * Like `decay` and `deleteItems`, this is a DIRECT delete — never
- * routed through `bulkSetStatus`/`enqueueUnsave` — so a retention purge
- * MUST NOT enqueue a Reddit unsave. Only ``status='done'`` rows are ever
- * selected; inbox/keep/archived are untouched. Pending ``reddit_unsave``
- * rows for purged items are removed (a local purge should not let a
- * later drain unsave something the user only deleted locally); drained
- * history rows are kept as audit. ``apply=true`` refuses to delete more
- * than ``maxRows`` (blast-radius cap, mirrors `deleteItems` — guards a
- * misconfigured 0-day retention). Dry-run (default) changes nothing.
- * Returns ``{total, applied, retention_days, cutoff, threads_deleted, sample}``.
- */
 export interface PurgeDoneResult {
   total: number;
   applied: boolean;
@@ -3899,13 +3134,7 @@ export function purgeDone(
 
   return { ...res, applied: true, threads_deleted: threadsDeleted };
 }
-// ---------------------------------------------------------------------------
-// Reddit thread cache (post + comment tree; kept out of
-// items.metadata so search stays cheap — the JSON blobs are
-// large). See AGENTS.md "Reddit management view".
-// ---------------------------------------------------------------------------
 
-/** Return the cached thread JSON and hydration time, or null when absent. */
 export function getRedditThread(
   db: Database,
   fullname: string,
@@ -3931,7 +3160,6 @@ export function getRedditThread(
   return { thread_json: threadJson, hydrated_at: r.hydrated_at };
 }
 
-/** Cache (or replace) a thread JSON blob for an item. Idempotent. */
 export function setRedditThread(
   db: Database,
   fullname: string,
@@ -3960,7 +3188,6 @@ export function setRedditThread(
   );
 }
 
-/** Per-subreddit item counts for reddit items (descending), for the sidebar. */
 export function redditSubredditCounts(
   db: Database,
   status?: string | null,
@@ -3982,14 +3209,6 @@ export function redditSubredditCounts(
   ).map((r) => ({ subreddit: String(r.subreddit), count: Number(r.c) }));
 }
 
-/**
- * Tiny ambient counts for the v3 console (Epic 20: win
- * pebbles, the "· N new" tab slice, the quiet decay line).
- * Deliberately guilt-free: arrivals and clears today, never
- * backlog totals. ``cleared_today`` counts manual triage only
- * — decay-stamped rows are excluded so a bulk decay can never
- * masquerade as a day's worth of cleared items.
- */
 export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCounts {
   const now = Math.floor(
     opts.now !== undefined && opts.now !== null ? opts.now : Date.now() / 1000,
@@ -4035,10 +3254,6 @@ export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCo
   };
 }
 
-// ---------------------------------------------------------------------------
-// Folders (Epic 26) — registry + item assignment
-// ---------------------------------------------------------------------------
-
 function folderRow(r: FolderSqlRow): Folder {
   let queryDef: FolderQueryDefinition = {};
 
@@ -4051,7 +3266,6 @@ function folderRow(r: FolderSqlRow): Folder {
   return { ...r, query_def: queryDef };
 }
 
-/** All registered folders, ordered by name. */
 export function listFolders(db: Database): Folder[] {
   return rows<FolderSqlRow>(
     db,
@@ -4060,11 +3274,6 @@ export function listFolders(db: Database): Folder[] {
   ).map(folderRow);
 }
 
-/**
- * Create a folder from a saved-query definition. Returns the created
- * folder. Throws an error on a duplicate name. Names are lowercased
- * for consistency.
- */
 export function createFolder(
   db: Database,
   name: string,
@@ -4094,7 +3303,6 @@ export function createFolder(
   return created;
 }
 
-/** Look up a folder by exact name. */
 export function getFolderByName(db: Database, name: string): Folder | null {
   const r = row<FolderSqlRow>(
     db,
@@ -4106,16 +3314,10 @@ export function getFolderByName(db: Database, name: string): Folder | null {
   return r ? folderRow(r) : null;
 }
 
-/**
- * Delete a folder by id. Returns true if deleted, false if
- * not found. Does NOT clear the folder field from items —
- * they keep their assignment.
- */
 export function deleteFolder(db: Database, folderId: number): boolean {
   return run(db, "DELETE FROM folders WHERE id=?", [folderId]) > 0;
 }
 
-/** Rename a folder. Returns the updated folder, or null if not found. */
 export function renameFolder(db: Database, folderId: number, newName: string): Folder | null {
   const now = Math.floor(Date.now() / 1000);
   const normName = newName.trim().toLowerCase().slice(0, 100);
@@ -4142,10 +3344,6 @@ export function renameFolder(db: Database, folderId: number, newName: string): F
   return getFolderByName(db, newName.trim().slice(0, 100));
 }
 
-/**
- * Set or clear `metadata.folder` on an item. Setting it to null clears
- * the field. Returns true if the item was found and updated.
- */
 export function setItemFolder(db: Database, fullname: string, folderName: string | null): boolean {
   const r = row<RawItem>(db, "SELECT * FROM items WHERE fullname=?", [fullname]);
 
@@ -4158,16 +3356,12 @@ export function setItemFolder(db: Database, fullname: string, folderName: string
   } else {
     delete md.folder;
   }
-  // SAFETY: no search_text rewrite — `folder` is not a _META_SEARCH_KEYS
-  // entry, so the search blob cannot change here. Adding it to that list
-  // without routing this through writeItemMetadata would silently desync FTS.
 
   run(db, "UPDATE items SET metadata=? WHERE fullname=?", [JSON.stringify(md), fullname]);
 
   return true;
 }
 
-/** Number of items assigned to each folder. */
 export function folderCounts(db: Database): CountByKey {
   const out: CountByKey = {};
 
@@ -4183,29 +3377,6 @@ export function folderCounts(db: Database): CountByKey {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// User-tag vocabulary (issue #70 / Epic 26)
-// ---------------------------------------------------------------------------
-
-/**
- * Rewrite ``metadata.tags_manual``/``tags`` on every item
- * carrying ``old``: ``new`` = rename to, ``null`` = remove the
- * tag entirely.
- *
- * The HUMAN stamp (``tags_manual``) and the displayed UNION
- * (``tags``) are rewritten; the PROGRAMMATIC stamp
- * (``tags_auto``) is left untouched so the rewrite can never
- * bleed into the heuristic path. After the writes,
- * ``search_text`` is rebuilt per row and the external-content
- * trigram FTS index is fully rebuilt
- * (``INSERT INTO items_trgm(items_trgm) VALUES('rebuild')`` —
- * SQLite's canonical FTS5 external-content rebuild command;
- * ``INSERT ... SELECT`` is the documented gotcha to avoid).
- * Returns the count of items whose ``tags_manual`` actually
- * contained ``old`` (0 = no-op + no FTS rebuild). Shared by
- * `renameUserTag` (CH-B4) and the user_tags delete path
- * (issue #70). Caller commits.
- */
 function rewriteManualTag(db: Database, old: string, newName: string | null): number {
   const oldTag = normUserTag(old);
 
@@ -4248,21 +3419,11 @@ function rewriteManualTag(db: Database, old: string, newName: string | null): nu
     writeItemMetadata(db, item, md);
   }
 
-  // Rebuild the external-content trigram FTS over search_text so
-  // a search for the new name surfaces the renamed items (or
-  // drops the removed ones). ``'rebuild'`` is SQLite's canonical
-  // FTS5 command for external-content tables (INSERT … SELECT is
-  // the gotcha).
   db.exec("INSERT INTO items_trgm(items_trgm) VALUES('rebuild')");
 
   return list.length;
 }
 
-/**
- * Rename a user-entered tag across every item that carries it
- * in ``metadata.tags_manual`` (CH-B4). Returns the count of
- * affected items (0 = no-op + no FTS rebuild). Caller commits.
- */
 export function renameUserTag(db: Database, old: string, newName: string): number {
   const oldTag = normUserTag(old);
   const newTag = normUserTag(newName);
@@ -4272,11 +3433,6 @@ export function renameUserTag(db: Database, old: string, newName: string): numbe
   return rewriteManualTag(db, oldTag, newTag);
 }
 
-/**
- * All registered user tags (stable id + display name), ordered
- * by name, each with the count of items currently stamped with
- * it (0 = pre-created empty tag — issue #70 / Epic 26 P3).
- */
 export interface UserTag {
   id: number;
   name: string;
@@ -4297,7 +3453,6 @@ export function listUserTags(db: Database): UserTag[] {
   }));
 }
 
-/** Look up a registered user tag by its stable id. */
 export function getUserTag(db: Database, tagId: number): UserTag | null {
   const r = row<{ id: number; name: string }>(db, "SELECT id, name FROM user_tags WHERE id=?", [
     tagId,
@@ -4306,11 +3461,6 @@ export function getUserTag(db: Database, tagId: number): UserTag | null {
   return r ? { id: Number(r.id), name: String(r.name) } : null;
 }
 
-/**
- * Pre-create a user tag in the vocabulary (issue #70): a
- * 0-item tag gets a stable id + display name to live in
- * before it is applied to any item. Raises on empty or duplicate names.
- */
 export function createUserTag(db: Database, name: string): UserTag {
   const norm = normUserTag(name);
 
@@ -4329,10 +3479,6 @@ export function createUserTag(db: Database, name: string): UserTag {
   return tag;
 }
 
-/**
- * Rename a user tag across the vocabulary and item metadata in one
- * transaction. Raises for a missing tag, empty name, or collision.
- */
 export function renameUserTagInVocab(db: Database, tagId: number, newName: string): UserTag {
   const existing = getUserTag(db, tagId);
 
@@ -4363,14 +3509,6 @@ export function renameUserTagInVocab(db: Database, tagId: number, newName: strin
   });
 }
 
-/**
- * Delete a user tag from the vocabulary (issue #70): drops the
- * row AND strips the tag from every item's ``tags_manual``/
- * ``tags`` (same bulk rewrite + FTS rebuild cost as rename —
- * Epic 26 unlocks it cheaply). Returns true if a row was
- * deleted, false if not found. Commits on success; rolls back
- * and re-raises on error.
- */
 export function deleteUserTag(db: Database, tagId: number): boolean {
   const existing = getUserTag(db, tagId);
 
@@ -4384,20 +3522,6 @@ export function deleteUserTag(db: Database, tagId: number): boolean {
   });
 }
 
-/**
- * The user-tag vocabulary: table-registered tags
- * (``user_tags`` — including pre-created empty ones, issue #70)
- * UNION the distinct ``tags_manual`` stamps that `setTags`
- * writes (Epic 26).
- *
- * Registered rows give tags a stable home (id + display name)
- * before or without any item; tags applied before registration
- * (or applied without registering) still surface via the derived
- * union, so nothing that rendered before drops out. Crucially
- * this reads ``tags_manual`` (only user-applied tags), NOT
- * ``tags`` (which also holds the tens-of-thousands of enrich
- * keywords), so surfacing these in the rail stays cheap + clean.
- */
 export function userTagVocab(db: Database): string[] {
   const out = rows<{ tag: string }>(
     db,
@@ -4422,19 +3546,6 @@ export function userTagVocab(db: Database): string[] {
   return out;
 }
 
-/**
- * Counts for the rail's facet tags (curated `FILTER_TAGS`
- * PLUS user-created tags from `userTagVocab`), descending.
- *
- * ``metadata.tags`` also holds non-facet values (e.g. YouTube
- * per-video keywords from the enrich pass), so the result is
- * restricted to the facet vocabulary — otherwise the browse
- * rail would render tens of thousands of one-off keyword tags.
- * User tags join the vocabulary so a manually-applied tag shows
- * up as a rail facet alongside the curated set (Epic 26).
- * Optionally cross-filtered by source/status so the rail
- * composes with the active source tab + status nav.
- */
 export function tagCounts(
   db: Database,
   opts: { source?: string | null; status?: string | null } = {},
@@ -4443,7 +3554,6 @@ export function tagCounts(
   const seen = new Set(facetTags);
 
   for (const t of userTagVocab(db)) {
-    // user-created tags join the curated facet vocabulary
     if (!seen.has(t)) {
       facetTags.push(t);
       seen.add(t);
@@ -4480,7 +3590,6 @@ export function tagCounts(
   return out;
 }
 
-/** Reddit-only stats for the management view's stats modal. */
 export function redditStats(db: Database): RedditStats {
   const sub = "json_extract(metadata, '$.subreddit')";
   const byKind: Record<string, number> = {};
@@ -4525,7 +3634,7 @@ export function redditStats(db: Database): RedditStats {
   ).map((r) => ({ year: Number(r.y), count: Number(r.c) }));
 
   return {
-    total: Object.values(byStatus).reduce((a, b) => a + b, 0), // 0 when there are no reddit items
+    total: Object.values(byStatus).reduce((a, b) => a + b, 0),
     by_kind: byKind,
     by_status: byStatus,
     by_tag: tagCounts(db, { source: "reddit" }),
@@ -4536,10 +3645,6 @@ export function redditStats(db: Database): RedditStats {
     by_year: byYear,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Stats
-// ---------------------------------------------------------------------------
 
 function groupCounts(
   db: Database,
@@ -4574,14 +3679,6 @@ function groupCounts(
   return out;
 }
 
-/**
- * Per-category counts with stable ordering from
- * `VALID_CATEGORIES`.
- *
- * Optional ``source`` / ``status`` cross-filter the counts so the
- * browse category tabs can compose with the active source/status
- * filters while still showing 0-count categories.
- */
 export function categoryCounts(
   db: Database,
   opts: { source?: string | null; status?: string | null } = {},
@@ -4615,12 +3712,6 @@ export function categoryCounts(
   }));
 }
 
-/**
- * Per-source counts. With ``status``, ``count`` is that
- * source's items in that status (sources present globally still
- * appear, possibly with 0); ordered by global size so the tab
- * order stays stable as the status filter changes.
- */
 export function sourceCounts(
   db: Database,
   status?: string | null,
@@ -4664,11 +3755,6 @@ export function getCounts(
   const byStatus = groupCounts(db, "status", source);
 
   if (opts.light) {
-    // Hot path: the browse rail refreshes status counts after every
-    // triage action. It only needs by_status (index-backed, ~3ms) —
-    // skip the unindexed full-table scans below (by_kind /
-    // processed_this_week / with_url, ~170ms total) that only the
-    // Stats modal uses.
     return {
       total,
       inbox: byStatus.inbox ?? 0,
@@ -4676,7 +3762,7 @@ export function getCounts(
     };
   }
 
-  const bySource = groupCounts(db, "source"); // global — drives the Stats modal chart
+  const bySource = groupCounts(db, "source");
   const sourceExtra = source ? " AND source = ?" : "";
   const sourceParams = source ? [source] : [];
   const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;

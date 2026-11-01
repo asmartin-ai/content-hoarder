@@ -10,7 +10,8 @@
     "lint": "oxlint --deny-warnings .",
     "format": "oxfmt src tests scripts",
     "format:check": "oxfmt --check src tests scripts",
-    "check": "bun run typecheck && bun run lint && bun run format:check && bun test"
+    "check": "bun run typecheck && bun run lint && bun run lint:comments && bun run format:check && bun test",
+    "lint:comments": "bun scripts/check-no-comments.ts"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.86.0",

@@ -1,9 +1,3 @@
-/* ============================================================
-   home/clear.css — Clear (focus mode): one card, one decision, a loud finish.
-   The card is a physical object that fills the stage (Tinder): every card the same size, the
-   next one waiting underneath, a stamp that follows the thumb. Contract: clear-v2.md §4–§5;
-   design pass: docs/design/deck-pass.md.
-   ============================================================ */
 body.is-round .ch-nav {
   display: none;
 }
@@ -28,7 +22,6 @@ body.is-round.has-tabbar {
   overflow: visible;
 }
 
-/* --- top bar: × · beads · undo --- */
 .round-bar {
   display: grid;
   flex: none;
@@ -145,7 +138,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- stage: one grid cell, the current card and the peek share it --- */
 .stage {
   position: relative;
   display: grid;
@@ -165,9 +157,6 @@ body.is-round.has-tabbar {
   min-height: 0;
 }
 
-/* Every moving part of a round animates transform and opacity only, so motion stays on the
-   compositor and runs at the display's own refresh rate (120 Hz phones included). Cards get their
-   own layers up front; the fg is the layer the thumb drags. */
 .stage > .card {
   grid-area: 1 / 1 / 2 / 2;
   transition:
@@ -192,14 +181,10 @@ body.is-round.has-tabbar {
   will-change: transform;
 }
 
-/* a text card is a typeset poster: a soft glow of the community's colour in one corner */
 .card[data-layout="text"] .card-fg {
   background: radial-gradient(130% 85% at 0% 0%, var(--paper-glow), transparent 62%), var(--paper);
 }
 
-/* --- the peek: the next card, already there underneath (its picture preloads). It is dimmed with
-   opacity, not a filter, and rises with the drag (round.js dragFeedback sets transform/opacity per
-   frame); on promotion the inline pose is dropped and the transition above carries it up. --- */
 .card.is-next {
   z-index: 1;
   opacity: 0.55;
@@ -222,7 +207,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- media: the picture, whole, over a blurred copy of itself (no crop, no bars) --- */
 .card-media {
   position: relative;
   display: grid;
@@ -237,8 +221,6 @@ body.is-round.has-tabbar {
   cursor: pointer;
 }
 
-/* The backdrop is blurred small and scaled up: the filter runs over a sixteenth of the area
-   (the blur is rasterised once per card, then only moved), and the scale makes it full-bleed. */
 .media-bg {
   position: absolute;
   top: -10%;
@@ -278,7 +260,6 @@ body.is-round.has-tabbar {
   white-space: nowrap;
 }
 
-/* NSFW: blurred until tapped (the island drops .is-nsfw) */
 .card-media.is-nsfw .media-img {
   filter: blur(30px) brightness(0.6);
   transform: scale(1.15);
@@ -300,7 +281,6 @@ body.is-round.has-tabbar {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
 
-/* media the card knows about but has no picture for: say so, tap opens it */
 .card-media.is-missing {
   place-content: center;
   justify-items: center;
@@ -315,7 +295,6 @@ body.is-round.has-tabbar {
   font: var(--fw-medium) var(--fs-sm) / 1.3 var(--font-sans);
 }
 
-/* --- the words --- */
 .card-info {
   display: flex;
   flex: 0 1 auto;
@@ -451,7 +430,6 @@ body.is-round.has-tabbar {
   font-weight: var(--fw-semibold);
 }
 
-/* titles are set in the display face; the shorter the title, the bigger it gets */
 .card-title {
   display: -webkit-box;
   margin: 0;
@@ -494,7 +472,6 @@ body.is-round.has-tabbar {
   line-height: 1.12;
 }
 
-/* body: shrinks first when the card is full; fades where it is cut */
 .card-body {
   position: relative;
   flex: 0 1 auto;
@@ -510,7 +487,6 @@ body.is-round.has-tabbar {
   max-height: calc(1rem * 1.55 * 3);
 }
 
-/* a saved comment is the hero even when its post has a picture: the picture gets a band */
 .card[data-kind="comment"] .card-media {
   flex: 0 0 34%;
   min-height: 0;
@@ -529,7 +505,6 @@ body.is-round.has-tabbar {
   mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
 }
 
-/* the saved comment is the hero: a big open quote in the community's colour */
 .card-body.is-comment {
   color: var(--text-body);
   font-size: 1.08rem;
@@ -567,8 +542,6 @@ body.is-round.has-tabbar {
   touch-action: manipulation;
 }
 
-/* --- markdown (shared renderer: core/markdown.js) --- */
-/* --- markdown (shared renderer: core/markdown.js) --- */
 .md > :first-child {
   margin-top: 0;
 }
@@ -659,7 +632,6 @@ body.is-round.has-tabbar {
   border: 1px solid var(--border-hairline);
 }
 
-/* --- cached top comment: a speech bubble --- */
 .card-reply {
   flex: 0 1 auto;
   min-height: 0;
@@ -686,7 +658,6 @@ body.is-round.has-tabbar {
   overflow-wrap: anywhere;
 }
 
-/* --- stats, pinned to the bottom of a poster --- */
 .card-stats {
   display: flex;
   flex-wrap: wrap;
@@ -740,7 +711,6 @@ body.is-round.has-tabbar {
   letter-spacing: 0.06em;
 }
 
-/* --- expanded: no clamps, the card scrolls inside itself --- */
 .card.is-expanded .card-fg {
   overflow: auto;
   overscroll-behavior: contain;
@@ -767,10 +737,6 @@ body.is-round.has-tabbar {
   mask-image: none;
 }
 
-/* --- swipe feedback: the card tilts with the thumb (core/swipe.js tilt) and springs back if let
-   go early; a rubber stamp and a tint fade in with the drag distance (round.js sets their opacity
-   per frame); the direction classes (toggled once, at 40px) pick the stamp's word and colour and
-   light the matching orb. --- */
 .card-wash,
 .card-stamp {
   position: absolute;
@@ -874,7 +840,6 @@ body.is-round.has-tabbar {
   content: "Skip";
 }
 
-/* a button/key decision: the stamp punches in as the card goes */
 .card[class*="leave-"]:not(.is-flung) .card-stamp {
   animation: stamp-punch 160ms var(--ease) both;
 }
@@ -901,9 +866,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- leaving: the decided card is a ghost above the stage, flying off while the next card is
-   already live underneath (input never waits for it). A flung card already flies under the
-   finger's own speed (core/swipe.js), so it plays no second animation. --- */
 .card.is-leaving {
   z-index: 3;
   pointer-events: none;
@@ -913,8 +875,6 @@ body.is-round.has-tabbar {
   animation: none;
 }
 
-/* reduced motion (tokens.css kills all animation): a decided card goes at once, it never sits
-   frozen over the next one */
 @media (prefers-reduced-motion: reduce) {
   .card.is-leaving {
     visibility: hidden;
@@ -988,7 +948,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* arriving from nowhere (first card, put-back) */
 .card.enter {
   animation: card-enter 260ms cubic-bezier(0.2, 0.9, 0.3, 1.04) both;
 }
@@ -1000,7 +959,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* undo is a rewind: the card comes back from where it went */
 .card.return-done {
   animation: return-done 280ms cubic-bezier(0.2, 0.9, 0.3, 1.04) both;
 }
@@ -1043,7 +1001,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- loading skeleton: <article class="card is-skeleton"> with no children --- */
 .card.is-skeleton {
   border-radius: 26px;
   background: var(--surface-card);
@@ -1058,8 +1015,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- combo: momentum, never a score --- */
-/* sits in the gap under the card, above the pad */
 .combo {
   position: absolute;
   bottom: -0.2rem;
@@ -1084,7 +1039,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* --- the pad: five orbs, the reduce-verbs biggest (friction asymmetry made physical) --- */
 .pad {
   display: flex;
   flex: none;
@@ -1197,7 +1151,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* the thumb's direction lights its orb (Tinder) */
 .round:has(.card.swipe-done) .act-done .act-orb,
 .round:has(.card.swipe-arch) .act-archive .act-orb {
   background: var(--verb);
@@ -1205,7 +1158,6 @@ body.is-round.has-tabbar {
   transform: scale(1.08);
 }
 
-/* --- states --- */
 .round[data-state="loading"] .pad {
   opacity: 0.4;
   pointer-events: none;
@@ -1242,7 +1194,6 @@ body.is-round.has-tabbar {
   letter-spacing: -0.015em;
 }
 
-/* --- cleared: the one loud moment --- */
 .cleared {
   display: flex;
   flex: 1;
@@ -1279,7 +1230,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* the receipt: every card of the round, in order, ringed in its decision's colour */
 .receipt {
   display: grid;
   grid-template-columns: repeat(5, 46px);
@@ -1312,7 +1262,6 @@ body.is-round.has-tabbar {
   object-fit: cover;
 }
 
-/* no picture: the title's first letter, set like a monogram on the community's paper */
 .rc span {
   display: grid;
   place-items: center;
@@ -1396,7 +1345,6 @@ body.is-round.has-tabbar {
   gap: var(--sp-3);
 }
 
-/* shared round buttons: cleared actions + the empty-state exit */
 .cleared-acts button,
 .round-empty button {
   min-height: 48px;
@@ -1438,7 +1386,6 @@ body.is-round.has-tabbar {
   }
 }
 
-/* today's ring, small, under the receipt (round.js todayHtml) */
 .cleared-today {
   display: flex;
   align-items: center;
@@ -1473,9 +1420,6 @@ body.is-round.has-tabbar {
   line-height: var(--lh-snug);
 }
 
-/* ============================================================
-   light theme
-   ============================================================ */
 :root[data-theme="light"] .card-fg {
   box-shadow:
     0 0 0 1px var(--paper-line),
@@ -1515,9 +1459,6 @@ body.is-round.has-tabbar {
   color: color-mix(in oklab, var(--done) 80%, var(--text-body));
 }
 
-/* ============================================================
-   phone (≤ 700px)
-   ============================================================ */
 @media (max-width: 700px) {
   body.is-round #toast {
     bottom: calc(7.5rem + env(safe-area-inset-bottom));
@@ -1535,15 +1476,11 @@ body.is-round.has-tabbar {
   }
 }
 
-/* ============================================================
-   desktop (≥ 701px)
-   ============================================================ */
 @media (min-width: 701px) {
   .stage {
     padding: var(--sp-3) 0 1.6rem;
   }
 
-  /* very tall windows: the card stays a hand-held proportion, centred in the stage */
   .stage > .card {
     align-self: center;
     height: 100%;

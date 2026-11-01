@@ -1,30 +1,9 @@
-/* browse/fastscroll.js — Nova Launcher–style fast-scroll bar (#46).
-   Spec: docs/specs/mobile-scrollbar.md (reworked 2026-07-13 from hidden-pill
-   to an always-visible track + proportional handle).
+const MIN_HANDLE_H = 24;
 
-   Mental model (Nova Launcher / Android contacts scrollbar):
-   - A thin track sits at the right edge, always visible while the list is long.
-   - The handle height = viewport / scrollHeight (small list = tall handle;
-     huge list = tiny handle). Its top = scrollTop / maxScroll.
-   - Dragging the HANDLE scrubs (pointer down on the handle = grab; moves = scrub).
-   - Dragging the track pages or jumps to that position.
-   - The list area itself is untouched — normal native scroll, no capture,
-     no preventDefault on #items.
+const FADE_IDLE_MS = 900;
 
-   Browse scrolls the document (window), not #items. Desktop (fine pointer +
-   hover) is a no-op (native scrollbar stays). */
+const SETTLE_MS = 250;
 
-// Widths live in browse.css: .fastscroll-bar is the 22px touch target,
-// .fastscroll-track/.fastscroll-handle the visuals.
-const MIN_HANDLE_H = 24; // never smaller than this even for enormous lists
-
-const FADE_IDLE_MS = 900; // hide shortly after scroll stops (Nova hides too)
-
-const SETTLE_MS = 250; // scrub is "over" this long after drag end
-
-// Scrub state, exposed so infinite scroll can pause page loads mid-drag
-// (docs/specs/46-fastscroll-scrub-loads-plan.md). True from pointerdown until
-// SETTLE_MS after drag end; "fastscroll:settle" fires on window when it clears.
 let scrubbing = false;
 
 let settleTimer = 0;
@@ -56,11 +35,6 @@ function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/**
- * Install the fast-scroll bar.
- * @param {HTMLElement | null} _listEl  (unused; kept for call-site compat)
- * @returns {() => void} teardown
- */
 export function installFastScroll(_listEl) {
   if (isDesktopPointer()) return () => {};
 
@@ -76,21 +50,20 @@ export function installFastScroll(_listEl) {
   document.body.appendChild(bar);
 
   let dragging = false;
-  let dragOffsetY = 0; // grab offset within the handle
+  let dragOffsetY = 0;
   let moveRaf = 0;
   let pendingY = 0;
   let idleTimer = 0;
   let activePointerId = null;
   let lastMax = -1;
-  let dragMt = null; // frozen metrics snapshot during drag (avoids per-frame reflow)
-  let layoutPending = false; // deferred layout after drag ends
+  let dragMt = null;
+  let layoutPending = false;
   let scrollRaf = 0;
   let pendingScrollTop = 0;
 
   function metrics() {
     const { se, viewH, max, scrollHeight } = scrollMetrics();
     const barH = window.innerHeight || 1;
-    // Track covers the safe vertical area; reserve space for the top bar + dock.
     const barStyle = getComputedStyle(bar);
 
     const trackTop = parseFloat(barStyle.getPropertyValue("--fastscroll-track-top")) || 0;
@@ -136,7 +109,7 @@ export function installFastScroll(_listEl) {
     const mt = dragMt || metrics();
 
     if (mt.max <= 0) return;
-    const rel = clientY - mt.trackTop; // y within the track
+    const rel = clientY - mt.trackTop;
     const targetTop = clamp(rel - dragOffsetY, 0, mt.handleMaxTop);
     const ratio = mt.handleMaxTop <= 0 ? 0 : targetTop / mt.handleMaxTop;
     mt.se.scrollTop = ratio * mt.max;
@@ -155,7 +128,6 @@ export function installFastScroll(_listEl) {
     }, FADE_IDLE_MS);
   }
 
-  // --- handle / track dragging (pointer events on the bar only) ---
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const mt = metrics();
@@ -164,8 +136,6 @@ export function installFastScroll(_listEl) {
     const rel = e.clientY - mt.trackTop;
     const handleRectTop = mt.trackTop + mt.handleTop;
 
-    // Grab the handle if the press lands on it; otherwise jump the handle
-    // center to the press (track tap → jump, Nova-style).
     if (e.clientY >= handleRectTop && e.clientY <= handleRectTop + mt.handleH) {
       dragOffsetY = rel - mt.handleTop;
     } else {
@@ -181,9 +151,7 @@ export function installFastScroll(_listEl) {
 
     try {
       bar.setPointerCapture?.(e.pointerId);
-    } catch {
-      /* pointer may already be inactive (fast tap) — scrub still works */
-    }
+    } catch {}
 
     showActive();
     pendingY = e.clientY;
@@ -228,9 +196,7 @@ export function installFastScroll(_listEl) {
 
     try {
       if (e?.pointerId != null) bar.releasePointerCapture?.(e.pointerId);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
 
     scheduleIdleHide();
     clearTimeout(settleTimer);
@@ -240,9 +206,8 @@ export function installFastScroll(_listEl) {
     }, SETTLE_MS);
   }
 
-  // --- keep the handle in sync with native scroll ---
   function onScroll() {
-    if (dragging) return; // we drive the handle while scrubbing
+    if (dragging) return;
     const mt = metrics();
 
     if (mt.max <= 0) {
@@ -251,9 +216,6 @@ export function installFastScroll(_listEl) {
       return;
     }
 
-    // Store the computed target; defer the transform to rAF so the handle
-    // stays aligned with the compositor on rapid fling scroll (the main-
-    // thread scroll event lags behind the compositor-scrolled page).
     pendingScrollTop = mt.handleMaxTop <= 0 ? 0 : (mt.se.scrollTop / mt.max) * mt.handleMaxTop;
     showActive();
     scheduleIdleHide();
@@ -275,9 +237,6 @@ export function installFastScroll(_listEl) {
   const onResize = () => layout();
   window.addEventListener("resize", onResize, { passive: true });
 
-  // Initial layout + observation for dynamic content height changes.
-  // Coalesce mutation/ResizeObserver bursts into one layout per frame —
-  // layout() forces reflow (scrollHeight + getComputedStyle).
   layout();
   let layoutRaf = 0;
 

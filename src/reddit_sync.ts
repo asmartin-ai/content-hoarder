@@ -242,10 +242,6 @@ export async function syncSaved(database: Database, opts: SyncOptions = {}): Pro
     }
 
     if (pageItems.length) {
-      // One transaction per listing page. Never-seen rows go in as a
-      // multi-row INSERT per chunk; known rows keep mergeUpsert's merge
-      // contract, and a malformed row is replayed alone so the rest of
-      // the page still lands.
       const merged = db.withTransaction(database, () => db.mergeUpsertMany(database, pageItems));
       const failed = new Set(merged.errors.map((error) => error.fullname));
 

@@ -107,17 +107,10 @@ export function mapYouTubePlaylist(
   };
 }
 
-/** Seconds before ffmpeg is killed and the partial file discarded. */
 const AUDIO_TIMEOUT_SECONDS = 900;
 
-/** Seconds — `RequestOptions.timeout` is in seconds, like every other caller. */
 const TRANSPORT_TIMEOUT_SECONDS = 30;
 
-/**
- * youtubei.js connection warm-up: refuse reserved and loopback targets before
- * Bun's real `fetch.preconnect` ever sees them. `preconnect` defaults to Bun's
- * own implementation and is injectable so tests never open a socket.
- */
 export function guardedPreconnect(
   url: string | URL,
   options?: Parameters<typeof fetch.preconnect>[1],
@@ -130,8 +123,6 @@ export function guardedPreconnect(
   preconnect(url, options);
 }
 
-/** The one guarded fetch youtubei.js ever uses: every request and warm-up is
- *  URL-checked by `safeFetchUrl`, sends the shared User-Agent, and retries. */
 export const youtubeFetch: typeof fetch = Object.assign(
   async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const outgoing =
@@ -158,11 +149,6 @@ export const youtubeFetch: typeof fetch = Object.assign(
   { preconnect: guardedPreconnect },
 );
 
-/**
- * Build one Innertube client bound to the guarded transport. Callers that fan
- * out over many videos (import, enrich) must build a single client and pass it
- * back through `opts.client` — constructing one per item triples the requests.
- */
 export async function innertubeClient(
   opts: { client?: YouTubeClient; fetch?: typeof fetch } = {},
 ): Promise<YouTubeClient> {

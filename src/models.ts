@@ -1,13 +1,5 @@
-/**
- * Item normalization — the single place an item is shaped.
- *
- * Every connector yields objects produced by `newItem`. The DB
- * layer and the pipeline rely on this exact shape (`ITEM_FIELDS`).
- */
-
 import * as z from "zod";
 
-/** Full, ordered list of columns in the `items` table. Keep in sync with db.ts. */
 export const ITEM_FIELDS = [
   "fullname",
   "source",
@@ -33,14 +25,10 @@ export const ITEM_FIELDS = [
 
 export const VALID_STATUSES = ["inbox", "keep", "archived", "done"] as const;
 
-/** Status domain — the only values `status` may take. */
 export type ItemStatus = (typeof VALID_STATUSES)[number];
 
-// The NSFW tag buckets (subreddit-driven; see categorize.ts). Canonical here so the
-// query layer (db.searchItems) and the search-bar parser share one source of truth.
 export const NSFW_TAGS = ["nsfw_erotic", "nsfw_other", "nsfw_talk"] as const;
 
-// Metadata keys that are worth folding into the full-text search blob.
 const _META_SEARCH_KEYS = [
   "subreddit",
   "channel",
@@ -74,7 +62,6 @@ const _ItemCoreSchema = z.object({
 
 export type ItemCore = z.infer<typeof _ItemCoreSchema>;
 
-/** SQLite item row: metadata and raw_json are stored as text. */
 export const RawItemSchema = _ItemCoreSchema.extend({
   metadata: z.string(),
   raw_json: z.string(),
@@ -95,7 +82,6 @@ const _PromotionReceiptSchema = z
   })
   .catchall(_JsonValueSchema);
 
-/** PKMS promote receipt (private #2): the four consumed fields. */
 export type PromotionReceipt = z.infer<typeof _PromotionReceiptSchema>;
 
 const _PromotionSchema = z
@@ -109,7 +95,6 @@ const _PromotionSchema = z
   })
   .catchall(_JsonValueSchema);
 
-/** PKMS promotion record stamped into `metadata.promotion`. */
 export type Promotion = z.infer<typeof _PromotionSchema>;
 
 const _optionalString = z.string().optional().catch(undefined);
@@ -193,13 +178,8 @@ export const MetadataSchema = z
   })
   .catchall(_JsonValueSchema);
 
-/**
- * Known source/user metadata plus validated JSON-valued extension keys.
- * Catchall preserves connector facts without laundering them as `unknown`.
- */
 export type Metadata = z.infer<typeof MetadataSchema>;
 
-/** Item as served to API consumers: metadata is parsed and schema-checked. */
 export const ItemSchema = _ItemCoreSchema.extend({
   metadata: MetadataSchema,
   raw_json: z.string(),
@@ -207,7 +187,6 @@ export const ItemSchema = _ItemCoreSchema.extend({
 
 export type Item = z.infer<typeof ItemSchema>;
 
-/** Parse stored JSON or an already-parsed metadata object with its schema. */
 export function parseMetadata(value: Metadata | string | null | undefined): Metadata {
   if (value === null || value === undefined) return {};
   const objectResult = MetadataSchema.safeParse(value);
@@ -226,12 +205,10 @@ export function parseMetadata(value: Metadata | string | null | undefined): Meta
   }
 }
 
-/** Copy a parsed metadata object (the dict-input half of the old parse_metadata). */
 export function copyMetadata(value: Metadata | null | undefined): Metadata {
   return value === null || value === undefined ? {} : { ...value };
 }
 
-/** Compose the denormalized search blob from item fields + key metadata. */
 export function buildSearchText(
   item: Pick<ItemCore, "title" | "body" | "author">,
   metadata?: Metadata | null,
@@ -259,7 +236,6 @@ export function buildSearchText(
     .trim();
 }
 
-/** Input for `newItem` — mirrors the Python `new_item` kwargs. */
 export interface NewItemInput {
   source: string;
   source_id: string | number;
@@ -278,19 +254,12 @@ export interface NewItemInput {
   now?: number | null;
 }
 
-/**
- * Build a fully-formed, DB-ready item. `fullname` is the global
- * dedup key `"<source>:<source_id>"`. `metadata` is JSON-encoded;
- * `search_text` is computed. `now` allows deterministic tests.
- */
 export function newItem(input: NewItemInput): RawItem {
   const ts = input.now ?? Math.floor(Date.now() / 1000);
 
   const md: Metadata =
     input.metadata === null || input.metadata === undefined ? {} : { ...input.metadata };
 
-  // Python default is `is_saved=1` (truthy): an omitted flag keeps the
-  // item saved; only an explicit false/0 un-saves.
   const isSaved = input.is_saved === undefined ? 1 : input.is_saved;
   const status = VALID_STATUSES.find((candidate) => candidate === input.status) ?? "inbox";
 

@@ -28,8 +28,6 @@ const NsfwRulesSchema = z
   })
   .catch({});
 
-// The nsfw rule file is re-read per item, but a rule set holds a handful of
-// keywords: compile each keyword's case-insensitive matcher once and reuse it.
 const _KEYWORD_PATTERNS = new Map<string, RegExp>();
 
 const DurationSecondsSchema = z
@@ -683,7 +681,6 @@ function tagSource(
 
   if (opts.limit) params.push(Math.trunc(opts.limit));
 
-  // SAFETY: SELECT projects fullname,title,url,metadata, matching TaggableRow.
   const rows = db
     .query(
       `SELECT fullname,title,url,metadata FROM items WHERE ${where.join(" AND ")} ORDER BY last_seen_utc DESC${limit}`,

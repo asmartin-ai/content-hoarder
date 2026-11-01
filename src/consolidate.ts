@@ -231,7 +231,6 @@ export function migrate(db: Database, opts: { apply?: boolean } = {}) {
 }
 
 export function unconsolidate(db: Database, opts: { apply?: boolean } = {}) {
-  // SAFETY: This query selects only the fullname column from the items table.
   const rows = db
     .query(
       "SELECT fullname FROM items WHERE metadata LIKE '%consolidated_into%' OR metadata LIKE '%companions%' OR metadata LIKE '%promoted_by%'",

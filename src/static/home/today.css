@@ -1,8 +1,3 @@
-/* ============================================================
-   home/today.css — Today (lamp mode): one lit object, everything else quiet.
-   The lit object is the next round itself: a fanned hand of its actual cards over the
-   ember "Clear N" button. Contract: clear-v2.md §6; design pass: docs/design/deck-pass.md.
-   ============================================================ */
 .today {
   display: flex;
   flex-direction: column;
@@ -39,7 +34,6 @@
   line-height: var(--lh-snug);
 }
 
-/* --- the hero: the hand of cards over the lit button --- */
 .hero {
   display: flex;
   flex-direction: column;
@@ -124,7 +118,6 @@
   display: none;
 }
 
-/* a text post is its own little poster: the title, typeset, on the community's paper */
 .deck-card.is-text {
   background: radial-gradient(120% 80% at 0% 0%, var(--paper-glow), transparent 65%), var(--paper);
 }
@@ -175,7 +168,6 @@
     rotate(calc(var(--slot) * var(--turn) * 0.8));
 }
 
-/* before htmx lands: one ghost card holds the space (no layout jump) */
 .deck.is-loading::before {
   content: "";
   position: absolute;
@@ -236,7 +228,6 @@
   transition: transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
-/* the hover glow is its own layer: only its opacity animates (no shadow repaint per frame) */
 .hero-go::after {
   content: "";
   position: absolute;
@@ -279,7 +270,6 @@
   }
 }
 
-/* round-size segmented control: links (hx-get swaps #upnext), current = aria-current="page" */
 .hero-sizes {
   display: inline-flex;
   gap: 2px;
@@ -308,7 +298,6 @@
     opacity var(--dur) var(--ease);
 }
 
-/* 44px hit area around a slim visual pill */
 .hero-sizes a::after {
   content: "";
   position: absolute;
@@ -331,7 +320,6 @@
   }
 }
 
-/* --- section headings --- */
 .sec-h {
   margin: 0;
   font: 700 1.4rem / 1.1 var(--font-display);
@@ -345,7 +333,6 @@
   line-height: var(--lh-normal);
 }
 
-/* --- wins: today's count inside the pebble ring; counted in the user's favour only --- */
 .wins {
   display: flex;
   align-items: center;
@@ -403,7 +390,6 @@
   filter: drop-shadow(0 0 3px color-mix(in srgb, var(--win) 70%, transparent));
 }
 
-/* a big day (a pile let go) still fits the ring: the type shrinks past three digits */
 .wins-n {
   font: 800 calc(2.1rem * min(1, 3.2 / var(--digits, 1))) / 1 var(--font-display);
   font-variant-numeric: tabular-nums;
@@ -441,7 +427,6 @@
   font-weight: var(--fw-bold);
 }
 
-/* --- piles: memory tiles (Google Photos) — the pile's pictures, its name over them --- */
 .piles {
   display: flex;
   flex-direction: column;
@@ -457,7 +442,6 @@
   list-style: none;
 }
 
-/* one grid cell holds the cover and the name over it; the actions sit below */
 .pile {
   position: relative;
   display: grid;
@@ -509,7 +493,6 @@
   object-fit: cover;
 }
 
-/* the scrim that carries the name */
 .pile-mosaic:not(.is-glyph)::after {
   content: "";
   position: absolute;
@@ -635,7 +618,6 @@
   }
 }
 
-/* --- resurface whisper (moss); htmx may swap in an empty one --- */
 .whisper {
   display: flex;
   flex-direction: column;
@@ -657,7 +639,6 @@
   line-height: var(--lh-snug);
 }
 
-/* a small open ring: "this comes back around" */
 .whisper-q::before {
   content: "";
   flex: none;
@@ -717,7 +698,6 @@
   }
 }
 
-/* --- footer --- */
 .today-foot {
   display: flex;
   align-items: center;
@@ -772,9 +752,6 @@
   font-size: var(--fs-md);
 }
 
-/* ============================================================
-   light theme
-   ============================================================ */
 :root[data-theme="light"] .hero-go {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
@@ -796,9 +773,6 @@
   color: color-mix(in oklab, var(--archive) 72%, var(--text-body));
 }
 
-/* ============================================================
-   phone (≤ 700px)
-   ============================================================ */
 @media (max-width: 700px) {
   .today {
     gap: 2.25rem;
@@ -812,7 +786,6 @@
     --turn: 6deg;
   }
 
-  /* piles scroll sideways, bleeding to the screen edges */
   .pile-list {
     grid-template-columns: none;
     grid-auto-columns: 72%;
@@ -831,9 +804,6 @@
   }
 }
 
-/* ============================================================
-   desktop (≥ 701px)
-   ============================================================ */
 @media (min-width: 701px) {
   .today {
     max-width: 720px;

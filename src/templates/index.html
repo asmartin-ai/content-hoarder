@@ -180,7 +180,6 @@
           />
           <kbd>/</kbd>
           <div class="oppop" id="oppop">
-            <!-- operators.js fills .ops with applied-operator chips + live suggestions -->
             <div class="ops" role="listbox" aria-label="Search operator suggestions"></div>
             <div class="hint">
               <span
@@ -324,7 +323,6 @@
             </select>
           </div>
         </div>
-        <!-- the ONE ambient slot: resurfacing question or surprise — never both, never a count -->
         <div class="ambient" id="ambient" hidden></div>
 
         <div class="items density-comfortable" id="items"></div>
@@ -474,9 +472,6 @@
       <div class="dup-list" id="dup-list">Loading&hellip;</div>
     </aside>
 
-    <!-- mobile "Jump" drawer — the phone expression of the desktop .rail.
-       Reuses the shared #scrim overlay; slides from the left. Sources/categories/
-       tags render from the same data that fills the rail (browse/data.js refreshRail). -->
     <aside
       class="navdrawer"
       id="navdrawer"
@@ -498,9 +493,7 @@
           aria-label="Filter sources and tags"
         />
       </div>
-      <div class="nd-list" id="nav-list">
-        <!-- groups rendered by browse/drawer.js -->
-      </div>
+      <div class="nd-list" id="nav-list"></div>
       <div class="nd-foot">
         <button
           type="button"
@@ -514,9 +507,6 @@
       </div>
     </aside>
 
-    <!-- inline item reader — full-screen sheet for Reddit/HN threads and editable notes.
-       Reddit/HN items render post + comments; Keep/Obsidian notes render the saved body
-       with a DB-backed editor. Behaviour: browse/reader.js. -->
     <section class="reader" id="reader" aria-label="Item reader" aria-hidden="true">
       <header class="rd-head">
         <span class="led" aria-hidden="true"></span>
@@ -538,12 +528,8 @@
         </button>
       </header>
       <div class="rd-scroll">
-        <article class="rd-post" id="reader-post">
-          <!-- rendered by reader.js -->
-        </article>
-        <div class="rd-comments" id="reader-comments">
-          <!-- rendered by reader.js -->
-        </div>
+        <article class="rd-post" id="reader-post"></article>
+        <div class="rd-comments" id="reader-comments"></div>
       </div>
     </section>
 
@@ -570,15 +556,9 @@
 
     <div id="media-modal" hidden><div id="media-body"></div></div>
 
-    <!-- Relay-style inline long-press strip — injected into the row on long-press /
-             right-click (Epic 16 B3). The row translates aside and this horizontal action
-             row appears where the row was, in the same thumb zone. -->
     <div class="relay-scrim" id="relay-scrim" aria-hidden="true"></div>
 
     <template id="relay-strip-tpl">
-      <!-- a horizontal action strip: icon over label, evenly spaced.
-                 data-relay="source|author|tag|share|snooze";
-                 source/author labels + aria-labels are set per-item by JS. -->
       <div class="relay-strip" role="menu" aria-label="Item actions">
         <button
           type="button"

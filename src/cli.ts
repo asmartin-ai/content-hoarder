@@ -578,7 +578,6 @@ const help = `Local triage-first content manager.\n\nCommands:\n  init-db, impor
 function commandSchema(command: string): (typeof commandOptions)[CommandName] | null {
   if (!Object.hasOwn(commandOptions, command)) return null;
 
-  // SAFETY: hasOwn above verifies command names this module defines.
   return commandOptions[command as CommandName];
 }
 

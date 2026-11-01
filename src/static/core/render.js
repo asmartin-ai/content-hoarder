@@ -1,13 +1,7 @@
-/* core/render.js — shared HTML fragment builders (data → string, all esc-safe).
-   Page-specific row/card layouts stay in each page's own files; only fragments
-   used by 2+ pages live here. Sources of the consolidated copies:
-   app.js:226-360/448-471 and triage.js:64-141. */
-
 import { esc, safeUrl, ago, fmtDate } from "./util.js";
 import { redditUrl } from "./media.js";
 import { toast } from "./toast.js";
 
-/* ---- source identity ---- */
 export const CH_SOURCES = {
   reddit: { glyph: "r/", token: "--source-reddit" },
   youtube: { glyph: "▶", token: "--source-youtube" },
@@ -24,7 +18,6 @@ export const srcAccent = (source) => {
   return m ? "var(" + m.token + ")" : "var(--accent)";
 };
 
-/* ---- canonical item links ---- */
 export const hnThreadUrl = (item) => {
   const id =
     item && item.source === "hackernews" && item.source_id ? String(item.source_id).trim() : "";
@@ -32,7 +25,6 @@ export const hnThreadUrl = (item) => {
   return id ? "https://news.ycombinator.com/item?id=" + encodeURIComponent(id) : "";
 };
 
-/* HN user profile (mirrors the Reddit /user/ author link). "" when no author. */
 export const hnUserUrl = (author) => {
   const a = (author || "").trim();
 
@@ -46,8 +38,6 @@ export const itemUrl = (item) =>
       ? redditUrl((item.metadata || {}).permalink) || item.url || ""
       : item.url || "";
 
-/* Share an item's canonical source link — native share sheet on mobile (navigator.share),
-   clipboard-copy fallback on desktop/unsupported (Epic 5 P2). A user-cancel is swallowed. */
 export function shareItem(item) {
   if (!item) return;
   const url = itemUrl(item) || item.url || "";
@@ -61,7 +51,7 @@ export function shareItem(item) {
   const data = { title: item.title || "Saved item", url };
 
   if (navigator.share) {
-    navigator.share(data).catch(() => {}); // ignore AbortError (user dismissed the sheet)
+    navigator.share(data).catch(() => {});
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard
       .writeText(url)
@@ -72,9 +62,6 @@ export function shareItem(item) {
   }
 }
 
-/* The external article an HN story links to (item.url), but only when it's a real
-   outbound link — Ask/Show-HN self-posts store the thread URL in item.url, so those
-   get "" (no chip). The title already opens the discussion via itemUrl. */
 export const hnArticleUrl = (item) => {
   if (!item || item.source !== "hackernews") return "";
   const u = (item.url || "").trim();
@@ -84,7 +71,6 @@ export const hnArticleUrl = (item) => {
   return safeUrl(u) || "";
 };
 
-/* A pill chip linking straight to the linked article (reuses the .comp-link look). */
 export const articleChip = (item) => {
   const u = hnArticleUrl(item);
 
@@ -111,7 +97,6 @@ export const metaAnchor = (href, label, cls) => {
   );
 };
 
-/* YouTube channel link when enrich captured the channel id (else "" → plain text). */
 export const channelHref = (item) => {
   const m = item.metadata || {};
 
@@ -120,7 +105,6 @@ export const channelHref = (item) => {
     : "";
 };
 
-/* YouTube upload date as YYYY-MM-DD (from enrich's upload_date, else created_utc). */
 export const uploadDate = (item) => {
   const m = item.metadata || {};
 
@@ -134,8 +118,6 @@ export const uploadDate = (item) => {
   return "";
 };
 
-/* opts.hideSub omits the origin (subreddit/channel/playlist) when the layout
-   already shows it; opts.sources is the page's id→{label} map for fallbacks. */
 export const metaLine = (item, opts) => {
   const { hideSub = false } = opts || {};
   const m = item.metadata || {};
@@ -187,9 +169,6 @@ export const metaLine = (item, opts) => {
   return parts.join(" · ") + (chip ? " " + chip : "");
 };
 
-/* Posted (created_utc) / added-in-source (saved_utc) / synced (first_seen_utc),
-   as a tooltip body. "Added in source" only when it's a genuine source timestamp:
-   distinct from post time AND clearly before our sync. */
 export const dateTitle = (item) => {
   const c = item.created_utc,
     s = item.saved_utc,
@@ -206,7 +185,6 @@ export const dateTitle = (item) => {
   return lines.join("\n");
 };
 
-/* Inline labeled breakdown (triage card style). */
 export const datesLine = (item) => {
   const c = item.created_utc,
     s = item.saved_utc,
@@ -239,7 +217,6 @@ export const datesLine = (item) => {
   );
 };
 
-/* Posted/synced age for the meta line (visible at every density). */
 export const ageMeta = (item) =>
   '<span class="m-age" title="' +
   esc(dateTitle(item)) +
@@ -247,8 +224,6 @@ export const ageMeta = (item) =>
   esc((item.created_utc ? "posted " : "synced ") + ago(item.created_utc || item.first_seen_utc)) +
   "</span>";
 
-/* Time-to-consume estimate, gated on available data: YouTube duration → "N min
-   watch/listen"; a text body → "N min read". Returns "" when there's no signal. */
 const READ_WPM = 200;
 
 export const consumeMeta = (item) => {
@@ -279,14 +254,6 @@ export const consumeMeta = (item) => {
   return '<span class="consume ' + verb + '">' + amt + " " + verb + "</span>";
 };
 
-/* Tag chips with the Epic 13:329 display strategy, implemented ONCE: enriched
-   YouTube items carry ~25+ raw yt-dlp keywords in metadata.tags; never dump them.
-   opts.curated — Set of curated vocabulary (FILTER_TAGS); curated tags sort first.
-   opts.max — visible cap (default 3); the rest render hidden behind a
-   "+M more" expander button (page CSS/JS toggles .expanded on the wrapper).
-   opts.expand=false — for fixed-height rows that can't grow: no hidden chips,
-   just a static "+N" marker (Epic 13: chips across all densities).
-   All tags stay in metadata.tags for FTS — this is display-only. */
 export const tagChips = (item, opts) => {
   const { curated = null, max = 3, expand = true } = opts || {};
   const all = (item.metadata || {}).tags || [];
@@ -325,8 +292,6 @@ export const tagChips = (item, opts) => {
   );
 };
 
-/* One delegated handler a page can install once to make the "+M more" expander
-   work anywhere tagChips() rendered. */
 export const wireTagExpanders = (container) => {
   container.addEventListener("click", (e) => {
     const more = e.target.closest(".tag-more");
@@ -347,13 +312,12 @@ export const wireTagExpanders = (container) => {
   });
 };
 
-/* Companion discussion threads folded onto a canonical YouTube item (Epic 11). */
 export const COMP_LABEL = { reddit: "Reddit", hackernews: "Hacker News", firefox: "Firefox" };
 
 export const companionHref = (c) => {
   let u = ((c && (c.permalink || c.url)) || "").trim();
 
-  if (/^\/r\//i.test(u)) u = "https://www.reddit.com" + u; // legacy relative reddit permalink
+  if (/^\/r\//i.test(u)) u = "https://www.reddit.com" + u;
 
   return safeUrl(u);
 };

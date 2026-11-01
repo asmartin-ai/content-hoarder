@@ -102,10 +102,6 @@ test("app HTML refuses to be framed by another site", async () => {
 });
 
 test("an autosync tick keeps the connection serving requests", async () => {
-  // Regression: SyncScheduler was handed the shared request connection and
-  // closed it after its first tick, so every later request answered
-  // "Cannot use a closed database". A recent last-run debounces the tick, so
-  // this exercises the lifecycle without touching the network.
   const root = mkdtempSync(join(tmpdir(), "content-hoarder-autosync-"));
   const databasePath = join(root, "app.db");
   const connection = db.connect(databasePath);

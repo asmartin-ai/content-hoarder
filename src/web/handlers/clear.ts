@@ -1,6 +1,3 @@
-/* Clear (focus mode): the round page shell and the card deal. Contract: docs/design/clear-v2.md §5.
-   The gestures live in the island (static/home/round.js, booted by main.js on data-page="clear"). */
-
 import * as db from "../../db.ts";
 import type { Item } from "../../models.ts";
 import { parse } from "../../search_query.ts";
@@ -20,7 +17,6 @@ const ORB_ICON = 26;
 
 const MAJOR_ORB_ICON = 32;
 
-/* One verb: an orb (icon) over its label. Reduce-verbs are the big orbs (friction asymmetry). */
 function act(opts: {
   act: string;
   cls: string;
@@ -40,7 +36,6 @@ function act(opts: {
   </button>`;
 }
 
-// The island's frame (clear-overhaul.md §4.3); round.js finds these elements in the page.
 const FRAME = html`<section class="round" data-state="loading">
   <header class="round-bar">
     <button class="round-x" type="button" aria-label="End round">${icon("x", 22)}</button>
@@ -95,14 +90,12 @@ export function clearPage(): Response {
   return htmlResponse(renderPage({ title: "Clear", tab: "clear", body: FRAME, round: true }));
 }
 
-/** A smart batch of `n` inbox items (dealt 2n so the NSFW filter still leaves a full round). */
 export function smartDeal(n: number, hideNsfw: boolean): Item[] {
   const batch = db.getRandomBatch(connection(), n * 2, { mode: "smart", unprocessed: true });
 
   return (hideNsfw ? batch.filter((item) => !isNsfw(item)) : batch).slice(0, n);
 }
 
-/** Today's dealt ids, in order, minus anything decided since (no longer inbox). */
 function dealIds(ids: string[]): Item[] {
   const database = connection();
 
@@ -113,7 +106,6 @@ function dealIds(ids: string[]): Item[] {
   });
 }
 
-/** Peek a pile: a search over inbox items only. */
 function dealQuery(q: string, n: number, safe: boolean): Item[] {
   const params = new URLSearchParams({ q, status: "inbox" });
 
@@ -126,10 +118,6 @@ function dealQuery(q: string, n: number, safe: boolean): Item[] {
   );
 }
 
-/**
- * `GET /clear/deal?n=&q=&ids=&safe=` → `{ items: [{ fullname, status, html }] }`.
- * `ids` (Today's Up next) wins, then `q`, else a smart random batch.
- */
 export function deal(url: URL): Response {
   const params = url.searchParams;
   const n = clamp(numberParam(params.get("n"), 10), 1, MAX_DEAL);

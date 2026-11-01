@@ -1,6 +1,3 @@
-/* browse/ambient.js — the one ambient slot: the resurfacing cluster card and the
-   "surprise me" random save (locked #4/#5). Never both, never a count. */
-
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
@@ -15,7 +12,6 @@ import { openMediaFor } from "./lightbox.js";
 import { readerUI } from "./instances.js";
 import { paintTabs } from "./nav.js";
 
-/* ---- the ambient slot: resurfacing card + surprise (locked #4/#5) ---- */
 const ambient = $("#ambient");
 
 function cardHtml(c) {
@@ -120,9 +116,7 @@ export async function loadAmbient() {
     ambientCard = await r.json();
     ambient.innerHTML = cardHtml(ambientCard);
     ambient.hidden = false;
-  } catch {
-    /* ambient — never an error surface */
-  }
+  } catch {}
 }
 
 ambient.addEventListener("click", async (e) => {
@@ -146,7 +140,7 @@ ambient.addEventListener("click", async (e) => {
   const cluster = ambientCard.cluster;
 
   if (action === "later") {
-    ambient.hidden = true; // silent — never mentioned again
+    ambient.hidden = true;
     api.postJSON("/resurface/dismiss", { cluster }).catch(() => {});
   } else if (action === "show") {
     ambient.hidden = true;
@@ -191,7 +185,6 @@ export async function surprise() {
 
     const mt = mediaType(it);
     const isRedditText = it.source === "reddit" && mt.cls === "text";
-    // hero: prefer the crisp card-sized thumbnail (gallery aware), fall back to any image
     const t = isRedditText ? "" : thumb(it, "card") || imageUrl(it) || "";
 
     const hero = t
@@ -273,7 +266,6 @@ ambient.addEventListener("click", (e) => {
   if (!it) return;
   const fn = it.fullname;
 
-  // triage actions: animate the card out, then commit via the same paths as inbox rows
   if (action === "keep" || action === "archived" || action === "done") {
     const card = ambient.querySelector(".surp-card");
 
@@ -282,7 +274,6 @@ ambient.addEventListener("click", (e) => {
     }
 
     surpriseItem = null;
-    // wait for the leave animation, then clear the slot and commit
     setTimeout(() => {
       ambient.hidden = true;
       ambient.innerHTML = "";

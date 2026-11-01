@@ -1,15 +1,3 @@
-/* ============================================================
-   home/home.css — shared base for the server-rendered rooms (Today + Clear):
-   reset, kbd, the toast/snackbar, and community "paper".
-   Room styles: home/today.css (lamp mode) and home/clear.css (focus mode).
-   Design pass: docs/design/deck-pass.md (on top of clear-v2.md).
-   Consumes core/tokens.css only; the shared .ch-nav lives in
-   core/nav.css. Phone ≤ 700px, desktop ≥ 701px (matches Library).
-   Motion never gates logic: JS uses timeouts, not animationend,
-   and tokens.css zeroes motion under prefers-reduced-motion.
-   ============================================================ */
-
-/* ---------- base ---------- */
 *,
 *::before,
 *::after {
@@ -54,7 +42,6 @@ a {
   min-height: 100%;
 }
 
-/* main.js boot failure line rendered straight into #view */
 .view > .today-err {
   max-width: 560px;
   margin: 4rem auto 0;
@@ -80,7 +67,6 @@ kbd {
   }
 }
 
-/* ---------- toast / snackbar (core/toast.js owns #toast) ---------- */
 #toast {
   position: fixed;
   left: 50%;
@@ -122,11 +108,6 @@ kbd {
   }
 }
 
-/* ---------- community paper ----------
-   Cards, deck cards, pile tiles and receipt tiles carry --hue (web/views/media.ts hueOf): every
-   community gets its own tint of the same calm paper, so a run of cards reads as a varied deck
-   (Spotify/Apple Music colour-per-album) without turning into confetti — chroma stays low and the
-   verbs keep the only saturated colours. */
 .card,
 .deck-card,
 .pile,

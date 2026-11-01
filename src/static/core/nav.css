@@ -1,12 +1,3 @@
-/* ============================================================
-   core/nav.css — the shared room switcher: Today · Clear · Library.
-   Loaded by the server-rendered Today/Clear pages (src/web/views/page.ts) and index.html (Library).
-   Desktop (≥ 701px): slim sticky top bar.
-   Phone (≤ 700px): fixed bottom tab bar in the thumb zone; the
-   page adds body.has-tabbar so content clears it.
-   Consumes core/tokens.css semantic aliases only.
-   ============================================================ */
-
 .ch-nav {
   position: sticky;
   top: 0;
@@ -124,7 +115,6 @@
   }
 }
 
-/* ---------- phone: bottom tab bar ---------- */
 @media (max-width: 700px) {
   .ch-nav {
     position: fixed;

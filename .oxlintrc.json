@@ -28,6 +28,10 @@
     {
       "name": "anti-slop",
       "specifier": "./tools/oxlint/anti-slop/index.ts"
+    },
+    {
+      "name": "khaos",
+      "specifier": "./tools/oxlint/khaos/index.ts"
     }
   ],
   "rules": {
@@ -49,6 +53,6 @@
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-readable-spacing": "error",
-    "anti-slop/require-safety-comment-for-type-assertion": "error"
+    "khaos/no-comments": "error"
   }
 }

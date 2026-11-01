@@ -33,13 +33,10 @@ describe("items_au FTS sync trigger", () => {
 
       expect(searchItems(db, "needle").map((item) => item.fullname)).toEqual(["reddit:t3_a"]);
 
-      // Search-irrelevant metadata: the trigger skips the rewrite,
-      // and the strict + trigram indexes still match the old text.
       patchItem(db, "reddit:t3_a", { metadata: { score: 7 } });
       expect(searchItems(db, "needle").map((item) => item.fullname)).toEqual(["reddit:t3_a"]);
       expect(searchItems(db, "needle", { fuzzy: true })).toHaveLength(1);
 
-      // Text write: both indexes follow the new value.
       patchItem(db, "reddit:t3_a", { title: "haddock" });
       expect(searchItems(db, "needle")).toHaveLength(0);
       expect(searchItems(db, "haddock").map((item) => item.fullname)).toEqual(["reddit:t3_a"]);
@@ -136,8 +133,6 @@ describe("mergeUpsertMany", () => {
     const db = open();
 
     try {
-      // A NOT NULL column forced to null: the chunk INSERT throws,
-      // and the row-by-row replay isolates the offender.
       const broken = newItem({ source: "reddit", source_id: "t3_bad" });
 
       Object.assign(broken, { first_seen_utc: null });

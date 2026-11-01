@@ -1,5 +1,3 @@
-/* Today (lamp mode): `GET /` and its htmx partials. Contract: docs/design/clear-v2.md §6. */
-
 import { z } from "zod";
 import * as db from "../../db.ts";
 import * as resurface from "../../resurface.ts";
@@ -33,7 +31,6 @@ const MOSAIC_TILES = 3;
 
 const YEAR_SECONDS = 365 * 86_400;
 
-// htmx posts hx-vals form-encoded, so numbers arrive as strings.
 const HxSweepApply = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("subreddit"),
@@ -68,7 +65,6 @@ function cookie(request: Request, name: string): string | null {
   return null;
 }
 
-/** `?n=` (5|10|25), else the remembered size, else 10. */
 function roundSize(request: Request, url: URL): number {
   const pick = (value: string | null) => ROUND_SIZES.find((size) => String(size) === value);
 
@@ -79,7 +75,6 @@ function sizeCookie(n: number): string {
   return `ch_round_size=${n}; Path=/; SameSite=Lax; Max-Age=${YEAR_SECONDS}`;
 }
 
-/** HX-Trigger JSON; non-ASCII escaped because header values must stay Latin-1 safe. */
 function triggerHeader(events: { "ch:wins"?: null; "ch:toast"?: Toast }): string {
   return JSON.stringify(events).replace(
     /[\u007f-\uffff]/g,
@@ -92,7 +87,6 @@ function fragment(body: SafeHtml, headers: Record<string, string> = {}): Respons
 }
 
 export function todayPage(request: Request, url: URL): Response {
-  // Old deep link: /?deck=1 opened the deck; rounds replace it.
   if (url.searchParams.has("deck")) return Response.redirect("/clear", 302);
   const n = roundSize(request, url);
   const now = Date.now();
@@ -108,10 +102,8 @@ export function todayPage(request: Request, url: URL): Response {
   });
 }
 
-/** Up next: deal the actual next round, so "Clear N" plays exactly these cards. */
 export function upNext(request: Request, url: URL): Response {
   const n = roundSize(request, url);
-  // The Library keeps the NSFW preference client-side; hide unless the user opted out.
   const items = smartDeal(n, cookie(request, "ch_safe") !== "0");
 
   return fragment(renderUpNext(items, n), { "Set-Cookie": sizeCookie(n) });
@@ -224,7 +216,6 @@ export function whisper(): Response {
   return fragment(renderWhisper(resurface.candidate(connection())));
 }
 
-/** "subreddit:adhd" → "r/adhd"; "tag:tips" → "tips". */
 function clusterLabel(cluster: string): string {
   const [kind, ...rest] = cluster.split(":");
   const name = rest.join(":");

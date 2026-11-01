@@ -27,7 +27,6 @@ const ArchiveResponseSchema = z.union([
   z.object({ data: JsonSchema }).catchall(JsonSchema),
 ]);
 
-/** Seconds-based sleep, matching the shape of the injectable `sleep` options. */
 const sleepSeconds = (seconds: number): Promise<void> => Bun.sleep(seconds * 1000);
 
 export type NormalizedPost = {

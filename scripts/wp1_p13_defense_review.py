@@ -11,7 +11,6 @@ DB = Path("data/app.db")
 ro = sqlite3.connect(f"file:{DB.resolve().as_posix()}?mode=ro", uri=True)
 ro.row_factory = sqlite3.Row
 
-# --- 1. Break down by subreddit ---
 print("=== Defense bucket: breakdown by subreddit ===")
 rows = ro.execute("""
     SELECT json_extract(metadata, '$.subreddit') AS sub, COUNT(*) AS c
@@ -25,30 +24,24 @@ total_defense = sum(r["c"] for r in rows)
 print(f"Total defense-tagged items: {total_defense}")
 print()
 
-# Classification data
 classifications = {
     "time-sensitive": "Ukraine/Russia war news — decays with news cycle",
     "evergreen": "Defense tech, hardware, aviation engineering — value persists",
     "evergreen-memes": "Defense-adjacent humor — identity content, keep separate",
 }
 
-# Per-sub classification
-# These are inferred from the subreddit name and purpose
 subs = []
 for r in rows:
     sub = r["sub"]
     count = r["c"]
     sub_lower = sub.lower() if sub else ""
 
-    # NonCredibleDefense / NonCredibleDiplomacy = defense memes (identity content)
     if "noncredible" in sub_lower:
         klass = "evergreen-memes"
-    # Time-sensitive: Ukraine war, conflict reporting
     elif any(
         kw in sub_lower for kw in ["ukraine", "ukrainianconflict", "combatfootage"]
     ):
         klass = "time-sensitive"
-    # Evergreen: defense tech, hardware, aviation engineering
     elif any(
         kw in sub_lower
         for kw in [
@@ -66,7 +59,7 @@ for r in rows:
     ):
         klass = "evergreen"
     else:
-        klass = "evergreen"  # default conservative
+        klass = "evergreen"
 
     subs.append((sub, count, klass))
 
@@ -76,7 +69,6 @@ for sub, count, klass in subs:
 
 print()
 
-# --- 2. Summarize ---
 evergreen_total = sum(c for _, c, k in subs if k == "evergreen")
 timesensitive_total = sum(c for _, c, k in subs if k == "time-sensitive")
 meme_total = sum(c for _, c, k in subs if k == "evergreen-memes")
@@ -96,7 +88,6 @@ print(
 )
 print()
 
-# --- 3. Recommended commands ---
 ts_subs = [sub for sub, _, k in subs if k == "time-sensitive"]
 ts_sub_flags = " ".join(f"--subreddit {s}" for s in ts_subs)
 print(f"=== Recommended decay commands ===")

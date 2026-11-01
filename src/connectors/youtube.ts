@@ -111,8 +111,6 @@ export class YouTubeConnector implements BaseConnector {
   async enrich(items: RawItem[]): Promise<RawItem[]> {
     const hydratedAt = Math.floor(Date.now() / 1000);
 
-    // One client for the whole batch: the innertube handshake is paid once, so
-    // a video costs a single API call through the guarded transport.
     const client = await innertubeClient();
 
     return Promise.all(

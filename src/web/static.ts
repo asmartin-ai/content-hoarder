@@ -41,11 +41,6 @@ export function serviceWorkerResponse(): Response {
   });
 }
 
-/**
- * HTML with the anti-framing headers. The local triage app must never sit
- * inside another site's iframe: a framed deck click is a same-origin POST
- * the Host/Origin guard cannot distinguish from a real one (clickjacking).
- */
 export function htmlResponse(
   body: string | Blob,
   init: { status?: number; headers?: Record<string, string> } = {},
@@ -59,7 +54,6 @@ export function htmlResponse(
   return new Response(body, { ...init, headers });
 }
 
-/** The Library page (`/library`, `/browse`): still a static template. */
 export function templateResponse(): Response {
   return htmlResponse(Bun.file(LIBRARY_TEMPLATE));
 }

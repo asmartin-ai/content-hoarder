@@ -25,7 +25,6 @@ const TriggerSchema = z.object({
   }),
 });
 
-/** Synthetic inbox: one meme pile (a sweep candidate) of twelve Reddit posts. */
 function seed(path: string): void {
   const connection = db.connect(path);
 
@@ -84,7 +83,6 @@ function form(base: string, path: string, values: Record<string, string>): Promi
   });
 }
 
-/** The ids Up next dealt, read from its out-of-band #hero-go replacement. */
 function heroIds(fragment: string): string[] {
   const hero = /<a class="hero-go" id="hero-go" href="([^"]+)" hx-swap-oob="true"/.exec(
     fragment.replace(/\s+/g, " "),
@@ -227,7 +225,6 @@ test("wins and whisper partials render without backlog totals", async () => {
       await fetch(`${base}/hx/today/wins`, { headers: { Cookie: "ch_goal=3" } })
     ).text();
 
-    // ch_goal sets the pebble ring: one arc per pebble, none lit on an empty day.
     expect(wins.match(/class="arc"/g)).toHaveLength(3);
     expect(wins).not.toContain('class="arc on"');
 

@@ -1,7 +1,3 @@
-/* core/util.js — pure helpers shared by every v3 page.
-   Consolidates the triplicated copies in app.js / triage.js / reddit.js
-   (reddit's esc missed the single-quote escape — this is the full 5-char one). */
-
 export const esc = (s) =>
   String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
@@ -10,7 +6,6 @@ export const esc = (s) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-/* Only http(s) or root-relative URLs are allowed in href (blocks javascript:/data: sinks). */
 export const safeUrl = (u) => (/^(https?:\/\/|\/)/i.test(u || "") ? u : "");
 
 export const debounce = (fn, ms) => {
@@ -24,7 +19,6 @@ export const debounce = (fn, ms) => {
 
 export const isTypingTarget = (el) => /input|select|textarea/i.test((el && el.tagName) || "");
 
-/* Compact relative age: 42s · 5m · 3h · 2d · 4mo · 1y. */
 export const ago = (ts) => {
   if (!ts) return "";
   const s = Math.floor(Date.now() / 1000 - ts);
@@ -48,8 +42,6 @@ export const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString() : 
 
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
 
-/* Removed/deleted Reddit posts — incl. admin/mod removals ("[ Removed by reddit … ]")
-   and "Deleted by user", not just the bare "[removed]"/"[deleted]" placeholders. */
 const _rmStart = /^\s*\[\s*(removed|deleted)/i;
 
 const _rmPhrase = /\b(removed by (reddit|a moderator|the moderators|moderator)|deleted by user)\b/i;

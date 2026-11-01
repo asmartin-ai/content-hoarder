@@ -1,7 +1,3 @@
-/* browse/nav.js — navigation, filters, search and the keymap: status tabs, the
-   rail/chip filters and their delegated clicks, drag-and-drop onto status buckets,
-   the search box with operator discovery, per-tab sort, and the one-hand keymap. */
-
 import { esc, debounce, isTypingTarget } from "../core/util.js";
 import { toast } from "../core/toast.js";
 import { $, $$, state, facets, sortForTab, sortKey } from "./shared.js";
@@ -13,7 +9,6 @@ import { tagEditor } from "./instances.js";
 import { closeSheets, toggleKbd } from "./panels.js";
 import { initOperators } from "./operators.js";
 
-/* ---- tabs / rail / chips (locked #2/#7) ---- */
 export function paintTabs() {
   $$(".folder, .spill").forEach((t) => {
     t.setAttribute("aria-selected", String((t.dataset.status ?? "") === state.status));
@@ -25,7 +20,7 @@ $$(".folder, .spill").forEach((t) =>
     if (t.dataset.status === undefined) return;
     state.status = t.dataset.status;
     state.sort = sortForTab(state.status);
-    sortSel.value = state.sort; // per-tab sort (All → smart)
+    sortSel.value = state.sort;
     paintTabs();
     refreshRail();
     loadItems(true);
@@ -33,10 +28,6 @@ $$(".folder, .spill").forEach((t) =>
   }),
 );
 
-/* Drag-and-drop to status buckets (desktop). Rows are draggable (native HTML5 DnD —
-   no library; mobile keeps swipe, the friction-asymmetry cheapest gesture). Drop
-   targets are the four real status buckets (the "All" tab has data-status="" and is
-   not a bucket). Drops reuse act(). */
 let dragFullname = null;
 
 function dropTargetFrom(e) {
@@ -44,7 +35,7 @@ function dropTargetFrom(e) {
     ".folder[data-status], .spill[data-status], .statuspills [data-status]",
   );
 
-  return t && t.dataset.status ? t : null; // "All" (empty status) is not a bucket
+  return t && t.dataset.status ? t : null;
 }
 
 function setDropTargets(on) {
@@ -52,15 +43,12 @@ function setDropTargets(on) {
 }
 
 function dragTargets() {
-  // Real buckets only: a non-empty data-status, excluding the "All" tab.
   return $$(".folder[data-status], .spill[data-status], .statuspills [data-status]").filter(
     (t) => t.dataset.status,
   );
 }
 
 document.addEventListener("dragstart", (e) => {
-  // Reset first: dragend is not guaranteed (spec skips it when the source
-  // node is removed mid-drag), so never trust leftover state from a prior drag.
   dragFullname = null;
   setDropTargets(false);
   const row = e.target.closest("[data-fullname]");
@@ -94,7 +82,7 @@ document.addEventListener("drop", (e) => {
   e.preventDefault();
   const status = t.dataset.status;
 
-  if (status === (state.status || "")) return; // dropping onto the active bucket = no-op
+  if (status === (state.status || "")) return;
   setDropTargets(false);
 
   act(dragFullname, status);
@@ -103,12 +91,10 @@ document.addEventListener("drop", (e) => {
 });
 
 document.addEventListener("click", (e) => {
-  // the drawer owns its own rows (and the category facet) — see the #navdrawer handler
   if (e.target.closest("#fchips") || e.target.closest("#navdrawer")) return;
   const parent = e.target.closest("[data-tagparent]");
 
   if (parent) {
-    // rail group header → OR-select (or clear) all of its present children at once
     const kids = parent.dataset.tagparent.split(",").filter(Boolean);
 
     if (kids.every((t) => state.tags.includes(t)))
@@ -131,9 +117,7 @@ document.addEventListener("click", (e) => {
   if (r.dataset.source !== undefined) {
     state.source = state.source === r.dataset.source ? "" : r.dataset.source;
 
-    /* Subreddit is a reddit-only facet — clear it when leaving reddit. */
     if (state.source !== "reddit") state.subreddit = "";
-    /* Leaving or entering reddit re-renders the subreddit facet via refreshRail. */
   } else if (r.dataset.subreddit !== undefined) {
     state.subreddit = state.subreddit === r.dataset.subreddit ? "" : r.dataset.subreddit;
     closeSheets();
@@ -210,7 +194,6 @@ $("#peekswept").addEventListener("click", () => {
   toast("Peeking at what rested — everything is still here.");
 });
 
-/* ---- search + operator discovery (Epic 12: visible Gmail/Discord-style operators) ---- */
 export const qInput = $("#q");
 
 function focusSearchBox() {
@@ -228,7 +211,7 @@ function focusSearchBox() {
 }
 
 const runSearch = debounce(() => {
-  if (qInput.value.startsWith(">")) return; // command mode — palette.js owns the input
+  if (qInput.value.startsWith(">")) return;
   state.q = qInput.value.trim();
   paintTabs();
   loadItems(true);
@@ -237,7 +220,6 @@ const runSearch = debounce(() => {
 qInput.addEventListener("input", runSearch);
 
 initOperators(qInput, $("#oppop"), {
-  // tag values come from the shared drawer/rail facet data (full curated list)
   getDyn: (which) => (which === "tags" ? facets.tags.map((t) => t.id) : []),
   onApply: () => {
     state.q = qInput.value.trim();
@@ -256,7 +238,6 @@ $("#open-search")?.addEventListener("click", () => {
   focusSearchBox();
 });
 
-/* ---- sort ---- */
 export const sortSel = $("#sort");
 
 sortSel.value = state.sort;
@@ -271,19 +252,15 @@ sortSel.addEventListener("change", () => {
 
   try {
     localStorage.setItem(sortKey(state.status), state.sort);
-  } catch {} // remember per tab
+  } catch {}
 
   loadItems(true);
 });
 
-/* Re-apply the restored tab's sort to the control. Called from main.js after the
-   session view is restored (per-tab sort memory wins over the initial default). */
 export function syncSortControl() {
   state.sort = sortForTab(state.status);
-  sortSel.value = state.sort; // apply the tab's sort once the view restores
+  sortSel.value = state.sort;
 }
-
-/* ---- keyboard: the one-hand map (locked at Gate 1) ---- */
 
 let cursor = -1;
 
@@ -312,7 +289,6 @@ document.addEventListener("keydown", (e) => {
   if (isTypingTarget(e.target)) return;
 
   if (e.ctrlKey || e.metaKey) {
-    // undo/redo chords; other modifier combos pass through to the browser
     const c = e.key.toLowerCase();
 
     if (c === "z" && !e.shiftKey && !e.altKey) {
@@ -325,7 +301,7 @@ document.addEventListener("keydown", (e) => {
       redo();
     }
 
-    return; // never fall through to single-key actions while a modifier is held
+    return;
   }
 
   const k = e.key.toLowerCase();

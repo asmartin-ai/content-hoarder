@@ -31,7 +31,6 @@ const SweepListSchema = z.object({ sweeps: z.array(SweepSchema) });
 
 const ApplySchema = z.object({ total: z.number(), wave: z.number().nullable() });
 
-/** Synthetic hoard: one meme pile, one large knowledge pile, one old YouTube pile, noise. */
 function seed(path: string): void {
   const connection = db.connect(path);
 
@@ -43,7 +42,6 @@ function seed(path: string): void {
         source_id: `t3_ncd_${index}`,
         title: `Crayon meme ${index}`,
         created_utc: NOW - 30 * DAY,
-        // One odd casing; the label must use the most common one.
         metadata: { subreddit: index === 0 ? "noncredibledefense" : "NonCredibleDefense" },
       }),
     );
@@ -121,7 +119,6 @@ function statusCounts(path: string, like: string) {
   }
 }
 
-/** Loose on purpose: the invalid-body test posts malformed shapes. */
 type SweepPostBody = {
   kind?: string;
   source?: string;
@@ -173,7 +170,6 @@ test("GET /sweeps offers meme and age piles, never knowledge subreddits", async 
     expect(age?.before_utc).toBeGreaterThan(NOW - 4 * 365 * DAY - 120);
     expect(age?.before_utc).toBeLessThanOrEqual(NOW - 4 * 365 * DAY + 120);
 
-    // Subreddit piles first, then age piles; each largest first, cut to limit.
     const firstAge = list.findIndex((sweep) => sweep.kind === "age");
 
     expect(list.slice(firstAge).every((sweep) => sweep.kind === "age")).toBe(true);

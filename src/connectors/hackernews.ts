@@ -69,13 +69,6 @@ const ogImage = (source: string, base: string): string => {
   }
 };
 
-/**
- * Best-effort og:image for an external article URL; "" on any failure
- * (blocked, network, non-HTML, no tag) so a flaky or hostile article never
- * breaks the enrich pass. `url` is attacker-controlled — any HN submission
- * may link a loopback or link-local address — so it goes through the
- * SSRF-guarded transport like every other network path.
- */
 export async function fetchOgImage(url: string): Promise<string> {
   try {
     const [, headers, raw] = await request(url, {
@@ -261,8 +254,6 @@ export class HackerNewsConnector implements BaseConnector {
         if (!item.source_id) return item;
 
         try {
-          // Guarded transport: a non-2xx raises HttpError, which the outer
-          // catch turns into "leave the item alone".
           const [, , raw] = await request(
             `https://hacker-news.firebaseio.com/v0/item/${item.source_id}.json`,
             { userAgent: config.get("USER_AGENT"), timeout: 10 },

@@ -17,7 +17,6 @@ APPLY = "--apply" in sys.argv
 
 ro = sqlite3.connect(f"file:{DB.resolve().as_posix()}?mode=ro", uri=True)
 
-# Switch to writable connection if --apply
 if APPLY:
     bak = DB.parent / f"app.backup-pre-gfycat-flag-{int(__import__('time').time())}.db"
     import shutil

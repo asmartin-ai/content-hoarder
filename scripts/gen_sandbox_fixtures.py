@@ -31,7 +31,6 @@ DB = Path("data/app.db")
 ro = sqlite3.connect(f"file:{DB.resolve().as_posix()}?mode=ro", uri=True)
 ro.row_factory = sqlite3.Row
 
-
 def is_nsfw(md: dict) -> bool:
     """Check if an item is NSFW (tag or over_18 flag)."""
     tags = md.get("tags") or []
@@ -40,7 +39,6 @@ def is_nsfw(md: dict) -> bool:
     if md.get("over_18"):
         return True
     return False
-
 
 def fetch(url: str, timeout: int = 15) -> dict | None:
     """Fetch a URL and return JSON, or None on failure."""
@@ -51,16 +49,13 @@ def fetch(url: str, timeout: int = 15) -> dict | None:
     except Exception:
         return None
 
-
-# --- 1. Sample items: 5 per source, no NSFW ---
 print("=== Building sample items ===")
 samples = []
-# Get total counts per source first
 for src in ("reddit", "youtube", "firefox", "hackernews", "keep", "obsidian"):
     total = ro.execute("SELECT COUNT(*) FROM items WHERE source=?", (src,)).fetchone()[
         0
     ]
-    limit = min(500, total * 2)  # enough to find 5 non-NSFW
+    limit = min(500, total * 2)
     rows = ro.execute(
         "SELECT * FROM items WHERE source=? ORDER BY last_seen_utc DESC LIMIT ?",
         (src, limit),
@@ -86,7 +81,6 @@ with open(OUT / "items.json", "w", encoding="utf-8") as f:
     json.dump(samples, f, indent=2, ensure_ascii=False)
 print(f"  Total: {len(samples)} items -> items.json")
 
-# --- 2. Sample reddit threads (from cached DB) ---
 print("\n=== Cached reddit threads ===")
 threads = ro.execute(
     """SELECT t.fullname, t.thread_json, i.title
@@ -110,9 +104,7 @@ with open(OUT / "reddit_threads.json", "w", encoding="utf-8") as f:
     json.dump(thread_out, f, indent=2, ensure_ascii=False)
 print(f"  {len(thread_out)} threads -> reddit_threads.json")
 
-# --- 3. Live API responses (cached for offline use) ---
 print("\n=== Live API snapshots ===")
-# Reddit thread (via pushshift/ pullpush alternative)
 reddit_rows = [s for s in samples if s["source"] == "reddit"]
 if reddit_rows:
     r = reddit_rows[0]
@@ -128,7 +120,6 @@ if reddit_rows:
         else:
             print(f"    Failed")
 
-# HN item
 hn_rows = [s for s in samples if s["source"] == "hackernews"]
 if hn_rows:
     hn = hn_rows[0]

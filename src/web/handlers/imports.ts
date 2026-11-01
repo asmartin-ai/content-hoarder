@@ -71,9 +71,7 @@ export async function importUpload(request: Request): Promise<Response> {
   } finally {
     try {
       unlinkSync(path);
-    } catch {
-      /* staged file is already gone */
-    }
+    } catch {}
   }
 }
 
@@ -166,9 +164,7 @@ export async function prepareImport(request: Request): Promise<Response> {
   } catch (error) {
     try {
       unlinkSync(stagedPath);
-    } catch {
-      /* parser cleanup */
-    }
+    } catch {}
 
     return json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }
@@ -195,8 +191,6 @@ export async function commitImport(request: Request): Promise<Response> {
   } finally {
     try {
       unlinkSync(staged.path);
-    } catch {
-      /* staged file is already gone */
-    }
+    } catch {}
   }
 }

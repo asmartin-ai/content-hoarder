@@ -580,9 +580,7 @@ export async function hydrateOneFromArchive(
         chosen = provider;
         break;
       }
-    } catch {
-      /* next archive source */
-    }
+    } catch {}
   }
 
   if (!post || !chosen) return { status: "archived", fullname, comments: 0 };

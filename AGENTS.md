@@ -59,6 +59,15 @@ metadata (JSON), raw_json`. Source-specific fields (subreddit, channel, score, l
 Triage: `status ∈ {inbox, keep, archived, done}` (default `inbox`); `processed_utc` set when it leaves
 inbox; `status_prev` enables one-step undo.
 
+## No comments in code
+Code carries no comments: no `//`, `/* */`, JSDoc, `#`, `<!-- -->`, `{# #}` or `REM`. Put the
+why in a test name, a doc beside the code (`docs/`, `DESIGN.md`) or the commit message; turn an
+invariant into a test. `bun run check` enforces it: the oxlint rule `khaos/no-comments`
+(`tools/oxlint/khaos/`, `oxlint --fix` removes them) covers TS/JS, and
+`scripts/check-no-comments.ts` (`--fix` removes them) covers CSS, HTML, Nunjucks, shell, Python,
+PowerShell and batch files. Shebangs and vendored code (`src/static/vendor/`, `.agents/`,
+`tools/oxlint/anti-slop/`) are exempt; Python docstrings are strings, not comments.
+
 ## NON-OBVIOUS GOTCHAS — do not reintroduce
 1. **External-content FTS5 must be backfilled with `INSERT INTO tbl(tbl) VALUES('rebuild')`**, NEVER
    `INSERT … SELECT` (the latter produces an index that returns no MATCH rows). Emptiness is NOT

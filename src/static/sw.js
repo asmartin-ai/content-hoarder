@@ -1,7 +1,3 @@
-/* Service worker (Phase 2): installable + offline app shell.
-   - static assets: cache-first (stale-while-revalidate)
-   - navigation pages: network-first, fall back to cache when offline
-   - data/API (and all POST): network only (never cached — must be fresh) */
 const CACHE = "ch-shell-v145";
 
 const SHELL = [
@@ -9,7 +5,6 @@ const SHELL = [
   "/clear",
   "/library",
   "/static/core/nav.css",
-  // Today + Clear shell ("/" and "/clear")
   "/static/home/home.css",
   "/static/home/today.css",
   "/static/home/clear.css",
@@ -17,7 +12,6 @@ const SHELL = [
   "/static/home/main.js",
   "/static/home/round.js",
   "/static/vendor/htmx.min.js",
-  // Library browse shell ("/library")
   "/static/theme.js",
   "/static/haptics.js",
   "/static/core/tokens.css",
@@ -30,7 +24,7 @@ const SHELL = [
   "/static/core/icons.js",
   "/static/core/tags.js",
   "/static/core/overlaynav.js",
-  "/static/core/markdown.js", // reader dependency (browse/reader.js:20)
+  "/static/core/markdown.js",
   "/static/browse/browse.css",
   "/static/browse/main.js",
   "/static/browse/shared.js",
@@ -88,10 +82,10 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
 
-  if (req.method !== "GET") return; // POST etc. -> network
+  if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  if (url.origin !== self.location.origin) return; // cross-origin -> network
+  if (url.origin !== self.location.origin) return;
 
   const isStatic = url.pathname.startsWith("/static/") || url.pathname === "/manifest.webmanifest";
 
@@ -111,8 +105,6 @@ self.addEventListener("fetch", (e) => {
 
               return res;
             })
-            // Uncached + offline: reject → raw browser error. Return 504 so the
-            // caller sees a controlled failure instead of an unhandled rejection.
             .catch(() => new Response("", { status: 504, statusText: "Gateway Offline" })),
       ),
     );
@@ -129,9 +121,6 @@ self.addEventListener("fetch", (e) => {
 
           return res;
         })
-        // Cache miss + offline: fall back to this page's own cached shell (ignoring the
-        // query, e.g. /library?open=…), then "/", so the user sees the PWA instead of the
-        // browser's raw network-error page.
         .catch(() =>
           caches
             .match(req, { ignoreSearch: true })
@@ -148,5 +137,4 @@ self.addEventListener("fetch", (e) => {
 
     return;
   }
-  // data/API: default to network (no respondWith)
 });

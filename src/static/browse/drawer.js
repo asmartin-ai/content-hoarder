@@ -1,7 +1,3 @@
-/* browse/drawer.js — the mobile "Jump" drawer (the phone expression of the desktop
-   .rail): grouped facets, filter, pin/collapse/sections, plus the left-edge swipe
-   that opens it. */
-
 import { esc } from "../core/util.js";
 import { toast } from "../core/toast.js";
 import {
@@ -23,14 +19,6 @@ let navFilter = "";
 
 let managing = false;
 
-/* ---- mobile "Jump" drawer: search + grouped facets, pin, collapse, sections ----
-   The phone expression of the desktop .rail. Rows render from the SAME facet data
-   refreshRail() fetches (sources/categories/tags); selecting a row drives the same
-   state.source/category/tags filter + #fchips chips the rail/desktop already use.
-   Deferred to a later tier: the per-row ⋮ action sheet (Mute/Rename need backend
-   endpoints that don't exist yet) and a standalone "+ New tag" (tags attach to items,
-   there's no standalone-tag create flow). The star (pin) + ⚙ (sections) cover the
-   locked Tier-1 affordances today. */
 const GROUPS = [
   { id: "sources", label: "SOURCES", kind: "source" },
   { id: "categories", label: "CATEGORIES", kind: "category" },
@@ -67,11 +55,6 @@ function facetRows(kind) {
       count: c.count,
     }));
 
-  // Categories are folded into the tag system, so /tags echoes the category names
-  // (listenable/watch/wotagei/unknown) back as tags. They have their own Categories
-  // group above, so drop them here — each facet should appear exactly once in the
-  // drawer. (Drawer-local: the desktop .rail reads facets.tags directly and has no
-  // Categories group, so it still surfaces these as its only way to reach them.)
   const catIds = new Set(facets.categories.map((c) => String(c.id).toLowerCase()));
 
   return facets.tags
@@ -261,7 +244,6 @@ export function openDrawer() {
   drawer.setAttribute("aria-hidden", "false");
   lockBrowseScroll();
 
-  // Desktop only: autofocusing the filter pops the on-screen keyboard on mobile (user-reported).
   if (!isPhone())
     setTimeout(() => {
       const fi = $("#nav-filter");
@@ -286,10 +268,6 @@ $("#nav-manage").addEventListener("click", () => {
 });
 
 drawer.addEventListener("click", (e) => {
-  // The drawer owns every click inside it. stopPropagation BEFORE any renderDrawer()
-  // re-render: re-rendering detaches the clicked node mid-event, which would otherwise
-  // bubble to the document rail handler and misfire (its #navdrawer guard sees an
-  // orphaned node and fails). Stopping here keeps drawer clicks out of that handler.
   const ghead = e.target.closest(".nd-ghead");
 
   if (ghead) {
@@ -359,7 +337,6 @@ drawer.addEventListener("keydown", (e) => {
   }
 });
 
-/* left edge-swipe opens the drawer (mobile only — desktop uses the rail) */
 let edgeX = null;
 
 document.addEventListener(

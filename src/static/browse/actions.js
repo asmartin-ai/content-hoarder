@@ -1,7 +1,3 @@
-/* browse/actions.js — triage on the feed: live clear + undo/redo, the delegated row
-   interactions (status buttons, media, title→reader), bulk select + its tray, the
-   predictive next-thread preload, and the row-menu unsave/promote actions. */
-
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
 import { imageUrl } from "../core/media.js";
@@ -13,20 +9,13 @@ import { render, rowEl } from "./feed.js";
 import { openMediaFor } from "./lightbox.js";
 import { readerUI, tagEditor } from "./instances.js";
 
-/* ---- actions: live clear + undo/redo (locked #11) ---- */
-/* Single-level redo buffer: the last single-item action that was undone, so it can
-   be replayed. Mirrors the single-level snackbar undo (only the most recent action is
-   undoable, so only one is redoable). Any new act() clears it. */
 let lastUndone = null;
 
 export async function act(fullname, status, opts = {}) {
-  lastUndone = null; // a fresh action invalidates the redo buffer
+  lastUndone = null;
 
-  if (window.chHaptic) window.chHaptic(status); // tactile confirm on the decision (covers swipe + buttons)
+  if (window.chHaptic) window.chHaptic(status);
 
-  /* SPEC A2: reader triage skips leave-anim, cache clear, item removal, and render().
-     The item stays in state.items with its status updated lazily; undo just reverts
-     the in-memory status. No redo tracking for the reader path. */
   if (opts.fromReader) {
     try {
       await api.setStatus(fullname, status);
@@ -56,7 +45,6 @@ export async function act(fullname, status, opts = {}) {
     return;
   }
 
-  // Inline row path: leave-anim, cache clear, item removal, render (existing behavior)
   const row = rowEl(fullname);
 
   if (row && !row.classList.contains("leaving")) {
@@ -86,13 +74,12 @@ export async function act(fullname, status, opts = {}) {
       await api.undoItem(fullname);
       clearItemFirstPageCache();
 
-      // restore the row in place — no full refetch/skeleton, keeps the scroll position
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
         state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
       }
 
       render();
-      lastUndone = { fullname, status }; // now redoable
+      lastUndone = { fullname, status };
     } catch {
       toast("Undo failed.");
     }
@@ -104,8 +91,6 @@ export async function snooze(fullname, opts = {}) {
 
   if (window.chHaptic) window.chHaptic("skip");
 
-  /* SPEC A2: reader snooze skips leave-anim, cache clear, item removal, and render().
-     The item stays in state.items with its status updated lazily; undo reverts status. */
   if (opts.fromReader) {
     let res;
 
@@ -141,7 +126,6 @@ export async function snooze(fullname, opts = {}) {
     return;
   }
 
-  // Inline row path: existing behavior
   const row = rowEl(fullname);
 
   if (row && !row.classList.contains("leaving")) {
@@ -188,8 +172,6 @@ export async function snooze(fullname, opts = {}) {
   });
 }
 
-/* Redo: replay the last undone single-item action (re-applies the status + shows a
-   fresh undo snackbar). act() resets lastUndone, so it's a clean one-step toggle. */
 export function redo() {
   if (!lastUndone) {
     toast("Nothing to redo.");
@@ -200,10 +182,7 @@ export function redo() {
   act(lastUndone.fullname, lastUndone.status);
 }
 
-/* delegated row interactions */
 itemsEl.addEventListener("click", (e) => {
-  // Relay-style long-press strip buttons are handled by a dedicated listener;
-  // bail here so the row's title/media logic doesn't double-process them.
   if (e.target.closest(".relay-strip")) return;
   const actBtn = e.target.closest(".act");
   const card = e.target.closest("[data-fullname]");
@@ -215,7 +194,7 @@ itemsEl.addEventListener("click", (e) => {
     act(fn, actBtn.dataset.act);
 
     return;
-  } // status acts carry data-act
+  }
 
   if (e.target.closest("[data-select]")) {
     toggleSelect(card);
@@ -240,26 +219,17 @@ itemsEl.addEventListener("click", (e) => {
     if (!item) return;
 
     if (isNsfw(item) && !nsfwRevealed.has(fn)) {
-      // first tap reveals, second opens
       nsfwRevealed.add(fn);
-      media.classList.remove("nsfw"); // veil hidden by CSS; re-blurs on reader/lightbox close
+      media.classList.remove("nsfw");
 
       return;
     }
 
-    // Thumbnail tap = a quick PLAIN-MEDIA peek — image lightbox / video player / gallery viewer.
-    // The post + comment THREAD is reached by tapping the title or body text (handled below).
-    // (Reverted the reddit-image/video → reader interception per user pref + Epic 5 P2, 2026-06-22.)
-    // openMediaFor → lightbox registers with the overlay coordinator (core/media.js pushOverlay),
-    // so the OS/back button closes the lightbox and returns to the feed (inbox), not exits the app.
     openMediaFor(item);
 
     return;
   }
 
-  // Discussion-thread + note items: tapping the title link or body text opens the in-app reader.
-  // A title link's parent is an <h3> (every density); meta/source links sit in .meta,
-  // so they keep their external navigation.
   const rItem = state.items.find((it) => it.fullname === fn);
 
   if (canOpenInReader(rItem)) {
@@ -275,11 +245,6 @@ itemsEl.addEventListener("click", (e) => {
     }
   }
 });
-/* ---- predictive preload: on reader-open, warm the NEXT discussion thread + its media (Epic 8 P2) ----
-   Sequential reading is the common path, so when an item opens we pre-hydrate the next Reddit/HN
-   comment thread (a GET lazily hydrates it server-side → the next open is instant) and prime its media
-   image. Bounded + safe: ONE thread fetch per open (de-duped via _preloaded), only discussion items have
-   threads, and an in-flight preload is aborted when a newer one starts. */
 
 let _preloadCtl = null;
 
@@ -297,7 +262,7 @@ export function preloadNext(opened) {
   const i = state.items.indexOf(opened);
 
   if (i < 0) return;
-  let next = null; // nearest following discussion item (small look-ahead)
+  let next = null;
 
   for (let j = i + 1; j < state.items.length && j <= i + 4; j++) {
     if (state.items[j].source === "reddit" || state.items[j].source === "hackernews") {
@@ -307,14 +272,14 @@ export function preloadNext(opened) {
   }
 
   if (!next) return;
-  const mu = imageUrl(next); // prime media (CDN/local — no rate-limit concern)
+  const mu = imageUrl(next);
 
   if (mu) {
     const im = new Image();
     im.src = mu;
   }
 
-  if (_preloaded.has(next.fullname)) return; // warm each thread at most once
+  if (_preloaded.has(next.fullname)) return;
   _preloaded.add(next.fullname);
 
   if (_preloadCtl) {
@@ -324,13 +289,11 @@ export function preloadNext(opened) {
   }
 
   _preloadCtl = new AbortController();
-  // sort is irrelevant for warming (hydration caches the whole thread; sort is applied at read time)
   const path = threadPath(next);
 
   if (path) fetch(path, { signal: _preloadCtl.signal }).catch(() => {});
 }
 
-/* ---- bulk select (locked: avatar shade select; overlay bar; bulk undo) ---- */
 export function toggleSelect(card) {
   const fn = card.dataset.fullname;
 
@@ -379,9 +342,6 @@ $$("#bulktray [data-bulk]").forEach((b) =>
 
     if (window.chHaptic) window.chHaptic(status);
 
-    // Bulk "Unsave" is reddit-only and queues locally; it does not change triage
-    // status, so it bypasses the bulkStatus path entirely. Only reddit items with
-    // is_saved !== 0 are queued; others are silently skipped (with a toast count).
     if (status === "unsave") {
       const targets = state.items.filter(
         (it) => fns.includes(it.fullname) && it.source === "reddit" && it.is_saved !== 0,
@@ -439,7 +399,6 @@ $$("#bulktray [data-bulk]").forEach((b) =>
     snackbar(fns.length + " — " + (COPY[status] || "logged.").toLowerCase(), async () => {
       await api.bulkUndo(fns);
       clearItemFirstPageCache();
-      // restore the rows in place (ascending index) — no full refetch/skeleton
       bulkRemoved
         .sort((a, b) => a.i - b.i)
         .forEach(({ i, item }) => {
@@ -452,8 +411,6 @@ $$("#bulktray [data-bulk]").forEach((b) =>
   }),
 );
 
-/* Queue one reddit item for unsave from the row menu. Local-only until
-   /reddit/unsave/drain runs; surface that as a follow-up snackbar action. */
 export async function unsaveRow(fn) {
   const it = state.items.find((i) => i.fullname === fn);
 
@@ -475,11 +432,6 @@ export async function unsaveRow(fn) {
   }
 }
 
-/* Promote the row item into PKMS (Spec 15 §7): POST the bridge route, mirror
-   the server-stamped metadata.promotion onto the local item so the row menu
-   hides the Promote button on re-open, snackbar the PKMS response body.
-   Errors toast data.error (unconfigured 400, transport 502). Item stays in
-   the feed — no re-render needed. */
 export async function promoteItem(fn) {
   const it = state.items.find((i) => i.fullname === fn);
 
@@ -487,8 +439,6 @@ export async function promoteItem(fn) {
 
   try {
     const res = await api.promoteItem(fn);
-    // Server always stamps status "promoted" (replay is a transient HTTP
-    // answer); mirror that so the menu's hide rule matches the receipt.
     const promotion = { status: res.status === "replay" ? "promoted" : res.status };
 
     if (res.response) promotion.response = res.response;

@@ -1,7 +1,3 @@
-/* browse/relay.js — the Relay-style inline long-press strip (Epic 16 B3): the row
-   action menu (source/author/tag/share/promote/snooze/unsave) opened by long-press
-   or right-click, and the strip's own delegated click handling. */
-
 import { $, state, itemsEl } from "./shared.js";
 import { itemUrl, shareItem } from "../core/render.js";
 import { rowEl } from "./feed.js";
@@ -9,11 +5,6 @@ import { snooze, unsaveRow, promoteItem } from "./actions.js";
 import { tagEditor } from "./instances.js";
 import { closeSheets } from "./panels.js";
 
-/* ---- Relay-style inline long-press strip (Epic 16 B3) ----
-   Long-press / right-click a row → the row translates aside and a horizontal action
-   strip appears in its place, in the same thumb zone (no reach to mid-screen).
-   The strip is injected into the row; a transparent .relay-scrim captures outside
-   taps / Escape to collapse it back. */
 let relayFn = null;
 
 let relayRow = null;
@@ -29,7 +20,6 @@ function relaySourceHref(it) {
     return "https://www.reddit.com/r/" + encodeURIComponent(m.subreddit);
 
   if (it.source === "youtube" && m.channel) {
-    // channel id preferred when present; falls back to the handle/@name
     const id = m.channel_id || "";
 
     if (id) return "https://www.youtube.com/channel/" + encodeURIComponent(id);
@@ -53,7 +43,6 @@ function relaySourceLabel(it) {
 
   if (it.source === "hackernews") return "HN";
 
-  // fall back to the URL domain
   try {
     const u = itemUrl(it) || it.url || "";
 
@@ -118,15 +107,11 @@ export function openRowMenu(fn) {
   const row = rowEl(fn);
 
   if (!row || !relayTpl) return;
-  // collapse any prior relay strip first (e.g. right-click after a long-press)
   closeSheets();
   closeRelay();
 
-  // build the strip from the template, then hydrate the source/author links
   const frag = relayTpl.content.cloneNode(true);
 
-  // helper: turn a <button class="relay-btn"> into a navigation <a> with the same
-  // children/classes (buttons don't navigate even with href set).
   const toLink = (btn, href) => {
     const a = document.createElement("a");
     a.className = btn.className;
@@ -166,7 +151,6 @@ export function openRowMenu(fn) {
     auBtn.hidden = true;
   }
 
-  // Reddit-only "Unsave" — only meaningful when still in the user's Saved list.
   const unsaveBtn = frag.querySelector('[data-relay="unsave"]');
 
   if (unsaveBtn) {
@@ -174,7 +158,6 @@ export function openRowMenu(fn) {
     unsaveBtn.hidden = !show;
   }
 
-  // "Promote" — hidden once a promoted receipt exists (re-promote is a no-op).
   const promoBtn = frag.querySelector('[data-relay="promote"]');
 
   if (promoBtn) {
@@ -185,7 +168,6 @@ export function openRowMenu(fn) {
   row.appendChild(frag);
   relayFn = fn;
   relayRow = row;
-  // double-rAF so the strip's enter transition runs (inserted at offset, then translated to 0)
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       row.classList.add("relay-open");
@@ -195,8 +177,6 @@ export function openRowMenu(fn) {
   );
 }
 
-// clicks on the strip (the row's own click handler is for triage/title taps; this is
-// a dedicated listener on itemsEl that only acts when a relay strip is the target)
 itemsEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".relay-btn[data-relay]");
 
@@ -205,7 +185,6 @@ itemsEl.addEventListener("click", (e) => {
   const action = btn.dataset.relay,
     fn = relayFn;
 
-  // source/author are real anchors (href set above) — let them navigate, just collapse
   if (action === "source" || action === "author") {
     closeRelay();
 
@@ -227,15 +206,11 @@ itemsEl.addEventListener("click", (e) => {
 
 if (relayScrim) relayScrim.addEventListener("click", closeRelay);
 
-// Escape closes an open relay strip (the global keydown below also routes here)
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && relayFn) closeRelay();
 });
 
-// desktop has no long-press → right-click a row opens the same menu
 itemsEl.addEventListener("contextmenu", (e) => {
-  // Keep the native browser menu on real links so users can copy/open URLs.
-  // Right-clicking row chrome/text still opens the row action strip.
   if (e.target.closest("a[href]")) return;
   const card = e.target.closest(".row[data-fullname]");
 

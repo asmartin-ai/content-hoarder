@@ -1,10 +1,3 @@
-/* browse/main.js — v3 browse page entry (Epic 20 Stage C).
-   Spec: 05-log-book-2.html + 06-adhd-round.html (LOCKED 2026-06-11).
-   Entry point only: the surface itself lives in the sibling browse modules (shared
-   state, data, feed, actions, lightbox, relay, nav, drawer, chrome, ambient, panels,
-   instances). Each of those installs its own DOM listeners when it is evaluated; this
-   file imports them in dependency order, then runs the boot sequence. */
-
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 import { wireTagExpanders } from "../core/render.js";
@@ -21,7 +14,6 @@ import { readerUI } from "./instances.js";
 import { paintChips, paintTabs, qInput, sortSel, syncSortControl } from "./nav.js";
 import { initPalette } from "./palette.js";
 
-/* modules main.js does not otherwise reach into: they wire their own listeners */
 import "./actions.js";
 import "./lightbox.js";
 import "./relay.js";
@@ -70,7 +62,6 @@ async function openDeepLinkedReader() {
   }
 }
 
-/* ---- boot ---- */
 paintTabs();
 
 paintChips();
@@ -89,30 +80,22 @@ openDeepLinkedReader();
 
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
-    // Service workers (and therefore PWA install) only work in a secure context:
-    // HTTPS, or localhost/127.0.0.1. Plain HTTP over a LAN or Tailscale IP fails
-    // here silently — surface it so the cause is visible. See docs/MOBILE_TAILSCALE.md.
     console.warn("Service worker registration failed (needs HTTPS or localhost):", err);
   });
 
-/* ---- automatic Reddit saved-sync: the PWA-open half of the auto path (Epic 25). Fire-and-forget on
-   boot + when the tab regains focus; the server DEBOUNCES (90s) and NO-OPs unless autosync is opted
-   in, so this is safe to call freely. Quietly refreshes the view when a sync actually imported or
-   reconciled something — never interrupts the user with a toast. The background scheduler funnels into
-   the same /reddit/sync/auto -> auto_sync path. */
 (function autoSyncOnOpen() {
   let lastPing = 0;
 
   async function ping() {
     const now = Date.now();
 
-    if (now - lastPing < 60000) return; // client guard; server debounce is the real gate
+    if (now - lastPing < 60000) return;
     lastPing = now;
 
     try {
       const data = await api.postJSON("/reddit/sync/auto", {});
 
-      if (!data || data.skipped) return; // disabled / debounced -> nothing changed
+      if (!data || data.skipped) return;
 
       const r = data.result || {},
         rec = r.reconcile || {};
@@ -124,9 +107,7 @@ if ("serviceWorker" in navigator)
         refreshRail();
         refreshPulse();
       }
-    } catch {
-      /* offline / network — silent; retried on next focus */
-    }
+    } catch {}
   }
 
   ping();
@@ -135,7 +116,6 @@ if ("serviceWorker" in navigator)
   });
 })();
 
-/* ---- command palette (locked Epic 20: ">" flips search to command mode) ---- */
 initPalette(qInput, [
   {
     label: "Start a round",

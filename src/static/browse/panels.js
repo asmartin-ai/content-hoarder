@@ -1,7 +1,3 @@
-/* browse/panels.js — the sheet layer: browse scroll lock, the settings / stats /
-   duplicates / keyboard-shortcut sheets, Done-retention settings + purge, the
-   "Sync newest" button, and swipe-down-to-dismiss for the mobile bottom sheets. */
-
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
@@ -17,20 +13,19 @@ import {
 import { render } from "./feed.js";
 import { closeRelay } from "./relay.js";
 
-/* ---- sheets / settings panel ---- */
 export const scrim = $("#scrim");
 
 let _browseLock = 0;
 
-let _browseLockSaved = 0; // #items scroll
+let _browseLockSaved = 0;
 
-let _browseBodyLockSaved = 0; // body scroll
+let _browseBodyLockSaved = 0;
 
 export function lockBrowseScroll() {
   if (_browseLock === 0) {
     _browseLockSaved = itemsEl.scrollTop;
     _browseBodyLockSaved = window.scrollY || document.documentElement.scrollTop;
-    document.body.style.overflow = "hidden"; // lock the body too
+    document.body.style.overflow = "hidden";
   }
 
   _browseLock++;
@@ -43,12 +38,12 @@ function unlockBrowseScroll() {
 
   if (_browseLock === 0) {
     itemsEl.style.overflow = "";
-    document.body.style.overflow = ""; // restore the body
+    document.body.style.overflow = "";
 
     if (_browseLockSaved) itemsEl.scrollTop = _browseLockSaved;
 
     if (_browseBodyLockSaved) {
-      window.scrollTo(0, _browseBodyLockSaved); // restore body scroll position
+      window.scrollTo(0, _browseBodyLockSaved);
     }
 
     _browseLockSaved = 0;
@@ -71,9 +66,7 @@ export function closeSheets() {
   if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
 
-  // also collapse any open Relay-style inline strip (Epic 16 B3)
   closeRelay();
-  // restore browse scroll when ALL sheets are closed (Epic 16: sidebar scroll-lock)
   unlockBrowseScroll();
 }
 
@@ -183,10 +176,6 @@ $("#open-settings").addEventListener("click", () => {
   loadDoneRetention(true);
 });
 
-/* Swipe-DOWN-to-dismiss for the mobile bottom sheets. Engages only at scroll-top with a
-   downward drag, so it never fights the sheet's own scroll or its toggle buttons. The
-   preventDefault on the engaged drag also blocks the browser's pull-to-refresh, which
-   otherwise hijacks the down-swipe and reloads the page instead of closing the sheet. */
 function attachSheetDismiss(panel) {
   if (!panel) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -204,8 +193,8 @@ function attachSheetDismiss(panel) {
       fired = true;
       panel.removeEventListener("transitionend", fin);
 
-      if (after) after(); // before clearing inline: closeSheets removes .show while
-      panel.style.transition = ""; // the sheet is already off-screen → no flash back up
+      if (after) after();
+      panel.style.transition = "";
       panel.style.transform = "";
     };
 
@@ -220,7 +209,7 @@ function attachSheetDismiss(panel) {
     panel.style.transition = "transform 180ms var(--ease)";
     panel.style.transform = toY;
     panel.addEventListener("transitionend", fin);
-    setTimeout(fin, 240); // fallback if transitionend never fires
+    setTimeout(fin, 240);
   };
 
   panel.addEventListener(
@@ -228,11 +217,11 @@ function attachSheetDismiss(panel) {
     (e) => {
       if (e.touches.length !== 1) return;
 
-      if (!window.matchMedia("(max-width:700px)").matches) return; // bottom-sheet layout only
+      if (!window.matchMedia("(max-width:700px)").matches) return;
       startY = e.touches[0].clientY;
       dy = 0;
       dragging = true;
-      engaged = panel.scrollTop <= 0; // decide once, up front
+      engaged = panel.scrollTop <= 0;
       panel.style.transition = "none";
     },
     { passive: true },
@@ -244,8 +233,8 @@ function attachSheetDismiss(panel) {
       if (!dragging || !engaged) return;
       dy = e.touches[0].clientY - startY;
 
-      if (dy <= 0) return; // upward → let content scroll
-      e.preventDefault(); // own the gesture (no pull-to-refresh)
+      if (dy <= 0) return;
+      e.preventDefault();
       panel.style.transform = "translate(-50%," + dy + "px)";
     },
     { passive: false },
@@ -266,7 +255,6 @@ function attachSheetDismiss(panel) {
 
 ["#settings", "#statsheet", "#dupesheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
 
-/* ---- stats sheet (Epic 14: Stats lives in the settings menu) ---- */
 function statsBarRows(obj, max) {
   return Object.entries(obj || {})
     .sort((a, b) => b[1] - a[1])
@@ -444,7 +432,6 @@ $("#dupesheet").addEventListener("click", async (e) => {
 
 $$("#set-theme button").forEach((b) =>
   b.addEventListener("click", () => {
-    // theme.js owns persistence; mirror its storage contract ("ch-theme")
     document.documentElement.dataset.theme = b.dataset.theme;
 
     try {
@@ -477,18 +464,18 @@ $$("#set-nsfw button").forEach((b) =>
     state.safe = b.dataset.nsfw === "hide";
     localStorage.chSafe = state.safe ? "1" : "0";
     $$("#set-nsfw button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    refreshRail(); // surface/hide the nsfw_* facets to match the toggle (Epic 14)
+    refreshRail();
     loadItems(true);
   }),
 );
 
 $$("#set-archive button").forEach((b) =>
   b.addEventListener("click", () => {
-    state.archiveMedia = b.dataset.archive === "on"; // prefer local /media copies (Epic 4 P1)
+    state.archiveMedia = b.dataset.archive === "on";
     localStorage.chArchiveMedia = state.archiveMedia ? "1" : "0";
     setArchivePref(state.archiveMedia);
     $$("#set-archive button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    render(); // re-render with the new media-source preference
+    render();
   }),
 );
 
@@ -570,7 +557,6 @@ $("#done-retention-purge").addEventListener("click", async () => {
   }
 });
 
-/* ---- "Sync newest": surface the /reddit incremental sync on the browse view (Epic 9 / spec 06) ---- */
 async function runSyncNewest(btn) {
   if (!btn || btn.disabled) return;
   const label = btn.textContent;
@@ -608,7 +594,6 @@ const syncHeaderBtn = $("#btn-sync-newest");
 
 if (syncHeaderBtn) syncHeaderBtn.addEventListener("click", () => runSyncNewest(syncHeaderBtn));
 
-/* reflect persisted settings into the panel */
 $$("#set-density button").forEach((b) =>
   b.setAttribute("aria-pressed", String(b.dataset.d === state.density)),
 );

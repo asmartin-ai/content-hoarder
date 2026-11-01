@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Start a throwaway demo library: a fresh database in a new temp folder, filled with the
-# 24 synthetic saves in docs/demo/demo-saves.json. It runs from that folder, so no .env
-# (and no Reddit/Karakeep credentials) is loaded, and it never opens data/app.db.
-# Walkthrough and safety checklist: docs/DEMO.md.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"

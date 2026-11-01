@@ -21,8 +21,6 @@ let activeDatabasePath: string | undefined;
 
 let activeDatabase: Database | undefined;
 
-// A Done enqueues instantly (db.setStatus); this idle-debounced drainer flushes
-// a small capped batch once triage settles, when unsave-on-done is opted in.
 let unsaveTrickle: TrickleDrainer | null = null;
 
 export function setDatabasePath(path: string | undefined): void {
@@ -69,9 +67,7 @@ export function cleanPrepared(): void {
     if (item.expires < Date.now()) {
       try {
         unlinkSync(item.path);
-      } catch {
-        /* expired staged file was already removed */
-      }
+      } catch {}
 
       prepared.delete(token);
     }

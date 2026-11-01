@@ -57,7 +57,6 @@ export function previewThumb(value: JsonValue): string {
   return thumbnail.startsWith("http") ? thumbnail : "";
 }
 
-/** A finite number from a loose sqlite column, or null when absent/blank/unparseable. */
 const finiteNumber = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);

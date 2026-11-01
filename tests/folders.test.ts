@@ -32,10 +32,7 @@ test("folder date filters are presence-based and drop undated items", () => {
     const epoch = db.createFolder(connection, "epoch", { before: 0 });
 
     expect(folders.evaluateFolder(connection, everything.id, { dryRun: true }).matched).toBe(2);
-    // created_utc = 0 means "unknown date", not "ancient": an undated row must
-    // not land in a date-filtered folder.
     expect(folders.evaluateFolder(connection, recent.id, { dryRun: true }).matched).toBe(1);
-    // `before: 0` is a real filter (before the epoch), not an absent one.
     expect(folders.evaluateFolder(connection, epoch.id, { dryRun: true }).matched).toBe(0);
   } finally {
     connection.close();

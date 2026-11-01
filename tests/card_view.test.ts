@@ -17,7 +17,6 @@ function makeItem(input: NewItemInput): Item {
   return { ...rawItem, metadata: parseMetadata(rawItem.metadata) };
 }
 
-/** The formatter reflows html`` templates; compare markup with whitespace collapsed. */
 function flat(markup: string): string {
   return markup
     .replace(/\s+/g, " ")

@@ -60,8 +60,6 @@ export async function handleItemAction(
 
       if (!item) return json({ error: "not found" }, 404);
 
-      // Arm the unsave trickle when a Reddit item is Done and unsave-on-done
-      // is opted in; the flag is read on this same connection.
       if (
         status === "done" &&
         fullname.startsWith("reddit:") &&

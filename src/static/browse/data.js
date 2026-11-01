@@ -1,7 +1,3 @@
-/* browse/data.js — the browse view's data layer: query params, the first-page
-   prefetch cache, feed loading/paging, status counts, rail facets, and the ambient
-   pulse refresh (with its repeated-failure staleness signal). */
-
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
@@ -16,7 +12,6 @@ import {
   createFirstPagePrefetcher,
 } from "./prefetch.js";
 
-/* ---- fetching + rendering ---- */
 function params(extra) {
   const p = {
     sort: state.sort.split(":")[0],
@@ -89,9 +84,6 @@ export function clearItemFirstPageCache() {
 let loadGen = 0;
 
 export async function loadItems(reset) {
-  // an append during a load is a duplicate; a RESET supersedes whatever is in
-  // flight (generation check below — otherwise clearing a slow search drops the
-  // user's newest intent on the floor)
   if (!reset && state.loading) return;
   const gen = ++loadGen;
   state.loading = true;
@@ -101,10 +93,8 @@ export async function loadItems(reset) {
   if (reset) {
     state.offset = 0;
     state.items = [];
-    saveView(); // persist the active view so a reload/return keeps your place
+    saveView();
 
-    // keep the current rows on screen (dimmed) during a refetch — only blank to the skeleton on a
-    // cold start, so changing filter/sort/status/source no longer flashes the whole list away
     if (itemsEl.querySelector("[data-fullname]")) itemsEl.classList.add("loading");
     else itemsEl.innerHTML = '<div class="skeleton">FETCHING…</div>';
   }
@@ -120,7 +110,7 @@ export async function loadItems(reset) {
       r = await api.getJSON("/items?" + query);
     }
 
-    if (gen !== loadGen) return; // a newer load superseded this one
+    if (gen !== loadGen) return;
 
     if (!fromCache) itemFirstPageCache.set(query, r);
     state.items = state.items.concat(r.items);
@@ -143,16 +133,10 @@ export async function refreshPulse() {
     paintPulse();
     _facetStaleReset();
   } catch (e) {
-    /* ambient — but count toward the staleness signal so a persistent failure
-       (which also freezes the "cleared today" pebbles) isn't silent. */
     _facetStaleBump(e);
   }
 }
 
-/* ---- Staleness signal (audit High 2026-07-02): repeated consecutive failures of
-   the ambient rail/pulse fetches surface one subtle toast + a console log, so a
-   dead server is distinguishable from "nothing to show". One signal per stall,
-   not per failure; resets on the first success. ---- */
 let _staleFailCount = 0;
 
 let _staleSignaled = false;
@@ -168,9 +152,7 @@ function _facetStaleBump(e) {
 
     try {
       toast("Couldn’t reach the server — showing cached state.");
-    } catch {
-      /* toast opt */
-    }
+    } catch {}
   }
 }
 
@@ -180,7 +162,6 @@ function _facetStaleReset() {
 }
 
 export async function loadCounts() {
-  // Keep + Done get counts (processed piles read as wins); Inbox/Archived/All never do.
   try {
     const s = await api.fetchStats({ light: 1 });
     const by = s.by_status || {};
@@ -192,9 +173,7 @@ export async function loadCounts() {
 
       el.textContent = v || "";
     });
-  } catch {
-    /* counts are decoration */
-  }
+  } catch {}
 }
 
 function railBtn(label, value, count, kind, color) {
@@ -224,11 +203,6 @@ function railBtn(label, value, count, kind, color) {
   );
 }
 
-/* The tag rail, grouped under parent headers (Epic 26 P2). Each present group renders a
-   header (data-tagparent = its present child ids) that OR-selects/clears all its children in
-   one click, then the indented child rows (the same per-tag toggles as before). Tags not in
-   any served group (drift / a user tag that ever reaches the curated facet set) fall into a
-   trailing "More" group so nothing silently vanishes. */
 function railTagsHtml() {
   const present = new Map(facets.tags.map((t) => [t.id, t]));
   const grouped = new Set();
@@ -237,7 +211,7 @@ function railTagsHtml() {
   for (const g of facets.groups) {
     const kids = (g.tags || []).map((id) => present.get(id)).filter(Boolean);
 
-    if (!kids.length) continue; // whole group filtered out (e.g. NSFW hidden)
+    if (!kids.length) continue;
     kids.forEach((k) => grouped.add(k.id));
     const sel = kids.filter((k) => state.tags.includes(k.id)).length;
     const selState = sel === 0 ? "none" : sel === kids.length ? "all" : "some";
@@ -274,10 +248,6 @@ function railTagsHtml() {
 
 export async function refreshRail() {
   try {
-    // Tag/category facets cross-filter by BOTH the active status AND source (Epic 26 P2:
-    // source-aware rail) — picking a source narrows the rail to that source's tags, volume-
-    // ordered within each group. The source list itself stays status-only so you can still
-    // switch source.
     const fp = {};
 
     if (state.status) fp.status = state.status;
@@ -292,12 +262,10 @@ export async function refreshRail() {
     ]);
 
     _facetStaleReset();
-    // one fetch fills BOTH the desktop rail and the mobile drawer (shared facet data)
     facets.sources = src.sources || [];
     facets.categories = cats.categories || [];
     facets.tags = Object.entries(tags.tags || {})
       .map(([id, count]) => ({ id, label: id, count }))
-      // hide the NSFW tag facets from the rail/drawer/autocomplete while "Hide NSFW" is on (Epic 14)
       .filter((t) => !(state.safe && /^nsfw/i.test(t.id)));
     facets.groups = tags.groups || [];
     state.curated = new Set(facets.tags.map((t) => t.id));
@@ -305,8 +273,6 @@ export async function refreshRail() {
       .map((s) => railBtn(s.label, s.id, s.count, "source", s.badge_color))
       .join("");
 
-    /* P3.3: second-tier subreddit facet — only when source=reddit is the
-       active filter. Fetches from /reddit/subreddits (status-scoped). */
     if (state.source === "reddit") {
       try {
         const srQs = new URLSearchParams();
@@ -325,9 +291,7 @@ export async function refreshRail() {
         slot.className = "rail-sub";
         slot.innerHTML = subHtml;
         $("#rail-sources").appendChild(slot);
-      } catch {
-        /* subreddit facet is sugar — never block the rail on it */
-      }
+      } catch {}
     }
 
     $("#rail-tags").innerHTML = railTagsHtml();
@@ -335,9 +299,6 @@ export async function refreshRail() {
 
     if (!state.loading) warmItemFirstPages();
   } catch (e) {
-    /* rail is navigation sugar — keep quiet on a one-off failure, but surface a
-       subtle staleness signal after repeated consecutive failures so a dead
-       server isn't indistinguishable from an empty inbox. Audit High 2026-07-02. */
     _facetStaleBump(e);
   }
 }

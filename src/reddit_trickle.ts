@@ -41,7 +41,6 @@ export class TrickleDrainer {
     );
   }
 
-  /** Cancel a pending fire; a server shutdown must not leave a timer armed. */
   stop(): void {
     clearTimeout(this.timer ?? undefined);
     this.timer = null;

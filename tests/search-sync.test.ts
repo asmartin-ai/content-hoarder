@@ -1,21 +1,11 @@
 import { expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import * as db from "../src/db.ts";
-import { newItem, parseMetadata } from "../src/models.ts";
-
-/**
- * FTS is external-content over `items`, so every metadata write that can
- * change the search blob must rewrite `search_text` in the same statement.
- * These cases existed only in the Python suite (tests/test_set_tags.py), so
- * retiring the Python tree would have silently dropped the coverage of the
- * one invariant that keeps search results honest.
- */
+import { buildSearchText, newItem, parseMetadata } from "../src/models.ts";
 
 const searchNames = (database: Database, query: string): string[] =>
   db.searchItems(database, query).map(({ fullname }) => fullname);
 
-// SAFETY: bun:sqlite `get()` returns `unknown`-shaped rows; every column
-// here is written by this file's own INSERT/UPDATE above.
 const stored = (database: Database): string =>
   (
     database.query("SELECT search_text FROM items WHERE fullname='reddit:t3_sync'").get() as
@@ -72,7 +62,6 @@ test("auto tags land in the search blob and preserve manual tags", () => {
     expect(stored(database)).toContain("auto-applied");
     expect(stored(database)).toContain("kept-manual");
     expect(parseMetadata(db.getItem(database, "reddit:t3_sync")?.metadata)).toMatchObject({
-      // Documented order: preserved, then auto, then manual.
       tags: ["auto-applied", "kept-manual"],
       tags_auto: ["auto-applied"],
       tags_manual: ["kept-manual"],
@@ -98,8 +87,6 @@ test("setAutoTags with an explicit last-seen still rewrites the search blob", ()
       lastSeenUtc: 1_700_000_000,
     });
 
-    // SAFETY: both columns are written by the setAutoTags call immediately
-    // above; last_seen_utc is non-null only because lastSeenUtc was passed.
     const row = database
       .query("SELECT search_text, last_seen_utc FROM items WHERE fullname='reddit:t3_sync'")
       .get() as { search_text: string; last_seen_utc: number };
@@ -109,15 +96,27 @@ test("setAutoTags with an explicit last-seen still rewrites the search blob", ()
   });
 });
 
-test("assigning a folder does not need a search_text rewrite but leaves the item findable", () => {
+const freshBlob = (database: Database): string => {
+  const row = db.getItem(database, "reddit:t3_sync");
+
+  return row ? buildSearchText(row, parseMetadata(row.metadata)) : "";
+};
+
+test("folder and snooze writes leave search_text equal to a fresh build", () => {
   withDb((database) => {
-    const before = stored(database);
-
     expect(db.setItemFolder(database, "reddit:t3_sync", "Research")).toBe(true);
+    expect(stored(database)).toBe(freshBlob(database));
 
-    // `folder` is deliberately not a search key, so the blob is untouched —
-    // but a title edit through the same row must still be searchable after.
-    expect(stored(database)).toBe(before);
+    const snoozed = db.snooze(database, {
+      fullnames: ["reddit:t3_sync"],
+      untilUtc: Math.floor(Date.now() / 1000) + 86_400,
+      apply: true,
+    });
+
+    expect(stored(database)).toBe(freshBlob(database));
+
+    db.unsnooze(database, { snoozedWave: snoozed.snoozed_wave, apply: true });
+    expect(stored(database)).toBe(freshBlob(database));
     expect(searchNames(database, "Original")).toHaveLength(1);
   });
 });

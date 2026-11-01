@@ -52,7 +52,6 @@ export function createSuggestion(
     "INSERT INTO tag_suggestions(fullname,suggested_tag,source,reason,status,created_utc) VALUES(?,?,?,?,'pending',?)",
   ).run(fullname, normalized, source, (reason || "").slice(0, 200), Math.floor(Date.now() / 1000));
 
-  // SAFETY: last_insert_rowid() always returns one integer in this connection.
   return (db.query("SELECT last_insert_rowid() AS id").get() as { id: number }).id;
 }
 
@@ -77,7 +76,6 @@ export function listSuggestions(
 
   if (opts.limit) params.push(Math.trunc(opts.limit));
 
-  // SAFETY: The selected columns and aliases match the public suggestion row contract.
   return db
     .query(
       `SELECT s.id,s.fullname,s.suggested_tag,s.source,s.reason,s.status,s.created_utc,s.resolved_utc,i.title AS item_title,i.source AS item_source FROM tag_suggestions s LEFT JOIN items i ON i.fullname=s.fullname WHERE ${filters.join(" AND ")} ORDER BY s.created_utc DESC${limit}`,
@@ -89,7 +87,6 @@ export function suggestionCounts(
   db: Database,
   opts: { status?: string } = {},
 ): Record<string, number> {
-  // SAFETY: The grouped query returns only suggested_tag and COUNT(*) aliases.
   const rows = db
     .query(
       "SELECT suggested_tag,COUNT(*) AS c FROM tag_suggestions WHERE status=? GROUP BY suggested_tag ORDER BY c DESC",
@@ -100,7 +97,6 @@ export function suggestionCounts(
 }
 
 function pending(db: Database, id: number): Suggestion | null {
-  // SAFETY: The query selects a suggestion row by primary key using its declared columns.
   return db
     .query("SELECT * FROM tag_suggestions WHERE id=? AND status='pending'")
     .get(id) as Suggestion | null;
@@ -151,7 +147,6 @@ export function acceptAllSuggestions(db: Database, opts: { tag?: string } = {}):
     params.push(opts.tag.trim().toLowerCase().slice(0, 40));
   }
 
-  // SAFETY: The query explicitly selects these three typed suggestion columns.
   const rows = db
     .query(`SELECT id,fullname,suggested_tag FROM tag_suggestions WHERE ${where}`)
     .all(...params) as Array<{ id: number; fullname: string; suggested_tag: string }>;
@@ -230,7 +225,6 @@ export function suggestFromRuleMatches(
 
       if (opts.limit) params.push(Math.trunc(opts.limit));
 
-      // SAFETY: The query selects these item fields by their table column names.
       const rows = db
         .query(
           `SELECT fullname,title,url,metadata FROM items WHERE ${where.join(" AND ")} ORDER BY last_seen_utc DESC${limit}`,
@@ -275,7 +269,6 @@ export function suggestFromDiscovery(
   const suggestions: Record<string, string[]> = {};
   let queued = 0;
 
-  // SAFETY: The query selects these item fields by their table column names.
   const rows = db
     .query(
       "SELECT fullname,title,source,metadata FROM items WHERE source='reddit' AND (json_extract(metadata,'$.tags') IS NULL OR json_extract(metadata,'$.tags')=json('[]')) AND json_extract(metadata,'$.subreddit') IS NOT NULL ORDER BY last_seen_utc DESC",
@@ -320,7 +313,6 @@ export function suggestFromDiscovery(
         }
     }
 
-    // SAFETY: The query selects the same projected columns as the Reddit rows.
     const browserRows = db
       .query(
         "SELECT fullname,title,source,metadata FROM items WHERE source IN ('firefox','hackernews') AND (json_extract(metadata,'$.tags') IS NULL OR json_extract(metadata,'$.tags')=json('[]')) ORDER BY last_seen_utc DESC",
@@ -392,7 +384,6 @@ export async function suggestFromLlm(db: Database, opts: { limit?: number; sourc
 
   if (opts.limit) params.push(Math.trunc(opts.limit));
 
-  // SAFETY: The query selects full item rows, whose schema matches RawItem.
   const rows = db
     .query(`SELECT * FROM items WHERE ${clauses.join(" AND ")} ORDER BY last_seen_utc DESC${limit}`)
     .all(...params) as RawItem[];

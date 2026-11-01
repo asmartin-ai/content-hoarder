@@ -16,7 +16,6 @@ export const DEFAULT_MAX_VIDEO_BYTES = 512 * 1024 * 1024;
 
 export const DEFAULT_VIDEO_TIMEOUT = 15 * 60;
 
-/** Seconds between archived URLs; matches the oracle's `throttle` default. */
 export const DEFAULT_THROTTLE_SECONDS = 0.3;
 
 export const SCOPES = ["salvageable", "galleries", "images", "twitter", "videos"] as const;

@@ -1,11 +1,3 @@
-/* core/toast.js — toast + undo snackbar, leak-free.
-   Replaces app.js:61-80 and triage.js:409-415, fixing the listener leak those
-   carried (every snackbar() rebuilt #toast's innerHTML and attached a FRESH click
-   listener to the new Undo button; stale closures piled up and a raced timer could
-   fire an outdated undo). Here the module owns #toast: ONE delegated listener is
-   attached at first use, and a single `currentUndo` slot is swapped per call —
-   an old undo can never fire after a newer snackbar replaces it. */
-
 import { esc } from "./util.js";
 
 let el = null;
@@ -59,7 +51,6 @@ export function toast(msg) {
   show(esc(msg), 4000);
 }
 
-/* Gmail-style snackbar with an Undo affordance. */
 export function snackbar(msg, undoFn) {
   currentUndo = undoFn || null;
   show(esc(msg) + (undoFn ? ' <button class="toast-undo" type="button">Undo</button>' : ""), 5000);

@@ -53,16 +53,10 @@ export async function serveApp(value: ServeOptions | string = {}): Promise<AppSe
   const host = options.host ?? config.host();
   const port = options.port ?? config.port();
 
-  // SyncScheduler closes the connection it opens. Handing it the shared request
-  // connection killed the server on the first tick ("Cannot use a closed
-  // database" on every later request), so it gets its own, exactly like the
-  // unsave drainer below.
   const scheduler = isAutosyncEnabled(connection())
     ? new SyncScheduler(() => db.connect(databasePath()), autosyncIntervalMs()).start()
     : null;
 
-  // The drainer opens its own connection per fire (never the shared request
-  // one, which it closes) and re-checks the opt-in before draining.
   const tricklePath = databasePath();
   const [trickleAudit] = redditUnsave.auditAppender(tricklePath);
 
@@ -94,9 +88,7 @@ export async function serveApp(value: ServeOptions | string = {}): Promise<AppSe
       for (const item of stagedImports())
         try {
           unlinkSync(item.path);
-        } catch {
-          /* staged file was already removed */
-        }
+        } catch {}
 
       clearPrepared();
     },

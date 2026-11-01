@@ -1,20 +1,3 @@
-/* browse/reader.js — in-app thread reader ("inline viewing").
-
-   Tap a saved Reddit or Hacker News item → a full-screen sheet with the post +
-   a collapsible comment thread, instead of bouncing out to an external tab. The
-   post always renders from the already-loaded list item (zero-network, never
-   blank); the comment thread loads from the cached /thread endpoint and hydrates
-   on a cache miss. "Open original ↗" stays in the header for the cases inline
-   can't handle (polls, crossposts, deleted threads, no auth/network).
-   Swipe-right or the system back-gesture returns to the feed.
-
-   Spec: docs/design/inline-reddit-reader/spec.md.
-
-   The pure collapsible-thread renderer (subtreeLen + renderThread) was generated
-   by the local gemma-4-12b-coder model and held-out tested (19 cases: deeper
-   nesting, nested collapse, leaf collapse, escaping, OP badge, empty) before
-   inlining. Only addition over the generated form: the `c.author &&` OP guard. */
-
 import { esc, ago, isTypingTarget, safeUrl } from "../core/util.js";
 import { normTag, itemTags as tagsOf, suggestTags } from "../core/tags.js";
 import { renderMarkdown } from "../core/markdown.js";
@@ -43,7 +26,6 @@ function parseRecords(value) {
   return Array.isArray(value) ? value.map(parseRecord).filter(Boolean) : [];
 }
 
-/* ---- collapsible comment thread (pure; local-LLM generated, verified) ---- */
 export function subtreeLen(comments, i) {
   let count = 0;
   const baseDepth = comments[i].depth;
@@ -58,8 +40,6 @@ export function subtreeLen(comments, i) {
 
 const DELETED_BODIES = new Set(["[deleted]", "[removed]"]);
 
-/* A comment Reddit has tombstoned — removed by a mod ("[removed]") or deleted by its author
-   ("[deleted]" body, and the author is "[deleted]" too). */
 export function isDeletedComment(c) {
   if (!c) return false;
   const body = String(c.body == null ? "" : c.body).trim();
@@ -67,10 +47,6 @@ export function isDeletedComment(c) {
   return DELETED_BODIES.has(body) || String(c.author || "") === "[deleted]";
 }
 
-/* Indices to auto-collapse on load: a deleted/removed comment that HAS replies AND whose entire
-   subtree is also deleted — a fully-dead thread worth hiding. A deleted comment with ANY live
-   descendant stays expanded (so the live reply remains visible); a childless deleted comment stays
-   as a single line (nothing to hide). Pure → node-testable. */
 export function deadThreadCollapseSet(comments) {
   const out = new Set();
 
@@ -78,7 +54,7 @@ export function deadThreadCollapseSet(comments) {
     if (!isDeletedComment(comments[i])) continue;
     const len = subtreeLen(comments, i);
 
-    if (len === 0) continue; // no replies → nothing to collapse
+    if (len === 0) continue;
     let allDead = true;
 
     for (let j = i + 1; j <= i + len; j++) {
@@ -94,9 +70,6 @@ export function deadThreadCollapseSet(comments) {
   return out;
 }
 
-/* #74 — pure helper: honest empty-thread copy (node-testable).
-   Never returns "No comments on this post." unless the thread was actually
-   cached and empty. */
 export function threadEmptyMessage(res, opts) {
   const o = opts || {};
   const escFn = o.esc || ((s) => String(s == null ? "" : s));
@@ -138,7 +111,6 @@ export function threadEmptyMessage(res, opts) {
     return "Thread not loaded yet." + openLink;
   }
 
-  // Truly cached empty thread
   return "No comments on this post.";
 }
 
@@ -196,8 +168,6 @@ const fmtScore = (n) => {
   return (v < 10 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.round(v))) + "k";
 };
 
-// Reddit permalinks are often stored RELATIVE ("/r/sub/comments/…"); an <a href> to a
-// relative path resolves against our own origin → a local 404. Absolutize before use.
 const absReddit = (p) => {
   p = (p || "").trim();
 
@@ -801,12 +771,6 @@ function renderTwitterReader(it, body, mediaHtml) {
   );
 }
 
-/* ---- manual tag editor (reader header/meta area) ----
-   Mirror of the triage card editor: existing tags as removable chips + a "＋ tag"
-   affordance (known vocabulary + free input), POSTed to /items/<fn>/tags, optimistic
-   with revert+toast on error. Styles live in browse.css (.rd-tag*), which index.html
-   loads. The pure helpers live at module scope; the stateful ones (which close over
-   the reader's item/postEl) are defined inside initReader, below. */
 function tagChipRowHtml(it) {
   const chips = tagsOf(it)
     .map(
@@ -843,7 +807,7 @@ function tagEditorHtml(it) {
   );
 }
 
-let knownTags = []; // the user's tag vocabulary, cached from /tags on first open
+let knownTags = [];
 
 let knownTagsLoading = false;
 
@@ -886,17 +850,16 @@ export function initReader({
     bodySaving = false;
 
   let noteVideoActive = "";
-  let loadCtl = null; // AbortController for the in-flight thread load (load() aborts prior, closeReader aborts current)
+  let loadCtl = null;
   let threadSort = localStorage.getItem("ch_reader_sort") || "best";
 
   if (!["best", "top", "new"].includes(threadSort)) threadSort = "best";
-  let videoTeardown = null; // teardown function for inline video (stops HLS buffering)
-  let videoEl = null; // the mounted <video> (also the "video is playing" flag); close pauses+resets it
-  let feedScrollY = 0; // feed scroll position captured on open; restored on close (reader-lock resets it)
+  let videoTeardown = null;
+  let videoEl = null;
+  let feedScrollY = 0;
   let readerScrollFullname = "";
   let readerScrollTop = 0;
 
-  /* ---- manual tag editor: stateful helpers (close over item/fullname/postEl) ---- */
   function refreshReaderTagRow() {
     if (!item) return;
     const row = postEl.querySelector(".rd-tagrow");
@@ -958,9 +921,9 @@ export function initReader({
     if (!item) return;
 
     const it = item,
-      fn = fullname; // snapshot: openReader may swap item mid-POST
+      fn = fullname;
 
-    if (!it.metadata) it.metadata = {}; // some items carry no metadata object
+    if (!it.metadata) it.metadata = {};
     const tag = normTag(raw);
 
     if (!tag) return;
@@ -968,19 +931,18 @@ export function initReader({
 
     if (prev.indexOf(tag) !== -1) return;
     it.metadata.tags = prev.concat([tag]);
-    refreshReaderTagRow(); // optimistic (item === it here)
+    refreshReaderTagRow();
 
     try {
       const res = await api.postJSON("/items/" + encodeURIComponent(fn) + "/tags", { add: [tag] });
 
       it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.concat([tag]);
     } catch {
-      it.metadata.tags = prev; // revert
+      it.metadata.tags = prev;
       toast("Couldn't add tag — check connection");
     }
 
     if (item === it) {
-      // repaint only if still showing this item
       refreshReaderTagRow();
       refreshAddSuggestions(postEl.querySelector(".rd-tag-add-input"));
     }
@@ -1004,7 +966,7 @@ export function initReader({
 
       it.metadata.tags = Array.isArray(res.tags) ? res.tags : prev.filter((t) => t !== tag);
     } catch {
-      it.metadata.tags = prev; // revert
+      it.metadata.tags = prev;
       toast("Couldn't remove tag — check connection");
     }
 
@@ -1164,27 +1126,20 @@ export function initReader({
     }
   }
 
-  /* Stop and discard any inline video: tear down HLS, pause the element, drop its
-     src so audio stops and the network fetch aborts. videoTeardown alone is a no-op
-     for direct/native-HLS playback (mountVideo returns destroy:null there), so the
-     pause+reset below is what actually silences those. Also removes note-mode
-     YouTube iframes so playback stops on every reader close path. */
   function stopInlineVideo() {
     if (videoTeardown) {
       videoTeardown();
       videoTeardown = null;
-    } // stop HLS buffering
+    }
 
     if (videoEl) {
       try {
         videoEl.pause();
         videoEl.removeAttribute("src");
-        videoEl.load(); // silence + abort fetch
+        videoEl.load();
         const wrap = videoEl.closest(".rd-video-wrap") || videoEl;
-        wrap.remove(); // blank the embed
-      } catch {
-        /* no-op */
-      }
+        wrap.remove();
+      } catch {}
 
       videoEl = null;
     }
@@ -1192,9 +1147,7 @@ export function initReader({
     postEl.querySelectorAll(".rd-note-video-wrap iframe").forEach((frame) => {
       try {
         frame.removeAttribute("src");
-      } catch {
-        /* no-op */
-      }
+      } catch {}
 
       const wrap = frame.closest(".rd-note-video-wrap") || frame;
       wrap.remove();
@@ -1202,13 +1155,10 @@ export function initReader({
     postEl.querySelectorAll(".rd-note-video-multi iframe").forEach((frame) => {
       try {
         frame.removeAttribute("src");
-      } catch {
-        /* no-op */
-      }
+      } catch {}
     });
   }
 
-  /* ---- render ---- */
   function noteYoutubeIds(body) {
     return canEditNoteBody(item) ? extractYoutubeIds(body) : [];
   }
@@ -1272,13 +1222,10 @@ export function initReader({
     if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
 
-    // a gallery's first full image is a crisper poster than the small reddit thumbnail (Epic 13 P2)
     const gal = Array.isArray(m.gallery) && m.gallery.length ? m.gallery[0] : "";
 
     const img = imageUrl(item) || gal || m.thumbnail;
 
-    // video/gallery with no poster (thumbnail-less v.redd.it) still gets a glyph-only play
-    // tile so it's tappable; an image with no URL has nothing to show.
     if (!img) {
       if (mt.cls === "image") return "";
 
@@ -1352,11 +1299,8 @@ export function initReader({
       if (!isNoteVideoMode(body) || bodyEditing) h += bodyHtml(body, post);
     }
 
-    h += tagEditorHtml(item); // header/meta area (not over the media tile)
+    h += tagEditorHtml(item);
     h += '<span class="rd-chip" id="reader-chip" hidden></span>';
-    // Preserve an in-progress tag add (open add-UI + typed text) across this rebuild — the
-    // thread load calls renderPost again a few hundred ms after open, which would otherwise
-    // wipe the editor the user is typing into. null = the add-UI was closed.
     const openUi = postEl.querySelector(".rd-tag-add-ui");
 
     const keep =
@@ -1431,7 +1375,6 @@ export function initReader({
       .join("") +
     "</select></div>";
 
-  /* #74: never claim "No comments on this post" for a cache miss / auth failure. */
   function emptyThreadMessage(res) {
     return threadEmptyMessage(res || {}, {
       openHref: ooHref || "",
@@ -1439,7 +1382,6 @@ export function initReader({
     });
   }
 
-  /* P2: show the saved comment body while the thread loads so the sheet isn't blank. */
   function seedSavedCommentHtml() {
     if (!item || item.kind !== "comment") return "";
     const body = (item.body || "").trim();
@@ -1457,9 +1399,6 @@ export function initReader({
   }
 
   function renderComments(res) {
-    // P2 fix: the seed is a loading-state placeholder — once comments
-    // are present the saved comment is already the first (or only) entry
-    // in the tree, so re-rendering it would duplicate the body.
     if (comments.length) {
       cmtsEl.innerHTML =
         commentsHead(comments.length) +
@@ -1492,10 +1431,10 @@ export function initReader({
 
   function applyThread(res, justHydrated) {
     comments = normalizeThreadComments(res.comments, item.source);
-    collapsed = deadThreadCollapseSet(comments); // auto-collapse fully-dead (deleted) threads on load
+    collapsed = deadThreadCollapseSet(comments);
     opAuthor = (res.post && res.post.author) || (item.metadata || {}).author || item.author || "";
 
-    if (!videoEl) renderPost(res.post || null); // don't clobber a playing inline video
+    if (!videoEl) renderPost(res.post || null);
     setChip(res.archived ? "archived" : justHydrated ? "hydrated" : "cached");
     renderComments(res);
 
@@ -1523,20 +1462,14 @@ export function initReader({
   async function load() {
     const fn = fullname;
 
-    // Abort any in-flight reader load (a previous open that was closed/switched
-    // before completing). Mirrors the _preloadCtl pattern in main.js so rapid
-    // open/close/open cycles don't leave orphaned requests running to completion.
     if (loadCtl) {
       try {
         loadCtl.abort();
-      } catch {
-        /* already aborted */
-      }
+      } catch {}
     }
 
     loadCtl = new AbortController();
     const signal = loadCtl.signal;
-    // P2: seed immediately so comment opens never flash a blank pane.
     cmtsEl.innerHTML = seedSavedCommentHtml() + '<div class="rd-cmtstate">loading thread…</div>';
     const sm = sourceMeta(item);
     let res;
@@ -1544,7 +1477,7 @@ export function initReader({
     try {
       res = await api.getJSON(sm.threadPath(fn, threadSort), { signal });
     } catch (e) {
-      if (e && e.name === "AbortError") return; // superseded by a newer open
+      if (e && e.name === "AbortError") return;
 
       if (fullname === fn)
         failState({
@@ -1555,7 +1488,7 @@ export function initReader({
       return;
     }
 
-    if (fullname !== fn) return; // closed / switched mid-fetch
+    if (fullname !== fn) return;
 
     if (res && res.cached) {
       applyThread(res, res.hydrate_status === "hydrated");
@@ -1563,9 +1496,7 @@ export function initReader({
       return;
     }
 
-    // Cache miss: surface hydrate_status from the same GET (lazy hydrate already ran server-side).
     if (res && res.hydrate_status && res.hydrate_status !== "cached") {
-      // auth/network/unavailable — don't claim "no comments"
       if (
         /auth_|network_error|offline|unavailable|no_permalink|not_found/.test(res.hydrate_status)
       ) {
@@ -1588,7 +1519,6 @@ export function initReader({
     try {
       hyd = await api.postJSON(sm.hydratePath(fn), {});
     } catch (e) {
-      // POST may reject with r.data.status for auth_missing etc.
       const st = (e && e.data && e.data.status) || (res && res.hydrate_status) || "network_error";
 
       if (fullname === fn)
@@ -1599,7 +1529,7 @@ export function initReader({
         });
 
       return;
-    } // 401 no-auth, 502 network, …
+    }
 
     if (fullname !== fn) return;
 
@@ -1628,14 +1558,13 @@ export function initReader({
       );
   }
 
-  /* ---- open / close (+ history so the system back-gesture returns to feed) ---- */
   function openReader(it, opts) {
     opts = opts || {};
 
     closeSheets?.();
 
     if (isOpen) saveReaderScroll();
-    stopInlineVideo(); // defensive: clear any leftover inline video if reopened without a clean close
+    stopInlineVideo();
     const nextFullname = it.fullname;
 
     const restoreTop = readerScrollFullname === nextFullname ? readerScrollTop : 0;
@@ -1674,35 +1603,27 @@ export function initReader({
     }
 
     reader.classList.toggle("no-original", !ooHref);
-    renderPost(null); // instant, from the list item
+    renderPost(null);
     reader.style.transition = "";
     reader.style.transform = "";
 
     if (opts.triageEnter) {
-      // Paint the translateY(100%) start BEFORE .show flips it to none — otherwise
-      // both classes land in the same frame and the slide-up never plays (the
-      // reader would inherit the base translateX(100%) entrance instead).
       void reader.offsetHeight;
     }
 
     reader.classList.add("show");
     reader.setAttribute("aria-hidden", "false");
-    // capture the feed scroll BEFORE the overflow:hidden lock (which resets it) so we can
-    // restore the user's place on close (Epic 16 P2)
     feedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     document.documentElement.classList.add("reader-lock");
 
     if (scrollEl) scrollEl.scrollTop = restoreTop;
     isOpen = true;
-    // Register with the shared overlay coordinator: OS-back closes the reader (or, if a lightbox is
-    // open over it, closes the lightbox first). Mirrors the old inline pushState/popstate.
     pushOverlay(() => closeReader(true));
 
     if (sm.threadPath) load();
     else if (isNoteVideoMode(currentBody(null))) renderNoteBodyRegion(currentBody(null), null);
     else cmtsEl.innerHTML = "";
 
-    // Lazy-load the tag vocabulary once so the "＋ tag" add-UI can suggest known tags.
     if (!knownTags.length && !knownTagsLoading) {
       knownTagsLoading = true;
       api
@@ -1723,13 +1644,10 @@ export function initReader({
     if (!isOpen) return;
     isOpen = false;
 
-    // Abort any in-flight thread load so it doesn't keep running after close.
     if (loadCtl) {
       try {
         loadCtl.abort();
-      } catch {
-        /* already aborted */
-      }
+      } catch {}
 
       loadCtl = null;
     }
@@ -1737,17 +1655,11 @@ export function initReader({
     const dest = returnTo;
     returnTo = "";
     saveReaderScroll();
-    stopInlineVideo(); // pause+reset+remove the <video> so audio doesn't bleed after close
+    stopInlineVideo();
     const wasTriageEnter = reader.classList.contains("triage-enter");
     reader.classList.remove("show", "from-triage");
 
     if (wasTriageEnter) {
-      // Slide back down to the round the way it came up (issue #40): keep
-      // .triage-enter so removing .show transitions transform to translateY(100%).
-      // No inline transition here — the base .reader rule (transform +
-      // visibility 0s var(--dur-slow)) applies once .show is gone, keeping the
-      // reader visible during the exit. Clear the class once the exit has
-      // played so the resting state is the base translateX(100%) (off-right).
       let fired = false;
 
       const fin = () => {
@@ -1755,8 +1667,6 @@ export function initReader({
         fired = true;
         reader.removeEventListener("transitionend", fin);
 
-        // If the reader was re-opened during the exit window, the new entrance
-        // owns the classes now — don't strip triage-enter mid-slide-up.
         if (isOpen) return;
         reader.classList.remove("triage-enter");
         reader.style.transition = "";
@@ -1764,7 +1674,7 @@ export function initReader({
       };
 
       reader.addEventListener("transitionend", fin);
-      setTimeout(fin, 240); // fallback if transitionend never fires
+      setTimeout(fin, 240);
     } else {
       reader.classList.remove("triage-enter");
       reader.style.transition = "";
@@ -1774,20 +1684,14 @@ export function initReader({
     reader.setAttribute("aria-hidden", "true");
     document.documentElement.classList.remove("reader-lock");
 
-    // restore the feed scroll the lock discarded (all close paths funnel here: button, Esc,
-    // popstate/back, swipe-right, the F/A/D reader keys) — Epic 16 P2
     if (feedScrollY) window.scrollTo(0, feedScrollY);
 
-    onClose?.(fullname); // re-blur the feed thumbnail (Epic 13 P2)
+    onClose?.(fullname);
 
-    // A manual close (button/Esc/swipe/F-A-D keys) unwinds the history entry we pushed; an OS-back
-    // (fromPop) already popped it, so the coordinator handled the history side for us.
     if (dest) location.replace(dest);
     else if (!fromPop) settleTop();
   }
 
-  /* Decide on the reader's OWN item, then close. Opened from a Clear round, the status
-     POST must land before we navigate back to /clear, so hold the return until it settles. */
   async function decideAndClose(run) {
     const fn = fullname;
     const dest = returnTo;
@@ -1813,10 +1717,7 @@ export function initReader({
 
       if (isTypingTarget(e.target)) return;
 
-      if (e.ctrlKey || e.metaKey || e.altKey) return; // let browser shortcuts (Ctrl/⌘+F/A/D, …) through
-      // Mirror the foot buttons so the reader's OWN item is triaged (not the list
-      // item behind it). This is a capture-phase listener, so it runs before
-      // main.js's bubble keydown; stopPropagation keeps that one from double-firing.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
 
       const status = k === "f" ? "keep" : k === "a" ? "archived" : k === "d" ? "done" : null;
@@ -1837,7 +1738,6 @@ export function initReader({
         return;
       }
 
-      // T = Tag — opens the inline tag editor in the reader without closing
       if (k === "t") {
         e.stopPropagation();
         e.preventDefault();
@@ -1849,7 +1749,6 @@ export function initReader({
     true,
   );
 
-  /* comment-sort selector → reload the thread in the chosen order (server sorts via ?sort) */
   cmtsEl.addEventListener("change", (e) => {
     const sel = e.target.closest(".rd-csort");
 
@@ -1864,7 +1763,6 @@ export function initReader({
     if (inp) toggleChecklistInput(inp);
   });
 
-  /* ---- manual tag editor: live suggestions + Enter/Esc on the free input ---- */
   postEl.addEventListener("input", (e) => {
     const inp = e.target.closest(".rd-tag-add-input");
 
@@ -1912,7 +1810,6 @@ export function initReader({
     }
   });
 
-  /* ---- clicks: close, collapse toggle, media reveal/open ---- */
   reader.addEventListener("click", (e) => {
     if (e.target.closest("#reader-close")) {
       closeReader(false);
@@ -1938,9 +1835,6 @@ export function initReader({
       return;
     }
 
-    // Tap ANYWHERE on a comment (byline OR body text) to collapse/expand its thread — a big tap
-    // target alongside the −/+ button. Excludes links, inline images, and buttons so those keep
-    // their own actions (the author link opens the profile; an md-img opens the lightbox below).
     const cmt = e.target.closest(".rd-cmt");
 
     if (cmt && !e.target.closest("a, .md-img, [data-img], button")) {
@@ -1955,7 +1849,6 @@ export function initReader({
       return;
     }
 
-    // ---- manual tag editor (POST /items/<fn>/tags) ----
     const tagRm = e.target.closest("[data-rd-rmtag]");
 
     if (tagRm) {
@@ -2011,7 +1904,6 @@ export function initReader({
       return;
     }
 
-    // ---- inline markdown image (comment / selftext) → open it in the lightbox ----
     const mdImg = e.target.closest(".md-img[data-img]");
 
     if (mdImg) {
@@ -2024,7 +1916,6 @@ export function initReader({
 
     if (med) {
       if (isNsfw(item) && !revealed) {
-        // first tap reveals, second opens
         revealed = true;
         med.classList.remove("nsfw");
         const v = med.querySelector(".rd-veil");
@@ -2034,16 +1925,12 @@ export function initReader({
         return;
       }
 
-      /* Directly-playable video (v.redd.it/HLS or a .mp4/.webm/.mov file) plays inline.
-         External "video" (YouTube, gfycat/redgifs pages, …) has no playable src, so
-         playableVideoSrc() returns "" and it falls through to onMedia (lightbox /
-         open-original) like images/galleries — avoids mounting a dead <video>. */
       const vsrc = playableVideoSrc(item);
 
       if (vsrc) {
         const m = item.metadata || {};
         const posterUrl = imageUrl(item) || m.thumbnail;
-        const wrap = document.createElement("div"); // replace the tile with a video container
+        const wrap = document.createElement("div");
         wrap.className = "rd-video-wrap";
         med.replaceWith(wrap);
 
@@ -2061,8 +1948,6 @@ export function initReader({
     }
   });
 
-  /* ---- swipe-right → return to feed (Relay-style). Left-edge is left to the
-         OS back-gesture, which also closes the reader via popstate. ---- */
   let sx = 0,
     sy = 0,
     dragging = false,
@@ -2085,7 +1970,7 @@ export function initReader({
         dragging = false;
 
         return;
-      } // OS back-gesture zone
+      }
 
       sx = x;
       sy = e.touches[0].clientY;
@@ -2123,7 +2008,7 @@ export function initReader({
         dragging = false;
 
         return;
-      } // vertical → let it scroll
+      }
 
       if (dx > 0) {
         e.preventDefault();

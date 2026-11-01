@@ -1,11 +1,3 @@
-/* home/round.js — the Clear island: one card at a time, 5/10/25 per round, ends with the
-   CLEARED stamp (clear-overhaul.md §4.3 + §5, clear-v2.md §5). The server renders the round
-   frame (GET /clear) and every card's HTML (GET /clear/deal); this island only deals,
-   animates and decides. Decisions are optimistic: the card leaves at once
-   and the POST runs in the background; a failed POST puts the card back. State (card HTML
-   included) persists in sessionStorage["ch.round"] so a reload or a trip to the reader
-   resumes the round. */
-
 import {
   getJSON,
   setStatus,
@@ -24,12 +16,10 @@ const KEY = "ch.round";
 
 const SIZES = [5, 10, 25];
 
-/* Animation lengths the island waits on (CSS owns the curves; JS only cleans up after them). */
 const ENTER_MS = 260;
 
 const LEAVE_MS = 300;
 
-/* Card-mode gesture tuning (core/swipe.js): commit distance, flick speed (px/ms), tilt (deg/px). */
 const COMMIT_PX = 90;
 
 const FLING = 0.55;
@@ -71,7 +61,6 @@ const COMBO_HTML = '<p class="combo" aria-live="polite" hidden></p>';
 
 const MONTH_S = 30 * 24 * 60 * 60;
 
-/* Leaving the page waits this long at most for in-flight decision POSTs to land. */
 const LEAVE_WAIT_MS = 1500;
 
 const haptic = (kind) => window.chHaptic?.(kind);
@@ -82,7 +71,6 @@ const fmtClock = (ms) => {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
 
-/* "25 min", "1 h 10 min" */
 const fmtMinutes = (m) => {
   const h = Math.floor(m / 60);
 
@@ -91,7 +79,6 @@ const fmtMinutes = (m) => {
 
 const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* Numbers on the cleared screen count up (Duolingo's lesson-end beat), once, ~0.7 s. */
 const countUp = (el, to, fmt) => {
   if (reduceMotion() || to <= 1) {
     el.textContent = fmt(to);
@@ -130,14 +117,12 @@ const readParams = () => {
 
 const safeOn = () => localStorage.chSafe !== "0";
 
-/* Daily goal in pebbles (Today shares the key); 0 = no goal. */
 const dailyGoal = () => {
   const g = parseInt(localStorage.getItem("chGoal") ?? "", 10);
 
   return Number.isFinite(g) && g >= 0 ? g : 8;
 };
 
-/* "<ring> 12 cleared today — goal met. …" under the cleared summary (Today's ring, small). */
 const todayHtml = (n, g) => {
   const line =
     n + " cleared today" + (g > 0 && n >= g ? " — goal met. Anything more is a bonus." : "");
@@ -145,7 +130,6 @@ const todayHtml = (n, g) => {
   return ringSvg(n, g) + '<span class="cleared-today-line">' + esc(line) + "</span>";
 };
 
-/* Card HTML (server-rendered, trusted) → a detached `.card` element, or null. */
 const cardFrom = (item) => {
   const tpl = document.createElement("template");
 
@@ -154,8 +138,6 @@ const cardFrom = (item) => {
   return tpl.content.firstElementChild;
 };
 
-/* Broken media: try the archived copy once (data-fallback, mirrored into the blurred backdrop),
-   then drop the figure and let the card fall back to its typeset poster layout. */
 const wireMedia = (card) => {
   for (const img of card.querySelectorAll(".media-img, .md img[data-fallback]")) {
     let fellBack = false;
@@ -184,7 +166,6 @@ const wireMedia = (card) => {
 
     img.addEventListener("error", onError);
 
-    // Imgur serves a real 161×81 "image no longer available" PNG for deleted images.
     const onLoad = () => {
       if (img.naturalWidth === 161 && img.naturalHeight === 81) onError();
     };
@@ -208,15 +189,12 @@ const loadSaved = (params) => {
 
   if (!r || !Array.isArray(r.items) || !Array.isArray(r.results) || !r.items.length) return null;
 
-  if (!(r.idx >= 0 && r.idx < r.items.length)) return null; // finished or corrupt
+  if (!(r.idx >= 0 && r.idx < r.items.length)) return null;
 
-  // A pre-v2 round stored no card HTML; it can't be shown, so start fresh.
   if (!r.items.every((it) => it && it.fullname && it.html)) return null;
 
-  // The reader returns to bare /clear (contract §6): resume whatever round is open.
   if (params.bare) return r;
 
-  // Today's Up next deals exact ids: the same deal resumes, a different one starts fresh.
   if (params.ids.length) return sameIds(r.ids, params.ids) ? r : null;
 
   return (r.q || "") === params.q && r.n === params.n ? r : null;
@@ -230,18 +208,16 @@ export function mountRound(root) {
 
   const params = readParams();
 
-  // { q, n, ids, items: [{ fullname, status, html }], idx, results: [{ fullname, act, undo? }],
-  //   startedAt }
   let round = null;
   let state = "loading";
-  let gen = 0; // bumps per fresh fetch so a stale response can't land
+  let gen = 0;
   let combo = 0;
   let shownAt = 0;
   let cardEl = null;
   let comboEl = null;
   let leaving = false;
 
-  const pending = new Map(); // fullname → Promise<boolean> for the in-flight decision POST
+  const pending = new Map();
 
   const beads = section.querySelector(".beads");
   const stage = section.querySelector(".stage");
@@ -272,7 +248,6 @@ export function mountRound(root) {
     } catch {}
   };
 
-  /* Real navigation; in-flight decision POSTs get a moment to land so unload can't drop them. */
   function go(url) {
     if (leaving) return;
     leaving = true;
@@ -283,8 +258,6 @@ export function mountRound(root) {
     });
   }
 
-  /* ---- rendering ---- */
-
   function setState(s) {
     state = s;
     section.dataset.state = s;
@@ -292,7 +265,6 @@ export function mountRound(root) {
     cleared.hidden = s !== "done";
   }
 
-  /* Replace the stage, keeping any card still flying off (it cleans itself up). */
   function setStage(html) {
     const ghosts = stage.querySelectorAll(":scope > .card.is-leaving");
 
@@ -327,7 +299,6 @@ export function mountRound(root) {
     comboEl.textContent = combo >= COMBO_MIN ? "on a roll · " + combo : "";
   }
 
-  /* Long bodies are clamped by CSS; offer "Show more" only when this one actually overflows. */
   function measureBody(el) {
     const body = el.querySelector(".card-body");
     const more = el.querySelector(".card-more");
@@ -339,7 +310,7 @@ export function mountRound(root) {
     };
 
     check();
-    body.addEventListener("load", check, true); // inline images grow the body after mount
+    body.addEventListener("load", check, true);
   }
 
   function toggleExpand() {
@@ -360,7 +331,6 @@ export function mountRound(root) {
     return true;
   }
 
-  /* The stack peek: the next card, inert, behind the current one. */
   function peekFor(item) {
     const el = item ? cardFrom(item) : null;
 
@@ -373,9 +343,6 @@ export function mountRound(root) {
     return el;
   }
 
-  /* Drag feedback, once per frame from core/swipe.js: the stamp and tint follow the thumb and the
-     card underneath rises toward the top — opacity and transform only, so it stays on the
-     compositor at any refresh rate. (0, 0) = settle: hand back to the CSS resting pose. */
   function dragFeedback(card, dx, dy) {
     const pull = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy)) / COMMIT_PX);
     const stamp = card.querySelector(".card-stamp");
@@ -406,9 +373,6 @@ export function mountRound(root) {
     peek.style.opacity = String(0.55 + 0.35 * pull);
   }
 
-  /* Show round.items[idx] as the current card. When the peek already holds it, the peek itself is
-     promoted (no re-render, no image re-decode: it just rises into place). Otherwise a fresh card
-     arrives — from the side it left by when `back` names the undone decision (a rewind). */
   function showCard(back = "") {
     const item = round.items[round.idx];
     const peekEl = stage.querySelector(":scope > .card.is-next");
@@ -436,7 +400,6 @@ export function mountRound(root) {
       wireMedia(el);
     }
 
-    // a rewound card replaces its own ghost if that is still flying
     for (const c of stage.querySelectorAll(":scope > .card")) {
       if (c === el) continue;
 
@@ -460,8 +423,6 @@ export function mountRound(root) {
     cardEl = el;
     measureBody(el);
 
-    // attachSwipe slides the inner `.item-fg` (the server marks `.card-fg` with it too);
-    // its listeners live on the card element and go away with it.
     attachSwipe(el, {
       onRight: () => decide("archived", true),
       onLeft: () => decide("done", true),
@@ -500,8 +461,6 @@ export function mountRound(root) {
     setState("empty");
     renderProgress();
   }
-
-  /* ---- round lifecycle ---- */
 
   async function deal() {
     const qs = new URLSearchParams({ n: String(params.n) });
@@ -552,8 +511,6 @@ export function mountRound(root) {
     showCard();
   }
 
-  /* The current card may have been decided inside the reader (Open → Library → back).
-     Only the decision is read from the server; the stored card HTML stays as dealt. */
   async function reconcile() {
     const item = round.items[round.idx];
     let latest;
@@ -587,7 +544,6 @@ export function mountRound(root) {
 
   async function resume(saved) {
     round = saved;
-    // A bare /clear resumes whatever round was open; "One more round" keeps its size and pile.
     params.n = SIZES.includes(saved.n) ? saved.n : params.n;
     params.q = saved.q || "";
     params.ids = Array.isArray(saved.ids) ? saved.ids : [];
@@ -603,7 +559,6 @@ export function mountRound(root) {
     else showCard();
   }
 
-  /* Minutes of reading/watching the round let go of (done + archived; data-cost per card). */
   function freedMinutes() {
     let total = 0;
 
@@ -617,7 +572,6 @@ export function mountRound(root) {
     return total;
   }
 
-  /* The round's receipt: one tile per card, in order, marked with its decision. */
   function renderReceipt() {
     let html = "";
 
@@ -687,14 +641,12 @@ export function mountRound(root) {
       localStorage.setItem("ch.lastRound", JSON.stringify({ at, cleared: n, ms }));
     } catch {}
 
-    // Today renders its re-entry line server-side from this cookie (clear-v2.md §6).
     document.cookie =
       "ch_last_round=" + at + "." + n + "; Path=/; SameSite=Lax; Max-Age=" + MONTH_S;
 
     forget();
   }
 
-  /* Today's count lands after this round's POSTs settle; a failed fetch just omits the line. */
   function showToday() {
     const my = gen;
 
@@ -710,8 +662,6 @@ export function mountRound(root) {
       })
       .catch(() => {});
   }
-
-  /* ---- decisions ---- */
 
   function send(item, result) {
     const fn = item.fullname;
@@ -747,12 +697,11 @@ export function mountRound(root) {
     });
   }
 
-  /* A background POST failed: drop its result and make that item the current card again. */
   function putBack(item, result) {
     if (!round) return;
     const pos = round.results.indexOf(result);
 
-    if (pos < 0) return; // already undone
+    if (pos < 0) return;
 
     round.results.splice(pos, 1);
     round.items.splice(pos, 1);
@@ -765,10 +714,6 @@ export function mountRound(root) {
     if (state === "playing") showCard();
   }
 
-  /* Decide the current card. Input never waits on animation: the card becomes a ghost that flies
-     off on its own (a flung card keeps the finger's flight; a button/key decision plays its leave
-     animation) while the next card is promoted at once, so D D D D clears four cards as fast as
-     the keys go. */
   function decide(act, flung = false) {
     if (leaving || state !== "playing" || !round) return;
     const item = round.items[round.idx];
@@ -805,7 +750,6 @@ export function mountRound(root) {
       return;
     }
 
-    // the last card: let it finish flying before the stamp lands (unless undone meanwhile)
     cardEl = null;
     const at = round.idx;
 
@@ -870,12 +814,9 @@ export function mountRound(root) {
     }
   }
 
-  /* ---- input ---- */
-
   function onClick(e) {
     if (leaving) return;
 
-    // NSFW media is blurred until tapped; the first tap only reveals it.
     const veiled = e.target.closest(".card-media.is-nsfw");
 
     if (veiled && cardEl && cardEl.contains(veiled)) {
@@ -886,8 +827,6 @@ export function mountRound(root) {
       return;
     }
 
-    // Tapping linkable media (video, link preview, gallery) is the Open action; plain images
-    // carry no data-open and do nothing.
     const media = e.target.closest(".card-media[data-open]");
 
     if (media && cardEl && cardEl.contains(media)) {
@@ -919,7 +858,6 @@ export function mountRound(root) {
       return;
     }
 
-    // Enter/Space on a focused button is that button's click, not "open".
     if ((e.key === "Enter" || e.key === " ") && e.target.closest && e.target.closest("button, a"))
       return;
 
@@ -939,8 +877,6 @@ export function mountRound(root) {
   section.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
 
-  // Back from the reader via the bfcache: the page is restored mid-leave, so re-check the
-  // current card against the server (it may have been decided there) and take input again.
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;
     leaving = false;

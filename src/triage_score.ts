@@ -73,7 +73,6 @@ export interface DriftReport {
 }
 
 function ageBucket(age: number): string {
-  // SAFETY: AGE_BUCKETS ends with an Infinity threshold, so find always succeeds.
   return AGE_BUCKETS.find(([limit]) => age < limit)![1];
 }
 
@@ -106,7 +105,6 @@ export function fit(db: Database, opts: { minSupport?: number; alpha?: number } 
   const alpha = opts.alpha ?? 50;
   const now = Math.floor(Date.now() / 1000);
 
-  // SAFETY: The query selects only these six declared item columns.
   const rows = db
     .query(
       "SELECT source,kind,status,created_utc,first_seen_utc,metadata FROM items WHERE json_extract(metadata,'$.decayed_at') IS NULL AND json_extract(metadata,'$.decay_label') IS NULL",
@@ -203,7 +201,6 @@ export function autoArchivePlan(
     if (bucket.feature.startsWith("sub:")) {
       const subreddit = bucket.feature.slice(4);
 
-      // SAFETY: COUNT(*) is the sole selected column and is aliased as c.
       const count = db
         .query(
           "SELECT COUNT(*) AS c FROM items WHERE status='inbox' AND source=? AND lower(json_extract(metadata,'$.subreddit'))=?",
@@ -287,7 +284,6 @@ export function drift(
 function newDecisionsSince(db: Database, sinceUtc: number | null): number {
   if (sinceUtc === null) return 0;
 
-  // SAFETY: COUNT(*) is the sole selected column and is aliased as c.
   return (
     db
       .query(
@@ -336,7 +332,6 @@ export function learn(
 
   if (opts.limit) params.push(Math.trunc(opts.limit));
 
-  // SAFETY: The query selects only these six declared item columns.
   const rows = db
     .query(
       `SELECT fullname,source,kind,created_utc,first_seen_utc,metadata FROM items WHERE status='inbox'${limit}`,

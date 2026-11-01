@@ -1,13 +1,11 @@
 import { esc } from "../core/util.js";
 
 export function initPalette(inputEl, commands) {
-  /* Build panel once — lives inside the search wrapper (position:relative) */
   const panel = document.createElement("div");
   panel.className = "palette";
   panel.id = "palette";
   panel.setAttribute("role", "listbox");
   inputEl.parentElement.appendChild(panel);
-  /* collapsed combobox state must exist BEFORE any interaction, or AT announces nothing */
   inputEl.setAttribute("aria-expanded", "false");
   inputEl.setAttribute("aria-haspopup", "listbox");
 
@@ -15,8 +13,6 @@ export function initPalette(inputEl, commands) {
   let selIdx = -1;
   let matches = [];
 
-  /* Fuzzy subsequence match with tiered scoring:
-     prefix hit > word-boundary hits > scattered; stable order within tier */
   function fuzzyMatch(query, label) {
     if (!query) return { score: 0, ok: true };
     const q = query.toLowerCase();
@@ -34,17 +30,13 @@ export function initPalette(inputEl, commands) {
     if (qi < q.length) return { ok: false };
     let sc = 0;
 
-    /* strict prefix only — a scattered match whose first char lands at 0 must not
-       outrank true word-boundary matches */
     if (l.startsWith(q)) sc += 100;
 
     for (const i of idx) {
-      // word-boundary tier
       if (i === 0 || " :_-".includes(label[i - 1])) sc += 10;
     }
 
     for (let i = 1; i < idx.length; i++) {
-      // contiguity within tier
       if (idx[i] === idx[i - 1] + 1) sc += 1;
     }
 
@@ -68,7 +60,6 @@ export function initPalette(inputEl, commands) {
       })
       .filter(Boolean);
 
-    /* stable sort: higher score first, then original index */
     scored.sort((a, b) => b.sc - a.sc || a.oi - b.oi);
     matches = scored.map((s) => s.cmd);
 
@@ -130,9 +121,6 @@ export function initPalette(inputEl, commands) {
     matches = [];
   }
 
-  /* --- events --- */
-
-  /* input drives activation + filtering */
   inputEl.addEventListener("input", () => {
     if (!inputEl.value.startsWith(">")) {
       if (active) deactivate();
@@ -140,28 +128,23 @@ export function initPalette(inputEl, commands) {
       return;
     }
 
-    /* entering command mode — dismiss operator popover */
     const oppop = document.querySelector("#oppop");
 
     if (oppop) oppop.classList.remove("show");
     render();
   });
 
-  /* re-activate on re-focus while still in command mode */
   inputEl.addEventListener("focus", () => {
     if (inputEl.value.startsWith(">")) render();
   });
 
-  /* close panel on blur (pointerdown+preventDefault on rows blocks this) */
   inputEl.addEventListener("blur", () => {
     if (active) deactivate();
   });
 
-  /* keyboard navigation — only while in command mode */
   inputEl.addEventListener("keydown", (e) => {
     if (!inputEl.value.startsWith(">")) return;
 
-    /* Escape always clears command mode, even with no visible panel */
     if (e.key === "Escape") {
       e.preventDefault();
       inputEl.value = "";
@@ -188,7 +171,6 @@ export function initPalette(inputEl, commands) {
     }
   });
 
-  /* mouse: pointerdown + preventDefault keeps focus on input */
   panel.addEventListener("pointerdown", (e) => {
     const row = e.target.closest(".pal-row");
 

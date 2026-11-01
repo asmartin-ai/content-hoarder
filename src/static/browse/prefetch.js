@@ -1,8 +1,5 @@
-/* Bounded /items first-page cache + warmer for the browse feed.
-   Scope is intentionally narrow: blank query, offset-0 slices only. */
-
 export const PREFETCH_LIMITS = Object.freeze({
-  SOURCES: 4, // includes the all-sources slice when no source filter is active
+  SOURCES: 4,
   SORTS: 3,
   SLICE_SIZE: 50,
   CONCURRENCY: 2,
@@ -229,9 +226,7 @@ export function createFirstPagePrefetcher(options = {}) {
 
         try {
           await cache.fetch(p, fetchJSON, controller ? { signal: controller.signal } : {});
-        } catch {
-          /* warming is opportunistic */
-        }
+        } catch {}
       }
     }
 

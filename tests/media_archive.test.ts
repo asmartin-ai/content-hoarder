@@ -10,7 +10,6 @@ test("media archiving paces archived URLs even without an injected sleep", async
   const root = mkdtempSync(join(tmpdir(), "content-hoarder-archive-"));
   const previousDatabase = process.env.CONTENT_HOARDER_DB;
 
-  // media blobs land beside the configured database, so point it at the temp dir.
   process.env.CONTENT_HOARDER_DB = join(root, "app.db");
   const connection = db.connect(join(root, "app.db"));
 
@@ -42,8 +41,6 @@ test("media archiving paces archived URLs even without an injected sleep", async
 
     expect(fetched).toHaveLength(2);
     expect(result.archived).toBe(2);
-    // Without a real sleep between URLs the whole archive runs at network speed,
-    // which is what gets remote hosts to throttle us.
     expect(elapsed).toBeGreaterThanOrEqual(2 * DEFAULT_THROTTLE_SECONDS * 1000 - 10);
   } finally {
     connection.close();
