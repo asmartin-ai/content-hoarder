@@ -38,7 +38,7 @@ content-hoarder exists to process and reduce saved content, not merely aggregate
 **Entry workflow vs company.** The entry workflow is the finite round plus reversible piles on content people already saved elsewhere. A larger company would be a trusted "what can I safely drop" layer across saved information and, later, commitments. That expansion is only worth testing after people repeatedly use the entry workflow.
 
 **Strongest counter-argument.** This may be a good personal tool, not a company:
-- the evidence is one user, who also stopped using it for months;
+- the evidence is one user, who stopped using it for three months because the PWA was slow and buggy (the owner, 2026-11-01). Speed and reliability come before any new mechanic;
 - clearing a backlog can be a one-off job, with no recurring reason to pay;
 - the connectors depend on platform exports and APIs that the product doesn't control;
 - read-later apps already sell this: Readwise Reader describes "Superhuman's fun, game-like triage … built the same for reading", and Recall targets threads "gone in a sea of saved posts you never reopen" (vendor pages, fetched 2026-11-01). What's left to test is the job (letting go of saves that stay in their own apps), not the triage interaction.
