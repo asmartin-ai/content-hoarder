@@ -1,99 +1,137 @@
-/* home/main.js — boot for the Today + Clear page (home.html): client-side routing between
-   "/" (Today) and "/clear" (a round), shared nav wiring, service worker, PWA-open autosync.
-   Contract: docs/design/clear-overhaul.md §4. */
+/* home/main.js — boot for the server-rendered Today and Clear pages (clear-v2.md §3, §6):
+   mounts the round island on Clear, htmx glue (ch:toast → undo snackbar), theme toggle,
+   Enter-to-start on Today, service worker, PWA-open autosync. */
 
 import { postJSON } from "../core/api.js";
-import { mountRound } from "./round.js";
-import { mountToday } from "./today.js";
+import { isTypingTarget } from "../core/util.js";
+import { snackbar } from "../core/toast.js";
 
-const ROUTES = { "/": mountToday, "/clear": mountRound };
-
-const TITLES = { "/": "Today · content-hoarder", "/clear": "Clear · content-hoarder" };
-
-const view = document.getElementById("view");
-
-let current = null;
-
-const ctx = { go };
-
-function mount() {
-  const path = location.pathname;
-  const fn = ROUTES[path] || mountToday;
-
-  if (current) {
-    try {
-      current.unmount();
-    } catch (err) {
-      console.error(err);
-    }
-
-    current = null;
-  }
-
-  document.body.classList.toggle("is-round", path === "/clear");
-  document.querySelectorAll(".ch-tab").forEach((tab) => {
-    const active =
-      (tab.dataset.tab === "today" && path === "/") ||
-      (tab.dataset.tab === "clear" && path === "/clear");
-
-    if (active) tab.setAttribute("aria-current", "page");
-    else tab.removeAttribute("aria-current");
-  });
-
-  if (TITLES[path]) document.title = TITLES[path];
-  view.innerHTML = "";
-
-  try {
-    current = fn(view, ctx);
-  } catch (err) {
-    console.error(err);
-    view.innerHTML =
-      '<p class="sec-sub today-err">Something went sideways. Reload to try again.</p>';
-  }
-}
-
-/* Client-side navigation between "/" and "/clear?…"; anything else is a real page load. */
-function go(path, opts) {
-  const url = new URL(path, location.href);
-
-  if (url.origin !== location.origin || !ROUTES[url.pathname]) {
-    location.href = url.href;
-
-    return;
-  }
-
-  const same = url.href === location.href;
-
-  if ((opts && opts.replace) || same) history.replaceState(null, "", url.href);
-  else history.pushState(null, "", url.href);
-  mount();
-  window.scrollTo(0, 0);
-}
+const page = document.body.dataset.page;
 
 /* Old deep link: /?deck=1 opened the deck; rounds replace it. */
 if (location.pathname === "/" && new URLSearchParams(location.search).has("deck"))
-  history.replaceState(null, "", "/clear");
+  location.replace("/clear");
 
-document.body.classList.add("has-tabbar");
+if (page === "clear") {
+  import("./round.js").then(({ mountRound }) => mountRound(document.querySelector(".round")));
+}
 
-document.addEventListener("click", (e) => {
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+/* Server responses announce results with `HX-Trigger: {"ch:toast": {msg, undo?}}`; htmx 2
+   dispatches the payload object itself as `event.detail` (plus `elt`). */
+document.body.addEventListener("ch:toast", (e) => {
+  const detail = e.detail || {};
+  const undo = detail.undo;
+
+  if (!detail.msg) return;
+
+  if (!undo || !undo.post) {
+    snackbar(detail.msg, null);
+
     return;
-  const t = e.target;
+  }
 
-  if (!(t instanceof Element)) return;
-  const link = t.closest('.ch-tab[data-tab="today"], .ch-tab[data-tab="clear"], .ch-brand');
-
-  if (!link) return;
-  e.preventDefault();
-  go(link.getAttribute("href") || "/");
+  window.chHaptic?.("archived");
+  snackbar(detail.msg, () => {
+    window.chHaptic?.("undo");
+    window.htmx?.ajax("POST", undo.post, {
+      values: undo.vals || {},
+      target: undo.target,
+      swap: "outerHTML",
+    });
+  });
 });
 
-document.getElementById("theme-toggle")?.addEventListener("click", () => window.toggleTheme?.());
+/* Theme buttons rendered (or re-rendered by htmx) without theme.js's [data-theme-toggle] hook. */
+document.addEventListener("click", (e) => {
+  const t = e.target instanceof Element ? e.target.closest("#theme-toggle, .today-theme") : null;
 
-window.addEventListener("popstate", mount);
+  if (!t || t.hasAttribute("data-theme-toggle")) return;
+  window.toggleTheme?.();
+});
 
-mount();
+/* Today: Enter anywhere starts the round — unless typing or another control has focus. */
+document.addEventListener("keydown", (e) => {
+  if (page !== "today" || e.key !== "Enter" || e.defaultPrevented || e.repeat) return;
+
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  const t = e.target;
+
+  if (isTypingTarget(t)) return;
+
+  if (t instanceof Element && t.closest("button, a, [role=radio], [contenteditable]")) return;
+  const go = document.getElementById("hero-go");
+
+  if (!go) return;
+  e.preventDefault();
+  go.click();
+});
+
+/* Today: broken thumbnails (hotlink blocks, 404s) never show the broken-image icon: try
+   data-fallback once, then a strip card becomes a text tile and a mosaic tile a glyph tile. */
+const THUMBS = ".strip-card img, .pile-mosaic img";
+
+function dropBrokenThumb(img) {
+  const fallback = img.dataset.fallback;
+
+  if (fallback) {
+    img.removeAttribute("data-fallback");
+    img.src = fallback;
+
+    return;
+  }
+
+  const card = img.closest(".strip-card");
+
+  if (card) {
+    img.remove();
+    card.classList.add("is-text");
+
+    return;
+  }
+
+  const glyph = document.createElement("span");
+  const mosaic = img.closest(".pile-mosaic");
+
+  glyph.className = "pile-glyph";
+  glyph.textContent =
+    mosaic?.dataset.glyph ?? mosaic?.querySelector(".pile-glyph")?.textContent ?? "";
+  img.replaceWith(glyph);
+}
+
+// Imgur serves a real 161×81 "image no longer available" PNG for deleted images.
+const isImgurGone = (img) => img.naturalWidth === 161 && img.naturalHeight === 81;
+
+if (page === "today") {
+  // `error` does not bubble: one capture listener covers htmx-swapped rows too.
+  document.addEventListener(
+    "error",
+    (e) => {
+      const img = e.target;
+
+      if (img instanceof HTMLImageElement && img.matches(THUMBS)) dropBrokenThumb(img);
+    },
+    true,
+  );
+
+  // `load` does not bubble either: catch Imgur's removed-image placeholder.
+  document.addEventListener(
+    "load",
+    (e) => {
+      const img = e.target;
+
+      if (img instanceof HTMLImageElement && img.matches(THUMBS) && isImgurGone(img))
+        dropBrokenThumb(img);
+    },
+    true,
+  );
+
+  // Thumbnails that already failed before this module ran.
+  for (const img of document.querySelectorAll(THUMBS)) {
+    if (!img.complete || !img.getAttribute("src")) continue;
+
+    if (img.naturalWidth === 0 || isImgurGone(img)) dropBrokenThumb(img);
+  }
+}
 
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {

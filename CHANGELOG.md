@@ -6,6 +6,16 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **Clear v2 (`docs/design/clear-v2.md`).** Round cards are rich and server-rendered
+  (`src/web/views/card.ts`): media hero with gallery/clip/duration badges and archived-copy
+  fallback, subreddit/author/age head, self-text and saved comments rendered as markdown, the cached
+  top comment, removed-post note, score/comments/views/domain stats, Show more; the next card peeks
+  from behind. Today and Clear are server-rendered TypeScript views; Today uses vendored htmx 2.0.11
+  for its partials (Up next filmstrip of the exact next round, wins, pile tiles with thumbnail
+  mosaics, whisper) with an `HX-Trigger` undo snackbar — the first step of the HTMX migration
+  (issue #3); the Library list is unchanged. `/clear/deal` serves cards; `home.html`, `today.js`
+  and `card.js` are gone. Piles list entertainment subreddits before age piles. SW cache
+  `ch-shell-v142`.
 - **Three-room UI ("Clear" overhaul, `docs/design/clear-overhaul.md`).** `/` is now **Today**: one
   lit "Clear 10" button (5/10/25), wins-only counting (today + all-time, pebbles toward the daily
   goal), a re-entry line, up to three sweeps, and the resurfacing whisper — no remaining-inbox count.

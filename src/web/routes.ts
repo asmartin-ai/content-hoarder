@@ -38,6 +38,19 @@ import {
 } from "./handlers/imports.ts";
 import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
+import { clearPage, deal } from "./handlers/clear.ts";
+import {
+  applyPile,
+  dismissWhisper,
+  letgoWhisper,
+  piles,
+  todayPage,
+  undoPile,
+  undoWhisper,
+  upNext,
+  whisper,
+  wins,
+} from "./handlers/today.ts";
 import {
   ClusterBody,
   ClusterUndoBody,
@@ -74,12 +87,33 @@ export async function handle(request: Request): Promise<Response> {
 
   if (method === "GET" && path === "/sw.js") return serviceWorkerResponse();
 
-  if (method === "GET" && (path === "/" || path === "/clear")) return templateResponse("home");
+  if (method === "GET" && path === "/") return todayPage(request, url);
 
-  if (method === "GET" && (path === "/library" || path === "/browse"))
-    return templateResponse("library");
+  if (method === "GET" && path === "/clear") return clearPage();
+
+  if (method === "GET" && (path === "/library" || path === "/browse")) return templateResponse();
 
   try {
+    if (method === "GET" && path === "/clear/deal") return deal(url);
+
+    if (method === "GET" && path === "/hx/today/upnext") return upNext(request, url);
+
+    if (method === "GET" && path === "/hx/today/wins") return wins(request);
+
+    if (method === "GET" && path === "/hx/today/piles") return piles();
+
+    if (method === "GET" && path === "/hx/today/whisper") return whisper();
+
+    if (method === "POST" && path === "/hx/sweeps/apply") return await applyPile(request);
+
+    if (method === "POST" && path === "/hx/sweeps/undo") return await undoPile(request);
+
+    if (method === "POST" && path === "/hx/whisper/dismiss") return await dismissWhisper(request);
+
+    if (method === "POST" && path === "/hx/whisper/letgo") return await letgoWhisper(request);
+
+    if (method === "POST" && path === "/hx/whisper/undo") return await undoWhisper(request);
+
     if (method === "GET" && path === "/items") {
       const search = options(url.searchParams);
       const count = search.limit ?? 51;

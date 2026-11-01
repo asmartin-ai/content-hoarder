@@ -102,15 +102,21 @@ live in **`docs/IMPORTING.md`**. One gotcha worth keeping here: Materialistic `M
 via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
-- **Three rooms** (spec + DOM contract: `docs/design/clear-overhaul.md`): Today `/` and Clear `/clear`
-  are one page (`templates/home.html`, `static/home/*`: `main.js` routes, `today.js`, `round.js`,
-  `card.js`); Library `/library` is `templates/index.html` + `static/browse/*`. `/triage` and
-  `/?deck=1` land on `/clear`. The shared nav is `static/core/nav.css` and its markup is duplicated in
-  both templates — keep them identical. The Library has no deck, focus batches, stamp or wins bar any
-  more; do not re-add a second triage system there.
-- **Rounds persist** in `sessionStorage["ch.round"]`; the reader opened from a round
-  (`/library?open=<fn>&from=clear&enter=up`) returns to `/clear`, which resumes and records a decision
-  made in the reader. `localStorage["ch.lastRound"]` feeds Today's re-entry line.
+- **Three rooms** (v2 spec: `docs/design/clear-v2.md`; v1 background: `clear-overhaul.md`). Today `/`
+  and Clear `/clear` are **server-rendered** TS views (`src/web/views/*`, `handlers/today.ts`,
+  `handlers/clear.ts`) using vendored htmx (`static/vendor/htmx.min.js`) for Today's partials
+  (`/hx/today/*`, `/hx/sweeps/*`, `/hx/whisper/*`). Cards are rendered once, on the server, by
+  `views/card.ts` (`/clear/deal` returns `{items:[{fullname,status,html}]}`); `static/home/round.js` is
+  the only island (gestures, keys, undo, resume); `static/home/main.js` is htmx glue (`ch:toast`
+  HX-Trigger → undo snackbar). The `html```template escapes every interpolation — never wrap
+  user data in `raw()`. oxfmt reflows html`` templates, so tests compare markup with whitespace
+  collapsed. Library `/library` is still `templates/index.html` + `static/browse/*`; its nav markup is
+  a copy of `views/page.ts` `navHtml()` — keep them identical. `/triage` and `/?deck=1` land on
+  `/clear`. Do not re-add a second triage system to the Library.
+- **Rounds persist** in `sessionStorage["ch.round"]` (card HTML included); the reader opened from a
+  round (`/library?open=<fn>&from=clear&enter=up`) returns to `/clear`, which resumes and records a
+  decision made in the reader. Finishing writes cookie `ch_last_round` for Today's re-entry line;
+  Today's size lives in cookie `ch_round_size`; Up next deals the exact ids the hero plays.
 - **Sweeps** (`GET /sweeps`, `POST /sweeps/apply|undo`) are `decay()` waves labelled `sweep`; they
   exclude `RESURFACE_SUBREDDITS`/`RESURFACE_TAGS` so knowledge is never swept, and never enqueue
   Reddit unsaves. Counts must equal what `decay()` archives.

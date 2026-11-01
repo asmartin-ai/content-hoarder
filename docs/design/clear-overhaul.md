@@ -1,7 +1,7 @@
 # The "Clear" overhaul — plan and contract (2026-10-31)
 
-Status: in progress on branch `feat/overhaul-clear`. This file is the single source of
-truth for every agent working on the overhaul. Read all of it before editing.
+Status: superseded in part by `clear-v2.md` (rich server-rendered cards, htmx Today; `home.html`,
+`today.js` and `card.js` below no longer exist). Kept for the rationale, routes and round behaviour.
 
 ## 1. Why
 

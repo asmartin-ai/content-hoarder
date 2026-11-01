@@ -21,3 +21,7 @@ Per CC BY 3.0, attribution is retained here. No icon-font or external icon depen
 
 Mozilla Firefox icon by **Just UI**, [Icon-Icons.com](https://icon-icons.com/authors/322-just-ui).
 Adapted only by setting `fill="currentColor"` so it recolors to the source-avatar foreground.
+
+## htmx (`vendor/htmx.min.js`)
+
+[htmx](https://htmx.org/) — version 2.0.11, licensed **0BSD**. Used for server-rendered Today/Clear pages and htmx-driven interactions.

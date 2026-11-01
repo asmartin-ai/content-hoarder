@@ -1,6 +1,6 @@
 /* ============================================================
    core/nav.css — the shared room switcher: Today · Clear · Library.
-   Loaded by home.html (Today + Clear) and index.html (Library).
+   Loaded by the server-rendered Today/Clear pages (src/web/views/page.ts) and index.html (Library).
    Desktop (≥ 701px): slim sticky top bar.
    Phone (≤ 700px): fixed bottom tab bar in the thumb zone; the
    page adds body.has-tabbar so content clears it.

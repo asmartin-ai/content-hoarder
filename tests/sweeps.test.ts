@@ -173,10 +173,17 @@ test("GET /sweeps offers meme and age piles, never knowledge subreddits", async 
     expect(age?.before_utc).toBeGreaterThan(NOW - 4 * 365 * DAY - 120);
     expect(age?.before_utc).toBeLessThanOrEqual(NOW - 4 * 365 * DAY + 120);
 
-    // Largest first, cut to limit.
-    expect(list.map((sweep) => sweep.count)).toEqual(
-      list.map((sweep) => sweep.count).sort((a, b) => b - a),
-    );
+    // Subreddit piles first, then age piles; each largest first, cut to limit.
+    const firstAge = list.findIndex((sweep) => sweep.kind === "age");
+
+    expect(list.slice(firstAge).every((sweep) => sweep.kind === "age")).toBe(true);
+
+    for (const group of [list.slice(0, firstAge), list.slice(firstAge)]) {
+      expect(group.map((sweep) => sweep.count)).toEqual(
+        group.map((sweep) => sweep.count).sort((a, b) => b - a),
+      );
+    }
+
     expect(await sweeps(base, "?limit=1")).toHaveLength(1);
   });
 });

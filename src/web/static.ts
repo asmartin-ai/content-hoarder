@@ -3,9 +3,7 @@ import { extname, join, normalize, resolve } from "node:path";
 
 const STATIC_DIR = join(import.meta.dir, "..", "static");
 
-const TEMPLATE_DIR = join(import.meta.dir, "..", "templates");
-
-const TEMPLATES = { home: "home.html", library: "index.html" } as const;
+const LIBRARY_TEMPLATE = join(import.meta.dir, "..", "templates", "index.html");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -43,15 +41,25 @@ export function serviceWorkerResponse(): Response {
   });
 }
 
-export function templateResponse(name: keyof typeof TEMPLATES): Response {
-  return new Response(Bun.file(join(TEMPLATE_DIR, TEMPLATES[name])), {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      // The local triage app must never sit inside another site's iframe:
-      // a framed deck click is a same-origin POST the Host/Origin guard
-      // cannot distinguish from a real one (clickjacking).
-      "Content-Security-Policy": "frame-ancestors 'none'",
-      "X-Frame-Options": "DENY",
-    },
-  });
+/**
+ * HTML with the anti-framing headers. The local triage app must never sit
+ * inside another site's iframe: a framed deck click is a same-origin POST
+ * the Host/Origin guard cannot distinguish from a real one (clickjacking).
+ */
+export function htmlResponse(
+  body: string | Blob,
+  init: { status?: number; headers?: Record<string, string> } = {},
+): Response {
+  const headers = new Headers(init.headers);
+
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+  headers.set("X-Frame-Options", "DENY");
+
+  return new Response(body, { ...init, headers });
+}
+
+/** The Library page (`/library`, `/browse`): still a static template. */
+export function templateResponse(): Response {
+  return htmlResponse(Bun.file(LIBRARY_TEMPLATE));
 }

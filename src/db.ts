@@ -100,7 +100,7 @@ type UnsnoozeResult = {
   sample: string[];
 };
 
-type DecayResult = {
+export type DecayResult = {
   total: number;
   applied: boolean;
   decayed_at: number | null;
@@ -3375,7 +3375,13 @@ export function sweepCandidates(
     pending.push({ kind: "age", key: String(r.source), count: Number(r.c) });
   }
 
-  pending.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+  // Subreddit piles (one-tap amnesty) before age piles (filler); each by count desc.
+  pending.sort(
+    (a, b) =>
+      Number(a.kind === "age") - Number(b.kind === "age") ||
+      b.count - a.count ||
+      a.key.localeCompare(b.key),
+  );
 
   const cutoffMonth = new Date(beforeUtc * 1000).toLocaleString("en-US", {
     month: "short",
@@ -3418,6 +3424,56 @@ export function sweepCandidates(
       sample: sweepSample(db, where, params),
     };
   });
+}
+
+export type SweepSelector = Pick<Sweep, "kind" | "source" | "subreddit" | "before_utc">;
+
+function sweepSelectorWhere(sweep: SweepSelector, exclusions: DecayExclusions) {
+  return sweep.kind === "subreddit"
+    ? decayWhere(null, [sweep.subreddit ?? ""], null, sweep.source, exclusions)
+    : decayWhere(null, null, sweep.before_utc ?? 0, sweep.source, exclusions);
+}
+
+/**
+ * Up to ``limit`` inbox items of one sweep pile (the exact rows `decay`
+ * would rest), items with preview media first — Today's pile mosaic.
+ */
+export function sweepSampleItems(
+  db: Database,
+  sweep: SweepSelector,
+  limit: number,
+  exclusions: DecayExclusions = {},
+): Item[] {
+  const [where, params] = sweepSelectorWhere(sweep, exclusions);
+
+  const visual =
+    "(json_extract(metadata, '$.thumbnail') LIKE 'http%' " +
+    "OR json_type(metadata, '$.gallery') = 'array' " +
+    "OR json_extract(metadata, '$.archived_media') IS NOT NULL OR source = 'youtube')";
+
+  return rows<RawItem>(
+    db,
+    `SELECT * FROM items WHERE ${where} ` +
+      `ORDER BY ${visual} DESC, COALESCE(json_extract(metadata, '$.score'), 0) DESC, fullname LIMIT ?`,
+    [...params, Math.max(0, limit)],
+  ).map(rowToPublic);
+}
+
+/** Oldest and newest content age (unix seconds) in one sweep pile; null when empty. */
+export function sweepSpan(
+  db: Database,
+  sweep: SweepSelector,
+  exclusions: DecayExclusions = {},
+): { first: number; last: number } | null {
+  const [where, params] = sweepSelectorWhere(sweep, exclusions);
+
+  const span = row<{ first: number | null; last: number | null }>(
+    db,
+    `SELECT MIN(${_AGE_EXPR}) AS first, MAX(${_AGE_EXPR}) AS last FROM items WHERE ${where}`,
+    params,
+  );
+
+  return span?.first && span.last ? { first: span.first, last: span.last } : null;
 }
 
 /**
