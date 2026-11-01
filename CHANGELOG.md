@@ -49,6 +49,20 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Home (`/home`), a dashboard prototype built around what's specific to Khaos.** The sections:
+  - **Start here:** one suggested round, with lighter and bigger options.
+  - **This week's flow:** what arrived, by source, and where your attention moved it: let go, kept, learning, commitment. "Let go" is the headline.
+  - **Worth seeing again:** the oldest waiting save, with a reason.
+  - **Parked until…:** shelved work that wakes on a condition.
+  - **Agent receipts.**
+  - **Patterns noticed:** user-model offers.
+  - **Attention guard:** nudge budget, quiet hours, earned-autonomy progress.
+  - **A 14-day rhythm strip** and module status chips.
+
+  Real data: Start here, arrivals by source, let go and kept counts, the resurfaced save and the
+  rhythm. Everything else is marked "Sample". `MODULES` in `src/web/views/home.ts` is the first
+  version of the module registry that life-os will own. Home tab added to every nav. SW cache
+  `ch-shell-v146`.
 - **Sanitized demo (`docs/DEMO.md`).** `scripts/demo.sh` starts a fresh library in a new temp folder
   with 24 invented saves (`docs/demo/demo-saves.json`). It runs from that folder, so it loads no
   `.env` and never opens `data/app.db`. The doc has the walkthrough, verified vs unverified steps

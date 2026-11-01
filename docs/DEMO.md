@@ -32,6 +32,7 @@ listing format, with links to `example.com` and no images.
 | 9 | Restart the server, open Library → **Keep** | The kept item is still there after the restart | ✅ |
 | 10 | `bun run src/cli.ts export-obsidian --vault <dir> --status keep` (with `CONTENT_HOARDER_DB` set to the demo DB) | One Markdown note with title, URL, date and tag | ✅ ✋ (CLI) |
 | 11 | Today → **Let a pile go** → undo from the toast | A whole community is archived, then restored | ⚠ not on demo data: no pile is offered for 24 mixed saves (checked: `#piles` hidden) |
+| 12 | Open **Home** (`/home`) after a round | Start here; this week's flow with let go and kept from the round; a resurfaced save with a reason; sample Parked / Agent receipts / Patterns / Attention guard panels, each marked Sample; today lit in the rhythm strip | ✅ desktop 1440 and phone 412 |
 
 ## Say it plainly in the recording
 

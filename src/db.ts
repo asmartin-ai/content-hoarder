@@ -3267,6 +3267,44 @@ export function keptTotal(db: Database): number {
   return scalar(db, "SELECT COUNT(*) AS c FROM items WHERE status = 'keep'");
 }
 
+export type WeekFlow = {
+  arrived: { source: string; n: number }[];
+  letGo: number;
+  kept: number;
+};
+
+export function weekFlow(db: Database, sinceUtc: number): WeekFlow {
+  const arrived = rows<{ source: string; n: number }>(
+    db,
+    "SELECT source, COUNT(*) AS n FROM items WHERE first_seen_utc >= ? GROUP BY source ORDER BY n DESC",
+    [sinceUtc],
+  );
+
+  const letGo = scalar(
+    db,
+    "SELECT COUNT(*) AS c FROM items WHERE status IN ('archived', 'done') AND processed_utc >= ?",
+    [sinceUtc],
+  );
+
+  const kept = scalar(
+    db,
+    "SELECT COUNT(*) AS c FROM items WHERE status = 'keep' AND processed_utc >= ?",
+    [sinceUtc],
+  );
+
+  return { arrived, letGo, kept };
+}
+
+export function oldestWaiting(db: Database): Item | null {
+  const found = row<{ fullname: string }>(
+    db,
+    "SELECT fullname FROM items WHERE status = 'inbox' AND created_utc > 0 " +
+      "ORDER BY created_utc ASC LIMIT 1",
+  );
+
+  return found ? getPublicItem(db, found.fullname) : null;
+}
+
 function folderRow(r: FolderSqlRow): Folder {
   let queryDef: FolderQueryDefinition = {};
 

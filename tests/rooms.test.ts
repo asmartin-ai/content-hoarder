@@ -184,11 +184,12 @@ test("an empty inbox deals nothing instead of failing", async () => {
   });
 });
 
-test("Home counts a decision in today's wins and marks today on the calendar", async () => {
+test("Home moves a decision into this week's flow and marks today in the rhythm", async () => {
   await withServer(async (base) => {
-    const before = await (await fetch(`${base}/home`)).text();
+    const before = (await (await fetch(`${base}/home`)).text()).replace(/\s+/g, " ");
 
-    expect(before).not.toContain("o-day is-on is-today");
+    expect(before).toContain('class=" is-today"');
+    expect(before).toContain("Kept <b>0</b>");
 
     const decided = await fetch(`${base}/items/${encodeURIComponent("reddit:t3_room_0")}/status`, {
       method: "POST",
@@ -200,9 +201,9 @@ test("Home counts a decision in today's wins and marks today on the calendar", a
 
     const after = (await (await fetch(`${base}/home`)).text()).replace(/\s+/g, " ");
 
-    expect(after).toMatch(/Cleared today <\/span> <span class="o-win-n">1</);
-    expect(after).toMatch(/Kept <\/span> <span class="o-win-n">1</);
-    expect(after).toContain("o-day is-on is-today");
+    expect(after).toContain("Kept <b>1</b>");
+    expect(after).toContain('class="is-on is-today"');
+    expect(after).toContain('<p class="o-again-title">Crayon meme 11</p>');
   });
 });
 

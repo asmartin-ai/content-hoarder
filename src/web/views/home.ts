@@ -1,140 +1,73 @@
+import type { Item } from "../../models.ts";
+import type { WeekFlow } from "../../db.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
-import { ringSvg } from "../../static/core/ring.js";
-import { dateLine, dayTitle, fmt } from "./today.ts";
+import { communityOf, hueOf } from "./media.ts";
+import { dateLine, dayTitle, fmt, sourceAccent } from "./today.ts";
 
 export type ModuleStatus = "live" | "prototype" | "planned";
 
 export type KhaosModule = {
   id: string;
   name: string;
-  job: string;
   layer: "capture" | "storage" | "engine" | "screen";
   status: ModuleStatus;
-  hue: number;
   href?: string;
-  note?: string;
 };
 
 export const MODULES: readonly KhaosModule[] = [
-  {
-    id: "hoard",
-    name: "Hoard",
-    job: "Saved posts, videos and tabs: clear rounds and a library",
-    layer: "screen",
-    status: "live",
-    hue: 40,
-    href: "/clear",
-  },
-  {
-    id: "vault",
-    name: "Vault",
-    job: "Notes and captures from Keep, WhatsApp, Discord and share",
-    layer: "storage",
-    status: "live",
-    hue: 285,
-    note: "Runs as PKMS",
-  },
-  {
-    id: "desk",
-    name: "Desk",
-    job: "Commitments and shelved projects: resume, park, close, hand off",
-    layer: "screen",
-    status: "prototype",
-    hue: 225,
-  },
-  {
-    id: "learn",
-    name: "Learn",
-    job: "Spaced review of the things you chose to keep",
-    layer: "screen",
-    status: "prototype",
-    hue: 150,
-  },
-  {
-    id: "agents",
-    name: "Agents",
-    job: "Hand work to an agent; a receipt comes back to the card",
-    layer: "engine",
-    status: "prototype",
-    hue: 320,
-    note: "Afternoon brief runs on Hermes",
-  },
-  {
-    id: "discover",
-    name: "Discover",
-    job: "A feed in chapters, with a clear-5 checkpoint at the end",
-    layer: "screen",
-    status: "planned",
-    hue: 195,
-  },
-  {
-    id: "car",
-    name: "Car",
-    job: "Say it while driving; it lands in the vault",
-    layer: "capture",
-    status: "planned",
-    hue: 65,
-  },
-  {
-    id: "health",
-    name: "Health",
-    job: "Activity and habits, only from what you link",
-    layer: "capture",
-    status: "planned",
-    hue: 120,
-  },
+  { id: "hoard", name: "Hoard", layer: "screen", status: "live", href: "/clear" },
+  { id: "vault", name: "Vault", layer: "storage", status: "live" },
+  { id: "desk", name: "Desk", layer: "screen", status: "prototype" },
+  { id: "learn", name: "Learn", layer: "screen", status: "prototype" },
+  { id: "agents", name: "Agents", layer: "engine", status: "prototype" },
+  { id: "discover", name: "Discover", layer: "screen", status: "planned" },
+  { id: "car", name: "Car", layer: "capture", status: "planned" },
+  { id: "health", name: "Health", layer: "capture", status: "planned" },
 ];
 
-export type DoNext = {
-  module: string;
-  title: string;
-  step: string;
-  minutes: number;
-  reason: string;
-  href: string;
-  sample: boolean;
-};
-
-export const SAMPLE_DO_NEXT: readonly DoNext[] = [
-  {
-    module: "desk",
-    title: "YC application",
-    step: "Record the one-minute founder video",
-    minutes: 10,
-    reason: "Due tomorrow, 8pm PT",
-    href: "#desk",
-    sample: true,
-  },
-  {
-    module: "learn",
-    title: "How SQLite stores a table",
-    step: "Three review cards from something you kept",
-    minutes: 3,
-    reason: "Ready to review",
-    href: "#learn",
-    sample: true,
-  },
+export const SAMPLE_PARKED: readonly { title: string; wake: string }[] = [
+  { title: "Logo feedback for Alex", wake: "wakes when Alex replies" },
+  { title: "Parked car-capture test", wake: "wakes Saturday morning" },
 ];
 
-export const SAMPLE_COMING_UP: readonly { module: string; title: string; when: string }[] = [
-  { module: "learn", title: "Review: the exposure triangle", when: "Thu" },
-  { module: "desk", title: "Wake: logo feedback from Alex", when: "when Alex replies" },
+export const SAMPLE_RECEIPTS: readonly { agent: string; did: string; ask: string }[] = [
+  { agent: "Hermes", did: "Delivered your afternoon brief", ask: "Read" },
+  { agent: "Coding agent", did: "Fixed the reader's thread bug", ask: "Review" },
+];
+
+export const SAMPLE_PATTERNS: readonly { seen: string; offer: string }[] = [
+  { seen: "You let go of 9 of the last 10 cooking posts.", offer: "Stop saving these here?" },
+  { seen: "Your rounds go fastest after 9 pm.", offer: "Suggest rounds then?" },
 ];
 
 export type HomeView = {
   now: Date;
-  clearedToday: number;
-  clearedTotal: number;
-  kept: number;
-  goal: number;
   roundSize: number;
-  showedUp: ReadonlySet<string>;
+  flow: WeekFlow;
+  resurfaced: Item | null;
+  rhythm: readonly { day: string; on: boolean; today: boolean }[];
 };
 
 const STATUS_LABEL = { live: "Live", prototype: "Prototype", planned: "Planned" } as const;
 
-function moduleById(id: string): KhaosModule | undefined {
-  return MODULES.find((m) => m.id === id);
+const SOURCE_LABEL = {
+  reddit: "Reddit",
+  youtube: "YouTube",
+  hackernews: "Hacker News",
+  firefox: "Tabs",
+  twitter: "X",
+  keep: "Keep",
+  obsidian: "Obsidian",
+} as const;
+
+function sourceLabel(source: string): string {
+  return Object.hasOwn(SOURCE_LABEL, source)
+    ? SOURCE_LABEL[source as keyof typeof SOURCE_LABEL]
+    : source;
+}
+
+function sampleChip(): SafeHtml {
+  return html`<span class="o-chip is-sample">Sample</span>`;
 }
 
 function arrow(): SafeHtml {
@@ -143,152 +76,214 @@ function arrow(): SafeHtml {
   );
 }
 
-function sampleChip(sample: boolean): SafeHtml | string {
-  return sample ? html`<span class="o-chip is-sample">Sample</span>` : "";
-}
+function startHere(n: number): SafeHtml {
+  const minutes = Math.max(1, Math.round((n * 12) / 60));
 
-function doNextCard(card: DoNext): SafeHtml {
-  const mod = moduleById(card.module);
-
-  return html`<li class="o-do" style="--hue: ${mod?.hue ?? 40}">
-    <a class="o-do-link" href="${card.href}">
-      <span class="o-do-top">
-        <span class="o-mod">${mod?.name ?? card.module}</span>
-        ${sampleChip(card.sample)}
-        <span class="o-arrow">${arrow()}</span>
-      </span>
-      <span class="o-do-title">${card.title}</span>
-      <span class="o-do-step">${card.step}</span>
-      <span class="o-do-meta">${card.reason} · ~${card.minutes} min</span>
+  return html`<section class="o-start" aria-labelledby="o-start-h">
+    <p class="o-kicker" id="o-start-h">Start here</p>
+    <a class="o-start-go" href="/clear?n=${n}">
+      <span class="o-start-verb">Clear ${n}</span>
+      <span class="o-start-sub">~${minutes} min · let most of it go, keep what matters</span>
+      <span class="o-arrow">${arrow()}</span>
     </a>
-  </li>`;
-}
-
-function hoardCard(n: number): DoNext {
-  return {
-    module: "hoard",
-    title: `Clear ${n}`,
-    step: "Let most of it go, keep the few that matter",
-    minutes: Math.max(1, Math.round((n * 12) / 60)),
-    reason: "A short round fits here",
-    href: `/clear?n=${n}`,
-    sample: false,
-  };
-}
-
-function winTile(label: string, value: string, hue: number, sample = false): SafeHtml {
-  return html`<li class="o-win" style="--hue: ${hue}">
-    <span class="o-win-label">${label} ${sampleChip(sample)}</span>
-    <span class="o-win-n">${value}</span>
-  </li>`;
-}
-
-function moduleTile(mod: KhaosModule): SafeHtml {
-  const body = html`<span class="o-mtop">
-      <span class="o-mname">${mod.name}</span>
-      <span class="o-chip is-${mod.status}">${STATUS_LABEL[mod.status]}</span>
-    </span>
-    <span class="o-mjob">${mod.job}</span>
-    ${mod.note ? html`<span class="o-mnote">${mod.note}</span>` : ""}`;
-
-  return html`<li
-    class="o-mod-tile is-${mod.status}"
-    style="--hue: ${mod.hue}"
-    data-layer="${mod.layer}"
-  >
-    ${mod.href ? html`<a class="o-mlink" href="${mod.href}">${body}</a>` : html`<div class="o-mlink">${body}</div>`}
-  </li>`;
-}
-
-function isoDay(d: Date): string {
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${d.getFullYear()}-${month}-${day}`;
-}
-
-function calendar(now: Date, showedUp: ReadonlySet<string>): SafeHtml {
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lead = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const today = isoDay(now);
-  const cells: SafeHtml[] = [];
-
-  for (let i = 0; i < lead; i++) cells.push(html`<span class="o-day is-pad"></span>`);
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const key = isoDay(new Date(now.getFullYear(), now.getMonth(), d));
-    const cls = [showedUp.has(key) ? "is-on" : "", key === today ? "is-today" : ""].join(" ");
-
-    cells.push(html`<span class="o-day ${cls}">${d}</span>`);
-  }
-
-  const month = now.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-
-  const heads = ["M", "T", "W", "T", "F", "S", "S"].map(
-    (h) => html`<span class="o-dh">${h}</span>`,
-  );
-
-  return html`<section class="o-cal" aria-label="Days you showed up">
-    <h2 class="o-h">${month}</h2>
-    <div class="o-grid">${heads}${cells}</div>
-    <p class="o-cal-key"><span class="o-dot"></span> a day with at least one decision</p>
+    <p class="o-start-alt">
+      <a href="/clear?n=5">Lighter: 5</a>
+      <a href="/clear?n=25">Bigger: 25</a>
+    </p>
   </section>`;
 }
 
-export function renderHome(view: HomeView): SafeHtml {
-  const doNext = [hoardCard(view.roundSize), ...SAMPLE_DO_NEXT];
+function flowSection(flow: WeekFlow): SafeHtml {
+  const arrivedTotal = flow.arrived.reduce((sum, row) => sum + row.n, 0);
+  const learning = 3;
+  const committed = 1;
+  const outcomes = Math.max(1, flow.letGo + flow.kept + learning + committed);
+  const share = (n: number): string => `${Math.max(4, (n / outcomes) * 100).toFixed(1)}%`;
 
+  return html`<section class="o-flow" aria-labelledby="o-flow-h">
+    <h2 class="o-h" id="o-flow-h">This week's flow</h2>
+    <p class="o-flow-lede">
+      <strong>${fmt(flow.letGo)}</strong> let go. That's ${fmt(flow.letGo)} things you don't owe
+      anyone.
+    </p>
+    <div class="o-flow-grid">
+      <div class="o-flow-in">
+        <p class="o-kicker">Arrived · ${fmt(arrivedTotal)}</p>
+        <ul class="o-ramps">
+          ${flow.arrived.map(
+            (row) =>
+              html`<li style="${sourceAccent(row.source)}">
+                <span class="o-ramp-dot"></span>${sourceLabel(row.source)}
+                <span class="o-ramp-n">${fmt(row.n)}</span>
+              </li>`,
+          )}
+          <li class="is-sample">
+            <span class="o-ramp-dot"></span>Keep · WhatsApp · Discord ${sampleChip()}
+          </li>
+        </ul>
+      </div>
+      <div class="o-flow-out">
+        <p class="o-kicker">Where your attention moved it</p>
+        <div class="o-river" role="img" aria-label="Let go ${flow.letGo}, kept ${flow.kept}">
+          <span class="o-seg is-letgo" style="flex-basis: ${share(flow.letGo)}"></span>
+          <span class="o-seg is-kept" style="flex-basis: ${share(flow.kept)}"></span>
+          <span class="o-seg is-learn" style="flex-basis: ${share(learning)}"></span>
+          <span class="o-seg is-commit" style="flex-basis: ${share(committed)}"></span>
+        </div>
+        <ul class="o-legend">
+          <li class="is-letgo"><span></span>Let go <b>${fmt(flow.letGo)}</b></li>
+          <li class="is-kept"><span></span>Kept <b>${fmt(flow.kept)}</b></li>
+          <li class="is-learn"><span></span>Learning <b>${learning}</b> ${sampleChip()}</li>
+          <li class="is-commit">
+            <span></span>Became a commitment <b>${committed}</b> ${sampleChip()}
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>`;
+}
+
+function savedAgo(item: Item, now: Date): string {
+  const created = Number(item.created_utc) || 0;
+
+  if (!created) return "Saved a while ago";
+  const days = Math.max(1, Math.round((now.getTime() / 1000 - created) / 86_400));
+
+  if (days >= 365) return `From ${Math.round(days / 365)} year${days >= 730 ? "s" : ""} ago`;
+
+  if (days >= 30) return `From ${Math.round(days / 30)} months ago`;
+
+  return `From ${days} days ago`;
+}
+
+function resurfacedCard(item: Item | null, now: Date): SafeHtml {
+  if (!item)
+    return html`<article class="o-panel o-again">
+      <p class="o-kicker">Worth seeing again</p>
+      <p class="o-muted">Nothing resting right now.</p>
+    </article>`;
+
+  const ids = encodeURIComponent(item.fullname);
+
+  return html`<article class="o-panel o-again" style="--hue: ${hueOf(communityOf(item))}">
+    <p class="o-kicker">Worth seeing again</p>
+    <p class="o-again-title">${item.title}</p>
+    <p class="o-reason">${savedAgo(item, now)} · ${communityOf(item)} · still glad you saved it?</p>
+    <p class="o-actions">
+      <a class="o-btn is-keep" href="/clear?n=1&amp;ids=${ids}">Decide</a>
+      <a class="o-btn" href="/library?open=${ids}">Open</a>
+    </p>
+  </article>`;
+}
+
+function parkedPanel(): SafeHtml {
+  return html`<article class="o-panel o-parked">
+    <p class="o-kicker">Parked until… ${sampleChip()}</p>
+    <ul>
+      ${SAMPLE_PARKED.map(
+        (row) =>
+          html`<li>
+            <span class="o-park-title">${row.title}</span><span class="o-wake">${row.wake}</span>
+          </li>`,
+      )}
+    </ul>
+    <p class="o-muted">Nothing here is overdue. It comes back when its condition is true.</p>
+  </article>`;
+}
+
+function receiptsPanel(): SafeHtml {
+  return html`<article class="o-panel o-receipts">
+    <p class="o-kicker">Agent receipts ${sampleChip()}</p>
+    <ul>
+      ${SAMPLE_RECEIPTS.map(
+        (row) =>
+          html`<li>
+            <span class="o-agent">${row.agent}</span>
+            <span class="o-did">${row.did}</span>
+            <a class="o-btn" href="#agents">${row.ask}</a>
+          </li>`,
+      )}
+    </ul>
+  </article>`;
+}
+
+function patternsPanel(): SafeHtml {
+  return html`<article class="o-panel o-patterns">
+    <p class="o-kicker">Patterns noticed ${sampleChip()}</p>
+    <ul>
+      ${SAMPLE_PATTERNS.map(
+        (row) =>
+          html`<li>
+            <span class="o-seen">${row.seen}</span>
+            <span class="o-offer">${row.offer}</span>
+            <span class="o-yesno"
+              ><a class="o-btn is-keep" href="#patterns">Yes</a
+              ><a class="o-btn" href="#patterns">No</a></span
+            >
+          </li>`,
+      )}
+    </ul>
+  </article>`;
+}
+
+function guardPanel(): SafeHtml {
+  return html`<article class="o-panel o-guard">
+    <p class="o-kicker">Attention guard ${sampleChip()}</p>
+    <div class="o-meter-row">
+      <span>Nudges today</span><b>1 of 3</b>
+      <span class="o-meter"><span style="width: 33%"></span></span>
+    </div>
+    <div class="o-meter-row"><span>Quiet hours</span><b>22:00 – 08:00</b></div>
+    <div class="o-meter-row">
+      <span>Earned autonomy: let go of r/memes saves on its own</span><b>18 of 20 approvals</b>
+      <span class="o-meter is-earn"><span style="width: 90%"></span></span>
+    </div>
+  </article>`;
+}
+
+function rhythmStrip(rhythm: HomeView["rhythm"]): SafeHtml {
+  return html`<section class="o-rhythm" aria-label="Days you showed up, last two weeks">
+    <p class="o-kicker">Rhythm · last 14 days</p>
+    <ol>
+      ${rhythm.map(
+        (d) =>
+          html`<li
+            class="${d.on ? "is-on" : ""} ${d.today ? "is-today" : ""}"
+            title="${d.day}"
+          ></li>`,
+      )}
+    </ol>
+  </section>`;
+}
+
+function modulesStrip(): SafeHtml {
+  return html`<nav class="o-modules" aria-label="Modules">
+    ${MODULES.map((m) =>
+      m.href
+        ? html`<a class="o-chip is-${m.status}" href="${m.href}" data-layer="${m.layer}"
+            >${m.name} · ${STATUS_LABEL[m.status]}</a
+          >`
+        : html`<span class="o-chip is-${m.status}" data-layer="${m.layer}"
+            >${m.name} · ${STATUS_LABEL[m.status]}</span
+          >`,
+    )}
+  </nav>`;
+}
+
+export function renderHome(view: HomeView): SafeHtml {
   return html`<section class="orient">
     <header class="o-head">
-      <p class="o-date">${dateLine(view.now)}</p>
+      <p class="o-date">${dateLine(view.now)} · ${dayTitle(view.now)}</p>
       <h1 class="o-title">Welcome back</h1>
-      <p class="o-sub">${dayTitle(view.now)}. Here's what's ready for you.</p>
+      <p class="o-sub">Here's how your attention moved, and one good place to start.</p>
     </header>
-    <div class="o-cols">
-      <div class="o-main">
-        <section aria-labelledby="o-do-h">
-          <h2 class="o-h" id="o-do-h">Do next</h2>
-          <ul class="o-dos">
-            ${doNext.map(doNextCard)}
-          </ul>
-        </section>
-        <section aria-labelledby="o-wins-h">
-          <h2 class="o-h" id="o-wins-h">Wins</h2>
-          <div class="o-wins-row">
-            <div class="o-ring" aria-hidden="true">
-              ${raw(ringSvg(Math.min(view.clearedToday, view.goal), view.goal))}
-            </div>
-            <ul class="o-wins">
-              ${winTile("Cleared today", fmt(view.clearedToday), 150)}
-              ${winTile("Cleared, all time", fmt(view.clearedTotal), 40)}
-              ${winTile("Kept", fmt(view.kept), 225)}
-              ${winTile("Learned this week", "12", 150, true)}
-            </ul>
-          </div>
-        </section>
-        <section aria-labelledby="o-mods-h">
-          <h2 class="o-h" id="o-mods-h">Modules</h2>
-          <ul class="o-mods">
-            ${MODULES.map(moduleTile)}
-          </ul>
-        </section>
-      </div>
-      <aside class="o-side">
-        ${calendar(view.now, view.showedUp)}
-        <section class="o-up" aria-labelledby="o-up-h">
-          <h2 class="o-h" id="o-up-h">Coming up ${sampleChip(true)}</h2>
-          <ul>
-            ${SAMPLE_COMING_UP.map(
-              (row) =>
-                html`<li style="--hue: ${moduleById(row.module)?.hue ?? 40}">
-                  <span class="o-up-title">${row.title}</span>
-                  <span class="o-up-when">${row.when}</span>
-                </li>`,
-            )}
-          </ul>
-        </section>
-      </aside>
+    <div class="o-top">${startHere(view.roundSize)} ${flowSection(view.flow)}</div>
+    <h2 class="o-h">Khaos is holding these for you</h2>
+    <div class="o-panels">
+      ${resurfacedCard(view.resurfaced, view.now)} ${parkedPanel()} ${receiptsPanel()}
     </div>
+    <h2 class="o-h">Learning how you work</h2>
+    <div class="o-panels is-two">${patternsPanel()} ${guardPanel()}</div>
+    <footer class="o-foot">${rhythmStrip(view.rhythm)} ${modulesStrip()}</footer>
   </section>`;
 }
