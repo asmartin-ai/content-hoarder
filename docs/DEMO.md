@@ -9,13 +9,20 @@ headless Chromium at 412×915). **⚠ unverified** = not exercised. **✋ manual
 ## Start
 
 ```bash
-./scripts/demo.sh            # fresh temp library, 24 synthetic saves, http://127.0.0.1:8791/
+./scripts/demo.sh                      # fresh temp library, 24 synthetic saves, http://127.0.0.1:8791/
+./scripts/demo.sh ~/tester-links.txt   # same, but imports a tester's own file instead
 ```
 
 It creates a new temp folder, runs from it (so no `.env` and no credentials load), sets
 `CONTENT_HOARDER_OFFLINE=1` (the server makes no request to anything but itself), and never
 opens `data/app.db`. The data is `docs/demo/demo-saves.json`: invented posts in a Reddit
 listing format, with links to `example.com` and no images.
+
+**A tester's own links.** Any file the importers accept works. The quickest is a `.txt` file. The
+first line is `Export Tabs URLs`, then one entry per paragraph: a title line and a URL line, or
+just the URL. Put a blank line between entries; without it, two URLs read as a title and a URL.
+Checked 2026-11-01: a three-entry file imported as `imported=3 skipped=0 errors=0`. Offline mode
+still applies, so cards show the title and link, not a fetched preview.
 
 ## Walkthrough
 
