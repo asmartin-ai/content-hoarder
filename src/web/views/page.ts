@@ -1,6 +1,6 @@
 import { html, raw, type SafeHtml } from "./html.ts";
 
-export type Tab = "home" | "today" | "clear";
+export type Tab = "home" | "today" | "clear" | "add";
 
 const SPLASHES: Array<[string, string]> = [
   [
@@ -76,6 +76,7 @@ const NAV_ICONS = {
       '<path d="M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z" />' +
       '<path d="M14 9l4 -1" /><path d="M16 16l3.923 -.98" /></svg>',
   ),
+  add: raw(`${SVG_OPEN}<path d="M12 5v14" /><path d="M5 12h14" /></svg>`),
 };
 
 const MOON = raw(
@@ -91,6 +92,7 @@ const TABS: Array<{ id: Tab | "library"; href: string; label: string }> = [
   { id: "today", href: "/", label: "Today" },
   { id: "clear", href: "/clear", label: "Clear" },
   { id: "library", href: "/library", label: "Library" },
+  { id: "add", href: "/add", label: "Add" },
 ];
 
 export function navHtml(tab: Tab | "library"): SafeHtml {
@@ -148,6 +150,7 @@ const ROOM_CSS: Record<Tab, string> = {
   home: "/static/home/orient.css",
   today: "/static/home/today.css",
   clear: "/static/home/clear.css",
+  add: "/static/add/add.css",
 };
 
 export function renderPage(opts: {

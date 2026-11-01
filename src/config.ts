@@ -18,6 +18,11 @@ const _DEFAULTS = {
   PKMS_CAPTURE_TOKEN: "",
   LLM_BASE_URL: "http://127.0.0.1:1234/v1",
   LLM_MODEL: "",
+  CONTENT_HOARDER_PUBLIC_ORIGIN: "",
+  GOOGLE_OAUTH_CLIENT_ID: "",
+  GOOGLE_OAUTH_CLIENT_SECRET: "",
+  TWITCH_OAUTH_CLIENT_ID: "",
+  TWITCH_OAUTH_CLIENT_SECRET: "",
 } satisfies Record<string, string>;
 
 export function loadEnv(path?: string): void {

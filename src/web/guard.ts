@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { hostedHost } from "../hosted.ts";
 import { json } from "./http.ts";
 
 export function localHost(host: string): boolean {
@@ -29,7 +30,10 @@ export function guard(request: Request): Response | null {
     return json({ error: "forbidden host" }, 403);
   }
 
-  if (!localHost(hostname)) return json({ error: "forbidden host" }, 403);
+  const hosted = hostedHost();
+
+  if (!localHost(hostname) && !(hosted && host.toLowerCase() === hosted))
+    return json({ error: "forbidden host" }, 403);
 
   if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
     const origin = request.headers.get("origin");

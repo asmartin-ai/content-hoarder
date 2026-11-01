@@ -259,5 +259,8 @@ test("all offline import connectors shape normalized source items", () => {
     "obsidian",
     "keep",
     "firefox",
+    "twitch",
+    "bookmarks",
+    "links",
   ]);
 });

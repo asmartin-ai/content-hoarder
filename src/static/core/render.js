@@ -10,6 +10,8 @@ export const CH_SOURCES = {
   keep: { glyph: "✎", token: "--source-keep" },
   firefox: { icon: "firefox", token: "--source-firefox" },
   twitter: { glyph: "X", token: "--source-twitter" },
+  bookmarks: { glyph: "★", token: "--source-bookmarks" },
+  twitch: { glyph: "◉", token: "--source-twitch" },
 };
 
 export const srcAccent = (source) => {

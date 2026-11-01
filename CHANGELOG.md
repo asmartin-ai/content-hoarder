@@ -49,6 +49,16 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Hosted, invite-only mode for a friend pilot (`CONTENT_HOARDER_PUBLIC_ORIGIN`).** Off unless that
+  origin is set; local use is unchanged. `bun scripts/invite.ts` prints a one-use invite link. The
+  first Google account to open it owns a session (30 days, hashed in `hosted_sessions`); everyone
+  else sees "invite-only". Google sign-in (PKCE) also reads the user's YouTube playlists and liked
+  videos once; **Connect Twitch** reads followed channels into a new `twitch` source. Access tokens
+  are used for that pull and never stored. `/privacy` explains this.
+- **Add page (`/add`)**: drop a bookmarks export or any file the importers know, or paste links;
+  preview, then add. New `bookmarks` (Netscape HTML) and `links` (plain text, OneTab, markdown)
+  connectors. A read-only "Get my Reddit saves" bookmarklet downloads the saved listing for import.
+  An empty Today now points to Add instead of offering a round. Service worker `ch-shell-v147`.
 - **Home (`/home`), a dashboard prototype built around what's specific to Khaos.** The sections:
   - **Start here:** one suggested round, with lighter and bigger options.
   - **This week's flow:** what arrived, by source, and where your attention moved it: let go, kept, learning, commitment. "Let go" is the headline.

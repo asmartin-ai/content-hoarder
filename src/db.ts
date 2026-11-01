@@ -288,6 +288,29 @@ CREATE TABLE IF NOT EXISTS user_tags (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE
 );
+
+CREATE TABLE IF NOT EXISTS hosted_invites (
+    token_hash TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER,
+    used_by_sub TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hosted_users (
+    sub TEXT PRIMARY KEY,
+    email TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS hosted_sessions (
+    token_hash TEXT PRIMARY KEY,
+    sub TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_hosted_sessions_sub ON hosted_sessions(sub);
+CREATE INDEX IF NOT EXISTS idx_hosted_sessions_expires ON hosted_sessions(expires_at);
 `;
 
 const _FTS_SCHEMA = `

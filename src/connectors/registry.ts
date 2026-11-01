@@ -1,10 +1,13 @@
 import { existsSync } from "node:fs";
 import type { BaseConnector } from "./base.ts";
+import { BookmarksConnector } from "./bookmarks.ts";
 import { FirefoxConnector } from "./firefox.ts";
 import { HackerNewsConnector } from "./hackernews.ts";
 import { KeepConnector } from "./keep.ts";
+import { LinksConnector } from "./links.ts";
 import { ObsidianConnector } from "./obsidian.ts";
 import { RedditConnector } from "./reddit.ts";
+import { TwitchConnector } from "./twitch.ts";
 import { TwitterConnector } from "./twitter.ts";
 import { YouTubeConnector } from "./youtube.ts";
 
@@ -18,6 +21,9 @@ const CONNECTORS: BaseConnector[] = [
   new ObsidianConnector(),
   new KeepConnector(),
   new FirefoxConnector(),
+  new TwitchConnector(),
+  new BookmarksConnector(),
+  new LinksConnector(),
 ];
 
 export const REGISTRY: Record<string, BaseConnector> = Object.fromEntries(

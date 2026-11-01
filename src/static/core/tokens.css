@@ -112,6 +112,8 @@
   --source-keep: #fbbc04;
   --source-firefox: #4a9df8;
   --source-twitter: #1d9bf0;
+  --source-bookmarks: #8fbf8f;
+  --source-twitch: #9146ff;
 }
 
 :root {

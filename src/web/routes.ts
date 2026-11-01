@@ -16,6 +16,7 @@ import * as hnThread from "../hn_thread.ts";
 import * as exportModule from "../export.ts";
 import * as mediaStore from "../media_store.ts";
 import { isAutosyncEnabled } from "../sync/scheduler.ts";
+import { gate, hostedOrigin } from "../hosted.ts";
 import { guard } from "./guard.ts";
 import { serviceWorkerResponse, staticResponse, templateResponse } from "./static.ts";
 import {
@@ -39,7 +40,18 @@ import {
 import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import { clearPage, deal } from "./handlers/clear.ts";
+import { addPage } from "./handlers/add.ts";
 import { homePage } from "./handlers/home.ts";
+import {
+  googleCallback,
+  googleStart,
+  invitePage,
+  loginPage,
+  logout,
+  privacyPage,
+  twitchCallback,
+  twitchStart,
+} from "./handlers/auth.ts";
 import {
   applyPile,
   dismissWhisper,
@@ -70,6 +82,35 @@ import {
   TagFilterBody,
 } from "./schemas.ts";
 
+async function hostedRoute(
+  request: Request,
+  method: string,
+  path: string,
+): Promise<Response | null> {
+  const blocked = gate(connection(), request);
+
+  if (blocked) return blocked;
+
+  if (method === "GET" && path.startsWith("/invite/"))
+    return invitePage(decodeURIComponent(path.slice("/invite/".length)));
+
+  if (method === "GET" && path === "/auth/login") return loginPage();
+
+  if (method === "POST" && path === "/auth/logout") return logout(request);
+
+  if (method === "GET" && path === "/privacy") return privacyPage();
+
+  if (method === "GET" && path === "/oauth/google/start") return googleStart(request);
+
+  if (method === "GET" && path === "/oauth/google/callback") return googleCallback(request);
+
+  if (method === "GET" && path === "/oauth/twitch/start") return twitchStart(request);
+
+  if (method === "GET" && path === "/oauth/twitch/callback") return twitchCallback(request);
+
+  return null;
+}
+
 export async function handle(request: Request): Promise<Response> {
   const forbidden = guard(request);
 
@@ -77,6 +118,12 @@ export async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+
+  if (hostedOrigin()) {
+    const hosted = await hostedRoute(request, method, path);
+
+    if (hosted) return hosted;
+  }
 
   if (method === "GET" && path === "/triage") return Response.redirect("/clear", 302);
 
@@ -93,6 +140,8 @@ export async function handle(request: Request): Promise<Response> {
   if (method === "GET" && path === "/home") return homePage(request);
 
   if (method === "GET" && path === "/clear") return clearPage();
+
+  if (method === "GET" && path === "/add") return addPage(request, url);
 
   if (method === "GET" && (path === "/library" || path === "/browse")) return templateResponse();
 

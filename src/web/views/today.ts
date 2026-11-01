@@ -21,6 +21,8 @@ const SOURCE_TOKENS = {
   keep: true,
   firefox: true,
   twitter: true,
+  bookmarks: true,
+  twitch: true,
 } as const;
 
 export function sourceAccent(source: string): string {
@@ -263,9 +265,13 @@ export function renderUpNext(items: Item[], n: number): SafeHtml {
 
   if (!items.length)
     return html`<section class="upnext" id="upnext" aria-label="Up next">
-        <p class="upnext-empty">Nothing waiting here. That's a clear deck.</p>
+        <p class="upnext-empty">Nothing waiting here.</p>
       </section>
-      ${oob}`;
+      <a class="hero-go" id="hero-go" href="/add" hx-swap-oob="true"
+        ><span class="hero-verb">Add your stuff</span
+        ><span class="hero-sub">Bring in what you saved</span></a
+      >
+      <nav class="hero-sizes" id="hero-sizes" hx-swap-oob="true" hidden></nav>`;
 
   const params = new URLSearchParams({ n: String(n), ids: ids.join(",") });
   const mix = mixLine(items);

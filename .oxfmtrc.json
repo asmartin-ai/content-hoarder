@@ -19,7 +19,8 @@
     "node_modules/**",
     "src/static/vendor/**",
     "design-ref/**",
-    "exports/**"
+    "exports/**",
+    "tests/fixtures/*.html"
   ],
   "sortPackageJson": false
 }
