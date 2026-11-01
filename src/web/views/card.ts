@@ -9,7 +9,18 @@ import { renderMarkdown } from "../../static/core/markdown.js";
 import { ago, isRemovedText } from "../../static/core/util.js";
 import { html, raw, type SafeHtml } from "./html.ts";
 import { icon } from "./icons.ts";
-import { cardMedia, compact, costLabel, domainOf, extraMeta } from "./media.ts";
+import {
+  cardMedia,
+  communityOf,
+  compact,
+  costLabel,
+  costMinutes,
+  domainOf,
+  extraMeta,
+  hueOf,
+  mediaEvidence,
+  thumbFor,
+} from "./media.ts";
 import type { TopComment } from "./thread.ts";
 
 const BODY_CAP = 6000;
@@ -93,10 +104,26 @@ function age(item: Item): SafeHtml {
     : html``;
 }
 
+const MISSING_LABEL = { gallery: "A gallery", image: "An image", video: "A clip" } as const;
+
+/** Media the card knows exists but has no picture for (dead gallery, unthumbed clip). */
+function missingFigure(item: Item): SafeHtml {
+  const evidence = mediaEvidence(item);
+
+  if (evidence !== "gallery" && evidence !== "image" && evidence !== "video") return html``;
+
+  return html`<figure class="card-media is-missing" data-media="${evidence}" data-open="">
+    ${icon(evidence === "video" ? "play" : "image", 40)}
+    <figcaption>${MISSING_LABEL[evidence]} — tap to open it</figcaption>
+  </figure>`;
+}
+
+/* The picture sits contained over a blurred, darkened copy of itself (no crop, no letterbox
+   bars). round.js wires .media-img (fallback, dead-image removal) and mirrors it into .media-bg. */
 function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
   const media = cardMedia(item);
 
-  if (!media) return html``;
+  if (!media) return missingFigure(item);
 
   const opens = media.kind === "video" || media.kind === "youtube" || media.kind === "link";
 
@@ -105,7 +132,8 @@ function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
     data-media="${media.kind}"
     ${opens ? html`data-open=""` : ""}
   >
-    <img
+    <img class="media-bg" src="${media.src}" alt="" aria-hidden="true" decoding="async" /><img
+      class="media-img"
       src="${media.src}"
       ${media.fallback ? html` data-fallback="${media.fallback}"` : ""}
       alt=""
@@ -115,9 +143,12 @@ function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
   </figure>`;
 }
 
+// Reddit pads empty paragraphs with a literal "&#x200B;" that would print as text once escaped.
+const ZERO_WIDTH = /&#x200b;/gi;
+
 function bodyText(item: Item): string {
   if (item.source === "youtube" || item.source === "firefox") return "";
-  const body = item.body.trim();
+  const body = item.body.replace(ZERO_WIDTH, "").trim();
 
   return body && !isRemovedText(body) ? body.slice(0, BODY_CAP) : "";
 }
@@ -174,13 +205,40 @@ function stats(item: Item, nsfw: boolean): SafeHtml {
   return parts.length ? html`<footer class="card-stats">${parts}</footer>` : html``;
 }
 
-/** Server-rendered rich card for any source. Every interpolation is escaped. */
+/** Title (or, for a saved comment, body) length class: the shorter, the bigger the type. */
+function lengthClass(text: string, short: number, medium: number): "s" | "m" | "l" {
+  if (text.length <= short) return "s";
+
+  return text.length <= medium ? "m" : "l";
+}
+
+const TITLE_SHORT = 50;
+
+const TITLE_MEDIUM = 110;
+
+const COMMENT_SHORT = 160;
+
+const COMMENT_MEDIUM = 420;
+
+/**
+ * Server-rendered rich card for any source. Every interpolation is escaped.
+ * `data-layout`: "media" (picture on top, words below) or "text" (a typeset poster).
+ * `--hue`: the community's paper tint. `data-cost` (minutes) and `data-thumb` feed the
+ * round's receipt on the cleared screen.
+ */
 export function renderCard(item: Item, opts?: { topComment?: TopComment | null }): SafeHtml {
   const kind = cardKind(item);
   const nsfw = Boolean(item.metadata.over_18);
   const isComment = kind === "comment";
   const title = item.title.trim();
   const body = bodyText(item);
+  const figure = mediaFigure(item, nsfw);
+  const layout = figure.toString() ? "media" : "text";
+
+  const len =
+    isComment && body
+      ? lengthClass(body, COMMENT_SHORT, COMMENT_MEDIUM)
+      : lengthClass(title, TITLE_SHORT, TITLE_MEDIUM);
 
   const accent = Object.hasOwn(SOURCES, item.source)
     ? `var(--source-${item.source})`
@@ -207,19 +265,36 @@ export function renderCard(item: Item, opts?: { topComment?: TopComment | null }
         </p>`
       : html``;
 
+  const thumb = nsfw ? "" : thumbFor(item);
+
   return html`<article
     class="card"
     data-fullname="${item.fullname}"
     data-source="${item.source}"
     data-kind="${kind}"
-    style="--src: ${accent}"
+    data-layout="${layout}"
+    data-len="${len}"
+    data-cost="${costMinutes(item).toFixed(2)}"
+    ${thumb ? html`data-thumb="${thumb}"` : ""}
+    style="--src: ${accent}; --hue: ${hueOf(communityOf(item))}"
   >
     <div class="card-fg item-fg">
-      <header class="card-head">
-        <span class="card-glyph" aria-hidden="true">${glyph(item.source)}</span
-        ><span class="card-where">${where(item)}</span>${age(item)}
-      </header>
-      ${mediaFigure(item, nsfw)}${context}${heading}${removed}${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
+      ${figure}
+      <div class="card-info">
+        <header class="card-head">
+          <span class="card-glyph" aria-hidden="true">${glyph(item.source)}</span
+          ><span class="card-where">${where(item)}</span>${age(item)}<button
+            class="card-open"
+            type="button"
+            data-act="open"
+            aria-label="Open"
+            title="Open (Enter)"
+          >
+            ${icon("open", 18)}
+          </button>
+        </header>
+        ${context}${heading}${removed}${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
+      </div>
     </div>
   </article>`;
 }

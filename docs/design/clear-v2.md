@@ -1,5 +1,8 @@
 # Clear v2 — rich cards, server-rendered rooms, htmx (2026-10-31)
 
+> Visuals superseded by `deck-pass.md` (2026-11-01): card layout, pad, Today hero, wins and pile
+> tiles look different; routes, partials and the island contract here still stand.
+
 Iteration 2 of `clear-overhaul.md` (read that first; everything there stands unless replaced here).
 Branch `feat/overhaul-clear`.
 
@@ -46,7 +49,7 @@ src/web/handlers/clear.ts GET /clear (page shell) and GET /clear/deal (cards)
 src/static/vendor/htmx.min.js   htmx 2.x, vendored (no CDN)
 src/static/home/main.js   htmx glue: ch:toast → snackbar with Undo; theme toggle; SW; autosync ping
 src/static/home/round.js  the island: deals, gestures, keys, undo, resume, stamp (consumes card HTML)
-src/static/home/home.css  styles for both rooms
+src/static/home/home.css  shared base (deck pass split it: + today.css, clear.css — deck-pass.md)
 ```
 Deleted: `src/templates/home.html`, `src/static/home/today.js`, `src/static/home/card.js`.
 

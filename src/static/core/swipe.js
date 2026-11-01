@@ -16,7 +16,10 @@
      {haptics:false} is passed.
    - optional vertical callbacks for focus-card flows: pass {onUp, onDown}. When
      absent, vertical movement is left to native scrolling (browse behavior).
-   Usage: attachSwipe(el, { onRight, onRightLong, onLeft, onLeftLong, onUp, onDown, edge, commit, commit2, mouse, haptics }). */
+   - optional {tilt}: degrees of rotation per px of horizontal drag (a card in the hand, Tinder-style).
+   While dragging, `--pull` on the element runs 0 → 1 as the gesture nears its commit distance, so CSS
+   can fade a stamp in with the finger.
+   Usage: attachSwipe(el, { onRight, onRightLong, onLeft, onLeftLong, onUp, onDown, edge, commit, commit2, mouse, haptics, tilt }). */
 
 export function attachSwipe(el, opts) {
   opts = opts || {};
@@ -28,6 +31,7 @@ export function attachSwipe(el, opts) {
 
   const HAS_VERTICAL = !!(opts.onUp || opts.onDown);
   const HAPTICS = opts.haptics !== false;
+  const TILT = opts.tilt || 0;
   const fg = el.querySelector(".item-fg") || el;
 
   let startX = 0,
@@ -58,6 +62,7 @@ export function attachSwipe(el, opts) {
       "swipe-skip",
     );
     fg.style.opacity = "";
+    el.style.removeProperty("--pull");
     stage2 = false;
     stage2left = false;
     armed = false;
@@ -161,6 +166,7 @@ export function attachSwipe(el, opts) {
     if (vertical && HAS_VERTICAL) {
       if (e.cancelable) e.preventDefault();
       fg.style.transform = "translateY(" + dy + "px) scale(.98)";
+      el.style.setProperty("--pull", String(Math.min(1, Math.abs(dy) / COMMIT)));
       fg.style.opacity = String(Math.max(0.5, 1 - Math.abs(dy) / 360));
       el.classList.toggle("swipe-open", dy < -40);
       el.classList.toggle("swipe-skip", dy > 40);
@@ -179,7 +185,8 @@ export function attachSwipe(el, opts) {
     }
 
     if (e.cancelable) e.preventDefault(); // claim the gesture: block link activation / native drag
-    fg.style.transform = "translateX(" + dx + "px)";
+    fg.style.transform = "translateX(" + dx + "px)" + (TILT ? " rotate(" + dx * TILT + "deg)" : "");
+    el.style.setProperty("--pull", String(Math.min(1, Math.abs(dx) / COMMIT)));
     el.classList.toggle("swipe-arch", dx > 40 && (!opts.onRightLong || dx <= COMMIT2)); // right → archive
     el.classList.toggle("swipe-done", dx < -40 && (!opts.onLeftLong || dx >= -COMMIT2)); // left → done
     el.classList.toggle("swipe-snooze", opts.onLeftLong && dx < -COMMIT2); // long-left → snooze
@@ -253,7 +260,8 @@ export function attachSwipe(el, opts) {
     } else if (horizontal && Math.abs(dx) >= COMMIT) {
       const dir = dx > 0 ? 1 : -1;
       fg.style.transition = "transform .2s ease-out";
-      fg.style.transform = "translateX(" + dir * 130 + "%)";
+      fg.style.transform =
+        "translateX(" + dir * 130 + "%)" + (TILT ? " rotate(" + dir * TILT * 240 + "deg)" : "");
 
       const cb =
         dir > 0

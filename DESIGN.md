@@ -139,6 +139,9 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 - **Readable Ink** (`#e0e5ec`, `#98a2b3`, `#7b8798`; light theme `#5a6875` for the dim step): body, metadata, and tertiary hints. Muted text must remain readable at AA; the dim step carries small meta and must not drop below 4.5:1 on its surface.
 - **Daylight Ops Stack** (`#e1e5ea`, `#edf0f3`, `#d6dce3`, `#17222d`): light theme for bright environments, not a separate brand.
 
+### Community Paper (Today + Clear)
+Cards, deck cards, pile tiles and receipt tiles sit on **paper tinted by their community**: `--hue` is a stable hash of the subreddit/channel (`web/views/media.ts hueOf`), and `home/home.css` turns it into a low-chroma OKLCH paper, line, glow and ink for both themes. A run of cards reads as a varied deck (Spotify/Apple Music colour-per-album) instead of identical grey panels. Chroma stays low so the triage verbs keep the only saturated colours; the community name takes the paper's ink, the source glyph keeps its source hue.
+
 ### Named Rules
 
 **The One Accent Rule.** On v3 browse, apricot phosphor is the only product accent. Keep / Archive / Done colors are semantic states, and source hues are identity marks. Do not invent decorative accents.
@@ -152,6 +155,7 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 **Display Font:** Lexend with system sans fallback.  
 **Body Font:** Lexend with system sans fallback on every surface.
 **Label/Mono Font:** JetBrains Mono for instrument labels, counts, keyboard hints, indexes, and command syntax.
+**Hearth Display Font (Today + Clear only):** Bricolage Grotesque (`--font-display`, vendored variable woff2 with optical sizing; VISUAL-LANGUAGE gate G-B) for the day title, card titles, pile names, big numbers and the CLEARED stamp. The Library keeps Lexend (`--font-disp`) for its headings and row titles.
 
 **Character:** Lexend’s open letterforms support quick scanning across messy saved-content titles. JetBrains Mono marks the “instrument panel” layer: counts, operators, keyboard shortcuts, and batch readouts.
 
@@ -166,7 +170,7 @@ The palette is restrained and operational: charcoal cockpit surfaces, apricot ph
 
 **The Scan First Rule.** Titles, metadata, duration, tags, and source must be distinguishable in one glance. If the user has to reread a row to find the decision signal, the hierarchy failed.
 
-**The Product Type Rule.** No display fonts, ornamental serifs, or huge marketing headers in task surfaces. This is a tool, not a landing page.
+**The Product Type Rule.** No ornamental serifs or huge marketing headers in bench surfaces (the Library). Today and Clear are lamp/focus rooms: there the Hearth display face carries the one thing on screen — a day title, a card title sized to its length, a big number — never a marketing headline.
 
 ## 4. Elevation
 
@@ -218,15 +222,15 @@ Rows are the core unit of work. They combine source avatar, title, meta line, ta
 
 ### Signature Component: Today Hero
 
-Today is a lamp-mode room: one lit object. The hero button reads “Clear 10” with a decision-time line (“about 2 minutes”), a 5/10/25 size picker under it, and Enter starts it. Right under it, **Up next** — a Netflix-style filmstrip of the actual cards the hero will deal (thumbnails, or title tiles for text posts) plus a mix line (“4 images · 3 videos (15 min) · 1 long read”): recognition pulls you in, and the round plays exactly those cards. Below, quiet: today's pebbles and wins line (“12 cleared today · 2,107 all-time” — wins only, never the remaining inbox size), the piles, an optional moss resurfacing whisper, and a link to the Library. A re-entry line says what happened last time; after a long gap it says “Welcome back. Nothing is owed — start small.” Today is server-rendered; its sections are htmx partials.
+Today is a lamp-mode room: one lit object, and the object is the next round itself. The page names the day and its part in the display face (“Sunday evening” — orientation, not a greeting), then a fanned hand of the actual cards the round will deal (up to five; thumbnails, or the title typeset on the community's paper for text posts; tap the hand to play) over the ember “Clear 10” button with its decision-time line (“about 2 minutes”), the 5/10/25 segmented control, and a mix line (“4 images · 3 videos (15 min) · 1 long read”). Enter starts it. Below, quiet: today's count inside the pebble ring (one arc per pebble of the daily goal; “Goal met — anything more is a bonus”) and the all-time line — wins only, never the remaining inbox size — then the piles, an optional moss resurfacing whisper, and a link to the Library. A re-entry line says what happened last time; after a long gap it says “Welcome back. Nothing is owed — start small.” Today is server-rendered; its sections are htmx partials.
 
 ### Signature Component: Pile Tile
 
-“Let a pile go” offers up to three piles the machine can rest in one tap — entertainment subreddits first, a source's saves older than four years only as filler. Knowledge subreddits and resurface tags are never offered — they resurface instead (one machine fate per content class). Each tile shows a three-thumbnail mosaic (Google Photos-memory style; source-glyph tiles when there are no images), label, count and year span, Peek (a round over that pile) and Let go (archive-green, because it archives). Let go is a reversible, wave-stamped decay that never touches Reddit; the snackbar names what rested and carries Undo.
+“Let a pile go” offers up to three piles the machine can rest in one tap — entertainment subreddits first, a source's saves older than four years only as filler. Knowledge subreddits and resurface tags are never offered — they resurface instead (one machine fate per content class). Each pile is a memory tile (Google Photos): its pictures as the cover (one large, two small; a large source glyph on the community's paper when there are none), the label and “count · year span” over a scrim, and below it Peek (a round over that pile) and Let go (archive-green, because it archives). Phones scroll the tiles sideways; desktop shows three across. Let go is a reversible, wave-stamped decay that never touches Reddit; the snackbar names what rested and carries Undo.
 
 ### Signature Component: Round Card (Clear)
 
-A round is a finite batch (5/10/25) of single cards on a focus surface with no app nav. The top bar has × (leave; the round is kept and resumable), progress beads that fill with the colour of each decision, and a clock. **The card is the decision** (Reddit/Apollo feed card, Tinder/Slidebox stack), rendered once on the server: full-bleed media hero (image, gallery “1 / 12”, clip, YouTube with duration; archived local copy as fallback; NSFW blurred until tapped; tapping a video/link hero opens it), a head with source glyph, `r/sub` in source colour, `u/author` and age, the title, the self-text or — for a saved comment — the comment itself as the hero with “Comment on <post>” above it, the cached top comment when the thread was hydrated, a calm note for removed posts (“Archive is the easy call”), and a stats row (score, comments, views, domain, cost pill). Long bodies clamp with “Show more” (Space). The next card peeks from behind as a 14px sheet edge and rises as the current card leaves. The pad prices gestures: Done and Archive are the two big buttons (reduce the pile — cheapest), Keep and Not now are small (preserve and defer cost more), Skip and Open sit beside them, Undo walks back one decision at a time. Swipe left = Done, right = Archive, up = Open, down = Skip; Keep and Not now are deliberately tap-only. On phones the pad lives in the thumb zone; keyboard hints show only with a fine pointer. A quiet “on a roll · N” appears after three quick decisions; it never persists.
+A round is a finite batch (5/10/25) of single cards on a focus surface with no app nav. The top bar has × (leave; the round is kept and resumable), progress beads that fill with the colour of each decision (the newest pops), and Undo — no running clock. **The card is the decision** and a physical object (Tinder): every card fills the stage at the same size, on its community's paper, and the next card already waits underneath (its picture preloads). Rendered once on the server: a media card puts the picture on top, whole, over a blurred copy of itself (no crop, no bars; gallery “1 / 12”, clip, YouTube with duration; archived local copy as fallback; NSFW blurred until tapped; tapping a video/link opens it; media known to exist but without a picture says so and opens on tap), then the words; a text card is a typeset poster whose title grows as it gets shorter. The head has the source glyph, `r/sub` in the community's colour, `u/author`, age and an Open button; then the title, the self-text or — for a saved comment — the comment itself as the hero under a big open quote (its post's picture shrinks to a band), the cached top comment as a speech bubble, a calm note for removed posts (“Archive is the easy call”), and a stats row (score, comments, views, domain, cost pill). Long bodies fade into “Show more” (Space). Dragging tilts the card with the thumb, fades in a rubber stamp (DONE / ARCHIVE / OPEN / SKIP) and a tint, and lights the matching orb; button and key decisions fly the card off with the same stamp. The pad is five orbs with labels: Skip · **Done** · Keep · **Archive** · Not now — the reduce-verbs are the big orbs (friction asymmetry made physical). Swipe left = Done, right = Archive, up = Open, down = Skip; Keep and Not now are tap/key only. Keyboard hints show only with a fine pointer. A quiet “on a roll · N” appears under the card after three quick decisions — momentum, never a score.
 
 ### Signature Component: Console and Rail
 
@@ -234,7 +238,7 @@ The Library console sits under the shared nav: the search field (placeholder tea
 
 ### Signature Component: Empty / Cleared State
 
-Empty states are permission states. The round ends on the CLEARED stamp — the one loud moment, win-green — with a summary (“10 in 1:42 — 6 done · 3 archived · 1 kept”), today's pebbles, and three equal exits: One more round, Let a pile go, That's enough for today. Empty states should teach the next useful action without implying backlog failure.
+Empty states are permission states. The round ends on the CLEARED stamp — the one loud moment, win-green, set in the display face — over the round's receipt (one tile per card in order, ringed in its decision's colour: Wordle's grid made of your own saves), three counted-up numbers (cleared · minutes of reading/watching freed by Done and Archive · time spent), the decision breakdown, today's ring, and three equal exits: One more round, Let a pile go, That's enough for today. Empty states should teach the next useful action without implying backlog failure.
 
 ### Signature Component: Recovery / Error State
 

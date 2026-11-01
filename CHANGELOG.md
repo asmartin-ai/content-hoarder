@@ -6,6 +6,17 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **Deck pass (`docs/design/deck-pass.md`).** Today and Clear get their own look. Clear: every card
+  fills the stage at one size on its community's tinted paper (stable hue per subreddit/channel);
+  pictures sit whole over a blurred copy of themselves; text posts are typeset posters in Bricolage
+  Grotesque (vendored, the Hearth display face) sized by title length; saved comments lead with a big
+  open quote; dead galleries say so and open on tap. Dragging tilts the card, fades in a DONE/ARCHIVE
+  stamp and lights the matching orb; the pad is five orbs (Done and Archive biggest); Undo moved to
+  the top bar and the running clock is gone. The cleared screen adds a receipt of the round's cards
+  and counted-up cleared · minutes freed · time spent. Today: the day title ("Sunday evening"), the
+  next round as a fanned hand of its cards over the Clear button, today's count in a pebble ring, and
+  piles as memory tiles. `home.css` split into `home.css` + `today.css` + `clear.css`. Reddit's
+  literal `&#x200B;` no longer prints in card bodies. SW cache `ch-shell-v143`.
 - **Clear v2 (`docs/design/clear-v2.md`).** Round cards are rich and server-rendered
   (`src/web/views/card.ts`): media hero with gallery/clip/duration badges and archived-copy
   fallback, subreddit/author/age head, self-text and saved comments rendered as markdown, the cached

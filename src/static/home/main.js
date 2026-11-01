@@ -67,8 +67,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* Today: broken thumbnails (hotlink blocks, 404s) never show the broken-image icon: try
-   data-fallback once, then a strip card becomes a text tile and a mosaic tile a glyph tile. */
-const THUMBS = ".strip-card img, .pile-mosaic img";
+   data-fallback once, then a deck card shows its typeset title and a mosaic tile a glyph tile. */
+const THUMBS = ".deck-card img, .pile-mosaic img";
 
 function dropBrokenThumb(img) {
   const fallback = img.dataset.fallback;
@@ -80,7 +80,7 @@ function dropBrokenThumb(img) {
     return;
   }
 
-  const card = img.closest(".strip-card");
+  const card = img.closest(".deck-card");
 
   if (card) {
     img.remove();

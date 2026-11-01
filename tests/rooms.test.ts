@@ -208,14 +208,15 @@ test("wins and whisper partials render without backlog totals", async () => {
       await fetch(`${base}/hx/today/wins`, { headers: { Cookie: "ch_goal=3" } })
     ).text();
 
-    expect(wins).toContain("<b>0</b> cleared today · <b>0</b> all-time");
-    expect(wins.match(/<i><\/i>/g)).toHaveLength(3);
+    // ch_goal sets the pebble ring: one arc per pebble, none lit on an empty day.
+    expect(wins.match(/class="arc"/g)).toHaveLength(3);
+    expect(wins).not.toContain('class="arc on"');
 
     const noGoal = await (
       await fetch(`${base}/hx/today/wins`, { headers: { Cookie: "ch_goal=0" } })
     ).text();
 
-    expect(noGoal).not.toContain("pebbles");
+    expect(noGoal).not.toContain('class="ring');
 
     const whisper = await (await fetch(`${base}/hx/today/whisper`)).text();
 

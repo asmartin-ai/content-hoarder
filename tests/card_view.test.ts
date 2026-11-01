@@ -243,3 +243,19 @@ test("a cached thread supplies the top comment, skipping stickied and the saved 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("Reddit's &#x200B; paragraph padding never prints as text", () => {
+  const item = makeItem({
+    source: "reddit",
+    source_id: "t3_zw",
+    kind: "post",
+    title: "Spacer",
+    body: "First paragraph.\n\n&#x200B;\n\nSecond paragraph.",
+    metadata: { subreddit: "test" },
+  });
+
+  const out = renderCard(item).value;
+
+  expect(out).not.toContain("x200B");
+  expect(out).toContain("Second paragraph.");
+});

@@ -1,0 +1,837 @@
+/* ============================================================
+   home/today.css — Today (lamp mode): one lit object, everything else quiet.
+   The lit object is the next round itself: a fanned hand of its actual cards over the
+   ember "Clear N" button. Contract: clear-v2.md §6; design pass: docs/design/deck-pass.md.
+   ============================================================ */
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: 2.75rem;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 3.5rem var(--sp-4) 4rem;
+}
+
+.today-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.today-date {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--fw-medium) var(--fs-xs) / 1.2 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.today-title {
+  margin: 0;
+  font: 700 clamp(2.2rem, 9vw, 3rem) / 1 var(--font-display);
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.today-reentry {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh-snug);
+}
+
+/* --- the hero: the hand of cards over the lit button --- */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.upnext {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+}
+
+.deck {
+  --card-w: 148px;
+  --card-h: 198px;
+  --spread: 58px;
+  --turn: 7deg;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  height: calc(var(--card-h) + 4rem);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.deck-fan {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-card {
+  position: absolute;
+  bottom: 1.75rem;
+  left: 50%;
+  z-index: calc(10 - var(--far));
+  width: var(--card-w);
+  height: var(--card-h);
+  margin-left: calc(var(--card-w) / -2);
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow:
+    0 0 0 1px var(--paper-line),
+    0 16px 32px -14px rgba(0, 0, 0, 0.75);
+  transform: translateX(calc(var(--slot) * var(--spread)))
+    translateY(calc(var(--far) * var(--far) * 6px)) rotate(calc(var(--slot) * var(--turn)));
+  transform-origin: 50% 130%;
+  transition: transform var(--dur-slow) var(--ease);
+  animation: deal-in 420ms var(--ease) both;
+  animation-delay: calc(var(--far) * 60ms);
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) rotate(0deg) scale(0.92);
+  }
+}
+
+.deck-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deck-card.is-nsfw img {
+  filter: blur(14px);
+  transform: scale(1.15);
+}
+
+.deck-title {
+  display: none;
+}
+
+/* a text post is its own little poster: the title, typeset, on the community's paper */
+.deck-card.is-text {
+  background: radial-gradient(120% 80% at 0% 0%, var(--paper-glow), transparent 65%), var(--paper);
+}
+
+.deck-card.is-text .deck-title {
+  display: -webkit-box;
+  margin: 0.85rem 0.8rem 0;
+  overflow: hidden;
+  color: var(--text-body);
+  font: 700 1.02rem / 1.1 var(--font-display);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+}
+
+.deck-cap {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1.5rem 0.65rem 0.55rem;
+  overflow: hidden;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #fff;
+  font: var(--fw-medium) 0.66rem / 1.2 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-card.is-text .deck-cap {
+  background: none;
+  color: var(--hue-ink);
+}
+
+@media (hover: hover) {
+  .deck:hover .deck-card {
+    transform: translateX(calc(var(--slot) * var(--spread) * 1.3))
+      translateY(calc(var(--far) * var(--far) * 7px - 8px))
+      rotate(calc(var(--slot) * var(--turn) * 1.3));
+  }
+}
+
+.deck:active .deck-card {
+  transform: translateX(calc(var(--slot) * var(--spread) * 0.8))
+    translateY(calc(var(--far) * var(--far) * 6px + 4px))
+    rotate(calc(var(--slot) * var(--turn) * 0.8));
+}
+
+/* before htmx lands: one ghost card holds the space (no layout jump) */
+.deck.is-loading::before {
+  content: "";
+  position: absolute;
+  bottom: 1.75rem;
+  left: 50%;
+  width: var(--card-w);
+  height: var(--card-h);
+  margin-left: calc(var(--card-w) / -2);
+  border-radius: 18px;
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-hairline);
+  animation: quiet-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes quiet-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.upnext-mix,
+.upnext-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--fw-medium) var(--fs-xs) / 1.4 var(--font-mono);
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.upnext-empty {
+  padding: 3rem 0 1rem;
+  font: var(--fw-medium) var(--fs-md) / var(--lh-snug) var(--font-sans);
+}
+
+.hero-go {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: min(100%, 380px);
+  min-height: 84px;
+  padding: var(--sp-4) var(--sp-5);
+  border: 0;
+  border-radius: 24px;
+  background: var(--ember-fill);
+  color: var(--ember-fill-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 14px 44px -10px color-mix(in srgb, var(--ember-fill) 55%, transparent);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
+}
+
+.hero-go:active {
+  transform: scale(0.97);
+}
+
+.hero-go:focus-visible {
+  outline: 2px solid var(--text-body);
+  outline-offset: 3px;
+}
+
+.hero-verb {
+  font: 800 2rem / 1 var(--font-display);
+  letter-spacing: -0.03em;
+}
+
+.hero-sub {
+  font: var(--fw-medium) var(--fs-sm) / 1.2 var(--font-sans);
+  opacity: 0.78;
+}
+
+@media (hover: hover) {
+  .hero-go:hover {
+    filter: brightness(1.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 18px 56px -10px color-mix(in srgb, var(--ember-fill) 65%, transparent);
+  }
+}
+
+/* round-size segmented control: links (hx-get swaps #upnext), current = aria-current="page" */
+.hero-sizes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--surface-card);
+  box-shadow: inset 0 0 0 1px var(--border-hairline);
+}
+
+.hero-sizes a {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 3.25rem;
+  height: 2.1rem;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  font: var(--fw-semibold) var(--fs-sm) / 1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+/* 44px hit area around a slim visual pill */
+.hero-sizes a::after {
+  content: "";
+  position: absolute;
+  inset: -6px -1px;
+}
+
+.hero-sizes a[aria-current="page"] {
+  background: var(--surface-inset);
+  color: var(--text-body);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.hero-sizes a.htmx-request {
+  opacity: 0.6;
+}
+
+@media (hover: hover) {
+  .hero-sizes a:hover {
+    color: var(--text-body);
+  }
+}
+
+/* --- section headings --- */
+.sec-h {
+  margin: 0;
+  font: 700 1.4rem / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.sec-sub {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+
+/* --- wins: today's count inside the pebble ring; counted in the user's favour only --- */
+.wins {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 104px;
+}
+
+.wins-dial {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+}
+
+.wins-dial.no-goal {
+  width: auto;
+}
+
+.wins-dial.is-loading {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 7px var(--surface-card);
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ring .arc {
+  fill: none;
+  stroke: var(--surface-inset);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.ring .arc.on {
+  stroke: var(--win);
+  animation: arc-on 360ms var(--ease) both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+@keyframes arc-on {
+  from {
+    stroke: var(--surface-inset);
+  }
+}
+
+.ring.is-met .arc.on {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--win) 70%, transparent));
+}
+
+/* a big day (a pile let go) still fits the ring: the type shrinks past three digits */
+.wins-n {
+  font: 800 calc(2.1rem * min(1, 3.2 / var(--digits, 1))) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.wins-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.wins-text p {
+  margin: 0;
+}
+
+.wins-today {
+  font: var(--fw-semibold) var(--fs-md) / 1.2 var(--font-sans);
+}
+
+.wins-met {
+  color: var(--win);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+
+.wins-all {
+  color: var(--text-muted);
+  font: var(--fw-medium) var(--fs-xs) / 1.3 var(--font-mono);
+}
+
+.wins-all b {
+  color: var(--text-body);
+  font-weight: var(--fw-bold);
+}
+
+/* --- piles: memory tiles (Google Photos) — the pile's pictures, its name over them --- */
+.piles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.pile-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* one grid cell holds the cover and the name over it; the actions sit below */
+.pile {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--paper-line);
+  scroll-snap-align: start;
+}
+
+.pile-mosaic {
+  position: relative;
+  display: grid;
+  grid-area: 1 / 1;
+  grid-template-rows: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
+  gap: 2px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--paper-deep);
+}
+
+.pile-mosaic > :first-child {
+  grid-row: 1 / 3;
+}
+
+.pile-mosaic:has(> :only-child) {
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+}
+
+.pile-mosaic:has(> :nth-child(2):last-child) {
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr 1fr;
+}
+
+.pile-mosaic:has(> :nth-child(2):last-child) > :first-child {
+  grid-row: auto;
+}
+
+.pile-mosaic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+}
+
+/* the scrim that carries the name */
+.pile-mosaic:not(.is-glyph)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.78));
+  pointer-events: none;
+}
+
+.pile-glyph {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  background: var(--paper-deep);
+  color: var(--hue-ink);
+  font: 800 1.3rem / 1 var(--font-display);
+}
+
+.pile-mosaic.is-glyph {
+  background:
+    radial-gradient(110% 90% at 20% 0%, var(--paper-glow), transparent 70%), var(--paper-deep);
+}
+
+.pile-mosaic.is-glyph {
+  align-items: start;
+  justify-items: start;
+  padding: var(--sp-4);
+}
+
+.pile-mosaic.is-glyph .pile-glyph {
+  background: none;
+  font-size: 3.2rem;
+  letter-spacing: -0.04em;
+}
+
+.pile-main {
+  position: relative;
+  z-index: 1;
+  grid-area: 1 / 1;
+  align-self: end;
+  min-width: 0;
+  padding: 0 var(--sp-4) var(--sp-3);
+  color: #fff;
+}
+
+.pile:has(.pile-mosaic.is-glyph) .pile-main {
+  color: var(--text-body);
+}
+
+.pile-label {
+  margin: 0;
+  overflow: hidden;
+  font: 700 1.2rem / 1.15 var(--font-display);
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pile-meta {
+  margin: 0.2rem 0 0;
+  overflow: hidden;
+  font: var(--fw-medium) 0.68rem / 1.3 var(--font-mono);
+  opacity: 0.85;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pile-acts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3) var(--sp-4);
+}
+
+.pile-peek {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--sp-2);
+  margin-left: calc(-1 * var(--sp-2));
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  font: var(--fw-semibold) var(--fs-sm) / 1 var(--font-sans);
+  text-decoration: none;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.pile-go {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--archive-tint);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--archive) 55%, transparent);
+  color: var(--archive);
+  font: var(--fw-semibold) var(--fs-sm) / 1 var(--font-sans);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.pile-go.htmx-request {
+  cursor: progress;
+  pointer-events: none;
+  animation: quiet-pulse 1.1s ease-in-out infinite;
+}
+
+@media (hover: hover) {
+  .pile-peek:hover {
+    background: var(--surface-hover);
+    color: var(--text-body);
+  }
+
+  .pile-go:hover {
+    background: var(--archive);
+    color: var(--archive-ink);
+  }
+}
+
+/* --- resurface whisper (moss); htmx may swap in an empty one --- */
+.whisper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--moss-tint);
+}
+
+.whisper:empty {
+  display: none;
+}
+
+.whisper-q {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin: 0;
+  line-height: var(--lh-snug);
+}
+
+/* a small open ring: "this comes back around" */
+.whisper-q::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--moss);
+  border-radius: 50%;
+  transform: translateY(-1px);
+}
+
+.whisper-q b {
+  color: var(--moss);
+  font-weight: var(--fw-semibold);
+}
+
+.whisper-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding-left: calc(9px + var(--sp-3));
+}
+
+.whisper-acts :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: var(--fw-medium) var(--fs-sm) / 1 var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.whisper-acts .whisper-peek {
+  border-color: var(--moss);
+  color: var(--moss);
+  font-weight: var(--fw-semibold);
+}
+
+.whisper-acts .htmx-request {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .whisper-acts :is(a, button):hover {
+    background: var(--moss-tint);
+    color: var(--text-body);
+  }
+}
+
+/* --- footer --- */
+.today-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+}
+
+.today-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--border-control);
+  text-underline-offset: 4px;
+  transition: color var(--dur) var(--ease);
+}
+
+.today-theme {
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  padding: 0;
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.today-theme svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (hover: hover) {
+  .today-foot a:hover,
+  .today-theme:hover {
+    color: var(--text-body);
+  }
+}
+
+.whisper {
+  border-radius: 20px;
+}
+
+.whisper-q {
+  font-size: var(--fs-md);
+}
+
+/* ============================================================
+   light theme
+   ============================================================ */
+:root[data-theme="light"] .hero-go {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 12px 32px -12px rgba(169, 106, 5, 0.55);
+}
+
+:root[data-theme="light"] .hero-sizes a[aria-current="page"] {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(30, 40, 50, 0.18);
+}
+
+:root[data-theme="light"] .deck-card {
+  box-shadow:
+    0 0 0 1px var(--paper-line),
+    0 14px 28px -14px rgba(30, 40, 50, 0.45);
+}
+
+:root[data-theme="light"] .pile-go {
+  color: color-mix(in oklab, var(--archive) 72%, var(--text-body));
+}
+
+/* ============================================================
+   phone (≤ 700px)
+   ============================================================ */
+@media (max-width: 700px) {
+  .today {
+    gap: 2.25rem;
+    padding: max(2rem, calc(env(safe-area-inset-top) + 1.25rem)) var(--sp-4) 2.5rem;
+  }
+
+  .deck {
+    --card-w: 132px;
+    --card-h: 178px;
+    --spread: 40px;
+    --turn: 6deg;
+  }
+
+  /* piles scroll sideways, bleeding to the screen edges */
+  .pile-list {
+    grid-template-columns: none;
+    grid-auto-columns: 72%;
+    grid-auto-flow: column;
+    margin-inline: calc(-1 * var(--sp-4));
+    padding-inline: var(--sp-4);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--sp-4);
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .whisper-acts {
+    padding-left: 0;
+  }
+}
+
+/* ============================================================
+   desktop (≥ 701px)
+   ============================================================ */
+@media (min-width: 701px) {
+  .today {
+    max-width: 720px;
+    padding-top: 4rem;
+  }
+
+  .today-theme {
+    display: none;
+  }
+
+  .deck {
+    --card-w: 168px;
+    --card-h: 224px;
+    --spread: 76px;
+  }
+}

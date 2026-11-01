@@ -16,6 +16,7 @@ import {
   fetchPulse,
 } from "../core/api.js";
 import { esc, isTypingTarget } from "../core/util.js";
+import { ringSvg } from "../core/ring.js";
 import { attachSwipe } from "../core/swipe.js";
 import { toast, snackbar } from "../core/toast.js";
 
@@ -71,6 +72,37 @@ const fmtClock = (ms) => {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
 
+/* "25 min", "1 h 10 min" */
+const fmtMinutes = (m) => {
+  const h = Math.floor(m / 60);
+
+  return h ? h + " h" + (m % 60 ? " " + (m % 60) + " min" : "") : m + " min";
+};
+
+const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* Numbers on the cleared screen count up (Duolingo's lesson-end beat), once, ~0.7 s. */
+const countUp = (el, to, fmt) => {
+  if (reduceMotion() || to <= 1) {
+    el.textContent = fmt(to);
+
+    return;
+  }
+
+  const t0 = performance.now();
+  const dur = 700;
+
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur);
+
+    el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - k, 3))));
+
+    if (k < 1) requestAnimationFrame(step);
+  };
+
+  requestAnimationFrame(step);
+};
+
 const readParams = () => {
   const p = new URLSearchParams(location.search);
   const n = Number(p.get("n"));
@@ -95,21 +127,12 @@ const dailyGoal = () => {
   return Number.isFinite(g) && g >= 0 ? g : 8;
 };
 
-/* "<pebbles> 12 cleared today — goal met. …" under the cleared summary. */
+/* "<ring> 12 cleared today — goal met. …" under the cleared summary (Today's ring, small). */
 const todayHtml = (n, g) => {
-  let pebbles = "";
-
-  for (let i = 0; i < g; i++) pebbles += i < n ? '<i class="on"></i>' : "<i></i>";
-
   const line =
     n + " cleared today" + (g > 0 && n >= g ? " — goal met. Anything more is a bonus." : "");
 
-  return (
-    (g > 0 ? '<span class="pebbles" aria-hidden="true">' + pebbles + "</span>" : "") +
-    '<span class="cleared-today-line">' +
-    esc(line) +
-    "</span>"
-  );
+  return ringSvg(n, g) + '<span class="cleared-today-line">' + esc(line) + "</span>";
 };
 
 /* Card HTML (server-rendered, trusted) → a detached `.card` element, or null. */
@@ -121,10 +144,13 @@ const cardFrom = (item) => {
   return tpl.content.firstElementChild;
 };
 
-/* Broken media: try the archived copy once (data-fallback), then drop the figure. */
+/* Broken media: try the archived copy once (data-fallback, mirrored into the blurred backdrop),
+   then drop the figure and let the card fall back to its typeset poster layout. */
 const wireMedia = (card) => {
-  for (const img of card.querySelectorAll(".card-media img, img[data-fallback]")) {
+  for (const img of card.querySelectorAll(".media-img, .md img[data-fallback]")) {
     let fellBack = false;
+    const figure = img.closest(".card-media");
+    const backdrop = figure && figure.querySelector(".media-bg");
 
     const onError = () => {
       const fallback = img.dataset.fallback;
@@ -133,11 +159,17 @@ const wireMedia = (card) => {
         fellBack = true;
         img.src = fallback;
 
+        if (backdrop) backdrop.src = fallback;
+
         return;
       }
 
       img.removeEventListener("error", onError);
-      (img.closest(".card-media") || img).remove();
+
+      if (figure) {
+        figure.remove();
+        card.dataset.layout = "text";
+      } else img.remove();
     };
 
     img.addEventListener("error", onError);
@@ -194,7 +226,6 @@ export function mountRound(root) {
   let state = "loading";
   let busy = false;
   let gen = 0; // bumps per fresh fetch so a stale response can't land
-  let clock = null;
   let combo = 0;
   let shownAt = 0;
   let cardEl = null;
@@ -204,12 +235,16 @@ export function mountRound(root) {
   const pending = new Map(); // fullname → Promise<boolean> for the in-flight decision POST
 
   const beads = section.querySelector(".beads");
-  const clockEl = section.querySelector(".round-clock");
   const stage = section.querySelector(".stage");
   const pad = section.querySelector(".pad");
   const undoBtn = section.querySelector(".undo");
   const cleared = section.querySelector(".cleared");
   const clearedLine = section.querySelector(".cleared-line");
+  const receipt = section.querySelector(".receipt");
+  const statN = section.querySelector(".cs-n");
+  const statFreed = section.querySelector(".cs-freed");
+  const statFreedBox = section.querySelector(".cs-freed-box");
+  const statTime = section.querySelector(".cs-time");
   const clearedToday = section.querySelector(".cleared-today");
 
   const later = (fn, ms) => setTimeout(fn, ms);
@@ -262,7 +297,8 @@ export function mountRound(root) {
     for (let i = 0; i < total; i++) {
       const res = round && i < decided ? round.results[i] : null;
       const cur = i === decided && state === "playing" ? " is-current" : "";
-      const cls = res ? " " + (BEAD[res.act] || "") : cur;
+      const fresh = i === decided - 1 ? " is-new" : "";
+      const cls = res ? " " + (BEAD[res.act] || "") + fresh : cur;
 
       html += '<li class="bead' + cls + '"></li>';
     }
@@ -276,21 +312,6 @@ export function mountRound(root) {
     if (!comboEl) return;
     comboEl.hidden = combo < COMBO_MIN;
     comboEl.textContent = combo >= COMBO_MIN ? "on a roll · " + combo : "";
-  }
-
-  function tick() {
-    if (round && round.startedAt) clockEl.textContent = fmtClock(Date.now() - round.startedAt);
-  }
-
-  function startClock() {
-    if (clock) return;
-    tick();
-    clock = setInterval(tick, 1000);
-  }
-
-  function stopClock() {
-    clearInterval(clock);
-    clock = null;
   }
 
   /* Long bodies are clamped by CSS; offer "Show more" only when this one actually overflows. */
@@ -374,6 +395,7 @@ export function mountRound(root) {
       onUp: () => openCurrent(),
       onDown: () => decide("skip"),
       mouse: false,
+      tilt: 0.06,
     });
 
     shownAt = Date.now();
@@ -384,13 +406,11 @@ export function mountRound(root) {
     }
 
     setState("playing");
-    startClock();
     renderProgress();
     renderCombo();
   }
 
   function showMessage(text, next, label) {
-    stopClock();
     setStage(
       '<div class="round-empty"><p class="round-empty-msg">' +
         esc(text) +
@@ -424,12 +444,10 @@ export function mountRound(root) {
     const my = ++gen;
 
     forget();
-    stopClock();
     pending.clear();
     round = null;
     busy = false;
     combo = 0;
-    clockEl.textContent = "0:00";
     setStage('<article class="card is-skeleton" aria-hidden="true"></article>');
     setState("loading");
     renderProgress();
@@ -509,8 +527,55 @@ export function mountRound(root) {
     else showCard();
   }
 
+  /* Minutes of reading/watching the round let go of (done + archived; data-cost per card). */
+  function freedMinutes() {
+    let total = 0;
+
+    round.results.forEach((r, i) => {
+      if (r.act !== "done" && r.act !== "archived") return;
+      const el = cardFrom(round.items[i]);
+
+      total += Number(el?.dataset.cost) || 0;
+    });
+
+    return total;
+  }
+
+  /* The round's receipt: one tile per card, in order, marked with its decision. */
+  function renderReceipt() {
+    let html = "";
+
+    round.results.forEach((r, i) => {
+      const el = cardFrom(round.items[i]);
+
+      if (!el) return;
+      const hue = el.style.getPropertyValue("--hue").trim();
+      const thumb = el.dataset.thumb || "";
+      const title = (el.querySelector(".card-title, .card-context b")?.textContent || "").trim();
+
+      html +=
+        '<li class="rc ' +
+        (BEAD[r.act] || "") +
+        '" style="--hue: ' +
+        esc(hue || "0") +
+        "; --i: " +
+        i +
+        '" title="' +
+        esc(title) +
+        '">' +
+        (thumb
+          ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" decoding="async" />'
+          : '<span aria-hidden="true">' + esc(Array.from(title)[0] || "") + "</span>") +
+        "</li>";
+    });
+
+    receipt.innerHTML = html;
+
+    for (const img of receipt.querySelectorAll("img"))
+      img.addEventListener("error", () => img.remove(), { once: true });
+  }
+
   function finish() {
-    stopClock();
     const ms = round.startedAt ? Date.now() - round.startedAt : 0;
     const count = { done: 0, archived: 0, keep: 0, snooze: 0, skip: 0 };
 
@@ -524,10 +589,14 @@ export function mountRound(root) {
       count.snooze ? count.snooze + " for later" : "",
     ].filter(Boolean);
 
-    clockEl.textContent = fmtClock(ms);
-    const summary = parts.length ? " — " + parts.join(" · ") : "";
+    const freed = freedMinutes();
 
-    clearedLine.textContent = n + " in " + fmtClock(ms) + summary;
+    clearedLine.textContent = parts.join(" · ");
+    renderReceipt();
+    statFreedBox.hidden = freed < 1;
+    countUp(statN, n, String);
+    countUp(statFreed, Math.round(freed), fmtMinutes);
+    statTime.textContent = fmtClock(ms);
     clearedToday.hidden = true;
     clearedToday.innerHTML = "";
     showToday();

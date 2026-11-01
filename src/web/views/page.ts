@@ -136,13 +136,17 @@ const HEAD_ASSETS = raw(
     '<link rel="icon" href="/static/icon.svg" type="image/svg+xml" />',
     '<link rel="stylesheet" href="/static/core/tokens.css" />',
     '<link rel="stylesheet" href="/static/core/nav.css" />',
-    '<link rel="stylesheet" href="/static/home/home.css" />',
     '<script src="/static/theme.js"></script>',
     '<script src="/static/haptics.js"></script>',
     '<script src="/static/vendor/htmx.min.js" defer></script>',
     '<script type="module" src="/static/home/main.js"></script>',
   ].join("\n    "),
 );
+
+const ROOM_CSS: Record<Tab, string> = {
+  today: "/static/home/today.css",
+  clear: "/static/home/clear.css",
+};
 
 /** A full server-rendered room. `round` = focus mode (nav hidden via body.is-round). */
 export function renderPage(opts: {
@@ -158,6 +162,8 @@ export function renderPage(opts: {
       ${HEAD_META}
       <title>${opts.title} · content-hoarder</title>
       ${HEAD_ASSETS}
+      <link rel="stylesheet" href="/static/home/home.css" />
+      <link rel="stylesheet" href="${ROOM_CSS[opts.tab]}" />
     </head>
     <body class="${bodyClass}" data-page="${opts.tab}">
       ${navHtml(opts.tab)}

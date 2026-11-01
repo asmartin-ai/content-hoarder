@@ -103,10 +103,10 @@ function youtubeId(item: Item): string {
   return item.source === "youtube" && /^[\w-]{11}$/.test(item.source_id) ? item.source_id : "";
 }
 
-type MediaEvidence = "video" | "gallery" | "image" | "youtube" | "text" | "link";
+export type MediaEvidence = "video" | "gallery" | "image" | "youtube" | "text" | "link";
 
 /** Content evidence, ported from media.js mediaType (comments classified by their metadata). */
-function mediaEvidence(item: Item): MediaEvidence {
+export function mediaEvidence(item: Item): MediaEvidence {
   const md = item.metadata;
   const extra = extraMeta(item);
   const mediaUrl = extra.media_url ?? "";
@@ -276,6 +276,53 @@ export function thumbFor(item: Item): string {
 const WORDS_PER_MINUTE = 230;
 
 const MIN_READ_WORDS = 40;
+
+const GLANCE_MINUTES = 0.1;
+
+const CLIP_MINUTES = 0.5;
+
+/** The same estimate as costLabel, in minutes (0 when unknown): what clearing it frees. */
+export function costMinutes(item: Item): number {
+  const evidence = mediaEvidence(item);
+  const duration = durationOf(item);
+
+  if ((evidence === "youtube" || evidence === "video") && duration) return duration / 60;
+  const body = item.body.trim();
+
+  if (body && !isRemovedText(body)) {
+    const words = body.split(/\s+/).length;
+
+    if (words >= MIN_READ_WORDS) return words / WORDS_PER_MINUTE;
+  }
+
+  if (evidence === "image" || evidence === "gallery") return GLANCE_MINUTES;
+
+  if (evidence === "video") return CLIP_MINUTES;
+
+  return 0;
+}
+
+/** The community a card belongs to: subreddit, else channel, else source. */
+export function communityOf(item: Item): string {
+  const md = item.metadata;
+  const sub = md.subreddit || /^\/r\/([^/]+)\//.exec(md.permalink ?? "")?.[1] || "";
+
+  return (sub || md.channel || item.author || item.source).toLowerCase();
+}
+
+const HUE_TURN = 360;
+
+/** Stable hue (0–359) for a name (FNV-1a): every community gets its own paper tint. */
+export function hueOf(key: string): number {
+  let hash = 0x81_1c_9d_c5;
+
+  for (let index = 0; index < key.length; index++) {
+    hash ^= key.codePointAt(index) ?? 0;
+    hash = Math.imul(hash, 0x01_00_01_93);
+  }
+
+  return (hash >>> 0) % HUE_TURN;
+}
 
 /** A calm effort estimate: "12 min video" | "3 min read" | "a glance" | "clip" | "". */
 export function costLabel(item: Item): string {

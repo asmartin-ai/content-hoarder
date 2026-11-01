@@ -2,7 +2,7 @@
    - static assets: cache-first (stale-while-revalidate)
    - navigation pages: network-first, fall back to cache when offline
    - data/API (and all POST): network only (never cached — must be fresh) */
-const CACHE = "ch-shell-v142"; // v142: server-rendered Today/Clear (htmx), rich cards, stack peek
+const CACHE = "ch-shell-v143"; // v143: deck pass — community paper, card-sized stage, Bricolage
 
 const SHELL = [
   "/",
@@ -11,6 +11,9 @@ const SHELL = [
   "/static/core/nav.css",
   // Today + Clear shell ("/" and "/clear")
   "/static/home/home.css",
+  "/static/home/today.css",
+  "/static/home/clear.css",
+  "/static/core/ring.js",
   "/static/home/main.js",
   "/static/home/round.js",
   "/static/vendor/htmx.min.js",

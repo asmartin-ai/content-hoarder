@@ -8,36 +8,79 @@ import { clamp, json, numberParam, options } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 import { renderCard } from "../views/card.ts";
-import { raw } from "../views/html.ts";
+import { html, type SafeHtml } from "../views/html.ts";
+import { icon, type IconName } from "../views/icons.ts";
 import { renderPage } from "../views/page.ts";
 import { topComment } from "../views/thread.ts";
 import { isNsfw } from "../views/today.ts";
 
 const MAX_DEAL = 50;
 
+const ORB_ICON = 26;
+
+const MAJOR_ORB_ICON = 32;
+
+/* One verb: an orb (icon) over its label. Reduce-verbs are the big orbs (friction asymmetry). */
+function act(opts: {
+  act: string;
+  cls: string;
+  glyph: IconName;
+  label: string;
+  key: string;
+  major?: boolean;
+}): SafeHtml {
+  return html`<button
+    class="act ${opts.cls}${opts.major ? " is-major" : ""}"
+    type="button"
+    data-act="${opts.act}"
+    aria-keyshortcuts="${opts.key}"
+  >
+    <span class="act-orb">${icon(opts.glyph, opts.major ? MAJOR_ORB_ICON : ORB_ICON)}</span
+    ><span class="act-label">${opts.label} <kbd>${opts.key}</kbd></span>
+  </button>`;
+}
+
 // The island's frame (clear-overhaul.md §4.3); round.js finds these elements in the page.
-const FRAME = `<section class="round" data-state="loading">
+const FRAME = html`<section class="round" data-state="loading">
   <header class="round-bar">
-    <button class="round-x" type="button" aria-label="End round">×</button>
+    <button class="round-x" type="button" aria-label="End round">${icon("x", 22)}</button>
     <ol class="beads" aria-label="0 of 0 decided"></ol>
-    <span class="round-clock">0:00</span>
+    <button class="undo" type="button" data-act="undo" aria-keyshortcuts="Z" disabled>
+      ${icon("undo", 20)}<span>Undo</span>
+    </button>
   </header>
   <div class="stage"></div>
   <div class="pad" role="group" aria-label="Decide">
-    <div class="pad-minor">
-      <button class="act act-keep" type="button" data-act="keep">Keep <kbd>K</kbd></button>
-      <button class="act act-snooze" type="button" data-act="snooze">Not now <kbd>N</kbd></button>
-      <button class="act act-skip" type="button" data-act="skip">Skip <kbd>S</kbd></button>
-      <button class="act act-open" type="button" data-act="open">Open <kbd>↵</kbd></button>
-    </div>
-    <div class="pad-major">
-      <button class="act act-done" type="button" data-act="done"><span>Done</span> <kbd>D</kbd></button>
-      <button class="act act-archive" type="button" data-act="archived"><span>Archive</span> <kbd>A</kbd></button>
-    </div>
-    <button class="undo" type="button" data-act="undo" disabled>Undo <kbd>Z</kbd></button>
+    ${act({ act: "skip", cls: "act-skip", glyph: "skip", label: "Skip", key: "S" })}
+    ${act({ act: "done", cls: "act-done", glyph: "check", label: "Done", key: "D", major: true })}
+    ${act({ act: "keep", cls: "act-keep", glyph: "bookmark", label: "Keep", key: "K" })}
+    ${act({
+      act: "archived",
+      cls: "act-archive",
+      glyph: "archive",
+      label: "Archive",
+      key: "A",
+      major: true,
+    })}
+    ${act({ act: "snooze", cls: "act-snooze", glyph: "clock", label: "Not now", key: "N" })}
   </div>
   <div class="cleared" hidden>
-    <p class="stamp">CLEARED</p>
+    <p class="stamp">Cleared</p>
+    <ol class="receipt" aria-label="This round"></ol>
+    <dl class="cleared-stats">
+      <div>
+        <dt>cleared</dt>
+        <dd class="cs-n">0</dd>
+      </div>
+      <div class="cs-freed-box" hidden>
+        <dt>freed</dt>
+        <dd class="cs-freed"></dd>
+      </div>
+      <div>
+        <dt>spent</dt>
+        <dd class="cs-time">0:00</dd>
+      </div>
+    </dl>
     <p class="cleared-line"></p>
     <div class="cleared-today" hidden></div>
     <div class="cleared-acts">
@@ -49,7 +92,7 @@ const FRAME = `<section class="round" data-state="loading">
 </section>`;
 
 export function clearPage(): Response {
-  return htmlResponse(renderPage({ title: "Clear", tab: "clear", body: raw(FRAME), round: true }));
+  return htmlResponse(renderPage({ title: "Clear", tab: "clear", body: FRAME, round: true }));
 }
 
 /** A smart batch of `n` inbox items (dealt 2n so the NSFW filter still leaves a full round). */

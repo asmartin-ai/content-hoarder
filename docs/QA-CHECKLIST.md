@@ -123,15 +123,20 @@ Opening items, the inline reader, triaging from inside it.
 
 The front door and the one-card-at-a-time round (spec: `docs/design/clear-overhaul.md`).
 
-- [ ] **Today** shows the date, the "Clear 10" hero, the 5/10/25 picker, pebbles + wins line (no
-      remaining-inbox count), up to three sweeps, and the Library link. Enter starts a round. ⬛
+- [ ] **Today** shows the day title, the fanned hand of the next round's cards over the "Clear 10"
+      hero (tapping the hand also starts it), the 5/10/25 picker, today's count in the pebble ring +
+      all-time line (no remaining-inbox count), up to three pile tiles, and the Library link. Enter
+      starts a round. ⬛
 - [ ] **Re-entry line** after a round ("Last round 2m ago — 10 cleared."); after 3+ days away it
       reads "Welcome back. Nothing is owed — start small." ⬛
 - [ ] **Let go** on a sweep rests the pile, the snackbar names it, Undo restores every item; the list
       refills with fresh counts. Knowledge subreddits (r/ADHD etc.) never appear as sweeps. ⬛
 - [ ] **Peek** opens a round over that pile only. ⬛
-- [ ] **Round pad:** big Done / Archive, small Keep / Not now / Skip / Open / Undo; keyboard hints
-      on desktop only. 📱 pad sits in the thumb zone, clear of the gesture bar. ⬛
+- [ ] **Round pad:** five orbs — Skip · Done · Keep · Archive · Not now (Done/Archive biggest); Undo
+      top right; Open on the card head; keyboard hints on desktop only. 📱 pad sits in the thumb
+      zone, clear of the gesture bar. ⬛
+- [ ] **Drag feel:** the card tilts with the thumb, the DONE/ARCHIVE stamp fades in with distance,
+      the matching orb lights, the next card shows underneath; a short drag snaps back. 📱
 - [ ] **Keyboard:** `D`/`←` done · `A`/`→` archive · `K`/`F` keep · `N` not now · `S`/`↓` skip ·
       `Enter`/`↑` open · `Z` undo · `Esc` leave. 🖥
 - [ ] **Swipe:** ← done, → archive, ↑ open, ↓ skip; no swipe starts within ~30px of a screen edge
@@ -140,8 +145,9 @@ The front door and the one-card-at-a-time round (spec: `docs/design/clear-overha
 - [ ] **Open** goes to the reader; F/A/D/S in the reader decides and returns to the same round. ⬛
 - [ ] **Leave and resume:** × or Esc returns to Today, whose hero reads "Resume round · N cards
       left". ⬛
-- [ ] **Cleared:** the green CLEARED stamp, summary, today's pebbles, One more round / Let a pile go /
-      That's enough for today. Haptic double-tap on phones. 📱
+- [ ] **Cleared:** the green CLEARED stamp, the receipt (one tile per card, ringed by decision),
+      counted-up cleared · freed · spent, today's ring, One more round / Let a pile go / That's enough
+      for today. Haptic double-tap on phones. 📱
 
 ## Story 7 — "I look at media" (lightbox / gallery / video)
 

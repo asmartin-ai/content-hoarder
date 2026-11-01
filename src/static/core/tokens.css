@@ -31,6 +31,13 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/static/fonts/BricolageGrotesque-var.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* ============ theme blocks (raw palette) ============ */
 :root,
@@ -159,7 +166,9 @@
 :root {
   /* type — Lexend for humans, JetBrains Mono for instruments */
   --font-sans: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-disp: var(--font-sans);
+  --font-disp: var(--font-sans); /* Library headings and row titles (bench mode) */
+  /* Hearth display face (G-B): Today and Clear only — headings, card titles, big numbers */
+  --font-display: "Bricolage Grotesque", var(--font-sans);
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
   --fs-xs: 0.73rem;

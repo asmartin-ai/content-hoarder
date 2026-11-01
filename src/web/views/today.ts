@@ -4,12 +4,13 @@
 import { NSFW_TAGS, type Item } from "../../models.ts";
 import type { ResurfaceCard } from "../../resurface.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
-import { cardMedia, costLabel, thumbFor } from "./media.ts";
+import { ringSvg } from "../../static/core/ring.js";
+import { cardMedia, communityOf, costLabel, hueOf, thumbFor } from "./media.ts";
 import { moonIcon } from "./page.ts";
 
 export const ROUND_SIZES = [5, 10, 25] as const;
 
-const STRIP_CARDS = 6;
+const DECK_CARDS = 5;
 
 const DECISION_SECONDS = 12;
 
@@ -41,12 +42,31 @@ function plural(n: number, one: string, many: string): string {
   return `${fmt(n)} ${n === 1 ? one : many}`;
 }
 
-/** "SAT 31 OCT" */
+/** "1 November" */
 export function dateLine(now: Date): string {
-  return now
-    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
-    .replace(/,/g, "")
-    .toUpperCase();
+  return now.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+}
+
+const MORNING = 5;
+
+const AFTERNOON = 12;
+
+const EVENING = 17;
+
+const NIGHT = 22;
+
+/** "Sunday evening": the page names the day and the part of it (orientation, not a greeting). */
+export function dayTitle(now: Date): string {
+  const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
+  const hour = now.getHours();
+
+  if (hour >= MORNING && hour < AFTERNOON) return `${weekday} morning`;
+
+  if (hour >= AFTERNOON && hour < EVENING) return `${weekday} afternoon`;
+
+  if (hour >= EVENING && hour < NIGHT) return `${weekday} evening`;
+
+  return `${weekday}, late`;
 }
 
 function agoText(seconds: number): string {
@@ -123,17 +143,22 @@ export function renderToday(opts: { now: Date; reentry: string; n: number }): Sa
   return html`<section class="today">
     <header class="today-head">
       <p class="today-date">${dateLine(opts.now)}</p>
+      <h1 class="today-title">${dayTitle(opts.now)}</h1>
       ${opts.reentry ? html`<p class="today-reentry">${opts.reentry}</p>` : ""}
     </header>
-    <div class="hero">${renderHeroGo({ n: opts.n })} ${renderSizes(opts.n)}</div>
-    <section
-      class="upnext"
-      id="upnext"
-      aria-label="Up next"
-      hx-get="/hx/today/upnext?n=${opts.n}"
-      hx-trigger="load"
-      hx-swap="outerHTML"
-    ></section>
+    <div class="hero">
+      <section
+        class="upnext"
+        id="upnext"
+        aria-label="Up next"
+        hx-get="/hx/today/upnext?n=${opts.n}"
+        hx-trigger="load"
+        hx-swap="outerHTML"
+      >
+        <div class="deck is-loading" aria-hidden="true"></div>
+      </section>
+      ${renderHeroGo({ n: opts.n })} ${renderSizes(opts.n)}
+    </div>
     <section
       class="wins"
       id="wins"
@@ -141,7 +166,7 @@ export function renderToday(opts: { now: Date; reentry: string; n: number }): Sa
       hx-get="/hx/today/wins"
       hx-trigger="load, ch:wins from:body"
     >
-      <p class="wins-line">&nbsp;</p>
+      <div class="wins-dial is-loading" aria-hidden="true"></div>
     </section>
     <section
       class="piles"
@@ -168,7 +193,7 @@ export function renderToday(opts: { now: Date; reentry: string; n: number }): Sa
   </section>`;
 }
 
-function stripCaption(item: Item): string {
+function caption(item: Item): string {
   if (item.metadata.subreddit) return `r/${item.metadata.subreddit}`;
 
   if (item.metadata.channel) return item.metadata.channel;
@@ -185,23 +210,27 @@ export function isNsfw(item: Item): boolean {
   );
 }
 
-function stripCard(item: Item): SafeHtml {
+/** Fan slot for the k-th card: 0 in the middle on top, then +1, -1, +2, -2. */
+function fanSlot(index: number): number {
+  const side = Math.ceil(index / 2);
+
+  return index % 2 ? side : -side;
+}
+
+/** One card of the Today deck: its picture, else a typeset title on the community's paper.
+    The title is always present so a dead thumbnail (main.js) falls back to it. */
+function deckCard(item: Item, index: number): SafeHtml {
   const thumb = thumbFor(item);
-  const caption = stripCaption(item);
+  const slot = fanSlot(index);
 
-  if (thumb)
-    return html`<li
-      class="strip-card${isNsfw(item) ? " is-nsfw" : ""}"
-      style="${sourceAccent(item.source)}"
-    >
-      <img src="${thumb}" alt="" loading="lazy" decoding="async" /><span class="strip-cap"
-        >${caption}</span
-      >
-    </li>`;
-
-  return html`<li class="strip-card is-text" style="${sourceAccent(item.source)}">
-    <span class="strip-title">${item.title || caption}</span
-    ><span class="strip-cap">${caption}</span>
+  return html`<li
+    class="deck-card${isNsfw(item) ? " is-nsfw" : ""}${thumb ? "" : " is-text"}"
+    style="${sourceAccent(item.source)}; --hue: ${hueOf(communityOf(item))}; --slot: ${slot}; --far: ${Math.abs(slot)}"
+  >
+    ${thumb ? html`<img src="${thumb}" alt="" loading="lazy" decoding="async" />` : ""}<span
+      class="deck-title"
+      >${item.title || caption(item)}</span
+    ><span class="deck-cap">${caption(item)}</span>
   </li>`;
 }
 
@@ -247,39 +276,50 @@ export function mixLine(items: Item[]): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Up next (Netflix row): the actual cards of the next round, plus OOB hero + sizes. */
+/** Up next: the actual next round as a fanned hand of cards (tap it to play), plus OOB hero +
+    sizes. The first card dealt sits on top in the middle. */
 export function renderUpNext(items: Item[], n: number): SafeHtml {
-  const oob = html`${renderHeroGo({ n, ids: items.map((item) => item.fullname), oob: true })}${renderSizes(n, true)}`;
+  const ids = items.map((item) => item.fullname);
+  const oob = html`${renderHeroGo({ n, ids, oob: true })}${renderSizes(n, true)}`;
 
   if (!items.length)
     return html`<section class="upnext" id="upnext" aria-label="Up next">
-        <h2 class="sec-h">Up next</h2>
-        <p class="sec-sub">Nothing waiting here. That's a clear deck.</p>
+        <p class="upnext-empty">Nothing waiting here. That's a clear deck.</p>
       </section>
       ${oob}`;
 
-  const more = items.length - STRIP_CARDS;
+  const params = new URLSearchParams({ n: String(n), ids: ids.join(",") });
+  const mix = mixLine(items);
 
   return html`<section class="upnext" id="upnext" aria-label="Up next">
-      <h2 class="sec-h">Up next</h2>
-      <ol class="strip">
-        ${items.slice(0, STRIP_CARDS).map(stripCard)}${more > 0 ? html`<li class="strip-more">+${more}</li>` : ""}
-      </ol>
-      <p class="upnext-mix">${mixLine(items)}</p>
+      <a class="deck" href="/clear?${params.toString()}" tabindex="-1" aria-hidden="true">
+        <ol class="deck-fan">
+          ${items.slice(0, DECK_CARDS).map(deckCard)}
+        </ol>
+      </a>
+      ${mix ? html`<p class="upnext-mix">${mix}</p>` : ""}
     </section>
     ${oob}`;
 }
 
-/** Inner content of #wins: pebbles toward the daily goal (0 = no goal) + the wins line. */
+/** Inner content of #wins: today's count inside the pebble ring (0 = no goal), then the
+    all-time line. Wins only: never what is left. */
 export function renderWins(opts: { today: number; total: number; goal: number }): SafeHtml {
-  const pebbles = Array.from({ length: opts.goal }, (_, index) =>
-    index < opts.today ? html`<i class="on"></i>` : html`<i></i>`,
-  );
+  const met = opts.goal > 0 && opts.today >= opts.goal;
 
-  return html`${opts.goal > 0 ? html`<div class="pebbles" aria-hidden="true">${pebbles}</div>` : ""}
-    <p class="wins-line">
-      <b>${fmt(opts.today)}</b> cleared today · <b>${fmt(opts.total)}</b> all-time
-    </p>`;
+  // ringSvg emits numbers-only SVG (core/ring.js).
+  return html`<div class="wins-dial${opts.goal > 0 ? "" : " no-goal"}">
+      ${raw(ringSvg(opts.today, opts.goal))}<span
+        class="wins-n"
+        style="--digits: ${fmt(opts.today).length}"
+        >${fmt(opts.today)}</span
+      >
+    </div>
+    <div class="wins-text">
+      <p class="wins-today">cleared today</p>
+      ${met ? html`<p class="wins-met">Goal met — anything more is a bonus.</p>` : ""}
+      <p class="wins-all"><b>${fmt(opts.total)}</b> all-time</p>
+    </div>`;
 }
 
 export type PileView = {
@@ -306,44 +346,41 @@ function pileMeta(pile: PileView): string {
   return `${saves} · ${pile.firstYear} – ${pile.lastYear}`;
 }
 
+/** A pile as a memory tile (Google Photos): its pictures as the cover, its name over them. */
 function pileRow(pile: PileView): SafeHtml {
   const mosaic = pile.thumbs.length
-    ? html`<div
-        class="pile-mosaic"
-        aria-hidden="true"
-        data-glyph="${pile.glyph}"
-        style="${sourceAccent(pile.source)}"
-      >
+    ? html`<div class="pile-mosaic" aria-hidden="true" data-glyph="${pile.glyph}">
         ${pile.thumbs.map((src) => html`<img src="${src}" alt="" loading="lazy" decoding="async" />`)}
       </div>`
-    : html`<div
-        class="pile-mosaic is-glyph"
-        aria-hidden="true"
-        style="${sourceAccent(pile.source)}"
-      >
+    : html`<div class="pile-mosaic is-glyph" aria-hidden="true">
         <span class="pile-glyph">${pile.glyph}</span>
       </div>`;
 
   const peek = new URLSearchParams({ n: "10", q: pile.peekQuery });
 
-  return html`<li class="pile">
+  const community =
+    pile.vals.kind === "subreddit" ? pile.vals.subreddit.toLowerCase() : pile.source;
+
+  return html`<li class="pile" style="${sourceAccent(pile.source)}; --hue: ${hueOf(community)}">
     ${mosaic}
     <div class="pile-main">
       <p class="pile-label">${pile.label}</p>
       <p class="pile-meta">${pileMeta(pile)}</p>
     </div>
-    <a class="pile-peek" href="/clear?${peek.toString()}">Peek</a>
-    <button
-      class="pile-go"
-      type="button"
-      hx-post="/hx/sweeps/apply"
-      hx-vals="${JSON.stringify(pile.vals)}"
-      hx-target="#piles"
-      hx-swap="outerHTML"
-      hx-disabled-elt="this"
-    >
-      Let go
-    </button>
+    <div class="pile-acts">
+      <a class="pile-peek" href="/clear?${peek.toString()}">Peek</a>
+      <button
+        class="pile-go"
+        type="button"
+        hx-post="/hx/sweeps/apply"
+        hx-vals="${JSON.stringify(pile.vals)}"
+        hx-target="#piles"
+        hx-swap="outerHTML"
+        hx-disabled-elt="this"
+      >
+        Let go
+      </button>
+    </div>
   </li>`;
 }
 
