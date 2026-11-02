@@ -3321,7 +3321,10 @@ export function oldestWaiting(db: Database): Item | null {
   const found = row<{ fullname: string }>(
     db,
     "SELECT fullname FROM items WHERE status = 'inbox' AND created_utc > 0 " +
+      "AND (json_extract(metadata, '$.snoozed_until') IS NULL " +
+      "OR json_extract(metadata, '$.snoozed_until') <= ?) " +
       "ORDER BY created_utc ASC LIMIT 1",
+    [Math.floor(Date.now() / 1000)],
   );
 
   return found ? getPublicItem(db, found.fullname) : null;

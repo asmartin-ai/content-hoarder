@@ -262,3 +262,21 @@ test("wins and whisper partials render without backlog totals", async () => {
     expect(whisper).toContain('id="whisper"');
   });
 });
+
+test("Home never resurfaces an item the user snoozed", async () => {
+  await withServer(async (base, path) => {
+    const connection = db.connect(path);
+
+    db.snooze(connection, {
+      fullnames: ["reddit:t3_room_11"],
+      untilUtc: NOW + 7 * DAY,
+      apply: true,
+    });
+    connection.close();
+
+    const page = (await (await fetch(`${base}/home`)).text()).replace(/\s+/g, " ");
+
+    expect(page).not.toContain('<p class="o-again-title">Crayon meme 11</p>');
+    expect(page).toContain('<p class="o-again-title">Crayon meme 10</p>');
+  });
+});
