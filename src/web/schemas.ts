@@ -35,7 +35,19 @@ export const HydrateResponseSchema = z.object({
   ]),
 });
 
-export const ItemStatusBody = z.object({ status: z.string() });
+export const HintVerdictSchema = z.enum(["keep", "skip"]);
+
+export const HintSourceSchema = z.enum(["ai", "history"]);
+
+export const StatusHintSchema = z.object({
+  verdict: HintVerdictSchema,
+  by: HintSourceSchema,
+});
+
+export const ItemStatusBody = z.object({
+  status: z.string(),
+  hint: StatusHintSchema.optional(),
+});
 
 export const SnoozeBody = z.object({
   window_days: z.union([z.number(), z.string()]).optional(),

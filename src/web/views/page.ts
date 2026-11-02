@@ -1,3 +1,6 @@
+import { aiConfigured, aiConsent, aiProviderLabel } from "../../assist/consent.ts";
+import { demoAnalyticsOn } from "../../demo_analytics.ts";
+import { connection } from "../state.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
 
 export type Tab = "home" | "today" | "clear" | "add";
@@ -146,6 +149,36 @@ const HEAD_ASSETS = raw(
   ].join("\n    "),
 );
 
+const AI_CONSENT_SCRIPT = raw('<script type="module" src="/static/home/ai-consent.js"></script>');
+
+function aiConsentPrompt(): SafeHtml | string {
+  if (!aiConfigured() || aiConsent(connection()) !== "unset") return "";
+
+  const provider = aiProviderLabel();
+
+  return html`<dialog class="ai-consent" data-ai-consent aria-labelledby="ai-consent-title">
+    <h2 id="ai-consent-title" class="ai-consent-title">Turn on AI suggestions?</h2>
+    <p class="ai-consent-line">
+      On Clear cards you'd get a quiet Keep or Let go hint with a short reason. You still decide
+      every card.
+    </p>
+    <p class="ai-consent-line">
+      To write a hint, Khaos sends each dealt card's source, title, author, subreddit or channel,
+      URL and the first 500 characters of its text to <b>${provider}</b>.
+    </p>
+    <p class="ai-consent-line">
+      It's off until you say yes, and you can turn it off again on <a href="/add">Add</a>.
+    </p>
+    <p class="ai-consent-error" data-ai-consent-error hidden role="alert"></p>
+    <div class="ai-consent-acts">
+      <button class="ai-consent-btn is-primary" type="button" data-ai-consent-enable autofocus>
+        Turn on
+      </button>
+      <button class="ai-consent-btn" type="button" data-ai-consent-decline>Not now</button>
+    </div>
+  </dialog>`;
+}
+
 const ROOM_CSS: Record<Tab, string> = {
   home: "/static/home/orient.css",
   today: "/static/home/today.css",
@@ -160,18 +193,22 @@ export function renderPage(opts: {
   round?: boolean;
 }): string {
   const bodyClass = opts.round ? "has-tabbar is-round" : "has-tabbar";
+  const analytics = demoAnalyticsOn() ? "1" : "0";
+  const configured = aiConfigured();
+  const aiPrompt = configured ? aiConsentPrompt() : "";
 
   return `<!doctype html>\n${html`<html lang="en">
     <head>
       ${HEAD_META}
       <title>${opts.title} · content-hoarder</title>
-      ${HEAD_ASSETS}
+      ${HEAD_ASSETS} ${configured ? AI_CONSENT_SCRIPT : ""}
       <link rel="stylesheet" href="/static/home/home.css" />
       <link rel="stylesheet" href="${ROOM_CSS[opts.tab]}" />
     </head>
-    <body class="${bodyClass}" data-page="${opts.tab}">
+    <body class="${bodyClass}" data-page="${opts.tab}" data-analytics="${analytics}">
       ${navHtml(opts.tab)}
       <main id="view" class="view">${opts.body}</main>
+      ${aiPrompt}
       <div id="toast" hidden aria-live="polite"></div>
     </body>
   </html> `}`;

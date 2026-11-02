@@ -12,6 +12,7 @@ import { esc, isTypingTarget } from "../core/util.js";
 import { ringSvg } from "../core/ring.js";
 import { attachSwipe } from "../core/swipe.js";
 import { toast, snackbar } from "../core/toast.js";
+import { track, flush } from "../core/track.js";
 
 const KEY = "ch.round";
 
@@ -67,6 +68,16 @@ const COMBO_HTML = '<p class="combo" aria-live="polite" hidden></p>';
 const MONTH_S = 30 * 24 * 60 * 60;
 
 const LEAVE_WAIT_MS = 1500;
+
+const HINT_PULL_MS = [2500, 6000, 12000, 20000];
+
+const HINT_RESUME_MS = [300, ...HINT_PULL_MS];
+
+const HINT_BATCH = 30;
+
+const HINT_POLL_MS = 5000;
+
+const HINT_WINDOW_MS = 60000;
 
 const haptic = (kind) => window.chHaptic?.(kind);
 
@@ -143,6 +154,36 @@ const cardFrom = (item) => {
   return tpl.content.firstElementChild;
 };
 
+const hintOf = (node) => {
+  const verdict = node ? node.dataset.hint : "";
+
+  if (verdict !== "keep" && verdict !== "skip") return null;
+
+  return { verdict, by: node.dataset.hintBy === "history" ? "history" : "ai" };
+};
+
+const hintFrom = (markup) => {
+  const el = markup ? cardFrom({ html: markup }) : null;
+
+  if (!el) return null;
+
+  return hintOf(el.matches("[data-hint]") ? el : el.querySelector("[data-hint]"));
+};
+
+const cardIn = (root, fullname) => {
+  for (const el of root.querySelectorAll(".card")) if (el.dataset.fullname === fullname) return el;
+
+  return null;
+};
+
+const itemHint = (item) => {
+  if (!item) return null;
+
+  if (item.hint === undefined) item.hint = hintFrom(item.html);
+
+  return item.hint;
+};
+
 const wireMedia = (card) => {
   for (const img of card.querySelectorAll(".media-img, .md img[data-fallback]")) {
     let fellBack = false;
@@ -183,6 +224,14 @@ const wireMedia = (card) => {
 
 const sameIds = (a, b) => (Array.isArray(a) ? a.join(",") : "") === b.join(",");
 
+const newRoundId = () =>
+  (
+    globalThis.crypto?.randomUUID?.() ||
+    Math.random().toString(36).slice(2) + Date.now().toString(36)
+  )
+    .replace(/-/g, "")
+    .slice(0, 32);
+
 const loadSaved = (params) => {
   let r;
 
@@ -222,6 +271,16 @@ export function mountRound(root) {
   let comboEl = null;
   let leaving = false;
   let clip = null;
+
+  const viewed = new Set();
+
+  const hintKeys = new Set();
+
+  let hintUntil = 0;
+
+  let announced = "";
+
+  let finalised = "";
 
   const pending = new Map();
 
@@ -454,10 +513,10 @@ export function mountRound(root) {
 
     attachSwipe(el, {
       allowVertical: () => !el.classList.contains("is-expanded"),
-      onRight: () => decide("archived", true),
-      onLeft: () => decide("done", true),
+      onRight: () => decide("archived", "swipe", true),
+      onLeft: () => decide("done", "swipe", true),
       onUp: () => openCurrent(),
-      onDown: () => decide("skip", true),
+      onDown: () => decide("skip", "swipe", true),
       onDrag: (dx, dy) => dragFeedback(el, dx, dy),
       mouse: false,
       commit: COMMIT_PX,
@@ -465,6 +524,26 @@ export function mountRound(root) {
       commitDelay: 0,
       tilt: TILT,
     });
+
+    const hint = hintOf(el.querySelector(".card-hint-slot [data-hint]"));
+
+    if (!viewed.has(item.fullname)) {
+      viewed.add(item.fullname);
+      const data = { idx: round.idx, hinted: Boolean(hint) };
+
+      if (hint) data.hint_by = hint.by;
+
+      track("card_view", data, { fullname: item.fullname });
+    }
+
+    if (hint) {
+      const key = item.fullname + "\u0000" + hint.by;
+
+      if (!hintKeys.has(key)) {
+        hintKeys.add(key);
+        track("hint_shown", { by: hint.by, idx: round.idx });
+      }
+    }
 
     shownAt = Date.now();
 
@@ -506,6 +585,128 @@ export function mountRound(root) {
     return items.filter((it) => it && it.fullname && it.html);
   }
 
+  function patchHints(hints) {
+    let changed = false;
+
+    for (const [idx, item] of round.items.entries()) {
+      if (!item || !item.fullname) continue;
+
+      if (!Object.hasOwn(hints, item.fullname)) continue;
+      const markup = hints[item.fullname];
+      const el = cardFrom(item);
+      const slot = el ? el.querySelector(".card-hint-slot") : null;
+
+      if (!slot) continue;
+
+      slot.innerHTML = markup;
+      item.html = el.outerHTML;
+      item.hint = hintFrom(markup);
+      changed = true;
+
+      for (const live of stage.querySelectorAll(".card")) {
+        if (live.dataset.fullname !== item.fullname) continue;
+        const liveSlot = live.querySelector(".card-hint-slot");
+
+        if (liveSlot) liveSlot.innerHTML = markup;
+      }
+
+      const current = round.items[round.idx];
+      const hint = item.hint;
+
+      if (hint && viewed.has(item.fullname) && current && current.fullname === item.fullname) {
+        const key = item.fullname + "\u0000" + hint.by;
+
+        if (!hintKeys.has(key)) {
+          hintKeys.add(key);
+          track("hint_shown", { by: hint.by, idx });
+        }
+      }
+    }
+
+    return changed;
+  }
+
+  function clearAiHints() {
+    if (!round) return;
+
+    for (const item of round.items) {
+      if (!item || !item.fullname) continue;
+      const hint = itemHint(item);
+
+      if (!hint || hint.by !== "ai") continue;
+      const el = cardFrom(item);
+      const slot = el ? el.querySelector(".card-hint-slot") : null;
+
+      if (slot) slot.innerHTML = "";
+
+      if (el) item.html = el.outerHTML;
+      item.hint = null;
+    }
+
+    for (const live of stage.querySelectorAll(".card .card-hint-slot [data-hint-by='ai']")) {
+      const slot = live.closest(".card-hint-slot");
+
+      if (slot) slot.innerHTML = "";
+    }
+
+    save();
+  }
+
+  function requestHints(my, ids) {
+    if (!ids.length) return;
+
+    getJSON("/clear/hints?ids=" + encodeURIComponent(ids.join(",")))
+      .then((res) => {
+        if (my !== gen || !round || !res || !res.hints) return;
+
+        if (patchHints(res.hints)) {
+          hintUntil = Date.now() + HINT_WINDOW_MS;
+          save();
+        }
+      })
+      .catch(() => {});
+  }
+
+  function pullHints(my) {
+    if (my !== gen || !round || state !== "playing") return;
+
+    const ids = round.items
+      .slice(round.idx)
+      .map((item) => (item ? item.fullname : ""))
+      .filter(Boolean);
+
+    for (let start = 0; start < ids.length; start += HINT_BATCH)
+      requestHints(my, ids.slice(start, start + HINT_BATCH));
+  }
+
+  function allHinted() {
+    if (!round) return true;
+
+    return round.items.slice(round.idx).every((item) => Boolean(itemHint(item)));
+  }
+
+  function scheduleHints(delays, forceFirst = false) {
+    const my = gen;
+
+    delays.forEach((ms, i) => {
+      later(() => {
+        if (my !== gen || !round || state !== "playing") return;
+
+        if (!(forceFirst && i === 0) && allHinted()) return;
+        pullHints(my);
+      }, ms);
+    });
+  }
+
+  function pollHints(my) {
+    if (my !== gen || !round || state !== "playing") return;
+
+    if (Date.now() >= hintUntil || allHinted()) return;
+
+    pullHints(my);
+    later(() => pollHints(my), HINT_POLL_MS);
+  }
+
   async function fresh() {
     const my = ++gen;
 
@@ -536,9 +737,25 @@ export function mountRound(root) {
       return;
     }
 
-    round = { q: params.q, n: params.n, ids: params.ids, items, idx: 0, results: [], startedAt: 0 };
+    round = {
+      rid: newRoundId(),
+      q: params.q,
+      n: params.n,
+      ids: params.ids,
+      items,
+      idx: 0,
+      results: [],
+      startedAt: 0,
+    };
+    viewed.clear();
+    hintKeys.clear();
+    announced = round.rid;
     save();
+    track("round_start", { size: items.length, resumed: false, round_id: round.rid });
+    hintUntil = Date.now() + HINT_WINDOW_MS;
     showCard();
+    scheduleHints(HINT_PULL_MS);
+    later(() => pollHints(my), HINT_POLL_MS);
   }
 
   async function reconcile() {
@@ -574,10 +791,21 @@ export function mountRound(root) {
 
   async function resume(saved) {
     round = saved;
+
+    if (!round.rid) {
+      round.rid = newRoundId();
+      save();
+    }
+
     params.n = SIZES.includes(saved.n) ? saved.n : params.n;
     params.q = saved.q || "";
     params.ids = Array.isArray(saved.ids) ? saved.ids : [];
     const my = ++gen;
+
+    if (announced !== round.rid) {
+      announced = round.rid;
+      track("round_start", { size: round.items.length, resumed: true, round_id: round.rid });
+    }
 
     setState("loading");
     setStage('<article class="card is-skeleton" aria-hidden="true"></article>');
@@ -587,7 +815,12 @@ export function mountRound(root) {
     if (my !== gen) return;
 
     if (round.idx >= round.items.length) finish();
-    else showCard();
+    else {
+      hintUntil = Date.now() + HINT_WINDOW_MS;
+      showCard();
+      scheduleHints(HINT_RESUME_MS, true);
+      later(() => pollHints(my), HINT_POLL_MS);
+    }
   }
 
   function freedMinutes() {
@@ -666,6 +899,17 @@ export function mountRound(root) {
     setState("done");
     renderProgress();
     haptic("milestone");
+
+    if (finalised !== round.rid) {
+      finalised = round.rid;
+      track("round_end", {
+        completed: true,
+        decided: round.results.length,
+        ms,
+        round_id: round.rid,
+      });
+    }
+
     const at = Date.now();
 
     try {
@@ -694,6 +938,21 @@ export function mountRound(root) {
       .catch(() => {});
   }
 
+  function hintBody(item) {
+    if (!item) return undefined;
+
+    const current = cardEl && cardEl.dataset.fullname === item.fullname ? cardEl : null;
+    const card = current || cardIn(stage, item.fullname);
+
+    const hint = card
+      ? hintOf(card.querySelector(".card-hint-slot [data-hint]"))
+      : hintFrom(item.html);
+
+    item.hint = hint;
+
+    return hint ? { hint } : undefined;
+  }
+
   function send(item, result) {
     const fn = item.fullname;
 
@@ -711,7 +970,7 @@ export function mountRound(root) {
 
             if (res && res.decayed_at) snackbar("Snoozed enough times — it's resting now.");
           })
-        : setStatus(fn, result.act);
+        : setStatus(fn, result.act, hintBody(item));
 
     const p = req.then(
       () => true,
@@ -750,7 +1009,7 @@ export function mountRound(root) {
     showCard();
   }
 
-  function decide(act, flung = false) {
+  function decide(act, method = "tap", flung = false) {
     if (leaving || state !== "playing" || !round) return;
     const item = round.items[round.idx];
 
@@ -758,6 +1017,16 @@ export function mountRound(root) {
 
     combo = Date.now() - shownAt < COMBO_MS ? combo + 1 : 0;
     const result = { fullname: item.fullname, act };
+
+    const hint = cardEl ? hintOf(cardEl.querySelector(".card-hint-slot [data-hint]")) : null;
+    const data = { act, method, dwell_ms: Math.max(0, Date.now() - shownAt) };
+
+    if (hint) {
+      data.hint = hint.verdict;
+      data.hint_by = hint.by;
+    }
+
+    track("decision", data, { fullname: item.fullname });
 
     round.results.push(result);
     round.idx += 1;
@@ -811,6 +1080,7 @@ export function mountRound(root) {
     round.idx -= 1;
     combo = 0;
     save();
+    track("undo", {});
 
     if (result.act !== "skip") {
       (pending.get(result.fullname) || Promise.resolve(true))
@@ -819,6 +1089,8 @@ export function mountRound(root) {
     }
 
     showCard(result.act);
+    hintUntil = Date.now() + HINT_WINDOW_MS;
+    pullHints(gen);
   }
 
   function openCurrent() {
@@ -827,13 +1099,14 @@ export function mountRound(root) {
 
     if (!item) return;
     save();
+    track("reader_open", {}, { fullname: item.fullname });
     go("/library?open=" + encodeURIComponent(item.fullname) + "&from=clear&enter=up");
   }
 
-  function run(act) {
+  function run(act, method = "tap") {
     if (act === "undo") undo();
     else if (act === "open") openCurrent();
-    else if (act in BEAD) decide(act);
+    else if (act in BEAD) decide(act, method);
   }
 
   function next(kind) {
@@ -854,6 +1127,19 @@ export function mountRound(root) {
 
   function onClick(e) {
     if (leaving) return;
+
+    const accept = e.target.closest("[data-hint-accept]");
+
+    if (accept && cardEl && cardEl.contains(accept)) {
+      e.preventDefault();
+      const hint = accept.closest("[data-hint]");
+
+      if (!hint) return;
+
+      decide(hint.dataset.hint === "skip" ? "archived" : "keep", "hint");
+
+      return;
+    }
 
     const veiled = e.target.closest(".card-media.is-nsfw");
 
@@ -928,11 +1214,32 @@ export function mountRound(root) {
     e.preventDefault();
 
     if (e.repeat && act !== "open") return;
-    run(act);
+    run(act, "key");
   }
+
+  section.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.target.closest && e.target.closest("[data-hint-accept]")) e.stopPropagation();
+    },
+    true,
+  );
 
   section.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
+  document.addEventListener("ch:ai-consent", (e) => {
+    if (e.detail && e.detail.on === false) clearAiHints();
+
+    hintUntil = Date.now() + HINT_WINDOW_MS;
+    pullHints(gen);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+
+    hintUntil = Date.now() + HINT_WINDOW_MS;
+    pullHints(gen);
+  });
 
   if (howto) {
     const openHowto = () => {
@@ -954,6 +1261,17 @@ export function mountRound(root) {
       if (!localStorage.getItem(HOWTO_KEY)) openHowto();
     } catch {}
   }
+
+  window.addEventListener("pagehide", () => {
+    if (!round || state !== "playing") return;
+
+    track("round_suspend", {
+      round_id: round.rid,
+      decided: round.results.length,
+      ms: round.startedAt ? Date.now() - round.startedAt : 0,
+    });
+    flush();
+  });
 
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;

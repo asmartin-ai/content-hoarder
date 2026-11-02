@@ -6,7 +6,9 @@ import * as redditHydrate from "../../reddit_hydrate.ts";
 import * as archival from "../../archival/service.ts";
 import { defaultMediaProviders } from "../../archival/providers.ts";
 import * as llm from "../../assist/llm.ts";
+import * as triageScore from "../../triage_score.ts";
 import * as pkms from "../../bridge/pkms.ts";
+import { track } from "../../demo_analytics.ts";
 import { json, objectBody, numberValue } from "../http.ts";
 import { connection, noteUnsaveEnqueue } from "../state.ts";
 import {
@@ -25,6 +27,28 @@ import {
 export interface ItemRoute {
   fullname: string;
   action: string | null;
+}
+
+const HintOutcomeMatchSchema = z.object({ matched: z.boolean() });
+
+const BulkStatusBody = z.object({ fullnames: z.array(z.string()), status: z.string() });
+
+const _AUTO_LEARN_STATUSES = ["keep", "archived", "done"] as const;
+
+export async function handleBulkStatus(request: Request): Promise<Response> {
+  const body = BulkStatusBody.parse(await request.json().catch(() => ({})));
+
+  try {
+    const database = connection();
+    const updated = db.bulkSetStatus(database, body.fullnames, body.status);
+
+    if (updated > 0 && _AUTO_LEARN_STATUSES.some((status) => status === body.status))
+      triageScore.noteDecision(database, updated);
+
+    return json({ updated });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
 }
 
 export async function handleItemAction(
@@ -56,9 +80,13 @@ export async function handleItemAction(
 
     try {
       const status = body.status.trim();
-      const item = db.setStatus(database, fullname, status);
+      const prior = db.getItem(database, fullname)?.status ?? null;
+      const item = db.setStatus(database, fullname, status, { hint: body.hint });
 
       if (!item) return json({ error: "not found" }, 404);
+
+      if (prior !== status && (status === "keep" || status === "archived" || status === "done"))
+        triageScore.noteDecision(database);
 
       if (
         status === "done" &&
@@ -66,6 +94,19 @@ export async function handleItemAction(
         db.getSetting(database, "reddit_unsave_on_done", "0") === "1"
       )
         noteUnsaveEnqueue();
+
+      const outcome =
+        prior === status ? null : HintOutcomeMatchSchema.safeParse(item.metadata.hint_outcome);
+
+      track(database, "srv_status", {
+        fullname,
+        data: {
+          status,
+          prior,
+          hint: body.hint?.verdict,
+          matched: outcome?.success ? outcome.data.matched : undefined,
+        },
+      });
 
       return json(item);
     } catch (error) {
@@ -85,6 +126,8 @@ export async function handleItemAction(
     let item = db.undoStatus(database, fullname);
 
     if (!item) return json({ error: "not found" }, 404);
+
+    track(database, "srv_undo", { fullname });
 
     if (
       prior.success &&

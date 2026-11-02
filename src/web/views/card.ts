@@ -216,7 +216,41 @@ const COMMENT_SHORT = 160;
 
 const COMMENT_MEDIUM = 420;
 
-export function renderCard(item: Item, opts?: { topComment?: TopComment | null }): SafeHtml {
+export type CardHint = { verdict: "keep" | "skip"; reason: string; by: "ai" | "history" };
+
+const HINT_REASON_CAP = 120;
+
+export function renderHint(hint: CardHint | null): SafeHtml {
+  if (!hint) return html``;
+
+  const keep = hint.verdict === "keep";
+  const reason = hint.reason.replace(/\s+/g, " ").trim().slice(0, HINT_REASON_CAP);
+  const label = keep ? "Suggest: Keep" : "Suggest: Archive";
+  const action = keep ? "Keep" : "Archive";
+
+  return html`<p
+    class="card-hint"
+    data-hint="${keep ? "keep" : "skip"}"
+    data-hint-by="${hint.by === "history" ? "history" : "ai"}"
+  >
+    <span class="hint-label">${label}</span><span class="hint-dot" aria-hidden="true">·</span
+    ><span class="hint-reason">${reason}</span
+    ><span class="hint-by">${hint.by === "history" ? "From your history" : "AI"}</span
+    ><button
+      class="hint-accept"
+      type="button"
+      data-hint-accept
+      aria-label="Accept suggestion: ${action}"
+    >
+      ${action}
+    </button>
+  </p>`;
+}
+
+export function renderCard(
+  item: Item,
+  opts?: { topComment?: TopComment | null; hint?: CardHint | null },
+): SafeHtml {
   const kind = cardKind(item);
   const nsfw = Boolean(item.metadata.over_18);
   const isComment = kind === "comment";
@@ -282,7 +316,9 @@ export function renderCard(item: Item, opts?: { topComment?: TopComment | null }
             ${icon("open", 18)}
           </button>
         </header>
-        ${context}${heading}${removed}${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
+        ${context}${heading}${removed}
+        <div class="card-hint-slot">${renderHint(opts?.hint ?? null)}</div>
+        ${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
       </div>
       <span class="card-wash" aria-hidden="true"></span
       ><span class="card-stamp" aria-hidden="true"></span>

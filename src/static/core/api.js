@@ -26,8 +26,8 @@ export const postJSON = (url, body) =>
         },
   );
 
-export const setStatus = (fullname, status) =>
-  postJSON("/items/" + encodeURIComponent(fullname) + "/status", { status });
+export const setStatus = (fullname, status, extra) =>
+  postJSON("/items/" + encodeURIComponent(fullname) + "/status", { status, ...extra });
 
 export const fetchItem = (fullname) => getJSON("/items/" + encodeURIComponent(fullname));
 

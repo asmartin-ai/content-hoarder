@@ -2,9 +2,23 @@ import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as db from "../../db.ts";
 import * as redditUnsave from "../../reddit_unsave.ts";
+import {
+  aiConfigured,
+  aiConsent,
+  aiProviderLabel,
+  setAiConsent,
+  type AiConsent,
+} from "../../assist/consent.ts";
 import { bool, clamp, json, numberValue, objectBody } from "../http.ts";
+import { track } from "../../demo_analytics.ts";
 import { connection, databasePath } from "../state.ts";
-import { DrainBody, EnqueueTagBody, PurgeBody, PurgeVictimSchema } from "../schemas.ts";
+import {
+  DrainBody,
+  EnabledBody,
+  EnqueueTagBody,
+  PurgeBody,
+  PurgeVictimSchema,
+} from "../schemas.ts";
 
 export async function purgeDone(request: Request): Promise<Response> {
   const body = await objectBody(request, PurgeBody);
@@ -113,4 +127,32 @@ export async function enqueueUnsaveByTag(request: Request): Promise<Response> {
   return requested && !apply
     ? json({ ...common, ok: false, error: "local by-tag enqueue requires yes=true" }, 409)
     : json(common);
+}
+
+interface AiState {
+  configured: boolean;
+  consent: AiConsent;
+  provider: string;
+}
+
+function aiState(): AiState {
+  return {
+    configured: aiConfigured(),
+    consent: aiConsent(connection()),
+    provider: aiProviderLabel(),
+  };
+}
+
+export function aiSettings(): Response {
+  return json(aiState());
+}
+
+export async function updateAiSettings(request: Request): Promise<Response> {
+  const body = await objectBody(request, EnabledBody);
+  const database = connection();
+
+  setAiConsent(database, body.enabled);
+  track(database, "srv_consent", { data: { on: body.enabled } });
+
+  return json(aiState());
 }

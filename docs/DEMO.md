@@ -24,6 +24,10 @@ just the URL. Put a blank line between entries; without it, two URLs read as a t
 Checked 2026-11-01: a three-entry file imported as `imported=3 skipped=0 errors=0`. Offline mode
 still applies, so cards show the title and link, not a fetched preview.
 
+The offline demo has no AI suggestions. To show an AI hint, use the hosted demo or a non-offline
+local run with the `LLM_*` settings in [`src/config.ts`](../src/config.ts), and enable AI for that
+library. See [AI suggestions](ai-suggestions.md). Never use the real library for a demo.
+
 ## Walkthrough
 
 | # | Step | What the viewer sees | Status |
@@ -31,6 +35,7 @@ still applies, so cards show the title and link, not a fetched preview.
 | 1 | Run `./scripts/demo.sh` in a terminal | `imported=24 skipped=0 errors=0` | ✅ |
 | 2 | Open Today (`/`) | A day title, five cards fanned under **Clear 10 · about 2 minutes**, 5/10/25 sizes, "0 cleared today" | ✅ |
 | 3 | Pick **5**, tap **Clear 5** | One full-size card. A dot row on top tracks the round | ✅ |
+| 3a | With AI enabled, read a suggested action on a Clear card and tap it | A quiet **Suggest: Keep** or **Suggest: Archive** line, a reason and an **AI** tag; history hints say **From your history** | ⚠ not exercised in the offline demo |
 | 4 | Read the card; tap ↗ to open it in the reader | Title, community, body text. The reader says "Offline mode: this thread wasn't fetched." | ✅ |
 | 5 | **Done**, **Archive**, **Keep**, **Not now** (keys `D` `A` `F` `N`, or swipes) | The card flies off, the next one is already there | ✅ |
 | 6 | Undo (top-right ↶ or `U`) | The last card comes back; the database reverts (checked: the snoozed item returned to the inbox) | ✅ |
@@ -43,12 +48,12 @@ still applies, so cards show the title and link, not a fetched preview.
 
 ## Say it plainly in the recording
 
-- Import runs from the command line. There's no in-app import button yet. The server has
-  `/import/prepare` and `/import/commit` endpoints, but no screen uses them.
-- The demo data is synthetic. Real Reddit data exports contain only links, so real cards are thinner
-  until a thread is fetched (a network step, which needs separate opt-in).
-- It runs on the founder's machine. There is no hosted version and no account system.
-- Not shown, because it's not built: AI suggestions in the round, one-next-action, multi-user.
+- The local recording uses synthetic data and imports from the command line. Add also supports
+  in-app imports.
+- Real Reddit data exports contain only links, so real cards are thinner until a thread is fetched
+  (a network step, which needs separate opt-in).
+- The hosted friend pilot has accounts and separate libraries; see [the pilot guide](FRIEND-PILOT.md).
+- One-next-action is not built. AI suggestions are not available in the offline demo.
 
 ## States checked
 
@@ -77,10 +82,7 @@ instead of failing".
 - [ ] The recording says the data is synthetic and import is a CLI step.
 - [ ] Afterwards, delete the temp folder the script printed.
 
-## If a hosted demo is ever needed
+## Hosted pilot
 
-Not needed for YC (see the quote above). Only build one if testers can't run it locally. It would
-need a separate instance with synthetic data only, no `.env` or tokens, a reset path, resource
-limits, and access control in front. A tunnel or TLS gives none of these. Real user data would
-also need consent, export and deletion, backup and restore, and per-user isolation, and none of
-these exist.
+The invite-only hosted pilot is separate from this offline recording. Its access, data isolation,
+consent and wipe procedure are in [the pilot guide](FRIEND-PILOT.md).

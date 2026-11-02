@@ -148,6 +148,11 @@ via `adb backup`, **not** `adb pull`.
 - Desktop inline action cluster is F/A/D (+IN off-inbox) only; Share lives in the right-click row menu
   (mobile hides `.acts` via `@media(hover:none)` → long-press).
 
+## AI suggestions and learning
+
+See [docs/ai-suggestions.md](docs/ai-suggestions.md) for consent, hint outcomes, learning,
+local stats and the temporary pilot analytics.
+
 ## Reddit unsave-on-Done (`reddit_unsave.ts`)
 Marking a reddit item **Done** can also unsave it from the user's Reddit *Saved* list. Off by default,
 gated on the `settings` flag `reddit_unsave_on_done`. Full design (decoupled queue, transport, drain):

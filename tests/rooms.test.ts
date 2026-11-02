@@ -4,8 +4,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as db from "../src/db.ts";
-import { newItem } from "../src/models.ts";
+import { newItem, parseMetadata } from "../src/models.ts";
 import { serveApp } from "../src/web.ts";
+import { renderCard } from "../src/web/views/card.ts";
 
 const DAY = 86_400;
 
@@ -279,4 +280,57 @@ test("Home never resurfaces an item the user snoozed", async () => {
     expect(page).not.toContain('<p class="o-again-title">Crayon meme 11</p>');
     expect(page).toContain('<p class="o-again-title">Crayon meme 10</p>');
   });
+});
+
+test("a Clear card shows one quiet hint line, and a hostile reason stays escaped", () => {
+  const raw = newItem({
+    source: "reddit",
+    source_id: "t3_hint_card",
+    kind: "post",
+    title: "A card with a suggestion",
+    created_utc: NOW - DAY,
+    metadata: { subreddit: "Clear" },
+  });
+
+  const item = { ...raw, metadata: parseMetadata(raw.metadata) };
+
+  const flat = (markup: string) =>
+    markup
+      .replace(/\s+/g, " ")
+      .replace(/>\s+</g, "><")
+      .replace(/\s+(\/?>)/g, "$1");
+
+  const hinted = flat(
+    renderCard(item, {
+      hint: {
+        verdict: "keep",
+        reason: "You kept three like this <script>alert(1)</script>",
+        by: "ai",
+      },
+    }).value,
+  );
+
+  expect(hinted).toContain('<div class="card-hint-slot">');
+  expect(hinted).toContain('data-hint="keep"');
+  expect(hinted).toContain('data-hint-by="ai"');
+  expect(hinted).toContain("Suggest: Keep");
+  expect(hinted).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  expect(hinted).not.toContain("<script>");
+  expect(hinted).toContain('data-hint-accept aria-label="Accept suggestion: Keep"');
+  expect(hinted).toMatch(/Keep\s*<\/button>/);
+
+  const letgo = flat(
+    renderCard(item, {
+      hint: { verdict: "skip", reason: "Opened once, never read", by: "history" },
+    }).value,
+  );
+
+  expect(letgo).toContain('data-hint="skip"');
+  expect(letgo).toContain('data-hint-by="history"');
+  expect(letgo).toContain("Suggest: Archive");
+  expect(letgo).toContain("From your history");
+  expect(letgo).toContain('aria-label="Accept suggestion: Archive"');
+  expect(letgo).toMatch(/Archive\s*<\/button>/);
+
+  expect(flat(renderCard(item).value)).toContain('<div class="card-hint-slot"></div>');
 });

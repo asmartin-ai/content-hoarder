@@ -314,6 +314,7 @@ export function renderWins(opts: { today: number; total: number; goal: number })
 export type PileView = {
   label: string;
   count: number;
+  reason?: string;
   firstYear: number | null;
   lastYear: number | null;
   thumbs: string[];
@@ -353,6 +354,11 @@ function pileRow(pile: PileView): SafeHtml {
     ${mosaic}
     <div class="pile-main">
       <p class="pile-label">${pile.label}</p>
+      ${
+        pile.reason
+          ? html`<p class="pile-meta pile-reason" style="white-space: normal">${pile.reason}</p>`
+          : ""
+      }
       <p class="pile-meta">${pileMeta(pile)}</p>
     </div>
     <div class="pile-acts">

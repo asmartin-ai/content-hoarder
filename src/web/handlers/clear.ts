@@ -1,10 +1,13 @@
+import { aiActive } from "../../assist/consent.ts";
+import { hintFor, prefetchHints, type PrefetchOptions } from "../../assist/hints.ts";
 import * as db from "../../db.ts";
-import type { Item } from "../../models.ts";
+import { track } from "../../demo_analytics.ts";
+import { LlmSuggestionSchema, type Item } from "../../models.ts";
 import { parse } from "../../search_query.ts";
 import { clamp, json, numberParam, options } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
-import { renderCard } from "../views/card.ts";
+import { renderCard, renderHint } from "../views/card.ts";
 import { html, type SafeHtml } from "../views/html.ts";
 import { icon, type IconName } from "../views/icons.ts";
 import { renderPage } from "../views/page.ts";
@@ -12,6 +15,10 @@ import { topComment } from "../views/thread.ts";
 import { isNsfw } from "../views/today.ts";
 
 const MAX_DEAL = 50;
+
+const MAX_HINTS = 30;
+
+const PREWARM_HINTS = 10;
 
 const ORB_ICON = 26;
 
@@ -173,7 +180,7 @@ function dealQuery(q: string, n: number, safe: boolean): Item[] {
   );
 }
 
-export function deal(url: URL): Response {
+export async function deal(url: URL): Promise<Response> {
   const params = url.searchParams;
   const n = clamp(numberParam(params.get("n"), 10), 1, MAX_DEAL);
   const safe = params.get("safe") === "1";
@@ -187,12 +194,84 @@ export function deal(url: URL): Response {
   const picked = ids.length ? dealIds(ids) : q ? dealQuery(q, n * 2, safe) : smartDeal(n, safe);
   const items = (safe ? picked.filter((item) => !isNsfw(item)) : picked).slice(0, n);
   const database = connection();
+  let waitMs = 0;
 
-  return json({
-    items: items.map((item) => ({
+  if (aiActive(database) && items.length) {
+    const started = Date.now();
+
+    try {
+      await prefetchHints(
+        database,
+        items.map((item) => item.fullname),
+      );
+    } catch {}
+
+    waitMs = Date.now() - started;
+
+    const dealt = new Set(items.map((item) => item.fullname));
+
+    setTimeout(() => {
+      try {
+        const upcoming = db
+          .getRandomBatch(database, n * 2 + PREWARM_HINTS, { mode: "smart", unprocessed: true })
+          .filter((item) => !dealt.has(item.fullname) && (!safe || !isNsfw(item)))
+          .slice(0, PREWARM_HINTS)
+          .map((item) => item.fullname);
+
+        void prefetchHints(database, upcoming);
+      } catch {}
+    }, 0);
+  }
+
+  const cards = items.map((item) => {
+    const hint = hintFor(database, db.getPublicItem(database, item.fullname) ?? item);
+
+    return {
       fullname: item.fullname,
       status: item.status,
-      html: renderCard(item, { topComment: topComment(database, item) }).toString(),
+      html: renderCard(item, { topComment: topComment(database, item), hint }).toString(),
+      hinted: hint !== null,
+    };
+  });
+
+  track(database, "srv_deal", {
+    data: { n: items.length, hinted: cards.filter((card) => card.hinted).length, wait_ms: waitMs },
+  });
+
+  return json({
+    items: cards.map((card) => ({
+      fullname: card.fullname,
+      status: card.status,
+      html: card.html,
     })),
   });
+}
+
+export function clearHints(url: URL, opts: PrefetchOptions = {}): Response {
+  const database = connection();
+
+  const ids = [
+    ...new Set(
+      (url.searchParams.get("ids") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, MAX_HINTS);
+
+  const hints: Record<string, string> = {};
+  const missing: string[] = [];
+
+  for (const id of ids) {
+    const item = db.getPublicItem(database, id);
+
+    if (!item || item.status !== "inbox") continue;
+    hints[id] = renderHint(hintFor(database, item)).toString();
+
+    if (!LlmSuggestionSchema.safeParse(item.metadata.llm).success) missing.push(id);
+  }
+
+  if (missing.length && aiActive(database)) void prefetchHints(database, missing, opts);
+
+  return json({ hints });
 }

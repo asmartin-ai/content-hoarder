@@ -20,7 +20,7 @@ import {
   type PileView,
 } from "../views/today.ts";
 import { smartDeal } from "./clear.ts";
-import { restorePile, restPile, sweepList, SWEEP_EXCLUSIONS } from "./sweeps.ts";
+import { pileList, restorePile, restPile, SWEEP_EXCLUSIONS, type PileSweep } from "./sweeps.ts";
 
 const DEFAULT_ROUND = 10;
 
@@ -120,7 +120,7 @@ function yearOf(utc: number): number {
   return new Date(utc * 1000).getFullYear();
 }
 
-function pileView(sweep: db.Sweep): PileView {
+function pileView(sweep: PileSweep): PileView {
   const database = connection();
 
   const thumbs = db
@@ -130,7 +130,14 @@ function pileView(sweep: db.Sweep): PileView {
     .slice(0, MOSAIC_TILES);
 
   const span = db.sweepSpan(database, sweep, SWEEP_EXCLUSIONS);
-  const common = { label: sweep.label, count: sweep.count, thumbs, source: sweep.source };
+
+  const common = {
+    label: sweep.label,
+    count: sweep.count,
+    reason: sweep.reason,
+    thumbs,
+    source: sweep.source,
+  };
 
   const years = {
     firstYear: span ? yearOf(span.first) : null,
@@ -161,7 +168,7 @@ function pileView(sweep: db.Sweep): PileView {
 }
 
 function pilesHtml(): SafeHtml {
-  return renderPiles(sweepList(TODAY_PILES).map(pileView));
+  return renderPiles(pileList(TODAY_PILES).map(pileView));
 }
 
 export function piles(): Response {

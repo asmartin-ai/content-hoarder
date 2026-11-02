@@ -6,6 +6,13 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Suggestions in Clear.** Cards can offer a one-tap Keep or Archive suggestion with a reason,
+  from AI with per-library consent or from your triage history. Decisions feed agreement stats
+  and automatic background learning; Today can suggest an undoable learned pile to let go.
+- **Local tuning and pilot analytics.** `surface-stats` reports feature outcomes, calibration,
+  hint agreement and AI usage. Temporary, opt-in-at-deployment demo analytics records pilot
+  behaviour in each tester's library; `demo-events` reads it. See [AI suggestions](docs/ai-suggestions.md).
+
 - **Hosted mode: a library per account.** Each Google account signed in to a hosted instance
   reads and writes its own SQLite file (`data/users/<hash>.db`); `app.db` keeps only accounts,
   sessions and invites. Testers no longer see each other's items, and the privacy page says so.

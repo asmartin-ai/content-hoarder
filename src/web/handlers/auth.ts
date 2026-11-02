@@ -21,6 +21,8 @@ import {
   userExists,
 } from "../../hosted.ts";
 import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
+import { aiProviderIsZai, aiProviderLabel } from "../../assist/consent.ts";
+import { demoAnalyticsOn } from "../../demo_analytics.ts";
 import { html, type SafeHtml } from "../views/html.ts";
 import { libraryConnection, mainConnection, notePull, startPull } from "../state.ts";
 import { htmlResponse } from "../static.ts";
@@ -183,11 +185,34 @@ export function privacyPage(): Response {
         </li>
         <li>
           Your items are in a library of their own on one server for this pilot. Other testers can't
-          see them. Nothing is sold, shared or used to train AI.
+          see them. Nothing is sold. AI suggestions are off by default. If you turn them on, the
+          fields above for cards being dealt are sent to ${aiProviderLabel()} to get a suggestion.
+          ${
+            aiProviderIsZai()
+              ? html`The provider says it does not use API content to train unless the developer
+                  opts in, and it processes data mainly in Singapore — see the
+                  <a
+                    href="https://docs.z.ai/legal-agreement/terms-of-use"
+                    target="_blank"
+                    rel="noopener"
+                    >Z.ai terms of use</a
+                  >
+                  (§IV.7) and the API data processing addendum.`
+              : "The provider's own terms apply."
+          }
         </li>
         <li>Letting something go in Khaos never changes your YouTube, Twitch or Reddit account.</li>
         <li>Ask and your data is deleted, all of it.</li>
       </ul>
+      ${
+        demoAnalyticsOn()
+          ? html`<p class="auth-line">
+              During the pilot, Khaos records what you do in the app — screens opened, cards shown,
+              decisions and their timing, undos — in your own library file, so I can improve it. It
+              isn't shared or sold, and it's deleted with your library when the pilot ends.
+            </p>`
+          : ""
+      }
       <p class="auth-line">Contact: https://github.com/asmartin-ai/content-hoarder/issues</p>`,
   );
 }

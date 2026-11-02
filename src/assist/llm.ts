@@ -4,7 +4,15 @@ import * as config from "../config.ts";
 import { VALID_CATEGORIES } from "../categorize.ts";
 import * as db from "../db.ts";
 import { request } from "../_http.ts";
-import { ItemSchema, MetadataSchema, RawItemSchema, parseMetadata, type Item } from "../models.ts";
+import {
+  ItemSchema,
+  LlmSuggestionSchema,
+  MetadataSchema,
+  RawItemSchema,
+  parseMetadata,
+  type Item,
+} from "../models.ts";
+import { aiConfigured } from "./consent.ts";
 
 const SYSTEM =
   'You help someone with ADHD triage a backlog of saved content. For the given item, decide whether it is worth KEEPING or can be SKIPPED (archived), and propose 1-5 short lowercase topical tags. Be decisive and brief. Respond with ONLY compact JSON of the form {"verdict":"keep"|"skip","reason":"<one short sentence>","tags":["tag1","tag2"]}.';
@@ -12,14 +20,14 @@ const SYSTEM =
 const CLASSIFY_SYSTEM =
   'You categorize a saved video into exactly one processing area for someone with ADHD:\n- listenable: audio-first (music, albums, podcasts, long talks) — playable in the background.\n- watch: needs your eyes (tutorials, vlogs, visual demos, short clips).\n- wotagei: an idol-event glowstick/penlight performance.\n- unknown: genuinely unclear.\nRespond with ONLY compact JSON: {"category":"listenable"|"watch"|"wotagei"|"unknown","reason":"<short>"}.';
 
-const SuggestionSchema = z.object({
-  verdict: z.enum(["keep", "skip"]),
-  reason: z.string().max(200),
-  tags: z.array(z.string()).max(5),
-});
-
 const ChatResponseSchema = z.object({
   choices: z.array(z.object({ message: z.object({ content: z.string() }) })),
+  usage: z
+    .object({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+    })
+    .optional(),
 });
 
 const CategorySchema = z.object({
@@ -35,6 +43,7 @@ interface ChatPayload {
   stream: boolean;
   model?: string;
   reasoning_effort?: string;
+  thinking?: { type: string };
 }
 
 interface ChatHeaders {
@@ -43,7 +52,7 @@ interface ChatHeaders {
   "User-Agent": string;
 }
 
-export type Suggestion = z.infer<typeof SuggestionSchema>;
+export type Suggestion = z.infer<typeof LlmSuggestionSchema>;
 
 type Category = (typeof VALID_CATEGORIES)[number];
 
@@ -61,7 +70,18 @@ export interface ClassifySourceResult {
 }
 
 export function isAvailable(): boolean {
-  return Boolean(config.get("LLM_BASE_URL"));
+  return aiConfigured();
+}
+
+export interface LlmUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+function llmTimeout(): number {
+  const seconds = Number.parseInt(config.get("LLM_TIMEOUT_S"), 10);
+
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 12;
 }
 
 function itemText(item: Item): string {
@@ -85,8 +105,8 @@ function itemText(item: Item): string {
 async function chat(
   messages: Array<{ role: string; content: string }>,
   backend: "local" | "fireworks" = "local",
-  timeout = 60,
-): Promise<string> {
+  timeout = llmTimeout(),
+): Promise<{ content: string; usage?: LlmUsage }> {
   const fireworks = backend === "fireworks";
 
   const base = (
@@ -104,6 +124,7 @@ async function chat(
   if (model) payload.model = model;
 
   if (fireworks) payload.reasoning_effort = "none";
+  else if (config.get("LLM_DISABLE_THINKING") === "1") payload.thinking = { type: "disabled" };
   const localBase = new URL(base);
 
   const allowLoopback =
@@ -117,6 +138,7 @@ async function chat(
   };
 
   if (fireworks) headers.Authorization = `Bearer ${config.get("FIREWORKS_API_KEY")}`;
+  else if (config.get("LLM_API_KEY")) headers.Authorization = `Bearer ${config.get("LLM_API_KEY")}`;
 
   const [, , raw] = await request(`${base}/chat/completions`, {
     method: "POST",
@@ -132,7 +154,14 @@ async function chat(
 
   if (!content) throw new Error("invalid chat completion response");
 
-  return content;
+  const usage = parsed.usage
+    ? {
+        prompt_tokens: parsed.usage.prompt_tokens ?? 0,
+        completion_tokens: parsed.usage.completion_tokens ?? 0,
+      }
+    : undefined;
+
+  return { content, usage };
 }
 
 function extractJson<T>(text: string, schema: z.ZodType<T>): T | null {
@@ -151,23 +180,55 @@ function extractJson<T>(text: string, schema: z.ZodType<T>): T | null {
 }
 
 function parseSuggestion(text: string): Suggestion | null {
-  const parsed = extractJson(text, SuggestionSchema);
+  const parsed = extractJson(text, LlmSuggestionSchema);
 
   return parsed
     ? { ...parsed, tags: parsed.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean) }
     : null;
 }
 
-export async function suggest(item: Item): Promise<Suggestion | null> {
+export interface SuggestResult {
+  suggestion: Suggestion & { model: string; at: number };
+  usage?: LlmUsage;
+}
+
+export async function suggest(
+  item: Item,
+  opts: { chat?: ChatOverride } = {},
+): Promise<SuggestResult | null> {
   if (!isAvailable()) return null;
 
   try {
-    return parseSuggestion(
-      await chat([
-        { role: "system", content: SYSTEM },
-        { role: "user", content: itemText(item) },
-      ]),
-    );
+    const messages = [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: itemText(item) },
+    ];
+
+    let suggestion: Suggestion | null;
+    let usage: LlmUsage | undefined;
+
+    if (opts.chat) {
+      suggestion = parseSuggestion(await opts.chat(messages));
+    } else {
+      const response = await chat(messages);
+
+      suggestion = parseSuggestion(response.content);
+      usage = response.usage;
+    }
+
+    if (!suggestion) return null;
+
+    const result: SuggestResult = {
+      suggestion: {
+        ...suggestion,
+        model: config.get("LLM_MODEL"),
+        at: Math.floor(Date.now() / 1000),
+      },
+    };
+
+    if (usage) result.usage = usage;
+
+    return result;
   } catch {
     return null;
   }
@@ -180,15 +241,21 @@ export async function suggestAndStore(
   const item = db.getPublicItem(database, fullname);
 
   if (!item) return null;
-  const suggestion = await suggest(item);
+  const result = await suggest(item);
 
-  if (!suggestion) return null;
-  const metadata = MetadataSchema.parse({ ...parseMetadata(item.metadata), llm: suggestion });
-  database
-    .query("UPDATE items SET metadata=? WHERE fullname=?")
-    .run(JSON.stringify(metadata), fullname);
+  if (!result) return null;
+  const fresh = db.getItem(database, fullname);
 
-  return suggestion;
+  if (!fresh) return null;
+
+  const metadata = MetadataSchema.parse({
+    ...parseMetadata(fresh.metadata),
+    llm: result.suggestion,
+  });
+
+  db.writeItemMetadata(database, fresh, metadata);
+
+  return result.suggestion;
 }
 
 export async function suggestInbox(
@@ -214,7 +281,7 @@ export async function suggestInbox(
 const parseCategory = (text: string): { category: Category; reason: string } | null =>
   extractJson(text, CategorySchema);
 
-type ChatOverride = (messages: Array<{ role: string; content: string }>) => Promise<string>;
+export type ChatOverride = (messages: Array<{ role: string; content: string }>) => Promise<string>;
 
 export async function classify(
   item: Item,
@@ -232,13 +299,15 @@ export async function classify(
           { role: "system", content: CLASSIFY_SYSTEM },
           { role: "user", content: itemText(item) },
         ])
-      : await chat(
-          [
-            { role: "system", content: CLASSIFY_SYSTEM },
-            { role: "user", content: itemText(item) },
-          ],
-          backend === "fireworks" ? "fireworks" : "local",
-        );
+      : (
+          await chat(
+            [
+              { role: "system", content: CLASSIFY_SYSTEM },
+              { role: "user", content: itemText(item) },
+            ],
+            backend === "fireworks" ? "fireworks" : "local",
+          )
+        ).content;
 
     return parseCategory(content);
   } catch {

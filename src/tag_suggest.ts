@@ -392,7 +392,8 @@ export async function suggestFromLlm(db: Database, opts: { limit?: number; sourc
 
   for (const row of rows) {
     const item: Item = { ...row, metadata: parseMetadata(row.metadata) };
-    const proposal = await suggest(item);
+    const result = await suggest(item);
+    const proposal = result?.suggestion;
 
     if (!proposal) continue;
 

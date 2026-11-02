@@ -1,4 +1,4 @@
-const CACHE = "ch-shell-v151";
+const CACHE = "ch-shell-v153";
 
 const SHELL = [
   "/",
@@ -15,6 +15,7 @@ const SHELL = [
   "/static/add/add.js",
   "/static/core/ring.js",
   "/static/home/main.js",
+  "/static/home/ai-consent.js",
   "/static/home/round.js",
   "/static/vendor/htmx.min.js",
   "/static/theme.js",
@@ -23,6 +24,7 @@ const SHELL = [
   "/static/core/util.js",
   "/static/core/api.js",
   "/static/core/toast.js",
+  "/static/core/track.js",
   "/static/core/media.js",
   "/static/core/swipe.js",
   "/static/core/render.js",

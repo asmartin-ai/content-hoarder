@@ -1,5 +1,5 @@
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
@@ -43,6 +43,13 @@ import * as rsmThreads from "./rsm_threads.ts";
 import * as redgifs from "./redgifs_resolver.ts";
 import * as tagSuggest from "./tag_suggest.ts";
 import * as triageScore from "./triage_score.ts";
+import { formatSurfaceStats, surfaceStats } from "./surface_stats.ts";
+import {
+  demoEventsFromFile,
+  formatDemoEventsSummary,
+  mergeDemoEventsSummaries,
+  summarizeDemoEvents,
+} from "./demo_analytics.ts";
 import * as llm from "./assist/llm.ts";
 import * as resurface from "./resurface.ts";
 import * as karakeep from "./bridge/karakeep.ts";
@@ -103,6 +110,8 @@ const commandOptions = {
   consolidate: { apply: "boolean", undo: "boolean" },
   serve: { host: "string", port: "string", tls: "boolean" },
   stats: {},
+  "surface-stats": { json: "boolean", since: "string" },
+  "demo-events": { dir: "string", json: "boolean", raw: "boolean" },
   sources: {},
   bankruptcy: { before: "string", source: "string", "dry-run": "boolean" },
   decay: {
@@ -375,7 +384,7 @@ options:
 } as const;
 
 const pythonRootUsage = `usage: content_hoarder [-h] [--version]
-                       {init-db,import,reddit-hydrate-titles,enrich,categorize,reddit-hydrate,reddit-thumbnails,dedup,migrate-firefox-tabs,firefox-token,migrate-note-youtube,migrate-rsm-threads,consolidate,serve,stats,sources,bankruptcy,decay,promote,learn-triage,assist-auto-archive,delete,purge-done,scan-media,archive-media,ocr,export,export-obsidian,suggest,reddit-sync,hn-sync,reddit-unsave,reddit-oauth,triage-drift,snooze,folder,tag,resolve-redgifs} ...`;
+                       {init-db,import,reddit-hydrate-titles,enrich,categorize,reddit-hydrate,reddit-thumbnails,dedup,migrate-firefox-tabs,firefox-token,migrate-note-youtube,migrate-rsm-threads,consolidate,serve,stats,surface-stats,sources,bankruptcy,decay,promote,learn-triage,assist-auto-archive,delete,purge-done,scan-media,archive-media,ocr,export,export-obsidian,suggest,reddit-sync,hn-sync,reddit-unsave,reddit-oauth,triage-drift,snooze,folder,tag,resolve-redgifs} ...`;
 
 const nestedPositionalSpecs = {
   folder: {
@@ -573,7 +582,7 @@ interface CliParseOptions {
 
 const CliValueSchema = z.union([z.string(), z.boolean(), z.array(z.string())]);
 
-const help = `Local triage-first content manager.\n\nCommands:\n  init-db, import, enrich, categorize, dedup, serve, stats, sources, bankruptcy, decay, delete, purge-done, scan-media, archive-media, ocr, export, export-obsidian, promote, suggest, learn-triage, assist-auto-archive, triage-drift, snooze, reddit-sync, hn-sync, reddit-unsave, reddit-oauth, reddit-hydrate, reddit-hydrate-titles, reddit-thumbnails, migrate-firefox-tabs, firefox-token, migrate-note-youtube, migrate-rsm-threads, consolidate, folder, tag, resolve-redgifs\n\nUse <command> --help for command options.\n`;
+const help = `Local triage-first content manager.\n\nCommands:\n  init-db, import, enrich, categorize, dedup, serve, stats, surface-stats, demo-events, sources, bankruptcy, decay, delete, purge-done, scan-media, archive-media, ocr, export, export-obsidian, promote, suggest, learn-triage, assist-auto-archive, triage-drift, snooze, reddit-sync, hn-sync, reddit-unsave, reddit-oauth, reddit-hydrate, reddit-hydrate-titles, reddit-thumbnails, migrate-firefox-tabs, firefox-token, migrate-note-youtube, migrate-rsm-threads, consolidate, folder, tag, resolve-redgifs\n\nUse <command> --help for command options.\n`;
 
 function commandSchema(command: string): (typeof commandOptions)[CommandName] | null {
   if (!Object.hasOwn(commandOptions, command)) return null;
@@ -898,6 +907,86 @@ async function run(command: string, args: CliArgs): Promise<number> {
         json(db.getCounts(conn));
       } finally {
         conn.close();
+      }
+
+      return 0;
+    }
+
+    case "surface-stats": {
+      const conn = openDb();
+
+      try {
+        const report = surfaceStats(conn, { since: parseDate(text(args, "since"), "--since") });
+
+        if (bool(args, "json")) json(report);
+        else console.log(formatSurfaceStats(report));
+      } finally {
+        conn.close();
+      }
+
+      return 0;
+    }
+
+    case "demo-events": {
+      const dir = text(args, "dir");
+
+      const files = dir
+        ? readdirSync(dir)
+            .filter((name) => name.endsWith(".db"))
+            .sort()
+            .map((name) => join(dir, name))
+        : [config.dbPath()];
+
+      if (!files.length) throw new Error(`no .db files in ${dir}`);
+
+      for (const file of files)
+        if (!existsSync(file)) throw new Error(`database not found: ${file}`);
+
+      const reports = files.map((file) => {
+        try {
+          const rows = demoEventsFromFile(file);
+
+          return { file, rows, summary: summarizeDemoEvents(rows) };
+        } catch (error) {
+          throw new Error(
+            `${basename(file)}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      });
+
+      const total = mergeDemoEventsSummaries(reports.map((report) => report.summary));
+
+      if (bool(args, "raw")) {
+        for (const report of reports)
+          for (const row of report.rows) console.log(JSON.stringify(row));
+
+        return 0;
+      }
+
+      if (bool(args, "json")) {
+        json(
+          dir
+            ? {
+                files: reports.map((report) => ({
+                  file: basename(report.file),
+                  summary: report.summary,
+                })),
+                total,
+              }
+            : total,
+        );
+
+        return 0;
+      }
+
+      for (const report of reports) {
+        if (dir) console.log(`${basename(report.file)}:`);
+        console.log(formatDemoEventsSummary(report.summary));
+      }
+
+      if (dir) {
+        console.log(`total (${reports.length} files):`);
+        console.log(formatDemoEventsSummary(total));
       }
 
       return 0;

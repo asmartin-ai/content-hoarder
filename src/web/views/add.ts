@@ -96,13 +96,42 @@ function connectSection(): SafeHtml | string {
   </section>`;
 }
 
-export function renderAdd(pull: LibraryPull | undefined): SafeHtml {
+export interface AiSettingsView {
+  on: boolean;
+  provider: string;
+}
+
+function aiSection(ai: AiSettingsView | undefined): SafeHtml | string {
+  if (!ai) return "";
+
+  return html`<section class="add-section" data-ai-settings>
+    <h2>AI suggestions</h2>
+    <div class="add-connect">
+      <button
+        class="add-btn"
+        type="button"
+        data-ai-toggle
+        aria-pressed="${ai.on ? "true" : "false"}"
+      >
+        <span data-ai-toggle-state>${ai.on ? "On" : "Off"}</span>
+      </button>
+    </div>
+    <p class="add-help">
+      Keep or Let go hints on Clear cards, written by ${ai.provider}. You still decide every card.
+      Sends each dealt card's source, title, author, subreddit or channel, URL and the first 500
+      characters of its text.
+    </p>
+    <p class="add-note" data-ai-toggle-error hidden role="alert"></p>
+  </section>`;
+}
+
+export function renderAdd(pull: LibraryPull | undefined, ai?: AiSettingsView): SafeHtml {
   return html`<section class="add-page">
     <header class="add-head">
       <h1 class="add-title">Add your stuff</h1>
       <p class="add-sub">Bring in what you saved. Nothing changes in your accounts.</p>
     </header>
-    ${renderPull(pull)} ${connectSection()}
+    ${renderPull(pull)} ${connectSection()} ${aiSection(ai)}
     <section class="add-section">
       <h2>Tabs on your computer</h2>
       <ol class="add-steps">

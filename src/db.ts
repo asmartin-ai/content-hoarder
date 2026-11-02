@@ -2092,11 +2092,23 @@ function assertStatus(status: string): void {
   }
 }
 
+export type StatusHint = {
+  verdict: "keep" | "skip";
+  by: "ai" | "history";
+};
+
+export type HintAgreement = {
+  shown: number;
+  matched: number;
+  rate: number | null;
+  by: Record<"ai" | "history", { shown: number; matched: number }>;
+};
+
 export function setStatus(
   db: Database,
   fullname: string,
   status: string,
-  opts: { queueUnsave?: boolean } = {},
+  opts: { queueUnsave?: boolean; hint?: StatusHint } = {},
 ): Item | null {
   const queueUnsave = opts.queueUnsave ?? true;
 
@@ -2113,13 +2125,33 @@ export function setStatus(
 
   const now = Math.floor(Date.now() / 1000);
   const processed = status === "inbox" ? null : now;
+  const decided = status === "keep" || status === "archived" || status === "done" ? status : null;
+  const hint = opts.hint;
+
+  const hintJson =
+    hint && decided
+      ? JSON.stringify({
+          verdict: hint.verdict,
+          by: hint.by,
+          decided,
+          matched:
+            hint.verdict === "keep"
+              ? decided === "keep" || decided === "done"
+              : decided === "archived",
+          at: now,
+        })
+      : null;
+
+  const metadataSql = hintJson
+    ? `json_set(${_STRIP_DECAY_SQL}, '$.hint_outcome', json(?))`
+    : `json_remove(${_STRIP_DECAY_SQL}, '$.hint_outcome')`;
 
   return withTransaction(db, () => {
     run(
       db,
       `UPDATE items SET status=?, status_prev=?, processed_utc=?, ` +
-        `metadata=${_STRIP_DECAY_SQL} WHERE fullname=?`,
-      [status, old, processed, fullname],
+        `metadata=${metadataSql} WHERE fullname=?`,
+      hintJson ? [status, old, processed, hintJson, fullname] : [status, old, processed, fullname],
     );
 
     if (status === "done" && queueUnsave && unsaveEnabled(db)) {
@@ -2146,12 +2178,13 @@ export function undoStatus(db: Database, fullname: string): Item | null {
   const prev = String(r.status_prev);
   const now = Math.floor(Date.now() / 1000);
   const processed = prev === "inbox" ? null : now;
+  const metadataSql = `json_remove(${_STRIP_DECAY_SQL}, '$.hint_outcome')`;
 
   return withTransaction(db, () => {
     run(
       db,
       `UPDATE items SET status=?, status_prev=NULL, processed_utc=?, ` +
-        `metadata=${_STRIP_DECAY_SQL} WHERE fullname=?`,
+        `metadata=${metadataSql} WHERE fullname=?`,
       [prev, processed, fullname],
     );
 
@@ -2163,12 +2196,51 @@ export function undoStatus(db: Database, fullname: string): Item | null {
   });
 }
 
+export function hintAgreement(db: Database): HintAgreement {
+  const result: HintAgreement = {
+    shown: 0,
+    matched: 0,
+    rate: null,
+    by: {
+      ai: { shown: 0, matched: 0 },
+      history: { shown: 0, matched: 0 },
+    },
+  };
+
+  const groups = rows<{ hint_by: string; shown: number; matched: number }>(
+    db,
+    "SELECT json_extract(metadata, '$.hint_outcome.by') AS hint_by, " +
+      "COUNT(*) AS shown, " +
+      "SUM(CASE WHEN json_extract(metadata, '$.hint_outcome.matched') = 1 THEN 1 ELSE 0 END) AS matched " +
+      "FROM items WHERE json_extract(metadata, '$.hint_outcome.by') IN ('ai', 'history') " +
+      "GROUP BY hint_by",
+  );
+
+  for (const group of groups) {
+    const by = group.hint_by === "ai" || group.hint_by === "history" ? group.hint_by : null;
+
+    if (!by) continue;
+    const shown = Number(group.shown) || 0;
+    const matched = Number(group.matched) || 0;
+
+    result.by[by].shown += shown;
+    result.by[by].matched += matched;
+    result.shown += shown;
+    result.matched += matched;
+  }
+
+  result.rate = result.shown === 0 ? null : result.matched / result.shown;
+
+  return result;
+}
+
 export function bulkSetStatus(db: Database, fullnames: string[], status: string): number {
   assertStatus(status);
 
   const now = Math.floor(Date.now() / 1000);
   const processed = status === "inbox" ? null : now;
   const enqueue = status === "done" && unsaveEnabled(db);
+  const metadataSql = `json_remove(${_STRIP_DECAY_SQL}, '$.hint_outcome')`;
   const changed: string[] = [];
   let count = 0;
 
@@ -2177,7 +2249,7 @@ export function bulkSetStatus(db: Database, fullnames: string[], status: string)
       const n = run(
         db,
         `UPDATE items SET status_prev=status, status=?, processed_utc=?, ` +
-          `metadata=${_STRIP_DECAY_SQL} WHERE fullname=? AND status<>?`,
+          `metadata=${metadataSql} WHERE fullname=? AND status<>?`,
         [status, processed, fn, status],
       );
 

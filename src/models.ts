@@ -107,6 +107,16 @@ const _optionalStrings = z.array(z.string()).optional().catch(undefined);
 
 const _optionalPromotedBy = z.enum(["consolidate", "note_youtube"]).optional().catch(undefined);
 
+export const LlmSuggestionSchema = z.object({
+  verdict: z.enum(["keep", "skip"]),
+  reason: z.string().max(200),
+  tags: z.array(z.string()).optional().default([]),
+  model: z.string().optional(),
+  at: z.number().optional(),
+});
+
+export type LlmSuggestion = z.infer<typeof LlmSuggestionSchema>;
+
 const _CompanionSchema = z
   .object({
     source: z.string(),

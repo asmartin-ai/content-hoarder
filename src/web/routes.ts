@@ -31,16 +31,28 @@ import {
   requestZone,
 } from "./http.ts";
 import { connection, libraryConnection, mainConnection, withLibrary } from "./state.ts";
-import { handleItemAction } from "./handlers/items.ts";
+import {
+  ClientEventsBody,
+  MAX_CLIENT_BODY_BYTES,
+  demoAnalyticsOn,
+  recordClientEvents,
+} from "../demo_analytics.ts";
+import { handleBulkStatus, handleItemAction } from "./handlers/items.ts";
 import {
   commitImport,
   importFirefoxTabs,
   importUpload,
   prepareImport,
 } from "./handlers/imports.ts";
-import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
+import {
+  aiSettings,
+  drainUnsave,
+  enqueueUnsaveByTag,
+  purgeDone,
+  updateAiSettings,
+} from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
-import { clearPage, deal } from "./handlers/clear.ts";
+import { clearHints, clearPage, deal } from "./handlers/clear.ts";
 import { addPage, pullStatus } from "./handlers/add.ts";
 import { homePage } from "./handlers/home.ts";
 import {
@@ -138,6 +150,60 @@ async function route(request: Request): Promise<Response> {
   return sub ? withLibrary(libraryConnection(sub), () => appRoute(request)) : appRoute(request);
 }
 
+async function collectEvents(request: Request): Promise<Response> {
+  if (!demoAnalyticsOn()) return new Response(null, { status: 204 });
+
+  const declared = Number(request.headers.get("content-length") ?? "");
+
+  if (Number.isFinite(declared) && declared > MAX_CLIENT_BODY_BYTES)
+    return json({ error: "event batch too large" }, 413);
+
+  const reader = request.body?.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let size = 0;
+
+  if (reader) {
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+
+        if (chunk.done) break;
+
+        size += chunk.value.byteLength;
+
+        if (size > MAX_CLIENT_BODY_BYTES) {
+          await reader.cancel().catch(() => {});
+
+          return json({ error: "event batch too large" }, 413);
+        }
+
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+
+      text += decoder.decode();
+    } catch {
+      return json({ error: "invalid event batch" }, 400);
+    }
+  }
+
+  let value: unknown;
+
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return json({ error: "invalid event batch" }, 400);
+  }
+
+  const body = ClientEventsBody.safeParse(value);
+
+  if (!body.success) return json({ error: "invalid event batch" }, 400);
+
+  recordClientEvents(connection(), body.data);
+
+  return new Response(null, { status: 204 });
+}
+
 async function appRoute(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -165,6 +231,10 @@ async function appRoute(request: Request): Promise<Response> {
 
   try {
     if (method === "GET" && path === "/clear/deal") return deal(url);
+
+    if (method === "GET" && path === "/clear/hints") return clearHints(url);
+
+    if (method === "POST" && path === "/events") return await collectEvents(request);
 
     if (method === "GET" && path === "/hx/today/upnext") return upNext(request, url);
 
@@ -482,17 +552,7 @@ async function appRoute(request: Request): Promise<Response> {
       return json({ resaved: await redditUnsave.resave(connection(), fullname) });
     }
 
-    if (method === "POST" && path === "/bulk/status") {
-      const body = z
-        .object({ fullnames: z.array(z.string()), status: z.string() })
-        .parse(await request.json().catch(() => ({})));
-
-      try {
-        return json({ updated: db.bulkSetStatus(connection(), body.fullnames, body.status) });
-      } catch (error) {
-        return json({ error: error instanceof Error ? error.message : String(error) }, 400);
-      }
-    }
+    if (method === "POST" && path === "/bulk/status") return handleBulkStatus(request);
 
     if (method === "POST" && path === "/snooze/undo") {
       const body = await objectBody(request, SnoozeUndoBody);
@@ -640,6 +700,10 @@ async function appRoute(request: Request): Promise<Response> {
 
       return json({ results: folders.evaluateAllFolders(connection()) });
     }
+
+    if (method === "GET" && path === "/settings/ai") return aiSettings();
+
+    if (method === "POST" && path === "/settings/ai") return await updateAiSettings(request);
 
     if (method === "GET" && path === "/settings/done-retention") {
       const database = connection();

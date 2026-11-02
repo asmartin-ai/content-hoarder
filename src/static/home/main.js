@@ -1,6 +1,7 @@
 import { postJSON } from "../core/api.js";
 import { isTypingTarget } from "../core/util.js";
 import { snackbar } from "../core/toast.js";
+import { track } from "../core/track.js";
 
 const page = document.body.dataset.page;
 
@@ -32,6 +33,28 @@ document.body.addEventListener("ch:toast", (e) => {
       swap: "outerHTML",
     });
   });
+});
+
+const pileKind = (detail) => {
+  try {
+    return (
+      detail.requestConfig?.parameters?.kind ||
+      JSON.parse(detail.elt?.getAttribute?.("hx-vals") || "{}").kind ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+};
+
+document.body.addEventListener("htmx:afterRequest", (e) => {
+  const detail = e.detail || {};
+
+  if (document.body.dataset.analytics !== "1" || !detail.successful) return;
+  const path = (detail.pathInfo?.requestPath || "").split("?")[0];
+
+  if (path === "/hx/sweeps/apply") track("pile_apply", { kind: pileKind(detail) });
+  else if (path === "/hx/sweeps/undo") track("pile_undo", {});
 });
 
 document.addEventListener("click", (e) => {

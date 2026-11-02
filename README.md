@@ -99,6 +99,8 @@ trusted private network; never expose this personal-data application publicly.
 | `reddit-thumbnails [--apply] [--limit N]` | Backfill Reddit thumbnails (esp. `v.redd.it` video posters) from already-cached thread blobs — zero network. Dry-run by default. |
 | `serve [--host HOST] [--port PORT] [--tls]` | Start the local web app (default `127.0.0.1:8788`). |
 | `stats` | Print item counts by source/kind/status. |
+| `surface-stats [--since YYYY-MM-DD] [--json]` | Local-only (no telemetry) triage analytics: decision rates excluding decay sweeps, per-family keep rates with Wilson 95% intervals, hint agreement, triage-score calibration deciles, and estimated LLM cost. Prints a text report; `--json` emits the full object. |
+| `demo-events [--dir USERS_DIR] [--json] [--raw]` | Read-only pilot telemetry report from the `demo_events` table (opt-in via `CONTENT_HOARDER_DEMO_ANALYTICS=1`). Without `--dir` it reports the current `CONTENT_HOARDER_DB`; `--dir` summarises every `*.db` in a hosted users directory plus totals. `--json` emits the object; `--raw` dumps events as JSONL. |
 | `sources` | List the registered import connectors. |
 | `bankruptcy --before YYYY-MM-DD [--source ID] [--dry-run]` | Reversibly bulk-archive inbox items older than a date. |
 | `decay --tag T... [--subreddit S...] [--before DATE] [--label swept] [--apply] [--undo]` | Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped per wave + reversible (`--undo` selects a wave by `--decayed-after/--decayed-before`). Pull decayed items with the `is:decayed` / `is:swept` search operators. |

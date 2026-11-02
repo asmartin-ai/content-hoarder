@@ -193,7 +193,7 @@ export function resolveGroup(
     for (const fullname of fullnames) {
       archived += db
         .query(
-          "UPDATE items SET status_prev=status,status='archived',processed_utc=?,metadata=json_remove(metadata,'$.decayed_at','$.decay_label','$.snoozed_until','$.snoozed_wave') WHERE fullname=? AND status<>'archived'",
+          "UPDATE items SET status_prev=status,status='archived',processed_utc=?,metadata=json_remove(metadata,'$.decayed_at','$.decay_label','$.snoozed_until','$.snoozed_wave','$.hint_outcome') WHERE fullname=? AND status<>'archived'",
         )
         .run(now, fullname).changes;
       updateMetadata(db, fullname, (metadata) => {
@@ -233,7 +233,7 @@ export function undoResolve(db: Database, fullnames: string[]): UndoResolveResul
       if (item && transition && transition.status_prev !== null) {
         const previous = transition.status_prev;
         db.query(
-          "UPDATE items SET status=?,status_prev=NULL,processed_utc=?,metadata=json_remove(metadata,'$.decayed_at','$.decay_label','$.snoozed_until','$.snoozed_wave') WHERE fullname=?",
+          "UPDATE items SET status=?,status_prev=NULL,processed_utc=?,metadata=json_remove(metadata,'$.decayed_at','$.decay_label','$.snoozed_until','$.snoozed_wave','$.hint_outcome') WHERE fullname=?",
         ).run(previous, previous === "inbox" ? null : Math.floor(Date.now() / 1000), fullname);
 
         if (transition.status === "done") dequeueUnsave(db, fullname);
