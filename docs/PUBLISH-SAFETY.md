@@ -189,9 +189,18 @@ reachable by SHA after any rewrite. Deleting the branch tip is not a removal.
 ## CI gate
 
 `.github/workflows/leak-scan.yml` runs on every push and PR in the public repo: the gitleaks action
-for the pushed commits, then a `gitleaks git` pass over every commit (`fetch-depth: 0`), with
-`.gitleaks.toml` as the allowlist for documented fixtures, plus a tracked-file scan for personal
-machine paths and Tailscale addresses. The allowlist holds fixture paths only — no denylist terms.
+for the pushed commits, then a `gitleaks git` pass over every commit (`fetch-depth: 0`), plus a
+tracked-file scan for personal machine paths and Tailscale addresses.
+
+`.gitleaks.toml` allowlists two things only: the two publication-safety test files (they commit
+deliberate synthetic credentials) and the `"key": "epic-…"` backlog id that trips
+`generic-api-key` entropy. It carries one `[allowlist]` block because that schema works across
+gitleaks versions; commit-scoped allowlists do not — 8.x silently ignores a `commits` field, so
+scoping is by path and line regex. No denylist terms.
+
+Rule sets differ between gitleaks releases: 8.24.3 (what `gitleaks-action` installs by default at
+time of writing) reports findings that 8.30.1 does not. Verify with the action's binary
+(`GITLEAKS_VERSION`) before trusting a local `no leaks found`.
 
 ## Open decisions (deferred to user)
 
