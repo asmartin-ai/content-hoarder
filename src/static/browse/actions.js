@@ -5,7 +5,7 @@ import { isNsfw } from "./render.js";
 import { canOpenInReader } from "./reader.js";
 import { $, $$, state, itemsEl, selected, nsfwRevealed, COPY } from "./shared.js";
 import { clearItemFirstPageCache } from "./data.js";
-import { render, rowEl } from "./feed.js";
+import { removeRow, render, rowEl } from "./feed.js";
 import { openMediaFor } from "./lightbox.js";
 import { readerUI, tagEditor } from "./instances.js";
 
@@ -16,38 +16,9 @@ export async function act(fullname, status, opts = {}) {
 
   if (window.chHaptic) window.chHaptic(status);
 
-  if (opts.fromReader) {
-    try {
-      await api.setStatus(fullname, status);
-    } catch {
-      toast("That didn't stick — try again.");
-
-      return;
-    }
-
-    const item = state.items.find((it) => it.fullname === fullname);
-    const prevStatus = item ? item.status : null;
-
-    if (item) item.status = status;
-
-    snackbar(COPY[status] || "Logged.", async () => {
-      if (window.chHaptic) window.chHaptic("undo");
-
-      try {
-        await api.undoItem(fullname);
-
-        if (item) item.status = prevStatus;
-      } catch {
-        toast("Undo failed.");
-      }
-    });
-
-    return;
-  }
-
   const row = rowEl(fullname);
 
-  if (row && !row.classList.contains("leaving")) {
+  if (row && !opts.fromReader && !row.classList.contains("leaving")) {
     row.classList.add("leaving", "lv-" + status);
     await new Promise((r) => setTimeout(r, 180));
   }
@@ -66,7 +37,8 @@ export async function act(fullname, status, opts = {}) {
   const undoItem = undoIdx >= 0 ? state.items[undoIdx] : null;
   state.items = state.items.filter((it) => it.fullname !== fullname);
 
-  render();
+  if (undoItem) state.offset = Math.max(0, state.offset - 1);
+  removeRow(fullname);
   snackbar(COPY[status] || "Logged.", async () => {
     if (window.chHaptic) window.chHaptic("undo");
 
@@ -76,6 +48,7 @@ export async function act(fullname, status, opts = {}) {
 
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
         state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
+        state.offset += 1;
       }
 
       render();
@@ -91,44 +64,9 @@ export async function snooze(fullname, opts = {}) {
 
   if (window.chHaptic) window.chHaptic("skip");
 
-  if (opts.fromReader) {
-    let res;
-
-    try {
-      res = await api.snoozeItem(fullname, { window_days: 7 });
-    } catch {
-      toast("Snooze didn't stick - try again.");
-
-      return;
-    }
-
-    const item = state.items.find((it) => it.fullname === fullname);
-    const prevStatus = item ? item.status : null;
-    const escalated = !!(res && res.decayed_at);
-
-    if (item && escalated) item.status = "archived";
-
-    snackbar(escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.", async () => {
-      try {
-        const undoBody =
-          res && res.snoozed_wave
-            ? { snoozed_wave: res.snoozed_wave }
-            : { decayed_at: res.decayed_at };
-
-        await api.undoSnooze(undoBody);
-
-        if (item) item.status = prevStatus;
-      } catch {
-        toast("Undo failed.");
-      }
-    });
-
-    return;
-  }
-
   const row = rowEl(fullname);
 
-  if (row && !row.classList.contains("leaving")) {
+  if (row && !opts.fromReader && !row.classList.contains("leaving")) {
     row.classList.add("leaving", "lv-snooze");
     await new Promise((r) => setTimeout(r, 180));
   }
@@ -150,7 +88,8 @@ export async function snooze(fullname, opts = {}) {
   state.items = state.items.filter((it) => it.fullname !== fullname);
   const escalated = !!(res && res.decayed_at);
 
-  render();
+  if (undoItem) state.offset = Math.max(0, state.offset - 1);
+  removeRow(fullname);
   snackbar(escalated ? "Archived after repeat snoozes." : "Snoozed for 7 days.", async () => {
     try {
       const undoBody =
@@ -163,6 +102,7 @@ export async function snooze(fullname, opts = {}) {
 
       if (undoItem && !state.items.some((it) => it.fullname === fullname)) {
         state.items.splice(Math.min(undoIdx, state.items.length), 0, undoItem);
+        state.offset += 1;
       }
 
       render();

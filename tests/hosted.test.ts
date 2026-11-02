@@ -167,6 +167,21 @@ test("hosted mode sends strangers to sign-in and rejects other hosts", async () 
   expect(api.status).toBe(401);
 });
 
+test("a signed-out htmx fragment asks the page to go to sign-in", async () => {
+  const fragment = await handle(
+    new Request(`${ORIGIN}/hx/today/upnext`, { headers: { host: HOST, "hx-request": "true" } }),
+  );
+
+  expect(fragment.status).toBe(401);
+  expect(fragment.headers.get("hx-redirect")).toBe("/auth/login");
+});
+
+test("a malformed address is not found, not a crash", async () => {
+  expect((await handle(request("/invite/%E0%A4%A"))).status).toBe(404);
+  delete process.env.CONTENT_HOARDER_PUBLIC_ORIGIN;
+  expect((await handle(request("/media/%E0%A4%A", {}, "127.0.0.1:8788"))).status).toBe(404);
+});
+
 test("public sign-in pages refuse to be framed", async () => {
   for (const path of ["/auth/login", "/privacy", "/invite/not-a-real-token"]) {
     const response = await handle(request(path));
@@ -327,4 +342,29 @@ test("each account has its own library", async () => {
   expect(listings[0]).toContain('"status":"keep"');
   expect(listings[1]).not.toContain('"status":"keep"');
   expect(connection().query("SELECT COUNT(*) AS n FROM items").get()).toEqual({ n: 0 });
+
+  const post = (path: string, session: string, body: FormData | string, type?: string) => {
+    const headers = new Headers({ host: HOST, origin: ORIGIN, cookie: `ch_session=${session}` });
+
+    if (type) headers.set("content-type", type);
+
+    return handle(new Request(`${ORIGIN}${path}`, { method: "POST", headers, body }));
+  };
+
+  const form = new FormData();
+
+  form.append("file", new File(["https://example.com/a"], "links.txt"));
+  form.append("source", "links");
+
+  const { token } = z
+    .object({ token: z.string() })
+    .parse(await (await post("/import/prepare", first, form)).json());
+
+  const commit = (session: string) =>
+    post("/import/commit", session, JSON.stringify({ token }), "application/json");
+
+  expect((await commit(second)).status).toBe(400);
+  expect((await commit(first)).status).toBe(200);
+  expect(countSource("friend-a", "bookmarks")).toBe(1);
+  expect(countSource("friend-b", "bookmarks")).toBe(0);
 });

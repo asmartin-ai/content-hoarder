@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { dispatch, get } from "../../connectors/registry.ts";
+import { type BaseConnector, dispatch, get } from "../../connectors/registry.ts";
 import * as firefoxTabs from "../../firefox_tabs.ts";
 import { importPath } from "../../pipeline.ts";
 import { resolveYouTubeUrl } from "../../youtube.ts";
@@ -16,6 +16,17 @@ import {
   takeImport,
 } from "../state.ts";
 import { CommitImportBody, ExistingCountSchema, PrepareImportBody } from "../schemas.ts";
+
+const UNSUPPORTED =
+  "Khaos can't read that file yet. Try a bookmarks export, a list of links, or a Reddit file.";
+
+function pickConnector(path: string, source: string | undefined): BaseConnector | null {
+  try {
+    return source ? get(source) : dispatch(path);
+  } catch {
+    return null;
+  }
+}
 
 export async function importFirefoxTabs(request: Request): Promise<Response> {
   const raw = z.json().safeParse(await request.json().catch(() => null));
@@ -120,7 +131,14 @@ export async function prepareImport(request: Request): Promise<Response> {
   if (!stagedPath) return json({ error: "Provide a file or a YouTube URL." }, 400);
 
   try {
-    const connector = source ? get(source) : dispatch(stagedPath);
+    const connector = pickConnector(stagedPath, source);
+
+    if (!connector) {
+      unlinkSync(stagedPath);
+
+      return json({ error: UNSUPPORTED }, 400);
+    }
+
     const items = connector.importFile(stagedPath);
 
     if (!items.length) {

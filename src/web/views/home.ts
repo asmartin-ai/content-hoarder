@@ -200,7 +200,7 @@ function receiptsPanel(): SafeHtml {
           html`<li>
             <span class="o-agent">${row.agent}</span>
             <span class="o-did">${row.did}</span>
-            <a class="o-btn" href="#agents">${row.ask}</a>
+            <span class="o-btn" aria-disabled="true">${row.ask}</span>
           </li>`,
       )}
     </ul>
@@ -217,8 +217,8 @@ function patternsPanel(): SafeHtml {
             <span class="o-seen">${row.seen}</span>
             <span class="o-offer">${row.offer}</span>
             <span class="o-yesno"
-              ><a class="o-btn is-keep" href="#patterns">Yes</a
-              ><a class="o-btn" href="#patterns">No</a></span
+              ><span class="o-btn is-keep" aria-disabled="true">Yes</span
+              ><span class="o-btn" aria-disabled="true">No</span></span
             >
           </li>`,
       )}

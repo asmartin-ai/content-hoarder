@@ -211,6 +211,13 @@ export function gate(db: Database, request: Request): Response | null {
 
   if (wantsPage) return new Response(null, { status: 302, headers: { location: "/auth/login" } });
 
+  if (request.headers.get("hx-request")) {
+    return Response.json(
+      { error: "sign in" },
+      { status: 401, headers: { "HX-Redirect": "/auth/login" } },
+    );
+  }
+
   return Response.json({ error: "sign in" }, { status: 401 });
 }
 

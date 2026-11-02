@@ -31,6 +31,8 @@ async function send(path, init) {
   const response = await fetch(path, { credentials: "same-origin", ...init });
   const body = await response.json().catch(() => ({}));
 
+  if (response.status === 401) location.assign("/auth/login");
+
   if (!response.ok) throw new Error(body.error || `Server answered ${response.status}`);
 
   return body;
@@ -49,7 +51,10 @@ async function prepareFile(file, source = "") {
     const result = await send("/import/prepare", { method: "POST", body: form });
 
     token = result.token;
-    previewLine.textContent = `${result.new} new of ${result.count} from ${result.label}.`;
+    previewLine.textContent = result.new
+      ? `${result.new} new of ${result.count} from ${result.label}.`
+      : `All ${result.count} from ${result.label} are already here.`;
+    $("add-commit").textContent = result.new ? "Add them" : "Update them";
     previewList.replaceChildren(
       ...result.sample.map((entry) => {
         const item = document.createElement("li");
@@ -72,6 +77,10 @@ async function commit() {
   const button = $("add-commit");
 
   button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  const label = button.textContent;
+
+  button.textContent = "Adding…";
 
   try {
     const result = await send("/import/commit", {
@@ -87,6 +96,8 @@ async function commit() {
     say(error.message, "is-error");
   } finally {
     button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = label;
   }
 }
 

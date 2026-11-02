@@ -3,7 +3,7 @@ import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 import { $, $$, state, facets, itemsEl, saveView } from "./shared.js";
 import { paintPulse } from "./chrome.js";
-import { render } from "./feed.js";
+import { appendRows, render } from "./feed.js";
 import { renderDrawer } from "./drawer.js";
 import {
   PREFETCH_LIMITS,
@@ -113,14 +113,22 @@ export async function loadItems(reset) {
     if (gen !== loadGen) return;
 
     if (!fromCache) itemFirstPageCache.set(query, r);
-    state.items = state.items.concat(r.items);
+    const seen = new Set(state.items.map((item) => item.fullname));
+    const start = state.items.length;
+    const added = r.items.filter((item) => !seen.has(item.fullname));
+
+    state.items = state.items.concat(added);
     state.hasMore = r.has_more;
     state.offset += r.items.length;
-    render();
+    state.loading = false;
+
+    if (reset) render();
+    else appendRows(added, start);
 
     if (reset) warmItemFirstPages();
   } catch {
     if (gen === loadGen) {
+      state.loading = false;
       itemsEl.classList.remove("loading");
       itemsEl.innerHTML = '<div class="skeleton">COULDN’T LOAD — IS THE SERVER UP?</div>';
     }

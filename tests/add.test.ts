@@ -142,7 +142,10 @@ test("pasted links preview and then land in an empty library", async () => {
     );
 
     expect(committed.imported).toBe(2);
-    expect(await (await fetch(`${base}/hx/today/upnext?n=10`)).text()).toContain("Clear 10");
+    const upNext = await (await fetch(`${base}/hx/today/upnext?n=10`)).text();
+
+    expect(upNext).toContain("Clear 2");
+    expect(upNext).not.toContain("Clear 10");
   });
 });
 

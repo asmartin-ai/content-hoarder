@@ -1,5 +1,7 @@
-const rejectResponse = (r) =>
-  r
+const rejectResponse = (r) => {
+  if (r.status === 401) location.assign("/auth/login");
+
+  return r
     .clone()
     .json()
     .catch(() => null)
@@ -7,6 +9,7 @@ const rejectResponse = (r) =>
       r.data = data;
       throw r;
     });
+};
 
 export const getJSON = (url, opts) =>
   fetch(url, opts).then((r) => (r.ok ? r.json() : rejectResponse(r)));

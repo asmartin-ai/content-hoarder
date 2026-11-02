@@ -367,8 +367,8 @@ export function listHtml(items, state, opts) {
   const grouped = state.sort === "first_seen_utc:desc";
 
   let html = "",
-    last = null,
-    n = 0;
+    last = grouped && o.after ? groupLabel(o.after, now) : null,
+    n = o.start || 0;
 
   for (const it of items) {
     n += 1;

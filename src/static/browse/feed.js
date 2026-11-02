@@ -19,35 +19,69 @@ export function render() {
     return;
   }
 
-  itemsEl.innerHTML = listHtml(state.items, state, {
-    view: state.status,
-    curated: state.curated,
-    nsfwRevealed: false,
-  });
-  $$(".row, .pin").forEach((row) => {
-    const fn = row.dataset.fullname;
+  itemsEl.innerHTML = listHtml(state.items, state, listOpts());
+  $$(".row, .pin").forEach(wireRow);
+}
 
-    if (selected.has(fn)) row.classList.add("selected");
+export function appendRows(items, start) {
+  if (!start || !itemsEl.querySelector("[data-fullname]")) return render();
 
-    if (nsfwRevealed.has(fn)) {
-      row
-        .querySelectorAll(".monitor.nsfw, .screen.nsfw")
-        .forEach((el) => el.classList.remove("nsfw"));
-    }
+  const before = itemsEl.children.length;
 
-    if (row.classList.contains("row")) {
-      attachSwipe(row, {
-        commit: 80,
-        commit2: 170,
-        onRight: () => act(fn, "archived"),
-        onRightLong: () => act(fn, "keep"),
-        onLeft: () => act(fn, "done"),
-        onLeftLong: () => snooze(fn),
-        onLongPress: () => openRowMenu(fn),
-        onRelayClose: () => closeRelay(),
-      });
-    }
-  });
+  itemsEl.insertAdjacentHTML(
+    "beforeend",
+    listHtml(items, state, { ...listOpts(), start, after: state.items[start - 1] }),
+  );
+
+  for (const el of [...itemsEl.children].slice(before)) {
+    if (el.matches(".row, .pin")) wireRow(el);
+  }
+}
+
+export function removeRow(fullname) {
+  const row = rowEl(fullname);
+  const numbered = state.density !== "comfortable" && state.density !== "card";
+
+  if (!row || numbered || !state.items.length) return render();
+
+  const prev = row.previousElementSibling;
+  const next = row.nextElementSibling;
+
+  row.remove();
+
+  if (prev?.classList.contains("grouphead") && (!next || next.classList.contains("grouphead")))
+    prev.remove();
+  syncSelectionToVisibleItems();
+  paintBulk();
+}
+
+function listOpts() {
+  return { view: state.status, curated: state.curated, nsfwRevealed: false };
+}
+
+function wireRow(row) {
+  const fn = row.dataset.fullname;
+
+  if (selected.has(fn)) row.classList.add("selected");
+
+  if (nsfwRevealed.has(fn)) {
+    row
+      .querySelectorAll(".monitor.nsfw, .screen.nsfw")
+      .forEach((el) => el.classList.remove("nsfw"));
+  }
+
+  if (row.classList.contains("row")) {
+    attachSwipe(row, {
+      commit: 80,
+      commit2: 170,
+      onRight: () => act(fn, "archived"),
+      onRightLong: () => act(fn, "keep"),
+      onLeft: () => act(fn, "done"),
+      onLeftLong: () => snooze(fn),
+      onLongPress: () => openRowMenu(fn),
+      onRelayClose: () => closeRelay(),
+    });
+  }
 }
 
 export function rowEl(fullname) {

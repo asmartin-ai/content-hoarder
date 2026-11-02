@@ -124,13 +124,16 @@ if ("serviceWorker" in navigator)
   });
 
 (function autoSyncOnOpen() {
-  let lastPing = 0;
+  const KEY = "ch.syncPing";
 
   function ping() {
     const now = Date.now();
 
-    if (now - lastPing < 60000) return;
-    lastPing = now;
+    try {
+      if (now - (Number(sessionStorage.getItem(KEY)) || 0) < 60000) return;
+      sessionStorage.setItem(KEY, String(now));
+    } catch {}
+
     postJSON("/reddit/sync/auto", {}).catch(() => {});
   }
 

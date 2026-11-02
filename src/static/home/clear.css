@@ -25,7 +25,7 @@ body.is-round.has-tabbar {
 .round-bar {
   display: grid;
   flex: none;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
@@ -35,7 +35,8 @@ body.is-round.has-tabbar {
 }
 
 .round-x,
-.undo {
+.undo,
+.round-help {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -69,8 +70,83 @@ body.is-round.has-tabbar {
   cursor: default;
 }
 
-.round:is([data-state="done"], [data-state="empty"]) .undo {
+.round[data-state="empty"] .undo {
   visibility: hidden;
+}
+
+.round-help {
+  margin-right: -6px;
+  font-size: var(--fs-md);
+}
+
+.howto {
+  width: min(420px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: var(--sp-5, 1.25rem);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--r-lg, 20px);
+  background: var(--surface-card);
+  color: var(--text-body);
+  overflow: auto;
+}
+
+.howto::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.howto-title {
+  margin: 0 0 var(--sp-4, 1rem);
+  font: var(--fw-bold) var(--fs-lg, 1.25rem) / 1.2 var(--font-display, var(--font-sans));
+}
+
+.howto-list {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.howto-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.howto-list .act-orb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.howto-text {
+  font: var(--fw-regular, 400) var(--fs-sm) / 1.35 var(--font-sans);
+}
+
+.howto-text b {
+  color: var(--verb);
+}
+
+.howto-text small {
+  display: block;
+  color: var(--text-muted);
+}
+
+.howto-foot {
+  margin: var(--sp-4, 1rem) 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.howto-ok {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--ember-fill);
+  color: var(--ember-fill-ink);
+  font: var(--fw-bold) var(--fs-md) / 1 var(--font-sans);
+  cursor: pointer;
 }
 
 @media (hover: hover) {

@@ -112,6 +112,16 @@ async function hostedRoute(
 }
 
 export async function handle(request: Request): Promise<Response> {
+  try {
+    return await route(request);
+  } catch (error) {
+    if (error instanceof URIError) return json({ error: "not found" }, 404);
+
+    throw error;
+  }
+}
+
+async function route(request: Request): Promise<Response> {
   const forbidden = guard(request);
 
   if (forbidden) return forbidden;
@@ -719,6 +729,8 @@ async function appRoute(request: Request): Promise<Response> {
       );
 
     if (error instanceof SyntaxError) return json({ error: "invalid request body" }, 400);
+
+    if (error instanceof URIError) return json({ error: "not found" }, 404);
 
     return json({ error: error instanceof Error ? error.message : "request failed" }, 500);
   }

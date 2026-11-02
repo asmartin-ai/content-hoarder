@@ -36,6 +36,59 @@ function act(opts: {
   </button>`;
 }
 
+const GUIDE: { cls: string; glyph: IconName; label: string; means: string; how: string }[] = [
+  {
+    cls: "act-done",
+    glyph: "check",
+    label: "Done",
+    means: "You got what you needed from it.",
+    how: "Swipe left",
+  },
+  {
+    cls: "act-archive",
+    glyph: "archive",
+    label: "Archive",
+    means: "You don't need it. Out of sight, still searchable.",
+    how: "Swipe right",
+  },
+  {
+    cls: "act-keep",
+    glyph: "bookmark",
+    label: "Keep",
+    means: "Worth coming back to. It goes on your Keep list.",
+    how: "Button only",
+  },
+  {
+    cls: "act-snooze",
+    glyph: "clock",
+    label: "Not now",
+    means: "Ask me again in a week.",
+    how: "Button only",
+  },
+  {
+    cls: "act-skip",
+    glyph: "skip",
+    label: "Skip",
+    means: "No decision. It stays where it was.",
+    how: "Swipe down",
+  },
+];
+
+const HOWTO = html`<dialog class="howto" aria-labelledby="howto-title">
+  <h2 id="howto-title" class="howto-title">What the buttons mean</h2>
+  <ul class="howto-list">
+    ${GUIDE.map(
+      (row) =>
+        html`<li class="${row.cls}">
+          <span class="act-orb">${icon(row.glyph, ORB_ICON)}</span>
+          <span class="howto-text"><b>${row.label}</b> ${row.means} <small>${row.how}</small></span>
+        </li>`,
+    )}
+  </ul>
+  <p class="howto-foot">Swipe up to open a card. Nothing is deleted, and Undo is at the top.</p>
+  <button class="primary howto-ok" type="button">Got it</button>
+</dialog>`;
+
 const FRAME = html`<section class="round" data-state="loading">
   <header class="round-bar">
     <button class="round-x" type="button" aria-label="End round">${icon("x", 22)}</button>
@@ -43,6 +96,7 @@ const FRAME = html`<section class="round" data-state="loading">
     <button class="undo" type="button" data-act="undo" aria-keyshortcuts="Z" disabled>
       ${icon("undo", 20)}<span>Undo</span>
     </button>
+    <button class="round-help" type="button" aria-label="What the buttons mean">?</button>
   </header>
   <div class="stage"></div>
   <div class="pad" role="group" aria-label="Decide">
@@ -84,6 +138,7 @@ const FRAME = html`<section class="round" data-state="loading">
       <button type="button" data-next="enough">That's enough for today</button>
     </div>
   </div>
+  ${HOWTO}
 </section>`;
 
 export function clearPage(): Response {

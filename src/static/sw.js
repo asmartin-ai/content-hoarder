@@ -1,4 +1,4 @@
-const CACHE = "ch-shell-v149";
+const CACHE = "ch-shell-v150";
 
 const SHELL = [
   "/",
@@ -51,26 +51,16 @@ const SHELL = [
   "/static/browse/palette.js",
   "/static/browse/operators.js",
   "/static/browse/fastscroll.js",
-  "/static/vendor/hls.min.js",
   "/static/apple-touch-icon.png",
-  "/static/apple-touch-startup-image-1290x2796.png",
-  "/static/apple-touch-startup-image-1179x2556.png",
-  "/static/apple-touch-startup-image-1170x2532.png",
-  "/static/apple-touch-startup-image-1080x2340.png",
-  "/static/apple-touch-startup-image-750x1334.png",
-  "/static/apple-touch-startup-image-640x1136.png",
-  "/static/apple-touch-startup-image-2048x2732.png",
-  "/static/apple-touch-startup-image-1668x2388.png",
-  "/static/apple-touch-startup-image-1668x2224.png",
-  "/static/apple-touch-startup-image-1536x2048.png",
-  "/static/apple-touch-startup-image-1488x2266.png",
 ];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.addAll(SHELL))
+      .then((c) =>
+        Promise.all(SHELL.map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => {}))),
+      )
       .then(() => self.skipWaiting()),
   );
 });
@@ -121,8 +111,11 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          if (res.ok && !res.redirected) {
+            const copy = res.clone();
+
+            caches.open(CACHE).then((c) => c.put(url.origin + url.pathname, copy));
+          }
 
           return res;
         })

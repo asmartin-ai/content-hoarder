@@ -13,6 +13,7 @@ export interface StagedImport {
   path: string;
   source: string;
   expires: number;
+  library: Database;
 }
 
 const prepared = new Map<string, StagedImport>();
@@ -113,7 +114,12 @@ export function cleanPrepared(): void {
 export function stageImport(path: string, source: string, ttlSeconds: number): string {
   const token = randomBytes(18).toString("base64url");
 
-  prepared.set(token, { path, source, expires: Date.now() + ttlSeconds * 1000 });
+  prepared.set(token, {
+    path,
+    source,
+    expires: Date.now() + ttlSeconds * 1000,
+    library: connection(),
+  });
 
   return token;
 }
@@ -121,7 +127,9 @@ export function stageImport(path: string, source: string, ttlSeconds: number): s
 export function takeImport(token: string): StagedImport | undefined {
   const staged = prepared.get(token);
 
-  if (staged) prepared.delete(token);
+  if (!staged || staged.library !== connection()) return undefined;
+
+  prepared.delete(token);
 
   return staged;
 }

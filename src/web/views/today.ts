@@ -91,6 +91,7 @@ function aboutMinutes(seconds: number): string {
 
 export function renderHeroGo(opts: { n: number; ids?: string[]; oob?: boolean }): SafeHtml {
   const params = new URLSearchParams({ n: String(opts.n) });
+  const count = opts.ids?.length ? Math.min(opts.n, opts.ids.length) : opts.n;
 
   if (opts.ids?.length) params.set("ids", opts.ids.join(","));
 
@@ -99,8 +100,8 @@ export function renderHeroGo(opts: { n: number; ids?: string[]; oob?: boolean })
     id="hero-go"
     href="/clear?${params.toString()}"
     ${opts.oob ? raw(' hx-swap-oob="true"') : ""}
-    ><span class="hero-verb">Clear ${opts.n}</span
-    ><span class="hero-sub">${aboutMinutes(opts.n * DECISION_SECONDS)}</span></a
+    ><span class="hero-verb">Clear ${count}</span
+    ><span class="hero-sub">${aboutMinutes(count * DECISION_SECONDS)}</span></a
   >`;
 }
 

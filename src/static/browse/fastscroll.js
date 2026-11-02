@@ -59,7 +59,6 @@ export function installFastScroll(_listEl) {
   let dragMt = null;
   let layoutPending = false;
   let scrollRaf = 0;
-  let pendingScrollTop = 0;
 
   function metrics() {
     const { se, viewH, max, scrollHeight } = scrollMetrics();
@@ -207,25 +206,24 @@ export function installFastScroll(_listEl) {
   }
 
   function onScroll() {
-    if (dragging) return;
-    const mt = metrics();
-
-    if (mt.max <= 0) {
-      layout();
-
-      return;
-    }
-
-    pendingScrollTop = mt.handleMaxTop <= 0 ? 0 : (mt.se.scrollTop / mt.max) * mt.handleMaxTop;
-    showActive();
-    scheduleIdleHide();
-
-    if (scrollRaf) return;
+    if (dragging || scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
 
       if (dragging) return;
-      handle.style.transform = `translateY(${pendingScrollTop}px)`;
+      const mt = metrics();
+
+      if (mt.max <= 0) {
+        layout();
+
+        return;
+      }
+
+      const top = mt.handleMaxTop <= 0 ? 0 : (mt.se.scrollTop / mt.max) * mt.handleMaxTop;
+
+      handle.style.transform = `translateY(${top}px)`;
+      showActive();
+      scheduleIdleHide();
     });
   }
 

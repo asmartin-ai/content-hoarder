@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as db from "../../db.ts";
 import * as resurface from "../../resurface.ts";
 import { REGISTRY } from "../../connectors/registry.ts";
+import { cookieValue } from "../../hosted.ts";
 import { objectBody } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
@@ -55,20 +56,12 @@ type Toast = {
   undo?: { post: string; vals: Record<string, string | number>; target: string };
 };
 
-function cookie(request: Request, name: string): string | null {
-  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-
-    if (key === name) return decodeURIComponent(rest.join("="));
-  }
-
-  return null;
-}
-
 function roundSize(request: Request, url: URL): number {
   const pick = (value: string | null) => ROUND_SIZES.find((size) => String(size) === value);
 
-  return pick(url.searchParams.get("n")) ?? pick(cookie(request, "ch_round_size")) ?? DEFAULT_ROUND;
+  return (
+    pick(url.searchParams.get("n")) ?? pick(cookieValue(request, "ch_round_size")) ?? DEFAULT_ROUND
+  );
 }
 
 function sizeCookie(n: number): string {
@@ -93,7 +86,7 @@ export function todayPage(request: Request, url: URL): Response {
 
   const body = renderToday({
     now: new Date(now),
-    reentry: reentryLine(cookie(request, "ch_last_round"), now),
+    reentry: reentryLine(cookieValue(request, "ch_last_round"), now),
     n,
   });
 
@@ -104,14 +97,14 @@ export function todayPage(request: Request, url: URL): Response {
 
 export function upNext(request: Request, url: URL): Response {
   const n = roundSize(request, url);
-  const items = smartDeal(n, cookie(request, "ch_safe") !== "0");
+  const items = smartDeal(n, cookieValue(request, "ch_safe") !== "0");
 
   return fragment(renderUpNext(items, n), { "Set-Cookie": sizeCookie(n) });
 }
 
 export function wins(request: Request): Response {
   const pulse = db.pulse(connection());
-  const goal = Number.parseInt(cookie(request, "ch_goal") ?? "", 10);
+  const goal = Number.parseInt(cookieValue(request, "ch_goal"), 10);
 
   return fragment(
     renderWins({

@@ -195,8 +195,11 @@ export function privacyPage(): Response {
 
 export function logout(request: Request): Response {
   endSession(mainConnection(), request);
+  const response = redirect("/auth/login", [clearedCookie(SESSION_COOKIE)]);
 
-  return redirect("/auth/login", [clearedCookie(SESSION_COOKIE)]);
+  response.headers.set("Clear-Site-Data", '"cache", "storage"');
+
+  return response;
 }
 
 export function googleStart(request: Request): Response {

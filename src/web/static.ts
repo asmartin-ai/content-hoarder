@@ -31,13 +31,17 @@ export function staticResponse(path: string): Response {
     "application/octet-stream";
 
   return new Response(Bun.file(target), {
-    headers: { "Content-Type": contentType },
+    headers: { "Content-Type": contentType, "Cache-Control": "no-cache" },
   });
 }
 
 export function serviceWorkerResponse(): Response {
   return new Response(Bun.file(join(STATIC_DIR, "sw.js")), {
-    headers: { "Content-Type": "text/javascript", "Service-Worker-Allowed": "/" },
+    headers: {
+      "Content-Type": "text/javascript",
+      "Service-Worker-Allowed": "/",
+      "Cache-Control": "no-cache",
+    },
   });
 }
 
@@ -50,6 +54,7 @@ export function htmlResponse(
   headers.set("Content-Type", "text/html; charset=utf-8");
   headers.set("Content-Security-Policy", "frame-ancestors 'none'");
   headers.set("X-Frame-Options", "DENY");
+  headers.set("Cache-Control", "private, no-cache");
 
   return new Response(body, { ...init, headers });
 }

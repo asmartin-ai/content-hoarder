@@ -15,6 +15,8 @@ import { toast, snackbar } from "../core/toast.js";
 
 const KEY = "ch.round";
 
+const HOWTO_KEY = "ch.howto";
+
 const SIZES = [5, 10, 25];
 
 const ENTER_MS = 260;
@@ -26,6 +28,8 @@ const COMMIT_PX = 90;
 const FLING = 0.55;
 
 const TILT = 0.06;
+
+const TAP_GUARD_MS = 300;
 
 const COMBO_MS = 6000;
 
@@ -233,6 +237,7 @@ export function mountRound(root) {
   const statFreedBox = section.querySelector(".cs-freed-box");
   const statTime = section.querySelector(".cs-time");
   const clearedToday = section.querySelector(".cleared-today");
+  const howto = section.querySelector(".howto");
 
   const later = (fn, ms) => setTimeout(fn, ms);
 
@@ -343,11 +348,12 @@ export function mountRound(root) {
 
     more.textContent = on ? "Show less" : "Show more";
     more.setAttribute("aria-expanded", String(on));
+    const fg = cardEl.querySelector(".card-fg");
 
-    if (!on) {
-      const fg = cardEl.querySelector(".card-fg");
+    if (fg) {
+      fg.style.touchAction = on ? "pan-y" : "none";
 
-      if (fg) fg.scrollTop = 0;
+      if (!on) fg.scrollTop = 0;
     }
 
     return true;
@@ -447,6 +453,7 @@ export function mountRound(root) {
     measureBody(el);
 
     attachSwipe(el, {
+      allowVertical: () => !el.classList.contains("is-expanded"),
       onRight: () => decide("archived", true),
       onLeft: () => decide("done", true),
       onUp: () => openCurrent(),
@@ -572,6 +579,7 @@ export function mountRound(root) {
     params.ids = Array.isArray(saved.ids) ? saved.ids : [];
     const my = ++gen;
 
+    setState("loading");
     setStage('<article class="card is-skeleton" aria-hidden="true"></article>');
     renderProgress();
     await reconcile();
@@ -726,6 +734,12 @@ export function mountRound(root) {
 
     if (pos < 0) return;
 
+    if (state !== "playing" || pos !== round.results.length - 1) {
+      toast("One card didn't save. It stays in your inbox.");
+
+      return;
+    }
+
     round.results.splice(pos, 1);
     round.items.splice(pos, 1);
     round.idx -= 1;
@@ -733,8 +747,7 @@ export function mountRound(root) {
     combo = 0;
     save();
     toast("That didn't stick — the card is back.");
-
-    if (state === "playing") showCard();
+    showCard();
   }
 
   function decide(act, flung = false) {
@@ -792,7 +805,7 @@ export function mountRound(root) {
   }
 
   function undo() {
-    if (state !== "playing" || !round || !round.results.length) return;
+    if ((state !== "playing" && state !== "done") || !round || !round.results.length) return;
     const result = round.results.pop();
 
     round.idx -= 1;
@@ -881,11 +894,15 @@ export function mountRound(root) {
     if (t.classList.contains("round-x")) go("/");
     else if (t.classList.contains("card-more")) toggleExpand();
     else if (t.dataset.next) next(t.dataset.next);
-    else if (t.dataset.act) run(t.dataset.act);
+    else if (t.dataset.act) {
+      if (t.dataset.act in BEAD && Date.now() - shownAt < TAP_GUARD_MS) return;
+
+      run(t.dataset.act);
+    }
   }
 
   function onKey(e) {
-    if (leaving || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (leaving || howto?.open || e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (isTypingTarget(e.target)) return;
 
@@ -907,7 +924,7 @@ export function mountRound(root) {
 
     const act = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
 
-    if (!act || state !== "playing") return;
+    if (!act || (state !== "playing" && !(state === "done" && act === "undo"))) return;
     e.preventDefault();
 
     if (e.repeat && act !== "open") return;
@@ -916,6 +933,27 @@ export function mountRound(root) {
 
   section.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
+
+  if (howto) {
+    const openHowto = () => {
+      if (!howto.open) howto.showModal();
+    };
+
+    section.querySelector(".round-help")?.addEventListener("click", openHowto);
+    howto.querySelector(".howto-ok").addEventListener("click", () => howto.close());
+    howto.addEventListener("click", (e) => {
+      if (e.target === howto) howto.close();
+    });
+    howto.addEventListener("close", () => {
+      try {
+        localStorage.setItem(HOWTO_KEY, "1");
+      } catch {}
+    });
+
+    try {
+      if (!localStorage.getItem(HOWTO_KEY)) openHowto();
+    } catch {}
+  }
 
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;

@@ -1,4 +1,4 @@
-import { googleConfigured, twitchConfigured } from "../../hosted.ts";
+import { googleConfigured, hostedOrigin, twitchConfigured } from "../../hosted.ts";
 import { html, type SafeHtml } from "./html.ts";
 
 const REDDIT_SAVES = [
@@ -117,25 +117,6 @@ export function renderAdd(url: URL): SafeHtml {
       <textarea id="add-paste" class="add-paste" rows="5" placeholder="https://…"></textarea>
       <button id="add-paste-go" class="add-btn" type="button">Preview pasted links</button>
     </section>
-    <section class="add-section">
-      <h2>Reddit saves</h2>
-      <ol class="add-steps">
-        <li>
-          Drag this button to your bookmarks bar:
-          <a class="add-bookmarklet" href="${REDDIT_BOOKMARKLET}">Get my Reddit saves</a>
-        </li>
-        <li>Open reddit.com, logged in, and click it. It only reads; a file downloads.</li>
-        <li>Drop <code>reddit-saved.json</code> in the box above.</li>
-      </ol>
-      <p class="add-sub add-more">
-        More than 1,000 saves? The button stops at 1,000. For all of them,
-        <a href="https://www.reddit.com/settings/data-request" target="_blank" rel="noopener"
-          >request your Reddit data</a
-        >
-        (Reddit says up to 30 days), then drop the ZIP in the box above. Cards from it show the
-        title from the link only.
-      </p>
-    </section>
     <section id="add-preview" class="add-preview" hidden aria-live="polite">
       <p id="add-preview-line" class="add-preview-line"></p>
       <ul id="add-preview-list" class="add-preview-list"></ul>
@@ -145,6 +126,36 @@ export function renderAdd(url: URL): SafeHtml {
       </div>
     </section>
     <p id="add-status" class="add-note" hidden role="status"></p>
+    <section class="add-section">
+      <h2>Reddit saves</h2>
+      <p class="add-help add-phone">
+        On a phone, the button below can't run. Use Reddit's data request instead (last line), or do
+        the button on a computer.
+      </p>
+      <ol class="add-steps">
+        <li>
+          On a computer, drag this button to your bookmarks bar:
+          <a class="add-bookmarklet" href="${REDDIT_BOOKMARKLET}">Get my Reddit saves</a>
+        </li>
+        <li>Open reddit.com, logged in, and click it. It only reads; a file downloads.</li>
+        <li>Drop <code>reddit-saved.json</code> in the box above.</li>
+      </ol>
+      <p class="add-sub add-more">
+        More than 1,000 saves, or on a phone?
+        <a href="https://www.reddit.com/settings/data-request" target="_blank" rel="noopener"
+          >Request your Reddit data</a
+        >
+        (Reddit says up to 30 days), then drop the ZIP in the box above. The button stops at 1,000;
+        cards from the ZIP show only the title from the link.
+      </p>
+    </section>
+    ${
+      hostedOrigin()
+        ? html`<form class="add-signout" method="post" action="/auth/logout">
+            <button class="add-btn" type="submit">Sign out</button>
+          </form>`
+        : ""
+    }
     <script type="module" src="/static/add/add.js"></script>
   </section>`;
 }

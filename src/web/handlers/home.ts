@@ -1,4 +1,5 @@
 import * as db from "../../db.ts";
+import { cookieValue } from "../../hosted.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 import { renderHome } from "../views/home.ts";
@@ -8,16 +9,6 @@ import { ROUND_SIZES } from "../views/today.ts";
 const DEFAULT_ROUND = 10;
 
 const RHYTHM_DAYS = 14;
-
-function cookie(request: Request, name: string): string | null {
-  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-
-    if (key === name) return decodeURIComponent(rest.join("="));
-  }
-
-  return null;
-}
 
 function isoDay(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -50,7 +41,7 @@ export function homePage(request: Request): Response {
     return { day, on: showedUp.has(day), today: day === today };
   });
 
-  const size = ROUND_SIZES.find((n) => String(n) === cookie(request, "ch_round_size"));
+  const size = ROUND_SIZES.find((n) => String(n) === cookieValue(request, "ch_round_size"));
 
   const body = renderHome({
     now,

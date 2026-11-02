@@ -197,3 +197,17 @@
   color: var(--accent);
   font-weight: 600;
 }
+
+.add-phone {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .add-phone {
+    display: block;
+  }
+}
+
+.add-signout {
+  margin: 2rem 0 0;
+}

@@ -39,7 +39,8 @@ export function attachSwipe(el, opts) {
     lastT = 0,
     vx = 0,
     vy = 0,
-    frame = 0;
+    frame = 0,
+    vOn = HAS_VERTICAL;
 
   fg.style.touchAction = HAS_VERTICAL ? "none" : "pan-y";
 
@@ -76,6 +77,8 @@ export function attachSwipe(el, opts) {
   }
 
   el.addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary) return;
+
     if (e.pointerType === "mouse" && !opts.mouse) return;
 
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -89,6 +92,7 @@ export function attachSwipe(el, opts) {
     decided = false;
     horizontal = false;
     vertical = false;
+    vOn = HAS_VERTICAL && (!opts.allowVertical || opts.allowVertical());
     startX = e.clientX;
     startY = e.clientY;
     lastX = e.clientX;
@@ -142,7 +146,7 @@ export function attachSwipe(el, opts) {
     const dx = curX - startX,
       dy = curY - startY;
 
-    if (vertical && HAS_VERTICAL) {
+    if (vertical && vOn) {
       fg.style.transform = "translateY(" + dy + "px) scale(.98)";
       fg.style.opacity = String(Math.max(0.5, 1 - Math.abs(dy) / 360));
       el.classList.toggle("swipe-open", dy < -40);
@@ -189,7 +193,7 @@ export function attachSwipe(el, opts) {
   }
 
   el.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
+    if (!dragging || !e.isPrimary) return;
 
     const dx = e.clientX - startX,
       dy = e.clientY - startY;
@@ -201,14 +205,14 @@ export function attachSwipe(el, opts) {
       horizontal = Math.abs(dx) > Math.abs(dy);
       vertical = !horizontal;
 
-      if (horizontal || (vertical && HAS_VERTICAL)) {
+      if (horizontal || (vertical && vOn)) {
         try {
           el.setPointerCapture(e.pointerId);
         } catch {}
       }
     }
 
-    if (vertical && !HAS_VERTICAL) return;
+    if (vertical && !vOn) return;
 
     if (e.cancelable) e.preventDefault();
 
@@ -236,7 +240,7 @@ export function attachSwipe(el, opts) {
   }
 
   function end(e) {
-    if (!dragging) return;
+    if (!dragging || !e.isPrimary) return;
     dragging = false;
     clearTimeout(lpTimer);
     cancelAnimationFrame(frame);
@@ -258,12 +262,12 @@ export function attachSwipe(el, opts) {
       return;
     }
 
-    if (horizontal || (vertical && HAS_VERTICAL)) suppressNextClick();
+    if (horizontal || (vertical && vOn)) suppressNextClick();
 
     const flungY = Math.abs(vy) > FLING && Math.abs(dy) > 24 && Math.sign(vy) === Math.sign(dy);
     const flungX = Math.abs(vx) > FLING && Math.abs(dx) > 24 && Math.sign(vx) === Math.sign(dx);
 
-    if (vertical && HAS_VERTICAL && (Math.abs(dy) >= COMMIT || flungY)) {
+    if (vertical && vOn && (Math.abs(dy) >= COMMIT || flungY)) {
       const dir = dy > 0 ? 1 : -1;
 
       flyOut(

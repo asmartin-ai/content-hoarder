@@ -11,10 +11,40 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   sessions and invites. Testers no longer see each other's items, and the privacy page says so.
 - **Add page: more than 1,000 Reddit saves.** Under the bookmarklet, a line points to Reddit's
   data request, whose ZIP (`saved_posts.csv`, `saved_comments.csv`) the Reddit connector already
-  imports. SW cache `ch-shell-v149`.
+  imports. On a phone, where the bookmarklet can't run, the page says to use the data request.
+- **Clear explains its buttons.** The first round opens a short guide to Done, Archive, Keep, Not
+  now and Skip (what each means, which swipe does it); the new `?` in the top bar reopens it.
+- **Sign out** button at the bottom of Add in hosted mode. Signing out clears the browser's cached
+  pages and storage (`Clear-Site-Data`), so the next person on that phone can't see them.
+
+### Changed
+
+- Faster, smoother Library on long lists: the next page is appended instead of re-rendering every
+  row, a decision removes one row instead of rebuilding the list, and the fast-scroll handle
+  measures once per frame instead of on every scroll event.
+- The service worker no longer precaches HLS (543 KB) or the iOS splash images, fetches its shell
+  fresh (`cache: "reload"`) so a deploy can't install stale files, and survives one failed file.
+  Static files and pages send `Cache-Control: no-cache`. SW cache `ch-shell-v150`.
+- Today's "Clear N" counts the cards actually waiting ("Clear 3", not "Clear 10").
+- Home's sample buttons are visibly inert instead of links that jumped to the top.
+- Add shows its preview and messages right under the drop box, says "Adding…" while it works,
+  "already here" when nothing is new, and a plain message for a file type it can't read.
 
 ### Fixed
 
+- **The Library stopped at 50 items.** Infinite scroll never loaded a second page, so a library
+  of 1,000 saves looked like 50. Pages are also deduped, and triaging an item no longer shifts
+  the next page by one.
+- Done/Keep/Archive/snooze from the reader left the item in the list until a reload.
+- An expired session now goes to sign-in instead of "That didn't stick" toasts and skeletons that
+  pulse forever.
+- A malformed address (`/invite/%E0%A4%A`, `/media/%E0%A4%A`) is a 404, not a crash; a malformed
+  cookie no longer breaks Today or Home.
+- **Security:** an import preview can only be committed by the account that made it.
+- Clear: a quick double tap no longer decides the next, unseen card; a second finger no longer
+  hijacks a swipe; an expanded card scrolls instead of skipping or opening; Undo works on the
+  "Cleared" screen; a failed save no longer rewinds the deck under you; returning with Back no
+  longer takes taps before the deck is ready.
 - Rows from Reddit's data-request CSVs only fill gaps: they no longer replace a saved item's real
   title, link or metadata with the slug-derived ones, and they're marked `reddit_export_thin`
   until a richer import arrives. Saved comments from the CSV get a title from the post's link

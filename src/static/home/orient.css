@@ -330,6 +330,11 @@
   color: var(--accent-ink);
 }
 
+.o-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .o-parked li,
 .o-receipts li,
 .o-patterns li {
