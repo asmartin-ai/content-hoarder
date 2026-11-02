@@ -115,7 +115,11 @@ test("Today is a server-rendered page that refuses framing", async () => {
 
     expect(clear.headers.get("X-Frame-Options")).toBe("DENY");
     expect(page).toContain('class="has-tabbar is-round"');
-    expect(page).toContain('<section class="round" data-state="loading">');
+    expect(page).toMatch(/<section\s+class="round"\s+data-state="loading"/);
+    expect(page).toContain('href="/settings"');
+    expect(page).not.toContain("data-reasons=");
+    expect(page).toContain("data-clear-ai");
+    expect(page).toContain("What the buttons mean");
   });
 });
 
@@ -282,7 +286,7 @@ test("Home never resurfaces an item the user snoozed", async () => {
   });
 });
 
-test("a Clear card shows one quiet hint line, and a hostile reason stays escaped", () => {
+test("a Clear card carries its hint as attributes and never prints the reason", () => {
   const raw = newItem({
     source: "reddit",
     source_id: "t3_hint_card",
@@ -302,35 +306,30 @@ test("a Clear card shows one quiet hint line, and a hostile reason stays escaped
 
   const hinted = flat(
     renderCard(item, {
-      hint: {
-        verdict: "keep",
-        reason: "You kept three like this <script>alert(1)</script>",
-        by: "ai",
-      },
+      hint: { verdict: "keep", by: "ai" },
     }).value,
   );
 
-  expect(hinted).toContain('<div class="card-hint-slot">');
   expect(hinted).toContain('data-hint="keep"');
   expect(hinted).toContain('data-hint-by="ai"');
-  expect(hinted).toContain("Suggest: Keep");
-  expect(hinted).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-  expect(hinted).not.toContain("<script>");
-  expect(hinted).toContain('data-hint-accept aria-label="Accept suggestion: Keep"');
-  expect(hinted).toMatch(/Keep\s*<\/button>/);
+  expect(hinted).not.toContain("card-hint");
+  expect(hinted).not.toContain("Suggest:");
+  expect(hinted).not.toContain("Accept");
 
   const letgo = flat(
     renderCard(item, {
-      hint: { verdict: "skip", reason: "Opened once, never read", by: "history" },
+      hint: { verdict: "skip", by: "history" },
     }).value,
   );
 
   expect(letgo).toContain('data-hint="skip"');
   expect(letgo).toContain('data-hint-by="history"');
-  expect(letgo).toContain("Suggest: Archive");
-  expect(letgo).toContain("From your history");
-  expect(letgo).toContain('aria-label="Accept suggestion: Archive"');
-  expect(letgo).toMatch(/Archive\s*<\/button>/);
+  expect(letgo).not.toContain("Suggest: Archive");
+  expect(letgo).not.toContain("From your history");
+  expect(letgo).not.toContain("Opened once");
 
-  expect(flat(renderCard(item).value)).toContain('<div class="card-hint-slot"></div>');
+  const plain = flat(renderCard(item).value);
+
+  expect(plain).not.toContain("data-hint=");
+  expect(plain).not.toContain("card-hint");
 });

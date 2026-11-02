@@ -106,7 +106,7 @@ const CLIENT_EVENT_SCHEMAS = [
     kind: z.literal("decision"),
     data: z.strictObject({
       act: z.enum(["keep", "archived", "done", "snooze", "skip"]),
-      method: z.enum(["swipe", "tap", "key", "hint"]),
+      method: z.enum(["swipe", "tap", "key"]),
       dwell_ms: CountSchema,
       hint: VerdictSchema.optional(),
       hint_by: HintBySchema.optional(),
@@ -214,7 +214,8 @@ export interface DemoEventsSummary {
   rounds_started: number;
   rounds_completed: number;
   hints_shown: number;
-  hints_accepted: number;
+  hint_agreement: number;
+  hints_accepted_legacy: number;
   hints_matched: number;
   ai_calls: {
     ok: number;
@@ -231,6 +232,7 @@ const RowFieldsSchema = z.object({
   completed: z.boolean().optional(),
   hinted: z.boolean().optional(),
   act: z.string().optional(),
+  hint: z.string().optional(),
   method: z.string().optional(),
   dwell_ms: z.number().optional(),
   ok: z.boolean().optional(),
@@ -419,7 +421,8 @@ export function summarizeDemoEvents(rows: DemoEventRow[]): DemoEventsSummary {
     rounds_started: 0,
     rounds_completed: 0,
     hints_shown: 0,
-    hints_accepted: 0,
+    hint_agreement: 0,
+    hints_accepted_legacy: 0,
     hints_matched: 0,
     ai_calls: { ok: 0, failed: 0, median_ms: null, prompt_tokens: 0, completion_tokens: 0 },
     first_decision_ms: null,
@@ -455,7 +458,12 @@ export function summarizeDemoEvents(rows: DemoEventRow[]): DemoEventsSummary {
 
       if (data.method) bump(summary.decisions_by_method, data.method);
 
-      if (data.method === "hint") summary.hints_accepted++;
+      if (data.method === "hint") summary.hints_accepted_legacy++;
+      else if (
+        (data.hint === "keep" && data.act === "keep") ||
+        (data.hint === "skip" && data.act === "archived")
+      )
+        summary.hint_agreement++;
 
       if (data.dwell_ms !== undefined && data.dwell_ms >= 0) dwell.push(data.dwell_ms);
 
@@ -538,7 +546,8 @@ export function mergeDemoEventsSummaries(summaries: DemoEventsSummary[]): DemoEv
     merged.rounds_started += summary.rounds_started;
     merged.rounds_completed += summary.rounds_completed;
     merged.hints_shown += summary.hints_shown;
-    merged.hints_accepted += summary.hints_accepted;
+    merged.hint_agreement += summary.hint_agreement;
+    merged.hints_accepted_legacy += summary.hints_accepted_legacy;
     merged.hints_matched += summary.hints_matched;
     merged.ai_calls.ok += summary.ai_calls.ok;
     merged.ai_calls.failed += summary.ai_calls.failed;
@@ -576,7 +585,7 @@ export function formatDemoEventsSummary(summary: DemoEventsSummary): string {
     `median_dwell_ms=${summary.median_dwell_ms ?? "-"}`,
     `undos=${summary.undos} undos_server=${summary.undos_server}`,
     `rounds: started=${summary.rounds_started} completed=${summary.rounds_completed}`,
-    `hints: shown=${summary.hints_shown} accepted=${summary.hints_accepted} matched=${summary.hints_matched}`,
+    `hints: shown=${summary.hints_shown} agreement=${summary.hint_agreement} accepted_legacy=${summary.hints_accepted_legacy} matched=${summary.hints_matched}`,
     `ai_calls: ok=${summary.ai_calls.ok} failed=${summary.ai_calls.failed} median_ms=${summary.ai_calls.median_ms ?? "-"} prompt_tokens=${summary.ai_calls.prompt_tokens} completion_tokens=${summary.ai_calls.completion_tokens}`,
     `first_decision_ms=${summary.first_decision_ms ?? "-"}`,
   ].join("\n");

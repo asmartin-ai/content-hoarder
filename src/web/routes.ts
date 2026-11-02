@@ -49,6 +49,7 @@ import {
   drainUnsave,
   enqueueUnsaveByTag,
   purgeDone,
+  settingsPage,
   updateAiSettings,
 } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
@@ -226,6 +227,8 @@ async function appRoute(request: Request): Promise<Response> {
   if (method === "GET" && path === "/clear") return clearPage();
 
   if (method === "GET" && path === "/add") return addPage();
+
+  if (method === "GET" && path === "/settings") return settingsPage();
 
   if (method === "GET" && (path === "/library" || path === "/browse")) return templateResponse();
 

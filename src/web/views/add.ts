@@ -98,7 +98,6 @@ function connectSection(): SafeHtml | string {
 
 export interface AiSettingsView {
   on: boolean;
-  provider: string;
 }
 
 function aiSection(ai: AiSettingsView | undefined): SafeHtml | string {
@@ -106,22 +105,9 @@ function aiSection(ai: AiSettingsView | undefined): SafeHtml | string {
 
   return html`<section class="add-section" data-ai-settings>
     <h2>AI suggestions</h2>
-    <div class="add-connect">
-      <button
-        class="add-btn"
-        type="button"
-        data-ai-toggle
-        aria-pressed="${ai.on ? "true" : "false"}"
-      >
-        <span data-ai-toggle-state>${ai.on ? "On" : "Off"}</span>
-      </button>
-    </div>
     <p class="add-help">
-      Keep or Let go hints on Clear cards, written by ${ai.provider}. You still decide every card.
-      Sends each dealt card's source, title, author, subreddit or channel, URL and the first 500
-      characters of its text.
+      AI suggestions: ${ai.on ? "On" : "Off"} · <a href="/settings">Settings</a>
     </p>
-    <p class="add-note" data-ai-toggle-error hidden role="alert"></p>
   </section>`;
 }
 

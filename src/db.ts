@@ -3180,7 +3180,12 @@ export interface PurgeDoneResult {
 
 export function purgeDone(
   db: Database,
-  opts: { now?: number | null; apply?: boolean; maxRows?: number } = {},
+  opts: {
+    now?: number | null;
+    apply?: boolean;
+    maxRows?: number;
+    cutoff?: number | null;
+  } = {},
 ): PurgeDoneResult {
   const apply = opts.apply ?? false;
   const maxRows = opts.maxRows ?? 5000;
@@ -3191,7 +3196,11 @@ export function purgeDone(
 
   const retentionDays = Number(getSetting(db, "done_retention_days", "30") || 30);
 
-  const cutoff = now - retentionDays * 86400;
+  const cutoff =
+    opts.cutoff !== undefined && opts.cutoff !== null
+      ? Math.floor(opts.cutoff)
+      : now - retentionDays * 86400;
+
   const where = "status='done' AND processed_utc IS NOT NULL AND processed_utc < ?";
   const params: SQLQueryBindings[] = [cutoff];
 

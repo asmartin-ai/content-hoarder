@@ -1,7 +1,8 @@
 # AI suggestions and learning
 
-Clear can suggest Keep or Archive without deciding for you. A quiet line gives a reason and an
-**AI** or **From your history** tag. Tap it to accept, or use any other decision.
+Clear can suggest Keep or Archive without deciding for you. A gentle highlight marks the button
+that AI or your history would pick; you can choose any decision. No reason text appears on the
+card. The model's reason is still stored in `metadata.llm` for analysis.
 
 ## How hints work
 
@@ -10,13 +11,20 @@ Clear can suggest Keep or Archive without deciding for you. A quiet line gives a
 | AI | With consent, an OpenAI-compatible endpoint suggests a verdict and reason. See [`llm.ts`](../src/assist/llm.ts) and [`hints.ts`](../src/assist/hints.ts). |
 | History | `learn-triage` writes `metadata.triage_hint` from past decisions. See [`triage_score.ts`](../src/triage_score.ts). |
 
-AI consent is off by default for each library. A first-open popup offers the choice; the Add page
-has a toggle to change it. The privacy page names the configured provider. See
-[`consent.ts`](../src/assist/consent.ts) and [`auth.ts`](../src/web/handlers/auth.ts).
+AI consent is off by default for each library. A first-open popup offers the choice and says
+Archive; Escape means **Not now**. Change AI on or off in Settings, reached from the nav gear or
+the Add page. Turning it off clears AI hints across tabs via `BroadcastChannel` `ch-settings`.
+The privacy page names the configured provider. See [`consent.ts`](../src/assist/consent.ts)
+and [`auth.ts`](../src/web/handlers/auth.ts).
+
+The AI prompt can include one line of the user's own decision counts for the card, such as
+“Of the 10 from r/x you've already decided, you archived 9”. It does not include other titles.
+See `historyLine` in [`triage_score.ts`](../src/triage_score.ts). The prompt is balanced without
+a verdict bias: a live 10-card smoke on 2026-11-02 returned 6 Keep and 4 Archive.
 
 The deal waits at most `LLM_DEAL_WAIT_MS` for AI hints. Later hints arrive through
-`GET /clear/hints`. `LLM_DAILY_CAP` limits calls per library per day; cumulative usage is in the
-library's `ai_usage` setting. Configuration and defaults are in [`src/config.ts`](../src/config.ts):
+`GET /clear/hints`, which returns `{verdict, by}` or `null`. `LLM_DAILY_CAP` limits calls per
+library per day; cumulative usage is in the library's `ai_usage` setting. Configuration and defaults are in [`src/config.ts`](../src/config.ts):
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_DISABLE_THINKING`, `LLM_TIMEOUT_S`,
 `LLM_DAILY_CAP`, `LLM_DEAL_WAIT_MS`, `LLM_PROVIDER_LABEL`, `TRIAGE_AUTO_LEARN_EVERY` and
 `CONTENT_HOARDER_DEMO_ANALYTICS`.

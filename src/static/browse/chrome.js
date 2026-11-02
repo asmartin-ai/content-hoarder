@@ -148,12 +148,7 @@ gotop.addEventListener("click", scrollToBrowseTop);
 
 installFastScroll(itemsEl);
 
-const APP_VERSION = "v140";
-
 (() => {
-  const ver = $("#set-version");
-
-  if (ver) ver.textContent = APP_VERSION;
   const head = $(".console");
 
   if (!head) return;

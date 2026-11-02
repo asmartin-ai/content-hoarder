@@ -12,6 +12,7 @@ import {
   autoLearnNow,
   extractFeatures,
   fit,
+  historyLine,
   learn,
   loadModel,
   noteDecision,
@@ -79,6 +80,24 @@ function withDb(body: (database: Database) => void): void {
 
 const metadataOf = (database: Database, fullname: string): Metadata =>
   parseMetadata(db.getItem(database, fullname)?.metadata);
+
+function modelWithOutcomes(
+  outcomes: Record<string, [number, number, number]>,
+  overrides: Partial<ScoreModel> = {},
+): ScoreModel {
+  return {
+    version: 1,
+    fitted_utc: 1_700_000_000,
+    trained_on: 10,
+    processed: 10,
+    prior: 0.5,
+    alpha: 50,
+    min_support: 20,
+    features: {},
+    outcomes,
+    ...overrides,
+  };
+}
 
 const storedSearchText = (database: Database, fullname: string): string =>
   (
@@ -298,6 +317,31 @@ test("apply writes a history hint and removes it when evidence weakens", () => {
 
     expect(metadataOf(database, "reddit:pics_inbox").triage_hint).toBeUndefined();
   });
+});
+
+test("historyLine qualifies the denominator as already decided", () => {
+  const row = { source: "reddit", kind: "post", created_utc: 1_700_000_000 };
+  const kept = modelWithOutcomes({ "sub:kept": [9, 8, 1] });
+  const dropped = modelWithOutcomes({ "sub:dropped": [10, 1, 9] });
+
+  expect(historyLine(kept, row, { subreddit: "kept" })).toBe(
+    "Of the 9 from r/kept you've already decided, you kept or finished 8",
+  );
+  expect(historyLine(dropped, row, { subreddit: "dropped" })).toBe(
+    "Of the 10 from r/dropped you've already decided, you archived 9",
+  );
+});
+
+test("historyLine needs three decided outcomes and a model", () => {
+  const row = { source: "reddit", kind: "post", created_utc: 1_700_000_000 };
+  const thin = modelWithOutcomes({ "sub:thin": [2, 0, 2] });
+  const enough = modelWithOutcomes({ "sub:thin": [3, 1, 2] });
+
+  expect(historyLine(thin, row, { subreddit: "thin" })).toBeNull();
+  expect(historyLine(null, row, { subreddit: "thin" })).toBeNull();
+  expect(historyLine(enough, row, { subreddit: "thin" })).toBe(
+    "Of the 3 from r/thin you've already decided, you archived 2",
+  );
 });
 
 test("apply names a channel in plain words", () => {

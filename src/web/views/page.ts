@@ -5,6 +5,8 @@ import { html, raw, type SafeHtml } from "./html.ts";
 
 export type Tab = "home" | "today" | "clear" | "add";
 
+export type PageTab = Tab | "settings";
+
 const SPLASHES: Array<[string, string]> = [
   [
     "1290x2796",
@@ -86,6 +88,10 @@ const MOON = raw(
   `${SVG_OPEN}<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>`,
 );
 
+const GEAR = raw(
+  `${SVG_OPEN}<path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>`,
+);
+
 export function moonIcon(): SafeHtml {
   return MOON;
 }
@@ -98,7 +104,7 @@ const TABS: Array<{ id: Tab | "library"; href: string; label: string }> = [
   { id: "add", href: "/add", label: "Add" },
 ];
 
-export function navHtml(tab: Tab | "library"): SafeHtml {
+export function navHtml(tab: PageTab | "library"): SafeHtml {
   const tabs = TABS.map(
     (entry) =>
       html`<a
@@ -113,6 +119,15 @@ export function navHtml(tab: Tab | "library"): SafeHtml {
   return html`<nav class="ch-nav" aria-label="Main">
     <a class="ch-brand" href="/"><span class="ch-led"></span><span>content-hoarder</span></a>
     <div class="ch-tabs">${tabs}</div>
+    <a
+      class="ch-iconbtn"
+      id="open-settings"
+      href="/settings"
+      aria-label="Settings"
+      title="Settings"
+      ${tab === "settings" ? raw('aria-current="page"') : ""}
+      >${GEAR}</a
+    >
     <button class="ch-iconbtn" id="theme-toggle" type="button" aria-label="Switch light/dark">
       ${MOON}
     </button>
@@ -159,14 +174,16 @@ function aiConsentPrompt(): SafeHtml | string {
   return html`<dialog class="ai-consent" data-ai-consent aria-labelledby="ai-consent-title">
     <h2 id="ai-consent-title" class="ai-consent-title">Turn on AI suggestions?</h2>
     <p class="ai-consent-line">
-      On Clear cards you'd get a quiet Keep or Let go hint with a short reason. You still decide
-      every card.
+      On Clear, the button the AI would pick (Keep or Archive) is gently highlighted. You still
+      decide every card.
     </p>
+    <p class="ai-consent-line">Archive keeps things searchable; nothing is deleted.</p>
     <p class="ai-consent-line">
       To write a hint, Khaos sends ${AI_FIELDS_SENT} to <b>${provider}</b>.
     </p>
     <p class="ai-consent-line">
-      It's off until you say yes, and you can turn it off again on <a href="/add">Add</a>.
+      It's off until you say yes, and you can turn it off again in
+      <a href="/settings">Settings</a>.
     </p>
     <p class="ai-consent-error" data-ai-consent-error hidden role="alert"></p>
     <div class="ai-consent-acts">
@@ -178,16 +195,17 @@ function aiConsentPrompt(): SafeHtml | string {
   </dialog>`;
 }
 
-const ROOM_CSS: Record<Tab, string> = {
+const ROOM_CSS: Record<PageTab, string> = {
   home: "/static/home/orient.css",
   today: "/static/home/today.css",
   clear: "/static/home/clear.css",
   add: "/static/add/add.css",
+  settings: "",
 };
 
 export function renderPage(opts: {
   title: string;
-  tab: Tab;
+  tab: PageTab;
   body: SafeHtml;
   round?: boolean;
 }): string {
@@ -202,7 +220,7 @@ export function renderPage(opts: {
       <title>${opts.title} · content-hoarder</title>
       ${HEAD_ASSETS} ${configured ? AI_CONSENT_SCRIPT : ""}
       <link rel="stylesheet" href="/static/home/home.css" />
-      <link rel="stylesheet" href="${ROOM_CSS[opts.tab]}" />
+      ${ROOM_CSS[opts.tab] ? raw(`<link rel="stylesheet" href="${ROOM_CSS[opts.tab]}" />`) : ""}
     </head>
     <body class="${bodyClass}" data-page="${opts.tab}" data-analytics="${analytics}">
       ${navHtml(opts.tab)}

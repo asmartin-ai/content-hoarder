@@ -470,17 +470,27 @@ function keepProbability(model: ScoreModel, featureList: string[]): number {
   return best ? (best.outcome[1] + alpha * base) / (best.outcome[0] + alpha) : base;
 }
 
-function historyHint(
+interface HintCandidate {
+  feature: string;
+  decided: number;
+  kept: number;
+  archived: number;
+  keep_rate: number;
+  letgo_rate: number;
+  rank: number;
+}
+
+function hintFeature(
   model: ScoreModel,
   featureList: string[],
-  metadata: Metadata,
-): TriageHint | null {
+  minDecided: number,
+): HintCandidate | null {
   const candidates = featureList
     .flatMap((feature) => {
       const outcome = model.outcomes?.[feature];
       const rank = featurePriority(feature);
 
-      if (!outcome || outcome[0] < _HINT_MIN_DECIDED || rank < 0) return [];
+      if (!outcome || outcome[0] < minDecided || rank < 0) return [];
 
       const [decided, kept, archived] = outcome;
 
@@ -504,7 +514,15 @@ function historyHint(
         a.feature.localeCompare(b.feature),
     );
 
-  const top = candidates[0];
+  return candidates[0] ?? null;
+}
+
+function historyHint(
+  model: ScoreModel,
+  featureList: string[],
+  metadata: Metadata,
+): TriageHint | null {
+  const top = hintFeature(model, featureList, _HINT_MIN_DECIDED);
 
   if (!top) return null;
 
@@ -519,6 +537,27 @@ function historyHint(
     verdict,
     reason: `${verb} ${count} of ${top.decided} ${hintSubject(top.feature, metadata)}`,
   };
+}
+
+const _HISTORY_LINE_MIN_DECIDED = 3;
+
+export function historyLine(
+  model: ScoreModel | null,
+  row: { source?: string; kind?: string; created_utc?: number; first_seen_utc?: number },
+  metadata: Metadata,
+  opts: { now?: number } = {},
+): string | null {
+  if (!model) return null;
+
+  const top = hintFeature(model, extractFeatures(row, metadata, opts), _HISTORY_LINE_MIN_DECIDED);
+
+  if (!top) return null;
+
+  const keep = top.kept >= top.archived;
+  const action = keep ? "kept or finished" : "archived";
+  const count = keep ? top.kept : top.archived;
+
+  return `Of the ${top.decided} ${hintSubject(top.feature, metadata)} you've already decided, you ${action} ${count}`;
 }
 
 export function drift(

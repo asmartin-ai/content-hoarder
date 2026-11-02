@@ -6,25 +6,34 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
-- **Suggestions in Clear.** Cards can offer a one-tap Keep or Archive suggestion with a reason,
-  from AI with per-library consent or from your triage history. Decisions feed agreement stats
-  and automatic background learning; Today can suggest an undoable learned pile to let go.
+- **Suggestions in Clear.** A gentle highlight marks the Keep or Archive button that AI, with
+  per-library consent, or your triage history would pick. No reason text appears on the card;
+  the model's reason remains in `metadata.llm` for analysis.
+  Decisions feed agreement stats and automatic background learning; Today can suggest an undoable
+  learned pile to let go. AI gets relevant counts from your own decisions, not other titles.
+  Turning AI off clears its hints across tabs.
 - **Local tuning and pilot analytics.** `surface-stats` reports feature outcomes, calibration,
   hint agreement and AI usage. Temporary, opt-in-at-deployment demo analytics records pilot
   behaviour in each tester's library; `demo-events` reads it. See [AI suggestions](docs/ai-suggestions.md).
-
+- **Settings page.** The nav gear opens AI, theme, density, daily goal, content
+  and NSFW, archived media, Done retention, Reddit unsave and library tools. Add links to Settings;
+  the Library settings sheet is gone.
+- **More demo saves.** The synthetic library now has 45 fictional saves, including community
+  clusters that can produce learned piles.
 - **Hosted mode: a library per account.** Each Google account signed in to a hosted instance
   reads and writes its own SQLite file (`data/users/<hash>.db`); `app.db` keeps only accounts,
   sessions and invites. Testers no longer see each other's items, and the privacy page says so.
 - **Add page: more than 1,000 Reddit saves.** Under the bookmarklet, a line points to Reddit's
   data request, whose ZIP (`saved_posts.csv`, `saved_comments.csv`) the Reddit connector already
   imports. On a phone, where the bookmarklet can't run, the page says to use the data request.
-- **Clear explains its buttons.** The first round opens a short guide to Done, Archive, Keep, Not
-  now and Skip (what each means, which swipe does it); the new `?` in the top bar reopens it.
+- **Clear explains its buttons.** A first-visit “? What the buttons mean” link opens a guide to
+  Done, Archive, Keep, Not now and Skip; the `?` in the top bar also opens it.
 - **Sign out** button at the bottom of Add in hosted mode. Signing out clears the browser's cached
   pages and storage (`Clear-Site-Data`), so the next person on that phone can't see them.
 
 ### Changed
+
+- Finishing with an empty inbox offers **Add more saves**.
 
 - Faster, smoother Library on long lists: the next page is appended instead of re-rendering every
   row, a decision removes one row instead of rebuilding the list, and the fast-scroll handle

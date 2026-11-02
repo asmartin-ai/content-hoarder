@@ -1,8 +1,7 @@
 import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
-import { setArchivePref } from "../core/media.js";
-import { $, $$, state, drawer, doneRetention } from "./shared.js";
+import { $, $$, drawer } from "./shared.js";
 import {
   clearItemFirstPageCache,
   loadCounts,
@@ -10,7 +9,6 @@ import {
   refreshPulse,
   refreshRail,
 } from "./data.js";
-import { render } from "./feed.js";
 import { closeRelay } from "./relay.js";
 
 export const scrim = $("#scrim");
@@ -49,102 +47,13 @@ function openPanel(id) {
 }
 
 export function closeSheets() {
-  ["#settings", "#navdrawer", "#kbd", "#statsheet", "#dupesheet"].forEach((s) =>
-    $(s).classList.remove("show"),
-  );
+  ["#navdrawer", "#kbd", "#statsheet", "#dupesheet"].forEach((s) => $(s).classList.remove("show"));
 
   if (drawer) drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("show");
 
   closeRelay();
   unlockBrowseScroll();
-}
-
-function readError(err, fallback) {
-  const body = err instanceof Response ? err.data : null;
-
-  return (body && body.error) || fallback;
-}
-
-function formatCutoffDate(ts) {
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function paintDoneRetention() {
-  const current = $("#done-retention-current");
-  const preview = $("#done-retention-preview");
-  const confirm = $("#done-retention-confirm");
-  const purge = $("#done-retention-purge");
-  const feedback = $("#done-retention-feedback");
-
-  if (!current || !preview || !confirm || !purge || !feedback) return;
-
-  $$("#set-done-retention button").forEach((b) =>
-    b.setAttribute("aria-pressed", String(parseInt(b.dataset.days, 10) === doneRetention.days)),
-  );
-
-  if (!doneRetention.loaded) {
-    current.textContent = "Loading current window...";
-    preview.textContent = "Checking what would be purged...";
-    confirm.checked = false;
-    purge.disabled = true;
-    feedback.innerHTML =
-      "The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.";
-
-    return;
-  }
-
-  current.textContent =
-    "Current window: " + doneRetention.days + " day" + (doneRetention.days === 1 ? "" : "s") + ".";
-
-  const plan = doneRetention.preview;
-
-  if (!plan) {
-    preview.textContent = "Could not load the current purge preview.";
-  } else if (!plan.total) {
-    preview.textContent =
-      "Nothing is eligible right now. Done items older than " +
-      formatCutoffDate(plan.cutoff) +
-      " would be purged.";
-  } else {
-    preview.innerHTML =
-      "<b>" +
-      plan.total.toLocaleString() +
-      "</b> Done item" +
-      (plan.total === 1 ? "" : "s") +
-      " older than <b>" +
-      formatCutoffDate(plan.cutoff) +
-      "</b> would be permanently deleted.";
-  }
-
-  purge.disabled = doneRetention.loading || !plan || !plan.total || !confirm.checked;
-  feedback.innerHTML = doneRetention.loading
-    ? "Working..."
-    : "The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.";
-}
-
-async function loadDoneRetention(force) {
-  if (doneRetention.loading || (doneRetention.loaded && !force)) {
-    paintDoneRetention();
-
-    return;
-  }
-
-  doneRetention.loading = true;
-  paintDoneRetention();
-
-  try {
-    const data = await api.getJSON("/settings/done-retention");
-    doneRetention.days = parseInt(data.retention_days, 10) || 30;
-    doneRetention.preview = data.preview || null;
-    doneRetention.loaded = true;
-  } catch {
-    toast("Couldn't load Done retention.");
-  }
 }
 
 export function toggleKbd() {
@@ -160,11 +69,6 @@ export function toggleKbd() {
 }
 
 scrim.addEventListener("click", closeSheets);
-
-$("#open-settings").addEventListener("click", () => {
-  openPanel("#settings");
-  loadDoneRetention(true);
-});
 
 function attachSheetDismiss(panel) {
   if (!panel) return;
@@ -243,7 +147,7 @@ function attachSheetDismiss(panel) {
   panel.addEventListener("touchcancel", end);
 }
 
-["#settings", "#statsheet", "#dupesheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
+["#statsheet", "#dupesheet", "#tagsheet"].forEach((s) => attachSheetDismiss($(s)));
 
 function statsBarRows(obj, max) {
   return Object.entries(obj || {})
@@ -286,7 +190,7 @@ function statsHtml(d) {
   );
 }
 
-$("#open-stats").addEventListener("click", async () => {
+async function openStats() {
   const list = $("#stats-list");
   list.textContent = "Counting the shelves…";
   openPanel("#statsheet");
@@ -296,7 +200,7 @@ $("#open-stats").addEventListener("click", async () => {
   } catch {
     list.textContent = "Couldn't load stats — try again.";
   }
-});
+}
 
 let dupeBy = "url";
 
@@ -365,10 +269,10 @@ async function loadDupes() {
   }
 }
 
-$("#open-dupes").addEventListener("click", () => {
+function openDupes() {
   openPanel("#dupesheet");
   loadDupes();
-});
+}
 
 $("#dupesheet").addEventListener("click", async (e) => {
   const by = e.target.closest("[data-dupe-by]");
@@ -420,133 +324,6 @@ $("#dupesheet").addEventListener("click", async (e) => {
   }
 });
 
-$$("#set-theme button").forEach((b) =>
-  b.addEventListener("click", () => {
-    document.documentElement.dataset.theme = b.dataset.theme;
-
-    try {
-      localStorage.setItem("ch-theme", b.dataset.theme);
-    } catch {}
-
-    $$("#set-theme button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-  }),
-);
-
-$$("#set-density button").forEach((b) =>
-  b.addEventListener("click", () => {
-    state.density = b.dataset.d;
-    localStorage.chDensity = state.density;
-    $$("#set-density button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    render();
-  }),
-);
-
-$$("#set-goal button").forEach((b) =>
-  b.addEventListener("click", () => {
-    state.goal = parseInt(b.dataset.g, 10) || 0;
-    localStorage.chGoal = String(state.goal);
-    $$("#set-goal button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-  }),
-);
-
-$$("#set-nsfw button").forEach((b) =>
-  b.addEventListener("click", () => {
-    state.safe = b.dataset.nsfw === "hide";
-    localStorage.chSafe = state.safe ? "1" : "0";
-    $$("#set-nsfw button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    refreshRail();
-    loadItems(true);
-  }),
-);
-
-$$("#set-archive button").forEach((b) =>
-  b.addEventListener("click", () => {
-    state.archiveMedia = b.dataset.archive === "on";
-    localStorage.chArchiveMedia = state.archiveMedia ? "1" : "0";
-    setArchivePref(state.archiveMedia);
-    $$("#set-archive button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    render();
-  }),
-);
-
-$("#done-retention-confirm").addEventListener("change", paintDoneRetention);
-
-$$("#set-done-retention button").forEach((b) =>
-  b.addEventListener("click", async () => {
-    if (doneRetention.loading) return;
-    const days = parseInt(b.dataset.days, 10);
-
-    if (!days || days === doneRetention.days) return;
-    doneRetention.loading = true;
-    $("#done-retention-confirm").checked = false;
-    paintDoneRetention();
-
-    try {
-      const data = await api.postJSON("/settings/done-retention", {
-        retention_days: days,
-      });
-
-      doneRetention.days = parseInt(data.retention_days, 10) || days;
-      doneRetention.preview = data.preview || null;
-      doneRetention.loaded = true;
-      toast("Done retention set to " + doneRetention.days + " days.");
-    } catch (err) {
-      toast(await readError(err, "Couldn't save Done retention."));
-    } finally {
-      doneRetention.loading = false;
-      paintDoneRetention();
-    }
-  }),
-);
-
-$("#done-retention-purge").addEventListener("click", async () => {
-  if (doneRetention.loading || !doneRetention.preview || !doneRetention.preview.total) return;
-
-  if (!$("#done-retention-confirm").checked) {
-    paintDoneRetention();
-
-    return;
-  }
-
-  doneRetention.loading = true;
-  paintDoneRetention();
-
-  try {
-    const data = await api.postJSON("/settings/done-retention/purge", {
-      expected_total: doneRetention.preview.total,
-      expected_cutoff: doneRetention.preview.cutoff,
-    });
-
-    doneRetention.preview = data.preview || null;
-    doneRetention.loaded = true;
-    $("#done-retention-confirm").checked = false;
-    toast(
-      "Purged " +
-        (data.purged?.total || 0) +
-        " Done item" +
-        ((data.purged?.total || 0) === 1 ? "." : "s."),
-    );
-    clearItemFirstPageCache();
-    loadItems(true);
-    loadCounts();
-    refreshRail();
-    refreshPulse();
-  } catch (err) {
-    const body = err instanceof Response ? err.data : null;
-
-    if (body && body.preview) {
-      doneRetention.preview = body.preview;
-      doneRetention.loaded = true;
-      $("#done-retention-confirm").checked = false;
-    }
-
-    toast((body && body.error) || "Done purge failed.");
-  } finally {
-    doneRetention.loading = false;
-    paintDoneRetention();
-  }
-});
-
 async function runSyncNewest(btn) {
   if (!btn || btn.disabled) return;
   const label = btn.textContent;
@@ -576,35 +353,11 @@ async function runSyncNewest(btn) {
   btn.disabled = false;
 }
 
-const syncBtn = $("#open-sync");
-
-if (syncBtn) syncBtn.addEventListener("click", () => runSyncNewest(syncBtn));
-
 const syncHeaderBtn = $("#btn-sync-newest");
 
 if (syncHeaderBtn) syncHeaderBtn.addEventListener("click", () => runSyncNewest(syncHeaderBtn));
 
-$$("#set-density button").forEach((b) =>
-  b.setAttribute("aria-pressed", String(b.dataset.d === state.density)),
-);
+const requestedPanel = new URLSearchParams(location.search).get("panel");
 
-$$("#set-goal button").forEach((b) =>
-  b.setAttribute("aria-pressed", String((parseInt(b.dataset.g, 10) || 0) === state.goal)),
-);
-
-$$("#set-nsfw button").forEach((b) =>
-  b.setAttribute("aria-pressed", String((b.dataset.nsfw === "hide") === state.safe)),
-);
-
-$$("#set-archive button").forEach((b) =>
-  b.setAttribute("aria-pressed", String((b.dataset.archive === "on") === state.archiveMedia)),
-);
-
-$$("#set-theme button").forEach((b) =>
-  b.setAttribute(
-    "aria-pressed",
-    String((document.documentElement.dataset.theme || "dark") === b.dataset.theme),
-  ),
-);
-
-paintDoneRetention();
+if (requestedPanel === "stats") void openStats();
+else if (requestedPanel === "dupes") openDupes();

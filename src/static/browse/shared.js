@@ -45,13 +45,6 @@ export const selected = new Set();
 
 export const itemsEl = $("#items");
 
-export const doneRetention = {
-  loaded: false,
-  loading: false,
-  days: 30,
-  preview: null,
-};
-
 export const drawer = $("#navdrawer");
 
 export const facets = { sources: [], categories: [], tags: [], groups: [] };

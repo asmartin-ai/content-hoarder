@@ -170,6 +170,49 @@ const hintFrom = (markup) => {
   return hintOf(el.matches("[data-hint]") ? el : el.querySelector("[data-hint]"));
 };
 
+const setHint = (el, hint) => {
+  if (!el) return;
+
+  if (hint) {
+    el.dataset.hint = hint.verdict;
+    el.dataset.hintBy = hint.by;
+  } else {
+    delete el.dataset.hint;
+    delete el.dataset.hintBy;
+  }
+};
+
+const sanitizeCard = (item, aiOn) => {
+  if (!item || !item.html) return false;
+
+  const el = cardFrom(item);
+
+  if (!el) return false;
+
+  const slot = el.querySelector(".card-hint-slot");
+  const existing = hintOf(el);
+  const legacy = slot ? hintOf(slot.querySelector("[data-hint]")) : null;
+  const hint = legacy ?? existing;
+  const keep = hint && (hint.by !== "ai" || aiOn);
+
+  if (!slot && (!existing || keep)) return false;
+
+  if (slot) slot.remove();
+  setHint(el, keep ? hint : null);
+  item.html = el.outerHTML;
+  item.hint = keep ? hint : null;
+
+  return true;
+};
+
+const sanitizeItems = (items, aiOn) => {
+  let changed = false;
+
+  for (const item of items ?? []) if (sanitizeCard(item, aiOn)) changed = true;
+
+  return changed;
+};
+
 const cardIn = (root, fullname) => {
   for (const el of root.querySelectorAll(".card")) if (el.dataset.fullname === fullname) return el;
 
@@ -297,6 +340,171 @@ export function mountRound(root) {
   const statTime = section.querySelector(".cs-time");
   const clearedToday = section.querySelector(".cleared-today");
   const howto = section.querySelector(".howto");
+
+  const settingsChannel = globalThis.BroadcastChannel ? new BroadcastChannel("ch-settings") : null;
+
+  let settingsSeq = 0;
+
+  let aiBusy = false;
+
+  let aiSeq = 0;
+
+  const aiButton = () => (howto ? howto.querySelector("[data-clear-ai]") : null);
+
+  const aiConfiguredNow = () => section.dataset.aiConfigured === "1";
+
+  const aiReady = () => section.dataset.aiConfigured === "1" && section.dataset.ai === "on";
+
+  const SUGGEST_ACT = { keep: "keep", skip: "archived" };
+
+  function paintSuggestion(hint) {
+    const wanted = hint ? SUGGEST_ACT[hint.verdict] : "";
+
+    for (const button of pad.querySelectorAll(".act[data-act]")) {
+      if (button.dataset.act === wanted) {
+        button.dataset.suggested = "1";
+        button.setAttribute("aria-describedby", "pad-suggested");
+      } else {
+        delete button.dataset.suggested;
+        button.removeAttribute("aria-describedby");
+      }
+    }
+  }
+
+  function announceSettings(msg) {
+    settingsChannel?.postMessage(msg);
+
+    if (msg.type === "ai")
+      document.dispatchEvent(new CustomEvent("ch:ai-consent", { detail: { on: msg.on } }));
+  }
+
+  function guideNeeded() {
+    try {
+      return !localStorage.getItem(HOWTO_KEY);
+    } catch {
+      return false;
+    }
+  }
+
+  function dismissGuide() {
+    try {
+      localStorage.setItem(HOWTO_KEY, "1");
+    } catch {}
+
+    for (const line of section.querySelectorAll(".guide-hint")) line.remove();
+  }
+
+  function guideLine() {
+    const line = document.createElement("button");
+
+    line.type = "button";
+    line.className = "guide-hint";
+    line.innerHTML = '<span aria-hidden="true">?</span> What the buttons mean';
+
+    return line;
+  }
+
+  function showDialog(dialog) {
+    if (dialog.showModal === undefined) {
+      dialog.setAttribute("open", "");
+
+      return;
+    }
+
+    try {
+      dialog.showModal();
+    } catch {
+      dialog.setAttribute("open", "");
+    }
+  }
+
+  function setAiBusy(busy) {
+    aiBusy = busy;
+    const btn = aiButton();
+
+    if (btn) btn.disabled = busy || !aiConfiguredNow();
+  }
+
+  function paintAiSwitch(state) {
+    const btn = aiButton();
+    const box = btn && btn.closest(".howto-ai");
+
+    if (!btn || !box) return;
+    const configured = Boolean(state && state.configured);
+    const on = Boolean(state && state.consent === "on");
+
+    section.dataset.aiConfigured = configured ? "1" : "0";
+    section.dataset.ai = configured ? (on ? "on" : "off") : "unset";
+    box.hidden = !configured;
+    btn.setAttribute("aria-pressed", String(on));
+    btn.disabled = aiBusy || !configured;
+    const label = btn.querySelector("[data-clear-ai-state]");
+
+    if (label) label.textContent = on ? "On" : "Off";
+  }
+
+  function paintAiFromBroadcast(msg) {
+    if (msg.on === undefined || !aiConfiguredNow()) return;
+
+    paintAiSwitch({ configured: true, consent: msg.on ? "on" : "off" });
+  }
+
+  function loadAiSwitch() {
+    const my = ++aiSeq;
+    const sv = settingsSeq;
+
+    setAiBusy(true);
+
+    getJSON("/settings/ai")
+      .then((state) => {
+        if (my !== aiSeq || sv !== settingsSeq) return;
+        paintAiSwitch(state);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (my === aiSeq) setAiBusy(false);
+      });
+  }
+
+  function openHowto() {
+    if (!howto) return;
+
+    if (!howto.open) showDialog(howto);
+    loadAiSwitch();
+  }
+
+  function toggleAi() {
+    const btn = aiButton();
+    const note = howto && howto.querySelector("[data-clear-ai-error]");
+
+    if (!btn || btn.disabled) return;
+    const next = btn.getAttribute("aria-pressed") !== "true";
+    const my = ++aiSeq;
+
+    setAiBusy(true);
+
+    if (note) note.hidden = true;
+
+    fetch("/settings/ai", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled: next }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("not saved"))))
+      .then((state) => {
+        if (my !== aiSeq) return;
+        paintAiSwitch(state);
+        announceSettings({ type: "ai", on: Boolean(state && state.consent === "on") });
+      })
+      .catch(() => {
+        if (my !== aiSeq || !note) return;
+        note.textContent = "Couldn't save that. Try again.";
+        note.hidden = false;
+      })
+      .finally(() => {
+        if (my === aiSeq) setAiBusy(false);
+      });
+  }
 
   const later = (fn, ms) => setTimeout(fn, ms);
 
@@ -509,6 +717,13 @@ export function mountRound(root) {
     }
 
     cardEl = el;
+
+    if (round.idx === 0 && guideNeeded()) {
+      const head = el.querySelector(".card-info .card-head");
+
+      if (head && !el.querySelector(".guide-hint")) head.after(guideLine());
+    }
+
     measureBody(el);
 
     attachSwipe(el, {
@@ -525,7 +740,9 @@ export function mountRound(root) {
       tilt: TILT,
     });
 
-    const hint = hintOf(el.querySelector(".card-hint-slot [data-hint]"));
+    const hint = hintOf(el);
+
+    paintSuggestion(hint);
 
     if (!viewed.has(item.fullname)) {
       viewed.add(item.fullname);
@@ -558,6 +775,7 @@ export function mountRound(root) {
   }
 
   function showMessage(text, next, label) {
+    paintSuggestion(null);
     setStage(
       '<div class="round-empty"><p class="round-empty-msg">' +
         esc(text) +
@@ -592,35 +810,43 @@ export function mountRound(root) {
       if (!item || !item.fullname) continue;
 
       if (!Object.hasOwn(hints, item.fullname)) continue;
-      const markup = hints[item.fullname];
+
+      const hint = hints[item.fullname];
+      const previous = itemHint(item);
+
+      const same = previous
+        ? Boolean(hint) && previous.verdict === hint.verdict && previous.by === hint.by
+        : !hint;
+
       const el = cardFrom(item);
-      const slot = el ? el.querySelector(".card-hint-slot") : null;
 
-      if (!slot) continue;
+      if (!el) continue;
 
-      slot.innerHTML = markup;
+      setHint(el, hint);
       item.html = el.outerHTML;
-      item.hint = hintFrom(markup);
-      changed = true;
+      item.hint = hint;
 
       for (const live of stage.querySelectorAll(".card")) {
         if (live.dataset.fullname !== item.fullname) continue;
-        const liveSlot = live.querySelector(".card-hint-slot");
-
-        if (liveSlot) liveSlot.innerHTML = markup;
+        setHint(live, hint);
       }
 
       const current = round.items[round.idx];
-      const hint = item.hint;
 
-      if (hint && viewed.has(item.fullname) && current && current.fullname === item.fullname) {
-        const key = item.fullname + "\u0000" + hint.by;
+      if (current && current.fullname === item.fullname) {
+        paintSuggestion(hint);
 
-        if (!hintKeys.has(key)) {
-          hintKeys.add(key);
-          track("hint_shown", { by: hint.by, idx });
+        if (hint && viewed.has(item.fullname)) {
+          const key = item.fullname + "\u0000" + hint.by;
+
+          if (!hintKeys.has(key)) {
+            hintKeys.add(key);
+            track("hint_shown", { by: hint.by, idx });
+          }
         }
       }
+
+      if (!same) changed = true;
     }
 
     return changed;
@@ -629,35 +855,37 @@ export function mountRound(root) {
   function clearAiHints() {
     if (!round) return;
 
-    for (const item of round.items) {
-      if (!item || !item.fullname) continue;
-      const hint = itemHint(item);
+    const changed = sanitizeItems(round.items, false);
 
-      if (!hint || hint.by !== "ai") continue;
-      const el = cardFrom(item);
-      const slot = el ? el.querySelector(".card-hint-slot") : null;
+    for (const live of stage.querySelectorAll(".card")) {
+      const slot = live.querySelector(".card-hint-slot");
+      const legacy = slot ? hintOf(slot.querySelector("[data-hint]")) : null;
+      const hint = legacy ?? hintOf(live);
 
-      if (slot) slot.innerHTML = "";
+      if (slot) slot.remove();
 
-      if (el) item.html = el.outerHTML;
-      item.hint = null;
+      if (!hint) continue;
+
+      if (hint.by === "ai") setHint(live, null);
+      else setHint(live, hint);
     }
 
-    for (const live of stage.querySelectorAll(".card .card-hint-slot [data-hint-by='ai']")) {
-      const slot = live.closest(".card-hint-slot");
+    if (cardEl) paintSuggestion(hintOf(cardEl));
 
-      if (slot) slot.innerHTML = "";
-    }
+    if (changed) save();
+  }
 
-    save();
+  function reconcileSavedHints() {
+    if (!aiReady()) clearAiHints();
   }
 
   function requestHints(my, ids) {
     if (!ids.length) return;
+    const sv = settingsSeq;
 
     getJSON("/clear/hints?ids=" + encodeURIComponent(ids.join(",")))
       .then((res) => {
-        if (my !== gen || !round || !res || !res.hints) return;
+        if (my !== gen || sv !== settingsSeq || !round || !res || !res.hints) return;
 
         if (patchHints(res.hints)) {
           hintUntil = Date.now() + HINT_WINDOW_MS;
@@ -737,6 +965,8 @@ export function mountRound(root) {
       return;
     }
 
+    sanitizeItems(items, aiReady());
+
     round = {
       rid: newRoundId(),
       q: params.q,
@@ -797,6 +1027,9 @@ export function mountRound(root) {
       save();
     }
 
+    if (sanitizeItems(round.items, aiReady())) save();
+
+    reconcileSavedHints();
     params.n = SIZES.includes(saved.n) ? saved.n : params.n;
     params.q = saved.q || "";
     params.ids = Array.isArray(saved.ids) ? saved.ids : [];
@@ -869,6 +1102,33 @@ export function mountRound(root) {
       img.addEventListener("error", () => img.remove(), { once: true });
   }
 
+  function inboxPrimary(empty) {
+    const btn = cleared.querySelector(
+      '.cleared-acts [data-next="again"], .cleared-acts [data-next="add"]',
+    );
+
+    if (!btn) return;
+    btn.dataset.next = empty ? "add" : "again";
+    btn.textContent = empty ? "Add more saves" : "One more round";
+  }
+
+  function checkInbox(my) {
+    Promise.allSettled(pending.values())
+      .then(() => {
+        if (my !== gen || state !== "done") return null;
+
+        return fetch("/hx/today/upnext?n=1", { headers: { Accept: "text/html" } });
+      })
+      .then((res) => (res && res.ok ? res.text() : null))
+      .then((text) => {
+        if (text === null) return;
+
+        if (my !== gen || state !== "done") return;
+        inboxPrimary(text.includes("upnext-empty"));
+      })
+      .catch(() => {});
+  }
+
   function finish() {
     const ms = round.startedAt ? Date.now() - round.startedAt : 0;
     const count = { done: 0, archived: 0, keep: 0, snooze: 0, skip: 0 };
@@ -895,9 +1155,12 @@ export function mountRound(root) {
     clearedToday.innerHTML = "";
     showToday();
     combo = 0;
+    paintSuggestion(null);
     setStage("");
     setState("done");
     renderProgress();
+    inboxPrimary(false);
+    checkInbox(gen);
     haptic("milestone");
 
     if (finalised !== round.rid) {
@@ -944,9 +1207,7 @@ export function mountRound(root) {
     const current = cardEl && cardEl.dataset.fullname === item.fullname ? cardEl : null;
     const card = current || cardIn(stage, item.fullname);
 
-    const hint = card
-      ? hintOf(card.querySelector(".card-hint-slot [data-hint]"))
-      : hintFrom(item.html);
+    const hint = card ? hintOf(card) : hintFrom(item.html);
 
     item.hint = hint;
 
@@ -1015,10 +1276,12 @@ export function mountRound(root) {
 
     if (!item) return;
 
+    if (guideNeeded()) dismissGuide();
+
     combo = Date.now() - shownAt < COMBO_MS ? combo + 1 : 0;
     const result = { fullname: item.fullname, act };
 
-    const hint = cardEl ? hintOf(cardEl.querySelector(".card-hint-slot [data-hint]")) : null;
+    const hint = cardEl ? hintOf(cardEl) : null;
     const data = { act, method, dwell_ms: Math.max(0, Date.now() - shownAt) };
 
     if (hint) {
@@ -1118,6 +1381,8 @@ export function mountRound(root) {
       if (params.q) qs.set("q", params.q);
       forget();
       go("/clear?" + qs);
+    } else if (kind === "add") {
+      go("/add");
     } else if (kind === "sweep") {
       go("/#piles");
     } else if (kind === "enough") {
@@ -1128,15 +1393,12 @@ export function mountRound(root) {
   function onClick(e) {
     if (leaving) return;
 
-    const accept = e.target.closest("[data-hint-accept]");
+    const guide = e.target.closest(".guide-hint");
 
-    if (accept && cardEl && cardEl.contains(accept)) {
+    if (guide && cardEl && cardEl.contains(guide)) {
       e.preventDefault();
-      const hint = accept.closest("[data-hint]");
-
-      if (!hint) return;
-
-      decide(hint.dataset.hint === "skip" ? "archived" : "keep", "hint");
+      dismissGuide();
+      openHowto();
 
       return;
     }
@@ -1220,7 +1482,7 @@ export function mountRound(root) {
   section.addEventListener(
     "pointerdown",
     (e) => {
-      if (e.target.closest && e.target.closest("[data-hint-accept]")) e.stopPropagation();
+      if (e.target.closest && e.target.closest(".guide-hint")) e.stopPropagation();
     },
     true,
   );
@@ -1228,8 +1490,14 @@ export function mountRound(root) {
   section.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
   document.addEventListener("ch:ai-consent", (e) => {
-    if (e.detail && e.detail.on === false) clearAiHints();
+    const on = Boolean(e.detail && e.detail.on);
 
+    settingsSeq += 1;
+    section.dataset.ai = on ? "on" : "off";
+
+    if (!on) clearAiHints();
+
+    paintAiFromBroadcast({ on });
     hintUntil = Date.now() + HINT_WINDOW_MS;
     pullHints(gen);
   });
@@ -1241,13 +1509,36 @@ export function mountRound(root) {
     pullHints(gen);
   });
 
-  if (howto) {
-    const openHowto = () => {
-      if (!howto.open) howto.showModal();
-    };
+  if (settingsChannel)
+    settingsChannel.addEventListener("message", (e) => {
+      const msg = e.data;
 
+      if (!msg || !msg.type) return;
+
+      if (msg.type !== "ai") return;
+
+      settingsSeq += 1;
+      section.dataset.ai = msg.on ? "on" : "off";
+      paintAiFromBroadcast(msg);
+
+      if (msg.on === false) clearAiHints();
+
+      hintUntil = Date.now() + HINT_WINDOW_MS;
+      pullHints(gen);
+    });
+
+  if (howto) {
     section.querySelector(".round-help")?.addEventListener("click", openHowto);
-    howto.querySelector(".howto-ok").addEventListener("click", () => howto.close());
+    howto.querySelector(".howto-ok")?.addEventListener("click", () => howto.close());
+
+    const aiToggle = howto.querySelector("[data-clear-ai]");
+
+    if (aiToggle)
+      aiToggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        toggleAi();
+      });
+
     howto.addEventListener("click", (e) => {
       if (e.target === howto) howto.close();
     });
@@ -1256,10 +1547,6 @@ export function mountRound(root) {
         localStorage.setItem(HOWTO_KEY, "1");
       } catch {}
     });
-
-    try {
-      if (!localStorage.getItem(HOWTO_KEY)) openHowto();
-    } catch {}
   }
 
   window.addEventListener("pagehide", () => {

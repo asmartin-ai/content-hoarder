@@ -11,7 +11,10 @@ import {
 } from "../../assist/consent.ts";
 import { bool, clamp, json, numberValue, objectBody } from "../http.ts";
 import { track } from "../../demo_analytics.ts";
+import { htmlResponse } from "../static.ts";
 import { connection, databasePath } from "../state.ts";
+import { renderPage } from "../views/page.ts";
+import { renderSettings } from "../views/settings.ts";
 import {
   DrainBody,
   EnabledBody,
@@ -29,11 +32,27 @@ export async function purgeDone(request: Request): Promise<Response> {
     return json({ error: "expected_total and expected_cutoff are required" }, 400);
   const database = connection();
   const now = Math.floor(Date.now() / 1000);
-  const plan = db.purgeDone(database, { now });
+  const stored = Number(db.getSetting(database, "done_retention_days", "30") ?? "30");
+  const retentionDays = Number.isFinite(stored) && stored >= 1 && stored <= 3650 ? stored : 30;
+  const cutoff = Math.floor(expectedCutoff);
 
-  if (plan.total !== expectedTotal || plan.cutoff !== expectedCutoff)
+  if (cutoff > now - retentionDays * 86400)
     return json(
-      { error: "purge preview changed; review the updated count before deleting", preview: plan },
+      {
+        error: "purge preview changed; review the updated count before deleting",
+        preview: db.purgeDone(database, { now }),
+      },
+      409,
+    );
+
+  const plan = db.purgeDone(database, { cutoff });
+
+  if (plan.total !== expectedTotal)
+    return json(
+      {
+        error: "purge preview changed; review the updated count before deleting",
+        preview: db.purgeDone(database, { now }),
+      },
       409,
     );
 
@@ -44,7 +63,7 @@ export async function purgeDone(request: Request): Promise<Response> {
     .query(
       "SELECT fullname, source, title FROM items WHERE status='done' AND processed_utc IS NOT NULL AND processed_utc < ? ORDER BY processed_utc",
     )
-    .all(plan.cutoff)
+    .all(cutoff)
     .map((row) => PurgeVictimSchema.parse(row));
 
   const backupPath = join(
@@ -53,7 +72,7 @@ export async function purgeDone(request: Request): Promise<Response> {
   );
 
   await Bun.write(backupPath, database.serialize());
-  const purged = db.purgeDone(database, { now, apply: true });
+  const purged = db.purgeDone(database, { cutoff, apply: true });
   const preview = db.purgeDone(database, { now });
 
   const audit = {
@@ -145,6 +164,31 @@ function aiState(): AiState {
 
 export function aiSettings(): Response {
   return json(aiState());
+}
+
+export function settingsPage(): Response {
+  const database = connection();
+  const now = Math.floor(Date.now() / 1000);
+  const stored = Number(db.getSetting(database, "done_retention_days", "30") ?? "30");
+  const retentionDays = Number.isFinite(stored) && stored >= 1 && stored <= 3650 ? stored : 30;
+
+  if (retentionDays !== stored) db.setSetting(database, "done_retention_days", "30");
+
+  const preview = db.purgeDone(database, { now });
+  const auth = redditUnsave.getAuth(database);
+
+  const body = renderSettings({
+    ai: aiConfigured() ? { on: aiConsent(database) === "on", provider: aiProviderLabel() } : null,
+    retention: { days: retentionDays, total: preview.total, cutoff: preview.cutoff },
+    unsave: {
+      enabled: db.unsaveEnabled(database),
+      username: auth?.username ?? null,
+      pending: redditUnsave.countPending(database),
+      failed: redditUnsave.countFailed(database),
+    },
+  });
+
+  return htmlResponse(renderPage({ title: "Settings", tab: "settings", body }));
 }
 
 export async function updateAiSettings(request: Request): Promise<Response> {

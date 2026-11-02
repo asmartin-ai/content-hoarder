@@ -2,6 +2,8 @@ import { track } from "../core/track.js";
 
 const endpoint = "/settings/ai";
 
+const channel = "BroadcastChannel" in globalThis ? new BroadcastChannel("ch-settings") : null;
+
 async function sendConsent(enabled) {
   const response = await fetch(endpoint, {
     method: "POST",
@@ -14,17 +16,9 @@ async function sendConsent(enabled) {
   return response.json();
 }
 
-function paintToggle(toggle, on) {
-  toggle.setAttribute("aria-pressed", String(on));
-  toggle.classList.toggle("is-primary", on);
-
-  const state = toggle.querySelector("[data-ai-toggle-state]");
-
-  if (state) state.textContent = on ? "On" : "Off";
-}
-
 function announce(on) {
   document.dispatchEvent(new CustomEvent("ch:ai-consent", { detail: { on } }));
+  channel?.postMessage({ type: "ai", on });
 }
 
 function showDialog(dialog) {
@@ -49,15 +43,17 @@ if (dialog) {
   const decline = dialog.querySelector("[data-ai-consent-decline]");
   const buttons = [enable, decline].filter(Boolean);
 
+  let busy = false;
+
   const decide = async (enabled) => {
+    if (busy) return;
+    busy = true;
+
     for (const button of buttons) button.disabled = true;
 
     try {
       const result = await sendConsent(enabled);
       const on = result?.consent === "on";
-      const toggle = document.querySelector("[data-ai-toggle]");
-
-      if (toggle) paintToggle(toggle, on);
 
       announce(on);
       track("consent_choice", { on, where: "popup" });
@@ -69,11 +65,20 @@ if (dialog) {
       }
 
       for (const button of buttons) button.disabled = false;
+    } finally {
+      busy = false;
     }
   };
 
   enable?.addEventListener("click", () => decide(true));
   decline?.addEventListener("click", () => decide(false));
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    decide(false);
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) event.stopPropagation();
+  });
   showDialog(dialog);
 
   document.addEventListener(
@@ -83,36 +88,4 @@ if (dialog) {
     },
     true,
   );
-}
-
-const toggle = document.querySelector("[data-ai-toggle]");
-
-if (toggle) {
-  const error = document.querySelector("[data-ai-toggle-error]");
-
-  paintToggle(toggle, toggle.getAttribute("aria-pressed") === "true");
-
-  toggle.addEventListener("click", async () => {
-    const next = toggle.getAttribute("aria-pressed") !== "true";
-
-    toggle.disabled = true;
-
-    if (error) error.hidden = true;
-
-    try {
-      const result = await sendConsent(next);
-      const on = result?.consent === "on";
-
-      paintToggle(toggle, on);
-      announce(on);
-      track("consent_choice", { on, where: "add" });
-    } catch {
-      if (error) {
-        error.textContent = "Couldn't save that. Try again.";
-        error.hidden = false;
-      }
-    } finally {
-      toggle.disabled = false;
-    }
-  });
 }

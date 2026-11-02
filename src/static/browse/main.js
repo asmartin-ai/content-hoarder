@@ -1,7 +1,9 @@
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 import { wireTagExpanders } from "../core/render.js";
-import { $, itemsEl, restoreView } from "./shared.js";
+import { setArchivePref } from "../core/media.js";
+import { itemsEl, restoreView, state } from "./shared.js";
+import { render } from "./feed.js";
 import {
   clearItemFirstPageCache,
   loadCounts,
@@ -25,6 +27,40 @@ wireTagExpanders(itemsEl);
 restoreView();
 
 syncSortControl();
+
+function reapplyStoredPrefs() {
+  const density = localStorage.chDensity || "comfortable";
+  const safe = localStorage.chSafe !== "0";
+  const archiveMedia = localStorage.chArchiveMedia === "1";
+
+  if (density === state.density && safe === state.safe && archiveMedia === state.archiveMedia)
+    return;
+
+  const safeChanged = safe !== state.safe;
+
+  state.density = density;
+  state.safe = safe;
+  state.archiveMedia = archiveMedia;
+  setArchivePref(archiveMedia);
+
+  if (safeChanged) {
+    refreshRail();
+    loadItems(true);
+
+    return;
+  }
+
+  render();
+}
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) reapplyStoredPrefs();
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "chDensity" || event.key === "chSafe" || event.key === "chArchiveMedia")
+    reapplyStoredPrefs();
+});
 
 if (window.visualViewport) {
   const vv = window.visualViewport;
@@ -144,45 +180,41 @@ initPalette(qInput, [
     label: "Theme: dark",
     hint: "view",
     run: () => {
-      const b = $('#set-theme [data-theme="dark"]');
-
-      if (b) b.click();
+      if ((document.documentElement.dataset.theme || "dark") !== "dark") window.toggleTheme?.();
     },
   },
   {
     label: "Theme: light",
     hint: "view",
     run: () => {
-      const b = $('#set-theme [data-theme="light"]');
-
-      if (b) b.click();
+      if ((document.documentElement.dataset.theme || "dark") !== "light") window.toggleTheme?.();
     },
   },
   {
     label: "Density: comfortable",
     hint: "view",
     run: () => {
-      const b = $('#set-density [data-d="comfortable"]');
-
-      if (b) b.click();
+      state.density = "comfortable";
+      localStorage.chDensity = state.density;
+      render();
     },
   },
   {
     label: "Density: compact",
     hint: "view",
     run: () => {
-      const b = $('#set-density [data-d="compact"]');
-
-      if (b) b.click();
+      state.density = "compact";
+      localStorage.chDensity = state.density;
+      render();
     },
   },
   {
     label: "Density: card",
     hint: "view",
     run: () => {
-      const b = $('#set-density [data-d="card"]');
-
-      if (b) b.click();
+      state.density = "card";
+      localStorage.chDensity = state.density;
+      render();
     },
   },
   {

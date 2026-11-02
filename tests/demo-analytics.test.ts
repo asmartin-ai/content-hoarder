@@ -282,6 +282,15 @@ test("invalid, forged, sensitive and oversized payloads are rejected", async () 
     expect(
       (
         await postEvents(base, {
+          sid: "tab-bad",
+          events: [{ kind: "decision", data: { act: "keep", method: "hint", dwell_ms: 10 } }],
+        })
+      ).status,
+    ).toBe(400);
+
+    expect(
+      (
+        await postEvents(base, {
           sid: "tab-big",
           events: [
             { kind: "decision", data: { act: "keep", method: "swipe", blob: "x".repeat(4096) } },
@@ -407,7 +416,7 @@ test("a status change records the stored hint outcome", async () => {
   });
 });
 
-test("the summary counts decisions, dwell and explicit hint acceptance", () => {
+test("the summary counts decisions, dwell, hint agreement and legacy accepts", () => {
   setEnv("CONTENT_HOARDER_DEMO_ANALYTICS", "1");
   const root = mkdtempSync(join(tmpdir(), "content-hoarder-demo-summary-"));
   const path = join(root, "app.db");
@@ -424,6 +433,9 @@ test("the summary counts decisions, dwell and explicit hint acceptance", () => {
       data: { act: "skip", method: "key", dwell_ms: 50, hint: "skip", hint_by: "history" },
     });
     track(connection, "decision", {
+      data: { act: "keep", method: "tap", dwell_ms: 150, hint: "keep", hint_by: "ai" },
+    });
+    track(connection, "decision", {
       data: { act: "keep", method: "hint", dwell_ms: 150, hint: "keep", hint_by: "ai" },
     });
     track(connection, "undo", {});
@@ -433,12 +445,13 @@ test("the summary counts decisions, dwell and explicit hint acceptance", () => {
 
     const summary = demoEventsSummary(connection);
 
-    expect(summary.events).toBe(8);
+    expect(summary.events).toBe(9);
     expect(summary.sessions).toBe(0);
-    expect(summary.decisions_by_act).toEqual({ archived: 2, keep: 2, skip: 1 });
-    expect(summary.decisions_by_method).toEqual({ swipe: 2, tap: 1, key: 1, hint: 1 });
+    expect(summary.decisions_by_act).toEqual({ archived: 2, keep: 3, skip: 1 });
+    expect(summary.decisions_by_method).toEqual({ swipe: 2, tap: 2, key: 1, hint: 1 });
     expect(summary.median_dwell_ms).toBe(150);
-    expect(summary.hints_accepted).toBe(1);
+    expect(summary.hint_agreement).toBe(2);
+    expect(summary.hints_accepted_legacy).toBe(1);
     expect(summary.hints_matched).toBe(0);
     expect(summary.undos).toBe(1);
     expect(summary.page_views).toEqual({ "/clear": 1 });
@@ -463,7 +476,7 @@ test("first-decision timing uses the client clock within a session", async () =>
       sid: "s1",
       events: [
         { kind: "page_view", at: 1_000_000, data: { path: "/clear" } },
-        { kind: "decision", at: 1_002_500, data: { act: "keep", method: "hint", dwell_ms: 900 } },
+        { kind: "decision", at: 1_002_500, data: { act: "keep", method: "tap", dwell_ms: 900 } },
       ],
     });
 

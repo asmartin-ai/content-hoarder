@@ -101,6 +101,7 @@ test("a configured provider prompts once and the opt-out is remembered", async (
     expect(today).toContain("data-ai-consent");
     expect(today).toContain("Turn on AI suggestions?");
     expect(today).toContain("Z.ai (GLM)");
+    expect(today).toContain("the button the AI would pick (Keep or Archive) is gently highlighted");
     expect(today).toContain("first 500 characters of its text");
 
     const declined = await setConsent(base, false);
@@ -112,9 +113,9 @@ test("a configured provider prompts once and the opt-out is remembered", async (
 
     const add = await (await fetch(`${base}/add`)).text();
 
-    expect(add).toContain("data-ai-toggle");
-    expect(add).toContain("Z.ai (GLM)");
-    expect(add).toContain('aria-pressed="false"');
+    expect(add).not.toContain("data-ai-toggle");
+    expect(add).toContain("AI suggestions: Off");
+    expect(add).toContain('href="/settings"');
 
     const accepted = await setConsent(base, true);
 

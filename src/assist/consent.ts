@@ -5,7 +5,7 @@ import { getSetting, setSetting } from "../db.ts";
 export const AI_CONSENT_KEY = "ai_suggestions";
 
 export const AI_FIELDS_SENT =
-  "each dealt card's source, title, author, subreddit or channel, URL and the first 500 characters of its text";
+  "each dealt card's source, title, author, subreddit or channel, URL, the first 500 characters of its text, and one line of your own decision counts for that card's source (for example, \"You archived 9 of 10 from r/pics\"; never other items' titles)";
 
 export type AiConsent = "on" | "off" | "unset";
 

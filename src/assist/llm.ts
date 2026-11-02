@@ -15,7 +15,7 @@ import {
 import { aiConfigured } from "./consent.ts";
 
 const SYSTEM =
-  'You help someone with ADHD triage a backlog of saved content. For the given item, decide whether it is worth KEEPING or can be SKIPPED (archived), and propose 1-5 short lowercase topical tags. Be decisive and brief. Respond with ONLY compact JSON of the form {"verdict":"keep"|"skip","reason":"<one short sentence>","tags":["tag1","tag2"]}.';
+  'You help someone with ADHD triage a backlog of saved content. For the given item, decide whether it should be KEPT or ARCHIVED (SKIPPED), and propose 1-5 short lowercase topical tags. Archiving is safe and reversible because archived items stay searchable, but do not bias toward either verdict. Keep items that are specific, practical, or a deliberate save the user would plausibly act on, such as tutorials, recipes, guides, and tools. Archive only when the item is ephemeral (an expired event, sale, AMA, price check, or live thread), low-effort or generic, a meme or entertainment the user has likely already consumed, a duplicate, or when the user\'s own history shows they archive that kind of item. "Easy to find again" is not on its own a reason to archive. Give one reason specific to this item, never a generic phrase like "useful reference". Be decisive and brief. Respond with ONLY compact JSON of the form {"verdict":"keep"|"skip","reason":"<one short sentence>","tags":["tag1","tag2"]}.';
 
 const CLASSIFY_SYSTEM =
   'You categorize a saved video into exactly one processing area for someone with ADHD:\n- listenable: audio-first (music, albums, podcasts, long talks) — playable in the background.\n- watch: needs your eyes (tutorials, vlogs, visual demos, short clips).\n- wotagei: an idol-event glowstick/penlight performance.\n- unknown: genuinely unclear.\nRespond with ONLY compact JSON: {"category":"listenable"|"watch"|"wotagei"|"unknown","reason":"<short>"}.';
@@ -84,7 +84,7 @@ function llmTimeout(): number {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 12;
 }
 
-function itemText(item: Item): string {
+function itemText(item: Item, history?: string): string {
   const metadata = parseMetadata(item.metadata);
   const parts = [`Source: ${item.source}`, `Title: ${item.title}`];
 
@@ -93,6 +93,8 @@ function itemText(item: Item): string {
   if (metadata.subreddit) parts.push(`Subreddit: ${metadata.subreddit}`);
 
   if (metadata.channel) parts.push(`Channel: ${metadata.channel}`);
+
+  if (history) parts.push(`Your history: ${history}`);
 
   if (item.url) parts.push(`URL: ${item.url}`);
   const body = (item.body || "").slice(0, 500);
@@ -194,14 +196,14 @@ export interface SuggestResult {
 
 export async function suggest(
   item: Item,
-  opts: { chat?: ChatOverride } = {},
+  opts: { chat?: ChatOverride; history?: string } = {},
 ): Promise<SuggestResult | null> {
   if (!isAvailable()) return null;
 
   try {
     const messages = [
       { role: "system", content: SYSTEM },
-      { role: "user", content: itemText(item) },
+      { role: "user", content: itemText(item, opts.history) },
     ];
 
     let suggestion: Suggestion | null;

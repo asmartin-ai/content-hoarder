@@ -216,42 +216,14 @@ const COMMENT_SHORT = 160;
 
 const COMMENT_MEDIUM = 420;
 
-export type CardHint = { verdict: "keep" | "skip"; reason: string; by: "ai" | "history" };
-
-const HINT_REASON_CAP = 120;
-
-export function renderHint(hint: CardHint | null): SafeHtml {
-  if (!hint) return html``;
-
-  const keep = hint.verdict === "keep";
-  const reason = hint.reason.replace(/\s+/g, " ").trim().slice(0, HINT_REASON_CAP);
-  const label = keep ? "Suggest: Keep" : "Suggest: Archive";
-  const action = keep ? "Keep" : "Archive";
-
-  return html`<p
-    class="card-hint"
-    data-hint="${keep ? "keep" : "skip"}"
-    data-hint-by="${hint.by === "history" ? "history" : "ai"}"
-  >
-    <span class="hint-label">${label}</span><span class="hint-dot" aria-hidden="true">·</span
-    ><span class="hint-reason">${reason}</span
-    ><span class="hint-by">${hint.by === "history" ? "From your history" : "AI"}</span
-    ><button
-      class="hint-accept"
-      type="button"
-      data-hint-accept
-      aria-label="Accept suggestion: ${action}"
-    >
-      ${action}
-    </button>
-  </p>`;
-}
+export type CardHint = { verdict: "keep" | "skip"; by: "ai" | "history" };
 
 export function renderCard(
   item: Item,
   opts?: { topComment?: TopComment | null; hint?: CardHint | null },
 ): SafeHtml {
   const kind = cardKind(item);
+  const hint = opts?.hint ?? null;
   const nsfw = Boolean(item.metadata.over_18);
   const isComment = kind === "comment";
   const title = item.title.trim();
@@ -298,6 +270,12 @@ export function renderCard(
     data-layout="${layout}"
     data-len="${len}"
     data-cost="${costMinutes(item).toFixed(2)}"
+    ${
+      hint
+        ? html`data-hint="${hint.verdict}"
+          data-hint-by="${hint.by === "history" ? "history" : "ai"}"`
+        : ""
+    }
     ${thumb ? html`data-thumb="${thumb}"` : ""}
     style="--src: ${accent}; --hue: ${hueOf(communityOf(item))}"
   >
@@ -316,9 +294,7 @@ export function renderCard(
             ${icon("open", 18)}
           </button>
         </header>
-        ${context}${heading}${removed}
-        <div class="card-hint-slot">${renderHint(opts?.hint ?? null)}</div>
-        ${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
+        ${context}${heading}${removed} ${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
       </div>
       <span class="card-wash" aria-hidden="true"></span
       ><span class="card-stamp" aria-hidden="true"></span>

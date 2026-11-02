@@ -10,7 +10,7 @@ import {
   type Item,
   type Metadata,
 } from "../models.ts";
-import type { CardHint } from "../web/views/card.ts";
+import { historyLine, loadModel, type ScoreModel } from "../triage_score.ts";
 import { aiActive } from "./consent.ts";
 import { suggest, type ChatOverride, type LlmUsage } from "./llm.ts";
 
@@ -28,6 +28,8 @@ const HistoryHintSchema = z.object({
   verdict: z.enum(["keep", "skip"]),
   reason: z.string(),
 });
+
+type Suggestion = { verdict: "keep" | "skip"; reason: string; by: "ai" | "history" };
 
 const DaySchema = z.object({
   day: z.string(),
@@ -164,7 +166,7 @@ function dealWaitMs(): number {
 export function hintFor(
   database: Database,
   item: { metadata: Metadata | string | null | undefined },
-): CardHint | null {
+): Suggestion | null {
   const metadata = parseMetadata(item.metadata);
 
   if (aiActive(database)) {
@@ -185,7 +187,12 @@ export function aiUsage(database: Database): AiUsage {
   return setting(database, USAGE_KEY, UsageSchema) ?? ZERO_USAGE;
 }
 
-async function fetchHint(database: Database, fullname: string, chat?: ChatOverride): Promise<void> {
+async function fetchHint(
+  database: Database,
+  fullname: string,
+  model: ScoreModel | null,
+  chat?: ChatOverride,
+): Promise<void> {
   const raw = db.getItem(database, fullname);
 
   if (!raw || raw.status !== "inbox") return;
@@ -197,8 +204,9 @@ async function fetchHint(database: Database, fullname: string, chat?: ChatOverri
 
   if (!reserveCall(database)) return;
   const item: Item = { ...raw, metadata };
+  const history = model ? historyLine(model, raw, metadata, { now: model.fitted_utc }) : null;
   const started = Date.now();
-  const result = await suggest(item, chat ? { chat } : {});
+  const result = await suggest(item, { chat, history: history ?? undefined });
 
   track(database, "srv_ai_call", {
     fullname,
@@ -247,6 +255,11 @@ export async function prefetchHints(
   for (const id of pending) gate.inflight.add(id);
 
   const waitMs = opts.waitMs ?? dealWaitMs();
+  let model: ScoreModel | null = null;
+
+  try {
+    model = loadModel(database);
+  } catch {}
 
   const worker = async (): Promise<void> => {
     while (pending.length) {
@@ -257,7 +270,7 @@ export async function prefetchHints(
       await acquire(database);
 
       try {
-        await fetchHint(database, id, opts.chat);
+        await fetchHint(database, id, model, opts.chat);
       } catch {}
 
       release(database);

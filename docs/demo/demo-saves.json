@@ -433,6 +433,384 @@
      "selftext": "Start with set -euo pipefail, one function, and an echo. Then grow it.",
      "url": "https://www.reddit.com/r/linux/comments/demo24/your_first_shell_script_a_five_minute_wa/"
     }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo25",
+     "id": "demo25",
+     "title": "when the code compiles on the first try",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo25/when_the_code_compiles_on_the_first_try/",
+     "author": "sample_author_25",
+     "created_utc": 1580644800,
+     "score": 12,
+     "num_comments": 3,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo25"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo26",
+     "id": "demo26",
+     "title": "nobody: … absolutely nobody: … me opening 40 tabs again",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo26/nobody_absolutely_nobody_me_opening_40_tabs_a/",
+     "author": "sample_author_26",
+     "created_utc": 1623758400,
+     "score": 9,
+     "num_comments": 2,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo26"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo27",
+     "id": "demo27",
+     "title": "POV: you call it research and open 47 tabs",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo27/pov_you_call_it_research_and_open_47_tabs/",
+     "author": "sample_author_27",
+     "created_utc": 1646913600,
+     "score": 6,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo27"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo28",
+     "id": "demo28",
+     "title": "me explaining my home server to my cat",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo28/me_explaining_my_home_server_to_my_cat/",
+     "author": "sample_author_28",
+     "created_utc": 1674216000,
+     "score": 14,
+     "num_comments": 2,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo28"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo29",
+     "id": "demo29",
+     "title": "that one meme from 2019 that still gets reposted every week",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo29/that_one_meme_from_2019_that_still_gets_repos/",
+     "author": "sample_author_29",
+     "created_utc": 1546344000,
+     "score": 5,
+     "num_comments": 4,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo29"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo30",
+     "id": "demo30",
+     "title": "when the meeting could have been an email",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo30/when_the_meeting_could_have_been_an_email/",
+     "author": "sample_author_30",
+     "created_utc": 1714910400,
+     "score": 8,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo30"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo31",
+     "id": "demo31",
+     "title": "my brain at 3am picking a random embarrassing memory",
+     "subreddit": "memes",
+     "permalink": "/r/memes/comments/demo31/my_brain_at_3am_picking_a_random_embarrassing/",
+     "author": "sample_author_31",
+     "created_utc": 1755172800,
+     "score": 11,
+     "num_comments": 2,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/memes/demo31"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo32",
+     "id": "demo32",
+     "title": "[USA] 2TB NVMe $89 flash sale ends tonight",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo32/usa_2tb_nvme_89_flash_sale_ends_tonight/",
+     "author": "sample_author_32",
+     "created_utc": 1787227200,
+     "score": 4,
+     "num_comments": 6,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/buildapc/demo32"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo33",
+     "id": "demo33",
+     "title": "Is this prebuilt worth $700? Specs in the comments",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo33/is_this_prebuilt_worth_700_specs_in_the_comme/",
+     "author": "sample_author_33",
+     "created_utc": 1787745600,
+     "score": 2,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "CPU and GPU combo, 16GB RAM, 1TB SSD. The listing calls it a deal. Is it?",
+     "url": "https://example.com/buildapc/demo33"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo34",
+     "id": "demo34",
+     "title": "Which GPU should I buy for 1440p with a $400 budget?",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo34/which_gpu_should_i_buy_for_1440p_with_a_400_b/",
+     "author": "sample_author_34",
+     "created_utc": 1788350400,
+     "score": 3,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Mostly single-player games, some older titles. Already have a 1080p monitor but may upgrade.",
+     "url": "https://example.com/buildapc/demo34"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo35",
+     "id": "demo35",
+     "title": "Best GPU for 1440p under $400?",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo35/best_gpu_for_1440p_under_400/",
+     "author": "sample_author_35",
+     "created_utc": 1789041600,
+     "score": 1,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Same question as yesterday's thread. My budget is firm.",
+     "url": "https://example.com/buildapc/demo35"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo36",
+     "id": "demo36",
+     "title": "[Deal] 32GB DDR5 kit $79 after code, expires Sunday",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo36/deal_32gb_ddr5_kit_79_after_code_expires_sund/",
+     "author": "sample_author_36",
+     "created_utc": 1789732800,
+     "score": 3,
+     "num_comments": 2,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/buildapc/demo36"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo37",
+     "id": "demo37",
+     "title": "Rate my first build before I order",
+     "subreddit": "buildapc",
+     "permalink": "/r/buildapc/comments/demo37/rate_my_first_build_before_i_order/",
+     "author": "sample_author_37",
+     "created_utc": 1790337600,
+     "score": 2,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Part list: 7600, 32GB, 2TB SSD, 7800 XT. Anything obviously wrong?",
+     "url": "https://example.com/buildapc/demo37"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo38",
+     "id": "demo38",
+     "title": "IAmA former museum night guard — AMA starts at 3pm ET today",
+     "subreddit": "IAmA",
+     "permalink": "/r/IAmA/comments/demo38/iama_former_museum_night_guard_ama_starts_at_/",
+     "author": "sample_author_38",
+     "created_utc": 1787745600,
+     "score": 7,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "I worked nights at a city museum for six years. I'll answer questions for an hour this afternoon.",
+     "url": "https://example.com/iama/demo38"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo39",
+     "id": "demo39",
+     "title": "AMA: we built a tiny weather station, ask us anything (live now)",
+     "subreddit": "IAmA",
+     "permalink": "/r/IAmA/comments/demo39/ama_we_built_a_tiny_weather_station_ask_us_an/",
+     "author": "sample_author_39",
+     "created_utc": 1788350400,
+     "score": 5,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Two friends and I built a solar weather station. We are live now and taking questions.",
+     "url": "https://example.com/iama/demo39"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo40",
+     "id": "demo40",
+     "title": "[GOG] 90% off old adventure games, ends in 6 hours",
+     "subreddit": "gamedeals",
+     "permalink": "/r/gamedeals/comments/demo40/gog_90_off_old_adventure_games_ends_in_6_hour/",
+     "author": "sample_author_40",
+     "created_utc": 1789041600,
+     "score": 6,
+     "num_comments": 3,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/gamedeals/demo40"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo41",
+     "id": "demo41",
+     "title": "[Steam] Summer sale picks under $5, sale over Sunday",
+     "subreddit": "gamedeals",
+     "permalink": "/r/gamedeals/comments/demo41/steam_summer_sale_picks_under_5_sale_over_sun/",
+     "author": "sample_author_41",
+     "created_utc": 1789732800,
+     "score": 4,
+     "num_comments": 2,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "",
+     "url": "https://example.com/gamedeals/demo41"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo42",
+     "id": "demo42",
+     "title": "What's a small thing that instantly ruins your mood?",
+     "subreddit": "AskReddit",
+     "permalink": "/r/AskReddit/comments/demo42/what_s_a_small_thing_that_instantly_ruins_you/",
+     "author": "sample_author_42",
+     "created_utc": 1790337600,
+     "score": 9,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Just what it says. One small thing.",
+     "url": "https://example.com/askreddit/demo42"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo43",
+     "id": "demo43",
+     "title": "What's a tiny thing that ruins your whole mood?",
+     "subreddit": "AskReddit",
+     "permalink": "/r/AskReddit/comments/demo43/what_s_a_tiny_thing_that_ruins_your_whole_moo/",
+     "author": "sample_author_43",
+     "created_utc": 1790856000,
+     "score": 2,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "Basically the same as the other thread today.",
+     "url": "https://example.com/askreddit/demo43"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo44",
+     "id": "demo44",
+     "title": "If you could only eat one food forever, what would it be?",
+     "subreddit": "AskReddit",
+     "permalink": "/r/AskReddit/comments/demo44/if_you_could_only_eat_one_food_forever_what_w/",
+     "author": "sample_author_44",
+     "created_utc": 1755172800,
+     "score": 3,
+     "num_comments": 0,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "No rules, just pick one.",
+     "url": "https://example.com/askreddit/demo44"
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demo45",
+     "id": "demo45",
+     "title": "Live thread: keynote starts at 10am PT, stream inside",
+     "subreddit": "technology",
+     "permalink": "/r/technology/comments/demo45/live_thread_keynote_starts_at_10am_pt_stream_/",
+     "author": "sample_author_45",
+     "created_utc": 1790337600,
+     "score": 3,
+     "num_comments": 1,
+     "over_18": false,
+     "is_self": false,
+     "selftext": "The stream starts at 10am PT. Discuss the announcements here.",
+     "url": "https://example.com/technology/demo45"
+    }
    }
   ]
  }

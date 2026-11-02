@@ -3,20 +3,21 @@
 A recorded or supervised local demo of the core loop. YC says a local demo is fine: "We don't
 care if you're still running it locally" ([YC library, "Include a demo"](https://www.ycombinator.com/library/J8-yc-application-tips-include-a-demo), checked 2026-11-01).
 
-Status key: **✅ verified** = run on 2026-11-01 against the synthetic demo library (`scripts/demo.sh`,
-headless Chromium at 412×915). **⚠ unverified** = not exercised. **✋ manual** = the founder does it by hand.
+Status key: **✅ verified** = run on 2026-11-01 against the earlier synthetic demo library
+(`scripts/demo.sh`, headless Chromium at 412×915). **⚠ unverified** = not exercised with the
+current data or UI. **✋ manual** = the founder does it by hand.
 
 ## Start
 
 ```bash
-./scripts/demo.sh                      # fresh temp library, 24 synthetic saves, http://127.0.0.1:8791/
+./scripts/demo.sh                      # fresh temp library, 45 synthetic saves, http://127.0.0.1:8791/
 ./scripts/demo.sh ~/tester-links.txt   # same, but imports a tester's own file instead
 ```
 
 It creates a new temp folder, runs from it (so no `.env` and no credentials load), sets
 `CONTENT_HOARDER_OFFLINE=1` (the server makes no request to anything but itself), and never
-opens `data/app.db`. The data is `docs/demo/demo-saves.json`: invented posts in a Reddit
-listing format, with links to `example.com` and no images.
+opens `data/app.db`. The data is [`docs/demo/demo-saves.json`](demo/demo-saves.json): 45 invented
+Reddit posts, including clusters in r/memes and r/buildapc that can produce learned piles.
 
 **A tester's own links.** Any file the importers accept works. The quickest is a `.txt` file. The
 first line is `Export Tabs URLs`, then one entry per paragraph: a title line and a URL line, or
@@ -32,10 +33,10 @@ library. See [AI suggestions](ai-suggestions.md). Never use the real library for
 
 | # | Step | What the viewer sees | Status |
 |---|---|---|---|
-| 1 | Run `./scripts/demo.sh` in a terminal | `imported=24 skipped=0 errors=0` | ✅ |
+| 1 | Run `./scripts/demo.sh` in a terminal | Imports the 45 fictional saves | ⚠ current dataset not exercised in the earlier run |
 | 2 | Open Today (`/`) | A day title, five cards fanned under **Clear 10 · about 2 minutes**, 5/10/25 sizes, "0 cleared today" | ✅ |
-| 3 | Pick **5**, tap **Clear 5** | One full-size card. A dot row on top tracks the round | ✅ |
-| 3a | With AI enabled, read a suggested action on a Clear card and tap it | A quiet **Suggest: Keep** or **Suggest: Archive** line, a reason and an **AI** tag; history hints say **From your history** | ⚠ not exercised in the offline demo |
+| 3 | Pick **5**, tap **Clear 5** | One full-size card, a dot row and a first-visit **? What the buttons mean** link | ⚠ guide change not exercised in the earlier run |
+| 3a | With AI enabled, notice the suggested action and choose a decision | A gentle highlight marks the Keep or Archive button that AI would pick; history suggestions use the same highlight. No reason text appears on the card | ⚠ not exercised in the offline demo |
 | 4 | Read the card; tap ↗ to open it in the reader | Title, community, body text. The reader says "Offline mode: this thread wasn't fetched." | ✅ |
 | 5 | **Done**, **Archive**, **Keep**, **Not now** (keys `D` `A` `F` `N`, or swipes) | The card flies off, the next one is already there | ✅ |
 | 6 | Undo (top-right ↶ or `U`) | The last card comes back; the database reverts (checked: the snoozed item returned to the inbox) | ✅ |
@@ -43,7 +44,7 @@ library. See [AI suggestions](ai-suggestions.md). Never use the real library for
 | 8 | Back to Today | "Last round 1m ago — N cleared" (Not now isn't counted), ring shows today's wins | ✅ |
 | 9 | Restart the server, open Library → **Keep** | The kept item is still there after the restart | ✅ |
 | 10 | `bun run src/cli.ts export-obsidian --vault <dir> --status keep` (with `CONTENT_HOARDER_DB` set to the demo DB) | One Markdown note with title, URL, date and tag | ✅ ✋ (CLI) |
-| 11 | Today → **Let a pile go** → undo from the toast | A whole community is archived, then restored | ⚠ not on demo data: no pile is offered for 24 mixed saves (checked: `#piles` hidden) |
+| 11 | Today → **Let a pile go** → undo from the toast | A suggested community pile is archived, then restored | ⚠ learned piles may appear after decisions; current dataset not exercised in the earlier run |
 | 12 | Open **Home** (`/home`) after a round | Start here; this week's flow with let go and kept from the round; a resurfaced save with a reason; sample Parked / Agent receipts / Patterns / Attention guard panels, each marked Sample; today lit in the rhythm strip | ✅ desktop 1440 and phone 412 |
 
 ## Say it plainly in the recording

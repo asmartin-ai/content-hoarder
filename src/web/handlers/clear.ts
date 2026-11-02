@@ -1,4 +1,4 @@
-import { aiActive } from "../../assist/consent.ts";
+import { aiActive, aiConfigured, aiConsent } from "../../assist/consent.ts";
 import { hintFor, prefetchHints, type PrefetchOptions } from "../../assist/hints.ts";
 import * as db from "../../db.ts";
 import { track } from "../../demo_analytics.ts";
@@ -7,7 +7,7 @@ import { parse } from "../../search_query.ts";
 import { clamp, json, numberParam, options } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
-import { renderCard, renderHint } from "../views/card.ts";
+import { renderCard } from "../views/card.ts";
 import { html, type SafeHtml } from "../views/html.ts";
 import { icon, type IconName } from "../views/icons.ts";
 import { renderPage } from "../views/page.ts";
@@ -81,75 +81,110 @@ const GUIDE: { cls: string; glyph: IconName; label: string; means: string; how: 
   },
 ];
 
-const HOWTO = html`<dialog class="howto" aria-labelledby="howto-title">
-  <h2 id="howto-title" class="howto-title">What the buttons mean</h2>
-  <ul class="howto-list">
-    ${GUIDE.map(
-      (row) =>
-        html`<li class="${row.cls}">
-          <span class="act-orb">${icon(row.glyph, ORB_ICON)}</span>
-          <span class="howto-text"><b>${row.label}</b> ${row.means} <small>${row.how}</small></span>
-        </li>`,
-    )}
-  </ul>
-  <p class="howto-foot">Swipe up to open a card. Nothing is deleted, and Undo is at the top.</p>
-  <button class="primary howto-ok" type="button">Got it</button>
-</dialog>`;
-
-const FRAME = html`<section class="round" data-state="loading">
-  <header class="round-bar">
-    <button class="round-x" type="button" aria-label="End round">${icon("x", 22)}</button>
-    <ol class="beads" aria-label="0 of 0 decided"></ol>
-    <button class="undo" type="button" data-act="undo" aria-keyshortcuts="Z" disabled>
-      ${icon("undo", 20)}<span>Undo</span>
-    </button>
-    <button class="round-help" type="button" aria-label="What the buttons mean">?</button>
-  </header>
-  <div class="stage"></div>
-  <div class="pad" role="group" aria-label="Decide">
-    ${act({ act: "skip", cls: "act-skip", glyph: "skip", label: "Skip", key: "S" })}
-    ${act({ act: "done", cls: "act-done", glyph: "check", label: "Done", key: "D", major: true })}
-    ${act({ act: "keep", cls: "act-keep", glyph: "bookmark", label: "Keep", key: "K" })}
-    ${act({
-      act: "archived",
-      cls: "act-archive",
-      glyph: "archive",
-      label: "Archive",
-      key: "A",
-      major: true,
-    })}
-    ${act({ act: "snooze", cls: "act-snooze", glyph: "clock", label: "Not now", key: "N" })}
-  </div>
-  <div class="cleared" hidden>
-    <p class="stamp">Cleared</p>
-    <ol class="receipt" aria-label="This round"></ol>
-    <dl class="cleared-stats">
-      <div>
-        <dt>cleared</dt>
-        <dd class="cs-n">0</dd>
-      </div>
-      <div class="cs-freed-box" hidden>
-        <dt>freed</dt>
-        <dd class="cs-freed"></dd>
-      </div>
-      <div>
-        <dt>spent</dt>
-        <dd class="cs-time">0:00</dd>
-      </div>
-    </dl>
-    <p class="cleared-line"></p>
-    <div class="cleared-today" hidden></div>
-    <div class="cleared-acts">
-      <button class="primary" type="button" data-next="again">One more round</button>
-      <button type="button" data-next="sweep">Let a pile go</button>
-      <button type="button" data-next="enough">That's enough for today</button>
+function howto(ai: { configured: boolean; on: boolean }): SafeHtml {
+  return html`<dialog class="howto" aria-labelledby="howto-title">
+    <h2 id="howto-title" class="howto-title">What the buttons mean</h2>
+    <ul class="howto-list">
+      ${GUIDE.map(
+        (row) =>
+          html`<li class="${row.cls}">
+            <span class="act-orb">${icon(row.glyph, ORB_ICON)}</span>
+            <span class="howto-text"
+              ><b>${row.label}</b> ${row.means} <small>${row.how}</small></span
+            >
+          </li>`,
+      )}
+    </ul>
+    <div class="howto-ai" ${ai.configured ? "" : html`hidden`}>
+      <button
+        class="howto-switch"
+        type="button"
+        data-clear-ai
+        aria-pressed="${ai.on ? "true" : "false"}"
+        ${ai.configured ? "" : html`disabled`}
+      >
+        <span class="howto-switch-track" aria-hidden="true"
+          ><span class="howto-switch-knob"></span
+        ></span>
+        <span class="howto-switch-copy"
+          >AI suggestions <b data-clear-ai-state>${ai.on ? "On" : "Off"}</b></span
+        >
+      </button>
+      <p class="howto-ai-note" data-clear-ai-error hidden role="alert"></p>
     </div>
-  </div>
-  ${HOWTO}
-</section>`;
+    <p class="howto-foot">
+      Archive is searchable, not deleted. Swipe up to open a card, and Undo is at the top.
+      <a class="howto-settings" href="/settings">Settings</a>
+    </p>
+    <button class="primary howto-ok" type="button">Got it</button>
+  </dialog>`;
+}
+
+function frame(): SafeHtml {
+  const configured = aiConfigured();
+  const consent = configured ? aiConsent(connection()) : "unset";
+
+  return html`<section
+    class="round"
+    data-state="loading"
+    data-ai-configured="${configured ? "1" : "0"}"
+    data-ai="${consent}"
+  >
+    <header class="round-bar">
+      <button class="round-x" type="button" aria-label="End round">${icon("x", 22)}</button>
+      <ol class="beads" aria-label="0 of 0 decided"></ol>
+      <button class="undo" type="button" data-act="undo" aria-keyshortcuts="Z" disabled>
+        ${icon("undo", 20)}<span>Undo</span>
+      </button>
+      <button class="round-help" type="button" aria-label="What the buttons mean">?</button>
+    </header>
+    <div class="stage"></div>
+    <div class="pad" role="group" aria-label="Decide">
+      ${act({ act: "skip", cls: "act-skip", glyph: "skip", label: "Skip", key: "S" })}
+      ${act({ act: "done", cls: "act-done", glyph: "check", label: "Done", key: "D", major: true })}
+      ${act({ act: "keep", cls: "act-keep", glyph: "bookmark", label: "Keep", key: "K" })}
+      ${act({
+        act: "archived",
+        cls: "act-archive",
+        glyph: "archive",
+        label: "Archive",
+        key: "A",
+        major: true,
+      })}
+      ${act({ act: "snooze", cls: "act-snooze", glyph: "clock", label: "Not now", key: "N" })}
+      <span class="pad-note" id="pad-suggested">Suggested</span>
+    </div>
+    <div class="cleared" hidden>
+      <p class="stamp">Cleared</p>
+      <ol class="receipt" aria-label="This round"></ol>
+      <dl class="cleared-stats">
+        <div>
+          <dt>cleared</dt>
+          <dd class="cs-n">0</dd>
+        </div>
+        <div class="cs-freed-box" hidden>
+          <dt>freed</dt>
+          <dd class="cs-freed"></dd>
+        </div>
+        <div>
+          <dt>spent</dt>
+          <dd class="cs-time">0:00</dd>
+        </div>
+      </dl>
+      <p class="cleared-line"></p>
+      <div class="cleared-today" hidden></div>
+      <div class="cleared-acts">
+        <button class="primary" type="button" data-next="again">One more round</button>
+        <button type="button" data-next="sweep">Let a pile go</button>
+        <button type="button" data-next="enough">That's enough for today</button>
+      </div>
+    </div>
+    ${howto({ configured, on: consent === "on" })}
+  </section>`;
+}
 
 export function clearPage(): Response {
-  return htmlResponse(renderPage({ title: "Clear", tab: "clear", body: FRAME, round: true }));
+  return htmlResponse(renderPage({ title: "Clear", tab: "clear", body: frame(), round: true }));
 }
 
 export function smartDeal(n: number, hideNsfw: boolean): Item[] {
@@ -229,7 +264,10 @@ export async function deal(url: URL): Promise<Response> {
     return {
       fullname: item.fullname,
       status: item.status,
-      html: renderCard(item, { topComment: topComment(database, item), hint }).toString(),
+      html: renderCard(item, {
+        topComment: topComment(database, item),
+        hint,
+      }).toString(),
       hinted: hint !== null,
     };
   });
@@ -259,14 +297,16 @@ export function clearHints(url: URL, opts: PrefetchOptions = {}): Response {
     ),
   ].slice(0, MAX_HINTS);
 
-  const hints: Record<string, string> = {};
+  const hints: Record<string, { verdict: "keep" | "skip"; by: "ai" | "history" } | null> = {};
   const missing: string[] = [];
 
   for (const id of ids) {
     const item = db.getPublicItem(database, id);
 
     if (!item || item.status !== "inbox") continue;
-    hints[id] = renderHint(hintFor(database, item)).toString();
+    const hint = hintFor(database, item);
+
+    hints[id] = hint ? { verdict: hint.verdict, by: hint.by } : null;
 
     if (!LlmSuggestionSchema.safeParse(item.metadata.llm).success) missing.push(id);
   }

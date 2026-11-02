@@ -1,4 +1,4 @@
-import { aiConfigured, aiConsent, aiProviderLabel } from "../../assist/consent.ts";
+import { aiConfigured, aiConsent } from "../../assist/consent.ts";
 import { connection, takePull } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 import { renderPage } from "../views/page.ts";
@@ -7,7 +7,7 @@ import { renderAdd, renderPull, type AiSettingsView } from "../views/add.ts";
 function aiSettings(): AiSettingsView | undefined {
   if (!aiConfigured()) return undefined;
 
-  return { on: aiConsent(connection()) === "on", provider: aiProviderLabel() };
+  return { on: aiConsent(connection()) === "on" };
 }
 
 export function addPage(): Response {

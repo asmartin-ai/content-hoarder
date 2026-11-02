@@ -11,6 +11,7 @@ import { aiUsage, hintFor, prefetchHints } from "../src/assist/hints.ts";
 import { clearHints } from "../src/web/handlers/clear.ts";
 import { withLibrary } from "../src/web/state.ts";
 import { serveApp } from "../src/web.ts";
+import { learn } from "../src/triage_score.ts";
 
 const NOW = 1_760_000_000;
 
@@ -32,7 +33,12 @@ const StoredLlmSchema = z.object({
   at: z.number(),
 });
 
-const HintsSchema = z.object({ hints: z.record(z.string(), z.string()) });
+const HintsSchema = z.object({
+  hints: z.record(
+    z.string(),
+    z.object({ verdict: z.enum(["keep", "skip"]), by: z.enum(["ai", "history"]) }).nullable(),
+  ),
+});
 
 type FakeCall = Array<{ role: string; content: string }>;
 
@@ -168,6 +174,62 @@ describe("hints with consent", () => {
     const hint = hintFor(database, db.getPublicItem(database, fullname) ?? { metadata: {} });
 
     expect(hint).toEqual({ verdict: "keep", reason: "still useful later", by: "ai" });
+  });
+
+  test("prompt carries the user's own history counts and no other item titles", async () => {
+    const calls: FakeCall[] = [];
+
+    for (let index = 0; index < 9; index += 1)
+      seed(`hist_arch_${index}`, {
+        status: "archived",
+        title: `Private archived item ${index}`,
+        metadata: { subreddit: "memes" },
+      });
+
+    seed("hist_kept", {
+      status: "keep",
+      title: "Private kept item",
+      metadata: { subreddit: "memes" },
+    });
+
+    learn(database, { apply: true });
+
+    const fullname = seed("hist_target", {
+      title: "Target item",
+      metadata: { subreddit: "memes" },
+    });
+
+    process.env.LLM_API_KEY = "test-key";
+    setAiConsent(database, true);
+
+    await prefetchHints(database, [fullname], { waitMs: 500, chat: fakeChat(GOOD_REPLY, calls) });
+
+    expect(calls).toHaveLength(1);
+
+    const prompt = calls[0]?.map((message) => message.content).join("\n") ?? "";
+
+    expect(prompt).toContain(
+      "Your history: Of the 10 from r/memes you've already decided, you archived 9",
+    );
+    expect(prompt).not.toContain("Private archived item 0");
+    expect(prompt).not.toContain("Private kept item");
+  });
+
+  test("prompt omits the history line when no model exists", async () => {
+    const fullname = seed("no_history", {
+      title: "Loose item",
+      metadata: { subreddit: "memes" },
+    });
+
+    const calls: FakeCall[] = [];
+
+    process.env.LLM_API_KEY = "test-key";
+    setAiConsent(database, true);
+
+    await prefetchHints(database, [fullname], { waitMs: 500, chat: fakeChat(GOOD_REPLY, calls) });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.map((message) => message.content).join("\n")).not.toContain("Your history:");
   });
 
   test("daily cap stops calls at the cap", async () => {
@@ -365,7 +427,7 @@ describe("shared concurrency", () => {
 });
 
 describe("clear hints endpoint", () => {
-  test("an empty entry clears a stale AI hint after consent is revoked", async () => {
+  test("a null entry clears a stale AI hint after consent is revoked", async () => {
     const root = mkdtempSync(join(tmpdir(), "content-hoarder-hints-endpoint-"));
     const path = join(root, "app.db");
     const seeded = db.connect(path);
@@ -395,8 +457,8 @@ describe("clear hints endpoint", () => {
         await (await fetch(`${base}/clear/hints?ids=${listed}`)).json(),
       );
 
-      expect(before.hints[ai]).toContain("card-hint");
-      expect(before.hints[history]).toContain('data-hint-by="history"');
+      expect(before.hints[ai]).toEqual({ verdict: "keep", by: "ai" });
+      expect(before.hints[history]).toEqual({ verdict: "skip", by: "history" });
       expect(before.hints[archived]).toBeUndefined();
       expect(before.hints["reddit:missing"]).toBeUndefined();
 
@@ -410,8 +472,8 @@ describe("clear hints endpoint", () => {
         await (await fetch(`${base}/clear/hints?ids=${ai},${history}`)).json(),
       );
 
-      expect(after.hints[ai]).toBe("");
-      expect(after.hints[history]).toContain('data-hint-by="history"');
+      expect(after.hints[ai]).toBeNull();
+      expect(after.hints[history]).toEqual({ verdict: "skip", by: "history" });
     } finally {
       await server.stop();
       seeded.close();
@@ -445,7 +507,7 @@ describe("clear hints endpoint", () => {
 
     const body = HintsSchema.parse(await response.json());
 
-    expect(body.hints[fullname]).toBe("");
+    expect(body.hints[fullname]).toBeNull();
 
     await called;
 
