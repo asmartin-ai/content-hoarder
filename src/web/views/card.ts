@@ -6,6 +6,7 @@ import { html, raw, type SafeHtml } from "./html.ts";
 import { icon } from "./icons.ts";
 import {
   cardMedia,
+  clipSrc,
   communityOf,
   compact,
   costLabel,
@@ -102,9 +103,18 @@ function missingFigure(item: Item): SafeHtml {
 
   if (evidence !== "gallery" && evidence !== "image" && evidence !== "video") return html``;
 
-  return html`<figure class="card-media is-missing" data-media="${evidence}" data-open="">
+  const play = evidence === "video" ? clipSrc(item) : "";
+
+  return html`<figure
+    class="card-media is-missing"
+    data-media="${evidence}"
+    data-open=""
+    ${play ? html`data-play="${play}"` : ""}
+  >
     ${icon(evidence === "video" ? "play" : "image", 40)}
-    <figcaption>${MISSING_LABEL[evidence]} — tap to open it</figcaption>
+    <figcaption>
+      ${MISSING_LABEL[evidence]} — tap to ${play ? "play it here" : "open it"}
+    </figcaption>
   </figure>`;
 }
 
@@ -119,6 +129,7 @@ function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
     class="card-media${nsfw ? " is-nsfw" : ""}"
     data-media="${media.kind}"
     ${opens ? html`data-open=""` : ""}
+    ${media.play ? html`data-play="${media.play}"` : ""}
   >
     <img class="media-bg" src="${media.src}" alt="" aria-hidden="true" decoding="async" /><img
       class="media-img"

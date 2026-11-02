@@ -6,6 +6,11 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **Clips play inside the round card.** Tapping a Reddit clip (v.redd.it via HLS, a direct
+  `.mp4`/`.webm`, or its archived copy) plays it in place instead of opening the reader; any
+  decision, undo or leaving the round stops it. Swipes that start on a playing video go to its
+  controls. The Library's "sections" button uses an SVG instead of the ⚙ glyph. SW cache
+  `ch-shell-v148`.
 - **Smooth, fast rounds (`docs/design/deck-pass.md` §3).** Everything that moves in Clear animates
   transform/opacity only. Drags paint once per frame, with no subtree-wide style invalidation (about
   8× less style work per frame). Decisions no longer lock input: the card flies off as a ghost while
