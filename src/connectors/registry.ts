@@ -15,8 +15,8 @@ export type { BaseConnector, ImportResult } from "./base.ts";
 
 const CONNECTORS: BaseConnector[] = [
   new BookmarksConnector(),
-  new TwitterConnector(),
   new RedditConnector(),
+  new TwitterConnector(),
   new YouTubeConnector(),
   new HackerNewsConnector(),
   new ObsidianConnector(),

@@ -169,3 +169,42 @@ test("a bookmarks export with Hacker News and Reddit links still imports every b
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("a reddit-saved.json from the bookmarklet imports as Reddit, not Twitter", () => {
+  const root = mkdtempSync(join(tmpdir(), "content-hoarder-reddit-saved-"));
+  const path = join(root, "reddit-saved.json");
+
+  try {
+    writeFileSync(
+      path,
+      JSON.stringify({
+        kind: "Listing",
+        data: {
+          after: null,
+          children: [
+            {
+              kind: "t3",
+              data: {
+                name: "t3_gal1",
+                id: "gal1",
+                title: "A gallery post",
+                subreddit: "pics",
+                permalink: "/r/pics/comments/gal1/a/",
+                url: "https://www.reddit.com/gallery/gal1",
+                created_utc: 1788264000,
+                gallery_data: { items: [{ media_id: "m1", id: 123456789 }] },
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    const connector = dispatch(path);
+
+    expect(connector.id).toBe("reddit");
+    expect(connector.importFile(path).map((item) => item.source)).toEqual(["reddit"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

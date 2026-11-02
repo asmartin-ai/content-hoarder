@@ -253,8 +253,8 @@ test("all offline import connectors shape normalized source items", () => {
   });
   expect(allConnectors().map((connector) => connector.id)).toEqual([
     "bookmarks",
-    "twitter",
     "reddit",
+    "twitter",
     "youtube",
     "hackernews",
     "obsidian",
