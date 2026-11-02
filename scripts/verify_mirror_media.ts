@@ -74,7 +74,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (!info.isDirectory()) throw Object.assign(new Error("not a directory"), { code: "ENOTDIR" });
   } catch {
     console.error(`ERROR: dest does not exist: ${dest}`);
-    console.error("Run scripts/mirror-media.bat first.");
+    console.error("Run a media mirror first.");
 
     return 1;
   }

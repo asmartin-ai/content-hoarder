@@ -146,7 +146,7 @@ export function invitePage(token: string): Response {
   if (!inviteOpen(mainConnection(), token))
     return notice(
       "This invite doesn't work",
-      "It was already used or the link is wrong. Ask the owner for a new one.",
+      "It was already used or the link is wrong. Ask the person who invited you for a new one.",
       404,
     );
 
@@ -213,7 +213,11 @@ export function privacyPage(): Response {
             </p>`
           : ""
       }
-      <p class="auth-line">Contact: https://github.com/asmartin-ai/content-hoarder/issues</p>`,
+      <p class="auth-line">
+        Questions or deletion requests:
+        <a href="https://github.com/asmartin-ai/content-hoarder/issues">open an issue on GitHub</a>
+        or message the person who invited you.
+      </p>`,
   );
 }
 
@@ -286,7 +290,7 @@ export async function googleCallback(request: Request): Promise<Response> {
 
     if (!userExists(database, user.data.sub)) {
       if (!invite || !claimInvite(database, invite, user.data.sub, user.data.email))
-        return notice("Khaos is invite-only", "Ask the owner for an invite link.", 403);
+        return notice("Khaos is invite-only", "Ask the project owner for an invite link.", 403);
     }
 
     setCookies.push(

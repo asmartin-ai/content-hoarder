@@ -154,6 +154,8 @@ test("privacy claims follow the provider host", async () => {
   expect(zaiPrivacy).toContain("Z.ai (GLM)");
   expect(zaiPrivacy).toContain("Singapore");
   expect(zaiPrivacy).toContain("docs.z.ai");
+  expect(zaiPrivacy).toContain("open an issue on GitHub");
+  expect(zaiPrivacy).not.toContain("@gmail.com");
 
   process.env.LLM_BASE_URL = "https://openrouter.ai/api/v1";
   process.env.LLM_PROVIDER_LABEL = "OpenRouter";

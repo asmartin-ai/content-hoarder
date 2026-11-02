@@ -1,5 +1,48 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve, sep } from "node:path";
+
+const DENYLIST_ENV = "CONTENT_HOARDER_PUBLISH_DENYLIST";
+
+const DENYLIST_DEFAULT = join(homedir(), ".config", "content-hoarder", "publish-denylist.txt");
+
+const GENERIC_HOME_SEGMENTS = {
+  user: true,
+  users: true,
+  you: true,
+  your: true,
+  yourname: true,
+  me: true,
+  example: true,
+  path: true,
+  username: true,
+  name: true,
+} satisfies Record<string, true>;
+
+const PERSONAL_DRIVE_ROOTS = {
+  users: true,
+  documents: true,
+  downloads: true,
+  desktop: true,
+  pictures: true,
+  videos: true,
+  music: true,
+  projects: true,
+  backups: true,
+  dev: true,
+  repos: true,
+  code: true,
+  khaos: true,
+  "llm-dev": true,
+  dropbox: true,
+  onedrive: true,
+} satisfies Record<string, true>;
+
+const HOME_PATH_RE = /\/(?:home|Users)\/([A-Za-z0-9._-]+)(?:[/\\]|$)/;
+
+const DRIVE_PATH_RE = /\b([A-Za-z]):[\\/]([A-Za-z0-9._-]+)(?:[\\/]|$)/;
+
+const MOUNT_PATH_RE = /\/mnt\/[a-z]\//;
 
 const SENSITIVE_PATH_PATTERNS: readonly RegExp[] = [
   /(^|\/)\.env(?:\.(?!example$)[^/]+)?$/i,
@@ -50,7 +93,12 @@ const HISTORY_EXTENSIONS: readonly string[] = [
   ".toml",
 ];
 
-export type FindingKind = "DATA_TRACKED" | "SECRET" | "HISTORY_SECRET";
+export type FindingKind =
+  | "DATA_TRACKED"
+  | "SECRET"
+  | "HISTORY_SECRET"
+  | "PRIVATE_IDENTIFIER"
+  | "HISTORY_IDENTIFIER";
 
 export type Finding = { path: string; kind: FindingKind; line?: number };
 
@@ -95,11 +143,41 @@ function secretLine(text: string): boolean {
   return false;
 }
 
-function scanWorkingTree(root: string, paths: string[]): Finding[] {
+function denylistTerms(): string[] {
+  const configured = process.env[DENYLIST_ENV]?.trim();
+  const path = configured !== undefined && configured.length > 0 ? configured : DENYLIST_DEFAULT;
+
+  if (!existsSync(path)) return [];
+
+  return readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 1 && !line.startsWith("#"));
+}
+
+function machinePath(text: string): boolean {
+  const home = HOME_PATH_RE.exec(text);
+
+  if (home !== null && !(home[1]!.toLowerCase() in GENERIC_HOME_SEGMENTS)) return true;
+
+  const drive = DRIVE_PATH_RE.exec(text);
+
+  if (drive !== null && drive[2]!.toLowerCase() in PERSONAL_DRIVE_ROOTS) return true;
+
+  return MOUNT_PATH_RE.test(text);
+}
+
+function identifierLine(text: string, terms: readonly string[]): boolean {
+  if (machinePath(text)) return true;
+  const lower = text.toLowerCase();
+
+  return terms.some((term) => lower.includes(term));
+}
+
+function scanWorkingTree(root: string, paths: string[], terms: readonly string[]): Finding[] {
   const findings: Finding[] = [];
 
   for (const path of paths) {
-    if (path.startsWith("tests/") && !path.startsWith("tests/fixtures/")) continue;
     const fullPath = resolve(root, path);
 
     if (fullPath !== root && !fullPath.startsWith(`${root}${sep}`)) continue;
@@ -113,10 +191,16 @@ function scanWorkingTree(root: string, paths: string[]): Finding[] {
       continue;
     }
 
+    const scanSecrets = !path.startsWith("tests/") || path.startsWith("tests/fixtures/");
     const lines = contents.split(/\r?\n/);
 
     for (let index = 0; index < lines.length; index += 1) {
-      if (secretLine(lines[index]!)) findings.push({ path, kind: "SECRET", line: index + 1 });
+      const line = lines[index]!;
+
+      if (scanSecrets && secretLine(line)) findings.push({ path, kind: "SECRET", line: index + 1 });
+
+      if (identifierLine(line, terms))
+        findings.push({ path, kind: "PRIVATE_IDENTIFIER", line: index + 1 });
     }
   }
 
@@ -133,7 +217,7 @@ function isHistoryCandidate(path: string): boolean {
   );
 }
 
-function historyFindings(root: string, maxBlobs: number): Finding[] {
+function historyFindings(root: string, maxBlobs: number, terms: readonly string[]): Finding[] {
   const listing = git(root, ["rev-list", "--all", "--objects"]);
 
   if (listing.exitCode !== 0) return [];
@@ -147,21 +231,24 @@ function historyFindings(root: string, maxBlobs: number): Finding[] {
     const sha = entry.slice(0, splitAt);
     const path = entry.slice(splitAt + 1);
 
-    if (
-      seen.has(sha) ||
-      !isHistoryCandidate(path) ||
-      (path.startsWith("tests/") && !path.startsWith("tests/fixtures/"))
-    ) {
-      continue;
-    }
+    if (seen.has(sha) || !isHistoryCandidate(path)) continue;
 
     seen.add(sha);
     const blob = git(root, ["cat-file", "-p", sha]);
 
     if (blob.exitCode !== 0) continue;
 
-    if (!blob.stdout.split(/\r?\n/).some(secretLine)) continue;
-    findings.push({ path, kind: "HISTORY_SECRET" });
+    const lines = blob.stdout.split(/\r?\n/);
+    const identifier = lines.some((line) => identifierLine(line, terms));
+
+    const secret =
+      !path.startsWith("tests/") || path.startsWith("tests/fixtures/")
+        ? lines.some((line) => secretLine(line))
+        : false;
+
+    if (!identifier && !secret) continue;
+
+    findings.push({ path, kind: identifier ? "HISTORY_IDENTIFIER" : "HISTORY_SECRET" });
 
     if (findings.length >= maxBlobs) return findings;
   }
@@ -176,14 +263,15 @@ export function scanRepository(
 ): Finding[] {
   const root = resolve(rootPath);
   const tracked = trackedPaths(root);
+  const terms = denylistTerms().map((term) => term.toLowerCase());
 
   const findings: Finding[] = tracked
     .filter(hasSensitivePath)
     .map((path) => ({ path, kind: "DATA_TRACKED" }));
 
-  findings.push(...scanWorkingTree(root, tracked));
+  findings.push(...scanWorkingTree(root, tracked, terms));
 
-  if (history) findings.push(...historyFindings(root, maxHistoryFindings));
+  if (history) findings.push(...historyFindings(root, maxHistoryFindings, terms));
 
   return findings;
 }

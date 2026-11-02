@@ -115,3 +115,52 @@ test("optional history scan finds a secret removed from the current tree", () =>
     });
   });
 });
+
+function withDenylist(run: () => void): void {
+  const directory = mkdtempSync(join(tmpdir(), "publish-denylist-"));
+  const file = join(directory, "denylist.txt");
+  const previous = process.env.CONTENT_HOARDER_PUBLISH_DENYLIST;
+
+  writeFileSync(file, "# synthetic terms\nplaceholder-owner-handle\n");
+  process.env.CONTENT_HOARDER_PUBLISH_DENYLIST = file;
+
+  try {
+    run();
+  } finally {
+    if (previous === undefined) delete process.env.CONTENT_HOARDER_PUBLISH_DENYLIST;
+    else process.env.CONTENT_HOARDER_PUBLISH_DENYLIST = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test("private identifiers and machine paths are reported in source and tests", () => {
+  withDenylist(() =>
+    withRepository((root) => {
+      mkdirSync(join(root, "src"), { recursive: true });
+      mkdirSync(join(root, "tests"), { recursive: true });
+      writeFileSync(join(root, "src", "handles.ts"), 'const owner = "placeholder-owner-handle";\n');
+      const homePath = ["/home", "someone", "Projects", "app", "data"].join("/");
+      const drivePath = ["K:", "Projects", "app", "data"].join("\\");
+
+      writeFileSync(join(root, "tests", "handles.test.ts"), `const path = "${homePath}";\n`);
+      writeFileSync(join(root, "README.md"), `Backups live in \`${drivePath}\`.\n`);
+      writeFileSync(join(root, "docs.md"), "Set it to `C:\\path\\to\\app` or `/home/user/app`.\n");
+      trackAndCommit(root, "synthetic identifiers");
+
+      const findings = scanRepository(root);
+
+      expect(findings).toContainEqual({
+        path: "src/handles.ts",
+        kind: "PRIVATE_IDENTIFIER",
+        line: 1,
+      });
+      expect(findings).toContainEqual({
+        path: "tests/handles.test.ts",
+        kind: "PRIVATE_IDENTIFIER",
+        line: 1,
+      });
+      expect(findings).toContainEqual({ path: "README.md", kind: "PRIVATE_IDENTIFIER", line: 1 });
+      expect(findings.every((finding) => finding.path !== "docs.md")).toBe(true);
+    }),
+  );
+});

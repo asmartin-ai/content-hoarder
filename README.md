@@ -1,13 +1,60 @@
 # content-hoarder
 
-A local-first, offline-capable triage tool for managing saved content across multiple sources.
-Built for an ADHD brain that over-saves everything: posts, videos, articles, and notes. The core
-thesis is **process and reduce, not just aggregate** — this isn't a prettier hoarding machine; it's
-a dedicated workspace to sift through your backlog and actually deal with what you saved.
+**A triage tool for your saved-content backlog.** Reddit saves, YouTube playlists, Hacker News
+favorites, browser tabs, Obsidian/Keep notes and Twitter/X bookmarks go into one local SQLite
+library; then you clear it a few cards at a time — *Done*, *Archive*, *Keep* or *Not now* — with
+undo on everything.
 
-Status: **1.0.0 local release** — content-hoarder now follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The v3 browse UI, offline PWA shell, Reddit OAuth/sync, inline reader, recovery tooling, media archiving, Obsidian export, and optional local-LLM assist are available. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
+It is built for the shape of an ADHD backlog: you over-save, the pile becomes debt, and reading all
+of it is never going to happen. So the product is not a prettier hoarding machine. The core thesis
+is **process and reduce, not just aggregate**: a five-minute round, a reversible "let this pile go",
+and a library that is smaller and calmer when you stop.
 
-## Features
+Status: local release (source `VERSION` is `1.0.0`; unreleased work ships from `main`). The v3
+browse UI, offline PWA shell, Reddit OAuth/sync, inline reader, recovery tooling, media archiving,
+Obsidian export and optional local-LLM assist are in. Release notes: [`CHANGELOG.md`](CHANGELOG.md).
+
+## Try it
+
+- **Hosted demo:** <https://demo.khaosapp.tech> — an invite-only pilot. It runs the same app with
+  one separate library per tester; ask for an invite link.
+- **Local demo, synthetic data:** `./scripts/demo.sh` creates a temp library with 45 invented
+  saves and serves it on <http://127.0.0.1:8791/>. Walkthrough and a safety checklist:
+  [`docs/DEMO.md`](docs/DEMO.md).
+
+### Local quickstart
+
+Install [Bun](https://bun.sh) 1.4 or newer, then:
+
+```bash
+bun install --frozen-lockfile
+bun run src/cli.ts --version
+bun run src/cli.ts init-db
+bun run src/cli.ts import <path>   # a file or directory; detects the source
+bun run start                      # http://127.0.0.1:8788
+```
+
+The default database path is `data/app.db` under the current working directory. Set
+`CONTENT_HOARDER_DB` to use a different path. The CLI loads `.env` from the working directory;
+existing shell environment values take precedence.
+
+Native media tools are optional and only needed by their corresponding commands: `ffmpeg` for
+video/HLS work, `tesseract` for OCR, and ImageMagick `magick` for image preparation. No server,
+scheduler, OAuth flow, sync, or archive operation runs during installation or startup.
+
+### Serve from anywhere
+
+Set `CONTENT_HOARDER_DB` to an explicit database path and run the entry point from this checkout:
+
+```bash
+CONTENT_HOARDER_DB=/path/to/app.db bun run /path/to/content-hoarder/src/cli.ts serve
+```
+
+The web server binds to `127.0.0.1:8788` by default. Use `--host` only on a trusted private
+network; never expose this personal-data application to the public internet.
+
+## What it does
+
 - Unified import from Reddit, YouTube playlists, Hacker News, Obsidian vaults, Google Keep,
   **Firefox tabs**, and browser-exported Twitter/X bookmarks into one local SQLite database.
 - Full-text **and** fuzzy (typo-tolerant) search, with discoverable Gmail/Discord-style **operators**
@@ -32,47 +79,38 @@ Status: **1.0.0 local release** — content-hoarder now follows [Semantic Versio
 - Responsive, installable **PWA** so you can triage on desktop or phone.
 - Runs locally on Bun + TypeScript, with SQLite and native media/network integrations. No Python runtime or yt-dlp dependency.
 
-## Project tracking
+## Privacy
 
-Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues).
+- **The library is local.** Your items live in one SQLite file (`data/app.db` by default) with
+  content-addressed media beside it. Your DB, media, exports, `.env` and NSFW list are gitignored,
+  so they are never part of this repository.
+- **This repository holds source and invented data.** Everything committed here is code, docs and
+  small synthetic fixtures written for tests and demos — no user library, no account exports, no
+  credentials.
+- **What leaves the machine, and when.** Cards load thumbnails and media from the sites they were
+  saved from. Opening a Reddit item in the reader fetches its comment thread (then public archives)
+  unless it is cached. Sync, recovery, enrichment, hydration, unsave and promote are separate
+  opt-in commands that talk to the services they name; nothing bulk-runs on startup.
+  `CONTENT_HOARDER_OFFLINE=1` turns all outbound requests off for demos and tests.
+- **AI suggestions are off by default.** With per-library consent, the item's title, source and
+  link go to the configured provider to get a hint.
+- **Reddit writes need explicit consent.** Unsave-on-done is off by default; the live lane requires
+  both `--live` and `--yes`.
+- **The hosted demo** stores each tester's library in a separate file on one server, deletes a
+  library on request, and records pilot interaction events inside that tester's own library (opt-in
+  at deployment; `CONTENT_HOARDER_DEMO_ANALYTICS=1`).
 
-## Quickstart
+To configure locally, copy `.env.example` → `.env` and (optionally)
+`nsfw_rules.example.json` → `nsfw_rules.json`.
 
-Install Bun 1.4 or newer, then run:
+Publication policy and the check that runs before a public push:
+[`docs/PUBLISH-SAFETY.md`](docs/PUBLISH-SAFETY.md).
 
-```bash
-bun install --frozen-lockfile
-bun run src/cli.ts --version
-bun run src/cli.ts init-db
-bun run src/cli.ts import <path>   # a file or directory; detects the source
-bun run start                      # http://127.0.0.1:8788
-```
+## CLI reference
 
-To try it on invented data without touching your own library, run `./scripts/demo.sh`
-(walkthrough and safety checklist: [`docs/DEMO.md`](docs/DEMO.md)).
+The web app covers most work; every capability also has a command. Mutations are dry-run by default
+and need explicit confirmation flags.
 
-The default database path is `data/app.db` under the current working directory.
-Set `CONTENT_HOARDER_DB` to use a different path. The CLI loads `.env` from the
-working directory; existing shell environment values take precedence.
-
-Native media tools are optional and only needed by their corresponding commands:
-`ffmpeg` for video/HLS work, `tesseract` for OCR, and ImageMagick `magick` for
-image preparation. No server, scheduler, OAuth flow, sync, or archive operation
-runs during installation or startup.
-
-### Serve from anywhere
-
-Set `CONTENT_HOARDER_DB` to an explicit database path and run the entry point
-from this checkout:
-
-```bash
-CONTENT_HOARDER_DB=/path/to/app.db bun run /path/to/content-hoarder/src/cli.ts serve
-```
-
-The web server binds to `127.0.0.1:8788` by default. Use `--host` only on a
-trusted private network; never expose this personal-data application publicly.
-
-## CLI commands
 | Command | Description |
 |---------|-------------|
 | `--version` | Print the installed content-hoarder version. |
@@ -89,9 +127,9 @@ trusted private network; never expose this personal-data application publicly.
 | `migrate-rsm-threads --from RSM_APP_DB` | One-time: copy cached Reddit thread JSON (post + comments) from a reddit-saved-manager `data/app.db` into the local thread cache (source opened read-only). |
 | `migrate-firefox-tabs [--apply]` | One-time: promote Firefox YouTube tabs imported before auto-promotion into `youtube:<id>` items and collapse duplicates (dry-run by default; run against a DB copy first). |
 | `migrate-note-youtube [--apply]` | One-time: promote Keep/Obsidian notes that contain YouTube links into `youtube:<id>` items and attach the note as a companion (dry-run by default; run against a DB copy first). |
-| `reddit-sync [--max-pages N] [--full] [--reconcile [--reconcile-dry-run]] [--enable-auto|--disable-auto]` | Sync saved Reddit items (default three pages, stop at known items; `--full` defaults to 50 pages). Reconcile is a full-walk census and should be previewed first. |
+| `reddit-sync [--max-pages N] [--full] [--reconcile [--reconcile-dry-run]] [--enable-auto\|--disable-auto]` | Sync saved Reddit items (default three pages, stop at known items; `--full` defaults to 50 pages). Reconcile is a full-walk census and should be previewed first. |
 | `hn-sync --user USER [--max-pages N] [--full] [--throttle S]` | Sync public Hacker News favorites (default five pages; `--full` defaults to 50) and stop at known items unless full. |
-| `reddit-unsave [--login --cookie VALUE] [--enable|--disable] [--drain [--live --yes]|--trickle] [--status] [--enqueue-existing] [--limit N] [--throttle S]` | Manage the local unsave queue. `--drain` is a dry run unless both live-consent flags are present; `--trickle` is the opted-in bounded network lane. |
+| `reddit-unsave [--login --cookie VALUE] [--enable\|--disable] [--drain [--live --yes]\|--trickle] [--status] [--enqueue-existing] [--limit N] [--throttle S]` | Manage the local unsave queue. `--drain` is a dry run unless both live-consent flags are present; `--trickle` is the opted-in bounded network lane. |
 | `firefox-token [--generate]` | Show whether an ingest token exists; `--generate` rotates it and prints the one-time token. |
 | `reddit-oauth [--login\|--logout]` | Set up / inspect the sanctioned **OAuth** transport (installed-app, no client secret; requests read + history + identity + save scopes; set `REDDIT_OAUTH_CLIENT_ID` first). `--login` is a one-time interactive authorize. Once configured it's preferred over the cookie for reads (hydration, saved-list sync) **and** writes (unsave) — see [docs/reddit-derisking.md](docs/reddit-derisking.md). |
 | `reddit-hydrate [FULLNAME] [--from BDFR_DIR] [--batch [--yes]]` | Cache a saved post's comment thread: one item (OAuth if configured, else cookie), `--from` a local BDFR archive (offline, lossless), or `--batch` the prioritized set (jittered throttle, small cap, resumable; safe-by-default — needs `--yes` to fetch). |
@@ -105,16 +143,16 @@ trusted private network; never expose this personal-data application publicly.
 | `bankruptcy --before YYYY-MM-DD [--source ID] [--dry-run]` | Reversibly bulk-archive inbox items older than a date. |
 | `decay --tag T... [--subreddit S...] [--before DATE] [--label swept] [--apply] [--undo]` | Guilt-free bulk decay: archive inbox items by tag/subreddit/age, stamped per wave + reversible (`--undo` selects a wave by `--decayed-after/--decayed-before`). Pull decayed items with the `is:decayed` / `is:swept` search operators. |
 | `delete --tag T... [--swept] [--also-unsave] --apply --yes` | **Permanently** delete matching items. Dry-run by default; execution needs both `--apply` and `--yes`, makes an automatic timestamped backup, and appends to `data/delete-audit.jsonl`. |
-| `export --out FILE [--format csv|json] [--tag T...] [--status S] [--source ID] [--subreddit S]` | Export matching items to CSV or JSON. |
+| `export --out FILE [--format csv\|json] [--tag T...] [--status S] [--source ID] [--subreddit S]` | Export matching items to CSV or JSON. |
 | `promote [--status keep] [--limit N] [--dry-run]` | Push eligible items to Karakeep when configured; output reports readiness when it is not configured. |
 | `export-obsidian --vault DIR [--status keep]` | Export matching items as Markdown notes. |
 | `suggest [--source ID] [--limit N]` | Annotate inbox items with local-LLM keep/skip suggestions. |
 | `learn-triage [--apply] [--min-support N] [--alpha F] [--limit N]` | Fit the transparent process-likelihood model and score inbox items. Preview by default. |
 | `assist-auto-archive [--source reddit] [--min-skip-rate F] [--min-support N] [--apply]` | Preview high-skip subreddit buckets from the learned model; apply archives through reversible decay. |
 | `triage-drift [--apply] [--min-support N] [--alpha F] [--limit N] [--since-processed UTC]` | Report drift in processing outcomes; optionally update scores. |
-| `snooze --fullname ITEM... [--until EPOCH_SECONDS|--window-days N] [--undo --wave N|--escalate] [--limit N] [--apply --yes]` | Defer inbox items, reverse a snooze wave, or escalate repeatedly snoozed items. Mutations need both confirmation flags. |
-| `folder list|create|rename|delete|evaluate|assign|stats` | Manage and evaluate saved query folders. |
-| `tag list|create|rename|delete` | Manage the user-tag vocabulary and item stamps. |
+| `snooze --fullname ITEM... [--until EPOCH_SECONDS\|--window-days N] [--undo --wave N\|--escalate] [--limit N] [--apply --yes]` | Defer inbox items, reverse a snooze wave, or escalate repeatedly snoozed items. Mutations need both confirmation flags. |
+| `folder list\|create\|rename\|delete\|evaluate\|assign\|stats` | Manage and evaluate saved query folders. |
+| `tag list\|create\|rename\|delete` | Manage the user-tag vocabulary and item stamps. |
 | `purge-done [--retention-days N] [--max N] [--apply --yes]` | Preview then permanently purge old done items; apply needs both confirmation flags and writes a backup/audit. |
 
 ### Reddit hydration & recovery — worked examples
@@ -144,6 +182,7 @@ bun run src/cli.ts enrich --source reddit --archives
 ```
 
 ## Mobile access
+
 The app is a responsive PWA you can install on **Chrome for Android** (browser menu → *Install app*,
 which creates a real standalone WebAPK). Reach it from your phone over a private **Tailscale** tunnel or your
 LAN. **Security warning: never expose this personal-data app to the public internet** — no port
@@ -161,6 +200,7 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
    the shell cache updates on the next reload (the SW takes one visit to swap versions).
 
 ## Source notes & caveats
+
 - **YouTube "Watch Later" cannot be exported** via the API or Google Takeout. Regular playlists
   (e.g. WL2, WL3) work via `yt-dlp --flat-playlist`; a Watch Later list can only be brought in from a
   manual/browser-extension export.
@@ -178,11 +218,10 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
   videos can be folded into canonical `youtube:<id>` rows with `consolidate`; imported tweet images
   and videos can be cached locally with `bun run src/cli.ts archive-media --twitter --apply`.
 
-## Privacy & data safety
-The SQLite database (`data/app.db`), all exports, `.env`, and `nsfw_rules.json` are gitignored.
-Personal data and API keys are never committed — only tiny synthetic fixtures live in the repo (for
-tests). To configure locally, copy `.env.example` → `.env` and (optionally) `nsfw_rules.example.json`
-→ `nsfw_rules.json`.
+## Project tracking
+
+Active work is tracked in [GitHub Issues](https://github.com/asmartin-ai/content-hoarder/issues).
 
 ## License
+
 [MIT](LICENSE).

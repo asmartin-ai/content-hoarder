@@ -319,4 +319,4 @@ The reader's `from=triage` return path becomes `from=clear` → `location.replac
 |---|---|---|
 | 1 | Backend sweeps+routes+pulse+tests · home.html+home.css · round.js+card.js · today.js+main.js+api wrappers · Library cutover+SW | `bun run check`; browser smoke desktop 1440×900 + mobile 412×915, dark + light |
 | 2 | Fix-ups from review/smoke | same |
-| 3 | Docs: DESIGN.md, AGENTS.md triage section, CHANGELOG, NEXT.md, README routes | `bun run check` |
+| 3 | Docs: DESIGN.md, AGENTS.md triage section, CHANGELOG, README routes | `bun run check` |

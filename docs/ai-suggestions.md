@@ -57,15 +57,14 @@ bun run src/cli.ts demo-events --dir /srv/khaos-demo/data/users
 
 See `demo-events --help` for options. Wiping the users directory deletes the events with the
 libraries. Remove this pilot instrumentation after the pilot; the final product will have self-owned
-analytics. The removal work is listed in [NEXT.md](../NEXT.md).
+analytics. The removal work is tracked in the private session notes.
 
 ## Pilot provider and cost
 
 The demo uses the owner's personal Z.ai GLM Coding Plan key with endpoint
-`https://api.z.ai/api/coding/paas/v4` and model `glm-5.3-flash`. The key is in the GNOME keyring
-note "content-hoarder ZAI-API-KEY"; do not put its value in docs. Z.ai's
+`https://api.z.ai/api/coding/paas/v4` and model `glm-5.3-flash`. The key lives in a local keyring entry; do not put its value in docs. Z.ai's
 [subscription terms §4](https://docs.z.ai/legal-agreement/subscription-terms), checked 2026-11-02,
-forbid using Coding Plan quota from your own apps. the owner accepted this for the demo only. Before
+forbid using Coding Plan quota from your own apps. The owner accepted this for the demo only. Before
 real users, switch to a standard pay-as-you-go key and `https://api.z.ai/api/paas/v4`.
 
 On 2026-11-02, 20 calls on the synthetic demo library with GLM-5.3-Flash and thinking disabled

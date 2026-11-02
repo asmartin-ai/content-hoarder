@@ -53,7 +53,8 @@ library. See [AI suggestions](ai-suggestions.md). Never use the real library for
   in-app imports.
 - Real Reddit data exports contain only links, so real cards are thinner until a thread is fetched
   (a network step, which needs separate opt-in).
-- The hosted friend pilot has accounts and separate libraries; see [the pilot guide](FRIEND-PILOT.md).
+- The hosted pilot gives each friend an account and a separate library; its operations guide is
+  private and not part of the public mirror.
 - One-next-action is not built. AI suggestions are not available in the offline demo.
 
 ## States checked
@@ -86,4 +87,4 @@ instead of failing".
 ## Hosted pilot
 
 The invite-only hosted pilot is separate from this offline recording. Its access, data isolation,
-consent and wipe procedure are in [the pilot guide](FRIEND-PILOT.md).
+consent and wipe procedure are in the private pilot guide.

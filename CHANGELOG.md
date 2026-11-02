@@ -303,8 +303,8 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   No yt-dlp and no Python sidecar.
 - The previous "refreshed the Python lockfile / Flask 3.x / `.venv`" entry has been removed: it
   described a runtime this project no longer has.
-- Repository relocated under `/path/to\` (2026-08-15 unification); all internal path
-  references updated to the new parent.
+- Repository relocated under a new parent directory (2026-08-15 unification); all internal
+  path references were updated.
 
 
 ## 1.1.0 - 2026-07-01
