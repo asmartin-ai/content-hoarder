@@ -35,7 +35,13 @@ export function homePage(request: Request): Response {
   const now = new Date();
   const weekStart = Math.floor(daysBack(now, 6).getTime() / 1000);
   const rhythmStart = daysBack(now, RHYTHM_DAYS - 1);
-  const showedUp = new Set(db.decisionDays(database, Math.floor(rhythmStart.getTime() / 1000)));
+
+  const showedUp = new Set(
+    db
+      .decisionTimes(database, Math.floor(rhythmStart.getTime() / 1000))
+      .map((t) => isoDay(new Date(t * 1000))),
+  );
+
   const today = isoDay(now);
 
   const rhythm = Array.from({ length: RHYTHM_DAYS }, (_, i) => {

@@ -3277,13 +3277,12 @@ export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCo
   };
 }
 
-export function decisionDays(db: Database, sinceUtc: number): string[] {
-  return rows<{ day: string }>(
+export function decisionTimes(db: Database, sinceUtc: number): number[] {
+  return rows<{ t: number }>(
     db,
-    "SELECT DISTINCT date(processed_utc, 'unixepoch', 'localtime') AS day FROM items " +
-      "WHERE status != 'inbox' AND processed_utc >= ? ORDER BY day",
+    "SELECT processed_utc AS t FROM items WHERE status != 'inbox' AND processed_utc >= ?",
     [sinceUtc],
-  ).map((r) => r.day);
+  ).map((r) => r.t);
 }
 
 export function keptTotal(db: Database): number {
