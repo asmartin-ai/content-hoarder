@@ -1,5 +1,7 @@
 import * as db from "../../db.ts";
 import { cookieValue } from "../../hosted.ts";
+import { isoDay, localMidnight } from "../../zone.ts";
+import { requestZone } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 import { renderHome } from "../views/home.ts";
@@ -10,33 +12,22 @@ const DEFAULT_ROUND = 10;
 
 const RHYTHM_DAYS = 14;
 
-function isoDay(d: Date): string {
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${d.getFullYear()}-${month}-${day}`;
-}
-
-function daysBack(now: Date, n: number): Date {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
-}
-
 export function homePage(request: Request): Response {
   const database = connection();
+  const zone = requestZone(request);
   const now = new Date();
-  const weekStart = Math.floor(daysBack(now, 6).getTime() / 1000);
-  const rhythmStart = daysBack(now, RHYTHM_DAYS - 1);
+  const ms = now.getTime();
+  const weekStart = Math.floor(localMidnight(ms, zone, 6) / 1000);
+  const rhythmStart = Math.floor(localMidnight(ms, zone, RHYTHM_DAYS - 1) / 1000);
 
   const showedUp = new Set(
-    db
-      .decisionTimes(database, Math.floor(rhythmStart.getTime() / 1000))
-      .map((t) => isoDay(new Date(t * 1000))),
+    db.decisionTimes(database, rhythmStart).map((t) => isoDay(t * 1000, zone)),
   );
 
-  const today = isoDay(now);
+  const today = isoDay(ms, zone);
 
   const rhythm = Array.from({ length: RHYTHM_DAYS }, (_, i) => {
-    const day = isoDay(daysBack(now, RHYTHM_DAYS - 1 - i));
+    const day = isoDay(localMidnight(ms, zone, RHYTHM_DAYS - 1 - i), zone);
 
     return { day, on: showedUp.has(day), today: day === today };
   });
@@ -45,6 +36,7 @@ export function homePage(request: Request): Response {
 
   const body = renderHome({
     now,
+    zone,
     roundSize: size ?? DEFAULT_ROUND,
     flow: db.weekFlow(database, weekStart),
     resurfaced: db.oldestWaiting(database),

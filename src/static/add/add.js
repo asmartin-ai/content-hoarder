@@ -27,11 +27,17 @@ function sayAdded(count) {
   status.append(link);
 }
 
+const MAX_MB = 100;
+
+const TOO_BIG = `That file is over ${MAX_MB} MB, too big to bring in here.`;
+
 async function send(path, init) {
   const response = await fetch(path, { credentials: "same-origin", ...init });
   const body = await response.json().catch(() => ({}));
 
   if (response.status === 401) location.assign("/auth/login");
+
+  if (response.status === 413) throw new Error(TOO_BIG);
 
   if (!response.ok) throw new Error(body.error || `Server answered ${response.status}`);
 
@@ -39,6 +45,8 @@ async function send(path, init) {
 }
 
 async function prepareFile(file, source = "") {
+  if (file.size > MAX_MB * 1024 * 1024) return say(TOO_BIG, "is-error");
+
   const form = new FormData();
 
   form.append("file", file);

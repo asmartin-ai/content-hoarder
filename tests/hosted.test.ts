@@ -8,6 +8,7 @@ import { handle } from "../src/web/routes.ts";
 import {
   closeConnection,
   connection,
+  currentPull,
   libraryConnection,
   setDatabasePath,
 } from "../src/web/state.ts";
@@ -131,6 +132,8 @@ async function googleSignIn(
     }),
   );
 
+  await currentPull(libraryConnection(sub))?.settled;
+
   return { response, cookies: setCookies(response) };
 }
 
@@ -200,9 +203,14 @@ test("an invite lets one Google account in once and pulls its YouTube", async ()
   const { response, cookies } = await googleSignIn("friend", setCookies(opened));
 
   expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("/add?pulled=youtube%3A2");
+  expect(response.headers.get("location")).toBe("/add");
   expect(cookies.ch_session).toBeTruthy();
   expect(countSource("friend", "youtube")).toBe(2);
+
+  const add = () => handle(request("/add", { ch_session: cookies.ch_session ?? "" }));
+
+  expect(await (await add()).text()).toContain("YouTube: 2 items added");
+  expect(await (await add()).text()).not.toContain("items added");
 
   const signedIn = await handle(request("/", { ch_session: cookies.ch_session ?? "" }));
 
@@ -218,6 +226,40 @@ test("an invite lets one Google account in once and pulls its YouTube", async ()
 
   expect(returning.response.status).toBe(302);
   expect(returning.cookies.ch_session).toBeTruthy();
+});
+
+test("Google sign-in lets you in before the YouTube pull finishes", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+  const api = googleApi("slow");
+
+  setHostedFetch(async (input) => {
+    if (new URL(input).pathname.endsWith("/playlists")) await gate;
+
+    return api(input);
+  });
+  const start = await handle(request("/oauth/google/start?return=/add", setCookies(opened)));
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ...setCookies(opened),
+      ...setCookies(start),
+    }),
+  );
+
+  const session = { ch_session: setCookies(response).ch_session ?? "" };
+
+  expect(response.headers.get("location")).toBe("/add");
+  expect(await (await handle(request("/add", session))).text()).toContain('hx-get="/hx/add/pull"');
+
+  release();
+  await currentPull(libraryConnection("slow"))?.settled;
+
+  const status = await handle(request("/hx/add/pull", session));
+
+  expect(await status.text()).toContain("YouTube: 2 items added");
+  expect(countSource("slow", "youtube")).toBe(2);
 });
 
 test("a tampered state is refused", async () => {
@@ -246,7 +288,9 @@ test("an account without a YouTube channel still signs in and brings its likes",
     }),
   );
 
-  expect(response.headers.get("location")).toBe("/add?pulled=youtube%3A1");
+  expect(response.headers.get("location")).toBe("/add");
+  await currentPull(libraryConnection("viewer"))?.settled;
+  expect(countSource("viewer", "youtube")).toBe(1);
   expect(setCookies(response).ch_session).toBeTruthy();
 });
 
@@ -293,7 +337,8 @@ test("Twitch needs a session and imports followed channels", async () => {
     }),
   );
 
-  expect(done.headers.get("location")).toBe("/add?pulled=twitch%3A1");
+  expect(done.headers.get("location")).toBe("/add");
+  await currentPull(libraryConnection("friend"))?.settled;
   expect(countSource("friend", "twitch")).toBe(1);
 });
 

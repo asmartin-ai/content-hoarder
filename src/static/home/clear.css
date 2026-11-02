@@ -1621,3 +1621,19 @@ body.is-round.has-tabbar {
     padding-bottom: 1.75rem;
   }
 }
+
+@media (max-width: 380px) {
+  .act {
+    min-width: 0;
+  }
+
+  .act-orb {
+    width: 46px;
+    height: 46px;
+  }
+
+  .act.is-major .act-orb {
+    width: 60px;
+    height: 60px;
+  }
+}

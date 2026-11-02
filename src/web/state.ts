@@ -87,6 +87,52 @@ export function closeConnection(): void {
   libraries.clear();
 }
 
+export type PullState = "running" | "done" | "error" | "cancelled";
+
+export interface LibraryPull {
+  source: string;
+  state: PullState;
+  count: number;
+  settled: Promise<void>;
+}
+
+const pulls = new WeakMap<Database, LibraryPull>();
+
+export function startPull(library: Database, source: string, run: () => Promise<number>): void {
+  if (pulls.get(library)?.state === "running") return;
+
+  const pull: LibraryPull = { source, state: "running", count: 0, settled: Promise.resolve() };
+
+  const settle = async (): Promise<void> => {
+    try {
+      pull.count = await run();
+      pull.state = "done";
+    } catch (error) {
+      console.error(`${source} pull failed: ${error instanceof Error ? error.message : error}`);
+      pull.state = "error";
+    }
+  };
+
+  pull.settled = settle();
+  pulls.set(library, pull);
+}
+
+export function notePull(library: Database, source: string, state: "error" | "cancelled"): void {
+  pulls.set(library, { source, state, count: 0, settled: Promise.resolve() });
+}
+
+export function currentPull(library: Database): LibraryPull | undefined {
+  return pulls.get(library);
+}
+
+export function takePull(library: Database): LibraryPull | undefined {
+  const pull = pulls.get(library);
+
+  if (pull && pull.state !== "running") pulls.delete(library);
+
+  return pull;
+}
+
 export function setUnsaveTrickle(drainer: TrickleDrainer | null): void {
   unsaveTrickle = drainer;
 }

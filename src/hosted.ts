@@ -227,11 +227,3 @@ export function safeReturn(value: string | null): string {
 
   return value;
 }
-
-export function withParam(path: string, key: string, value: string): string {
-  const url = new URL(path, "http://local");
-
-  url.searchParams.set(key, value);
-
-  return `${url.pathname}${url.search}`;
-}

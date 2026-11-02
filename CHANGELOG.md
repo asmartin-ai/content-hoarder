@@ -24,7 +24,18 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   measures once per frame instead of on every scroll event.
 - The service worker no longer precaches HLS (543 KB) or the iOS splash images, fetches its shell
   fresh (`cache: "reload"`) so a deploy can't install stale files, and survives one failed file.
-  Static files and pages send `Cache-Control: no-cache`. SW cache `ch-shell-v150`.
+  Static files and pages send `Cache-Control: no-cache`. SW cache `ch-shell-v151`.
+- **Sign-in no longer waits for YouTube.** Google (and Twitch) sign-in lets you in at once; the
+  pull runs in the background and Add shows "bringing your saves over", then the count.
+- **Times follow the reader's time zone.** The browser sends its zone (`ch_tz`); Today's greeting
+  and date, "cleared today", and Home's week and rhythm use it instead of the server's.
+- **One tester's import no longer slows the others.** Parsing and writing an import runs in a
+  worker thread (`src/import_worker.ts`), one import per library at a time (a second gets "an
+  import is already running"). With a 20,000-item file, other requests took up to 922 ms before
+  and 17 ms after. Uploads are capped at 100 MB, with a plain message when a file is bigger.
+- Phone: sheets in the Library lock the page behind them on iOS, the tag sheet sits above the
+  keyboard, the tag "+" and select circles have 44 px tap areas, filter chips no longer get
+  clipped, and the Clear buttons fit a 320 px screen.
 - Today's "Clear N" counts the cards actually waiting ("Clear 3", not "Clear 10").
 - Home's sample buttons are visibly inert instead of links that jumped to the top.
 - Add shows its preview and messages right under the drop box, says "Adding…" while it works,

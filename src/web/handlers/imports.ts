@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { type BaseConnector, dispatch, get } from "../../connectors/registry.ts";
 import * as firefoxTabs from "../../firefox_tabs.ts";
-import { importPath } from "../../pipeline.ts";
+import { ImportRefused } from "../../import_jobs.ts";
+import { IMPORT_BUSY, importBusy, importOffThread, prepareOffThread } from "../../import_runner.ts";
 import { resolveYouTubeUrl } from "../../youtube.ts";
 import { json } from "../http.ts";
 import {
@@ -15,17 +15,15 @@ import {
   stageImport,
   takeImport,
 } from "../state.ts";
-import { CommitImportBody, ExistingCountSchema, PrepareImportBody } from "../schemas.ts";
+import { CommitImportBody, PrepareImportBody } from "../schemas.ts";
 
-const UNSUPPORTED =
-  "Khaos can't read that file yet. Try a bookmarks export, a list of links, or a Reddit file.";
+function failure(error: Error): Response {
+  if (error instanceof ImportRefused)
+    return json({ error: error.message }, error.message === IMPORT_BUSY ? 409 : 400);
 
-function pickConnector(path: string, source: string | undefined): BaseConnector | null {
-  try {
-    return source ? get(source) : dispatch(path);
-  } catch {
-    return null;
-  }
+  console.error(`import failed: ${error.message}`);
+
+  return json({ error: "That import didn't work. Try again, or try a different file." }, 400);
 }
 
 export async function importFirefoxTabs(request: Request): Promise<Response> {
@@ -68,17 +66,11 @@ export async function importUpload(request: Request): Promise<Response> {
   const rawSource = z.string().safeParse(form.get("source"));
 
   try {
-    const result = await importPath(connection(), path, {
-      source: rawSource.success ? rawSource.data : undefined,
-    });
-
-    return json({
-      imported: result.imported,
-      skipped: result.skipped,
-      errors: result.errors.slice(0, 20),
-    });
+    return json(
+      await importOffThread(connection(), path, rawSource.success ? rawSource.data : undefined),
+    );
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    return failure(error instanceof Error ? error : new Error(String(error)));
   } finally {
     try {
       unlinkSync(path);
@@ -131,60 +123,23 @@ export async function prepareImport(request: Request): Promise<Response> {
   if (!stagedPath) return json({ error: "Provide a file or a YouTube URL." }, 400);
 
   try {
-    const connector = pickConnector(stagedPath, source);
-
-    if (!connector) {
-      unlinkSync(stagedPath);
-
-      return json({ error: UNSUPPORTED }, 400);
-    }
-
-    const items = connector.importFile(stagedPath);
-
-    if (!items.length) {
-      unlinkSync(stagedPath);
-
-      return json({ error: "No importable items found in that input." }, 400);
-    }
-
-    const names = [...new Set(items.map((item) => item.fullname))];
-    const database = connection();
-    let existing = 0;
-
-    for (let offset = 0; offset < names.length; offset += 500) {
-      const chunk = names.slice(offset, offset + 500);
-      const placeholders = chunk.map(() => "?").join(",");
-
-      const countRow = ExistingCountSchema.safeParse(
-        database
-          .query(`SELECT COUNT(*) AS count FROM items WHERE fullname IN (${placeholders})`)
-          .get(...chunk),
-      );
-
-      existing += countRow.success ? countRow.data.count : 0;
-    }
-
-    const token = stageImport(stagedPath, connector.id, PREPARED_TTL_SECONDS);
-
-    const sample = items.slice(0, 5).map((item) => ({
-      title: (item.title || item.url || item.fullname).slice(0, 120),
-      source: item.source,
-    }));
+    const prepared = await prepareOffThread(connection(), stagedPath, source);
+    const token = stageImport(stagedPath, prepared.source, PREPARED_TTL_SECONDS);
 
     return json({
       token,
-      count: names.length,
-      new: Math.max(names.length - existing, 0),
-      source: connector.id,
-      label: connector.label,
-      sample,
+      count: prepared.count,
+      new: prepared.fresh,
+      source: prepared.source,
+      label: prepared.label,
+      sample: prepared.sample,
     });
   } catch (error) {
     try {
       unlinkSync(stagedPath);
     } catch {}
 
-    return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    return failure(error instanceof Error ? error : new Error(String(error)));
   }
 }
 
@@ -192,20 +147,17 @@ export async function commitImport(request: Request): Promise<Response> {
   cleanPrepared();
   const body = CommitImportBody.parse(await request.json().catch(() => ({})));
   const token = body.token?.trim() ?? "";
+
+  if (importBusy(connection())) return json({ error: IMPORT_BUSY }, 409);
+
   const staged = takeImport(token);
 
   if (!staged) return json({ error: "this import preview expired — please preview again" }, 400);
 
   try {
-    const result = await importPath(connection(), staged.path, { source: staged.source });
-
-    return json({
-      imported: result.imported,
-      skipped: result.skipped,
-      errors: result.errors.slice(0, 20),
-    });
+    return json(await importOffThread(connection(), staged.path, staged.source));
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    return failure(error instanceof Error ? error : new Error(String(error)));
   } finally {
     try {
       unlinkSync(staged.path);

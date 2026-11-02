@@ -8,7 +8,7 @@ import * as config from "./config.ts";
 import { TWITCH_FOLLOWS_SCHEMA } from "./connectors/twitch.ts";
 import type { JsonRecord } from "./connectors/base.ts";
 import { hostedFetch } from "./hosted.ts";
-import { importPath } from "./pipeline.ts";
+import { importOffThread } from "./import_runner.ts";
 
 const YOUTUBE_API = "https://www.googleapis.com/youtube/v3";
 
@@ -213,7 +213,7 @@ async function importJson(db: Database, source: string, payload: PullFile): Prom
   await Bun.write(path, JSON.stringify(payload));
 
   try {
-    return (await importPath(db, path, { source })).imported;
+    return (await importOffThread(db, path, source, { queue: true })).imported;
   } finally {
     try {
       unlinkSync(path);

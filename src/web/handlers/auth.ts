@@ -19,11 +19,10 @@ import {
   sessionCookie,
   sessionSub,
   userExists,
-  withParam,
 } from "../../hosted.ts";
 import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
 import { html, type SafeHtml } from "../views/html.ts";
-import { libraryConnection, mainConnection } from "../state.ts";
+import { libraryConnection, mainConnection, notePull, startPull } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 
 type Provider = "google" | "twitch";
@@ -272,16 +271,11 @@ export async function googleCallback(request: Request): Promise<Response> {
     sub = user.data.sub;
   }
 
-  let pulled: string;
+  const library = libraryConnection(sub);
 
-  try {
-    pulled = `youtube:${await pullYoutube(libraryConnection(sub), token)}`;
-  } catch (error) {
-    console.error(`youtube pull failed: ${error instanceof Error ? error.message : String(error)}`);
-    pulled = "youtube:error";
-  }
+  startPull(library, "youtube", () => pullYoutube(library, token));
 
-  return redirect(withParam(pending.returnPath, "pulled", pulled), setCookies);
+  return redirect(pending.returnPath, setCookies);
 }
 
 export function twitchStart(request: Request): Response {
@@ -308,10 +302,15 @@ export async function twitchCallback(request: Request): Promise<Response> {
 
   const code = new URL(request.url).searchParams.get("code") ?? "";
 
-  const done = (pulled: string): Response =>
-    redirect(withParam(pending.returnPath, "pulled", pulled), [clearedCookie(OAUTH_COOKIE)]);
+  const sub = sessionSub(mainConnection(), request);
+  const library = sub ? libraryConnection(sub) : null;
+  const done = (): Response => redirect(pending.returnPath, [clearedCookie(OAUTH_COOKIE)]);
 
-  if (!code) return done("twitch:cancelled");
+  if (!code) {
+    if (library) notePull(library, "twitch", "cancelled");
+
+    return done();
+  }
 
   const token = await exchange("https://id.twitch.tv/oauth2/token", {
     code,
@@ -321,15 +320,10 @@ export async function twitchCallback(request: Request): Promise<Response> {
     grant_type: "authorization_code",
   });
 
-  const sub = sessionSub(mainConnection(), request);
+  if (!library) return done();
 
-  if (!token || !sub) return done("twitch:error");
+  if (token) startPull(library, "twitch", () => pullTwitch(library, token));
+  else notePull(library, "twitch", "error");
 
-  try {
-    return done(`twitch:${await pullTwitch(libraryConnection(sub), token)}`);
-  } catch (error) {
-    console.error(`twitch pull failed: ${error instanceof Error ? error.message : String(error)}`);
-
-    return done("twitch:error");
-  }
+  return done();
 }

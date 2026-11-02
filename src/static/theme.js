@@ -9,6 +9,15 @@
     }
   } catch {}
 
+  try {
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    if (zone) {
+      document.cookie =
+        "ch_tz=" + encodeURIComponent(zone) + "; Path=/; SameSite=Lax; Max-Age=31536000";
+    }
+  } catch {}
+
   function current() {
     return document.documentElement.getAttribute("data-theme") || "dark";
   }

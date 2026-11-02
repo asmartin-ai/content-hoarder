@@ -2,6 +2,12 @@ import { z } from "zod";
 import * as db from "../db.ts";
 import { parse } from "../search_query.ts";
 import type { Item, JsonValue } from "../models.ts";
+import { cookieValue } from "../hosted.ts";
+import { ZONE_COOKIE, zoneOr } from "../zone.ts";
+
+export function requestZone(request: Request): string {
+  return zoneOr(cookieValue(request, ZONE_COOKIE));
+}
 
 export function json<T>(body: T, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });

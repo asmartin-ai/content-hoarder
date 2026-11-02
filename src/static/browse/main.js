@@ -26,6 +26,19 @@ restoreView();
 
 syncSortControl();
 
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+
+  const syncKeyboard = () => {
+    const hidden = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+
+    document.documentElement.style.setProperty("--kb", Math.round(hidden) + "px");
+  };
+
+  vv.addEventListener("resize", syncKeyboard);
+  vv.addEventListener("scroll", syncKeyboard);
+}
+
 async function openDeepLinkedReader() {
   const qs = new URLSearchParams(location.search);
   const fn = qs.get("open");

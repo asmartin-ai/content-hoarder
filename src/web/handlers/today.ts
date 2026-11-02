@@ -3,7 +3,7 @@ import * as db from "../../db.ts";
 import * as resurface from "../../resurface.ts";
 import { REGISTRY } from "../../connectors/registry.ts";
 import { cookieValue } from "../../hosted.ts";
-import { objectBody } from "../http.ts";
+import { objectBody, requestZone } from "../http.ts";
 import { connection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 import type { SafeHtml } from "../views/html.ts";
@@ -86,6 +86,7 @@ export function todayPage(request: Request, url: URL): Response {
 
   const body = renderToday({
     now: new Date(now),
+    zone: requestZone(request),
     reentry: reentryLine(cookieValue(request, "ch_last_round"), now),
     n,
   });
@@ -103,7 +104,7 @@ export function upNext(request: Request, url: URL): Response {
 }
 
 export function wins(request: Request): Response {
-  const pulse = db.pulse(connection());
+  const pulse = db.pulse(connection(), { zone: requestZone(request) });
   const goal = Number.parseInt(cookieValue(request, "ch_goal"), 10);
 
   return fragment(

@@ -18,6 +18,7 @@ import {
 } from "./models.ts";
 import { FILTER_TAGS, VALID_CATEGORIES } from "./categorize.ts";
 import { sidFromPermalink } from "./connectors/reddit.ts";
+import { localMidnight, serverZone } from "./zone.ts";
 
 type CountRow = { c: number | string | null };
 
@@ -3239,16 +3240,15 @@ export function redditSubredditCounts(
   ).map((r) => ({ subreddit: String(r.subreddit), count: Number(r.c) }));
 }
 
-export function pulse(db: Database, opts: { now?: number | null } = {}): PulseCounts {
+export function pulse(
+  db: Database,
+  opts: { now?: number | null; zone?: string } = {},
+): PulseCounts {
   const now = Math.floor(
     opts.now !== undefined && opts.now !== null ? opts.now : Date.now() / 1000,
   );
 
-  const d = new Date(now * 1000);
-
-  const midnight = Math.floor(
-    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000,
-  );
+  const midnight = Math.floor(localMidnight(now * 1000, opts.zone ?? serverZone()) / 1000);
 
   const newToday = scalar(db, "SELECT COUNT(*) AS c FROM items WHERE first_seen_utc >= ?", [
     midnight,

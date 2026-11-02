@@ -19,8 +19,6 @@ export const PurgeVictimSchema = z.object({
   title: z.string(),
 });
 
-export const ExistingCountSchema = z.object({ count: z.number() });
-
 export const HydrateResponseSchema = z.object({
   status: z.enum([
     "hydrated",

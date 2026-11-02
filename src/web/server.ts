@@ -20,6 +20,8 @@ import {
   stopUnsaveTrickle,
 } from "./state.ts";
 
+const MAX_BODY = 100 * 1024 * 1024;
+
 const ServeOptionsSchema = z.object({
   dbPath: z.string().optional(),
   host: z.string().optional(),
@@ -62,18 +64,23 @@ export async function serveApp(value: ServeOptions | string = {}): Promise<AppSe
 
   setUnsaveTrickle(new TrickleDrainer(() => db.connect(tricklePath), { audit: trickleAudit }));
 
+  const base = {
+    fetch: handle,
+    hostname: host,
+    port,
+    idleTimeout: 120,
+    maxRequestBodySize: MAX_BODY,
+  };
+
   const server: Server<undefined> = options.tls
     ? serve({
-        fetch: handle,
-        hostname: host,
-        port,
-        idleTimeout: 120,
+        ...base,
         tls: {
           cert: readFileSync(join(import.meta.dir, "..", "..", "cert.pem")),
           key: readFileSync(join(import.meta.dir, "..", "..", "key.pem")),
         },
       })
-    : serve({ fetch: handle, hostname: host, port, idleTimeout: 120 });
+    : serve(base);
 
   return {
     port: server.port ?? port,

@@ -2,7 +2,7 @@ import { esc } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
 import { setArchivePref } from "../core/media.js";
-import { $, $$, state, itemsEl, drawer, doneRetention } from "./shared.js";
+import { $, $$, state, drawer, doneRetention } from "./shared.js";
 import {
   clearItemFirstPageCache,
   loadCounts,
@@ -17,37 +17,27 @@ export const scrim = $("#scrim");
 
 let _browseLock = 0;
 
-let _browseLockSaved = 0;
+let _browseLockY = 0;
 
-let _browseBodyLockSaved = 0;
+const LOCK_STYLE = { position: "fixed", left: "0", right: "0", width: "100%", overflow: "hidden" };
 
 export function lockBrowseScroll() {
   if (_browseLock === 0) {
-    _browseLockSaved = itemsEl.scrollTop;
-    _browseBodyLockSaved = window.scrollY || document.documentElement.scrollTop;
-    document.body.style.overflow = "hidden";
+    _browseLockY = window.scrollY || document.documentElement.scrollTop || 0;
+    Object.assign(document.body.style, LOCK_STYLE, { top: -_browseLockY + "px" });
   }
 
   _browseLock++;
-  itemsEl.style.overflow = "hidden";
 }
 
 function unlockBrowseScroll() {
   if (_browseLock <= 0) return;
-  _browseLock = Math.max(0, _browseLock - 1);
+  _browseLock -= 1;
 
   if (_browseLock === 0) {
-    itemsEl.style.overflow = "";
-    document.body.style.overflow = "";
-
-    if (_browseLockSaved) itemsEl.scrollTop = _browseLockSaved;
-
-    if (_browseBodyLockSaved) {
-      window.scrollTo(0, _browseBodyLockSaved);
-    }
-
-    _browseLockSaved = 0;
-    _browseBodyLockSaved = 0;
+    for (const key of [...Object.keys(LOCK_STYLE), "top"]) document.body.style[key] = "";
+    window.scrollTo(0, _browseLockY);
+    _browseLockY = 0;
   }
 }
 

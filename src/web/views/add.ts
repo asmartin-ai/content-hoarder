@@ -1,4 +1,5 @@
 import { googleConfigured, hostedOrigin, twitchConfigured } from "../../hosted.ts";
+import type { LibraryPull } from "../state.ts";
 import { html, type SafeHtml } from "./html.ts";
 
 const REDDIT_SAVES = [
@@ -27,38 +28,42 @@ const PULLED_LABELS = new Map([
   ["twitch", "Twitch"],
 ]);
 
-function pulledLine(value: string | null): SafeHtml | string {
-  if (!value) return "";
+export function renderPull(pull: LibraryPull | undefined): SafeHtml | string {
+  const label = pull ? PULLED_LABELS.get(pull.source) : undefined;
 
-  const [source = "", outcome = ""] = value.split(":");
-  const label = PULLED_LABELS.get(source);
+  if (!pull || !label) return "";
 
-  if (!label) return "";
+  if (pull.state === "running")
+    return html`<p
+      class="add-note"
+      role="status"
+      hx-get="/hx/add/pull"
+      hx-trigger="every 2s"
+      hx-swap="outerHTML"
+    >
+      ${label}: bringing your saves over. You can use Khaos meanwhile.
+    </p>`;
 
-  if (outcome === "error")
+  if (pull.state === "error")
     return html`<p class="add-note is-error" role="status">
       ${label} didn't share anything.
       ${
-        source === "youtube"
+        pull.source === "youtube"
           ? "On Google's screen, tick the YouTube box, then try again."
           : "Try again in a minute."
       }
     </p>`;
 
-  if (outcome === "cancelled")
+  if (pull.state === "cancelled")
     return html`<p class="add-note" role="status">${label} wasn't connected.</p>`;
 
-  const count = Number.parseInt(outcome, 10);
-
-  if (!Number.isFinite(count)) return "";
-
-  if (count === 0)
+  if (pull.count === 0)
     return html`<p class="add-note" role="status">
       ${label}: nothing new on that account. Signed in to the right one?
     </p>`;
 
   return html`<p class="add-note is-ok" role="status">
-    ${label}: ${count} ${count === 1 ? "item" : "items"} added.
+    ${label}: ${pull.count} ${pull.count === 1 ? "item" : "items"} added.
     <a href="/clear?n=10">Clear 10 →</a>
   </p>`;
 }
@@ -91,13 +96,13 @@ function connectSection(): SafeHtml | string {
   </section>`;
 }
 
-export function renderAdd(url: URL): SafeHtml {
+export function renderAdd(pull: LibraryPull | undefined): SafeHtml {
   return html`<section class="add-page">
     <header class="add-head">
       <h1 class="add-title">Add your stuff</h1>
       <p class="add-sub">Bring in what you saved. Nothing changes in your accounts.</p>
     </header>
-    ${pulledLine(url.searchParams.get("pulled"))} ${connectSection()}
+    ${renderPull(pull)} ${connectSection()}
     <section class="add-section">
       <h2>Tabs on your computer</h2>
       <ol class="add-steps">

@@ -42,6 +42,7 @@ export const SAMPLE_PATTERNS: readonly { seen: string; offer: string }[] = [
 
 export type HomeView = {
   now: Date;
+  zone: string;
   roundSize: number;
   flow: WeekFlow;
   resurfaced: Item | null;
@@ -273,7 +274,7 @@ function modulesStrip(): SafeHtml {
 export function renderHome(view: HomeView): SafeHtml {
   return html`<section class="orient">
     <header class="o-head">
-      <p class="o-date">${dateLine(view.now)} · ${dayTitle(view.now)}</p>
+      <p class="o-date">${dateLine(view.now, view.zone)} · ${dayTitle(view.now, view.zone)}</p>
       <h1 class="o-title">Welcome back</h1>
       <p class="o-sub">Here's how your attention moved, and one good place to start.</p>
     </header>

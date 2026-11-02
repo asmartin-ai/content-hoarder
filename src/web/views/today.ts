@@ -1,5 +1,6 @@
 import { NSFW_TAGS, type Item } from "../../models.ts";
 import type { ResurfaceCard } from "../../resurface.ts";
+import { wallClock } from "../../zone.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
 import { ringSvg } from "../../static/core/ring.js";
 import { cardMedia, communityOf, costLabel, hueOf, thumbFor } from "./media.ts";
@@ -39,8 +40,8 @@ function plural(n: number, one: string, many: string): string {
   return `${fmt(n)} ${n === 1 ? one : many}`;
 }
 
-export function dateLine(now: Date): string {
-  return now.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+export function dateLine(now: Date, zone: string): string {
+  return now.toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: zone });
 }
 
 const MORNING = 5;
@@ -51,9 +52,9 @@ const EVENING = 17;
 
 const NIGHT = 22;
 
-export function dayTitle(now: Date): string {
-  const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
-  const hour = now.getHours();
+export function dayTitle(now: Date, zone: string): string {
+  const weekday = now.toLocaleDateString("en-GB", { weekday: "long", timeZone: zone });
+  const { hour } = wallClock(now.getTime(), zone);
 
   if (hour >= MORNING && hour < AFTERNOON) return `${weekday} morning`;
 
@@ -129,11 +130,16 @@ export function renderSizes(n: number, oob = false): SafeHtml {
   </nav>`;
 }
 
-export function renderToday(opts: { now: Date; reentry: string; n: number }): SafeHtml {
+export function renderToday(opts: {
+  now: Date;
+  zone: string;
+  reentry: string;
+  n: number;
+}): SafeHtml {
   return html`<section class="today">
     <header class="today-head">
-      <p class="today-date">${dateLine(opts.now)}</p>
-      <h1 class="today-title">${dayTitle(opts.now)}</h1>
+      <p class="today-date">${dateLine(opts.now, opts.zone)}</p>
+      <h1 class="today-title">${dayTitle(opts.now, opts.zone)}</h1>
       ${opts.reentry ? html`<p class="today-reentry">${opts.reentry}</p>` : ""}
     </header>
     <div class="hero">

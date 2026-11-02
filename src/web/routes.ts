@@ -28,6 +28,7 @@ import {
   options,
   redditView,
   requestItem,
+  requestZone,
 } from "./http.ts";
 import { connection, libraryConnection, mainConnection, withLibrary } from "./state.ts";
 import { handleItemAction } from "./handlers/items.ts";
@@ -40,7 +41,7 @@ import {
 import { drainUnsave, enqueueUnsaveByTag, purgeDone } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import { clearPage, deal } from "./handlers/clear.ts";
-import { addPage } from "./handlers/add.ts";
+import { addPage, pullStatus } from "./handlers/add.ts";
 import { homePage } from "./handlers/home.ts";
 import {
   googleCallback,
@@ -158,7 +159,7 @@ async function appRoute(request: Request): Promise<Response> {
 
   if (method === "GET" && path === "/clear") return clearPage();
 
-  if (method === "GET" && path === "/add") return addPage(request, url);
+  if (method === "GET" && path === "/add") return addPage();
 
   if (method === "GET" && (path === "/library" || path === "/browse")) return templateResponse();
 
@@ -172,6 +173,8 @@ async function appRoute(request: Request): Promise<Response> {
     if (method === "GET" && path === "/hx/today/piles") return piles();
 
     if (method === "GET" && path === "/hx/today/whisper") return whisper();
+
+    if (method === "GET" && path === "/hx/add/pull") return pullStatus();
 
     if (method === "POST" && path === "/hx/sweeps/apply") return await applyPile(request);
 
@@ -310,7 +313,8 @@ async function appRoute(request: Request): Promise<Response> {
         }),
       );
 
-    if (method === "GET" && path === "/pulse") return json(db.pulse(connection()));
+    if (method === "GET" && path === "/pulse")
+      return json(db.pulse(connection(), { zone: requestZone(request) }));
 
     if (method === "GET" && path === "/sweeps") return listSweeps(url);
 
