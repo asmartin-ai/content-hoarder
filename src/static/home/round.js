@@ -7,6 +7,7 @@ import {
   fetchItem,
   fetchPulse,
 } from "../core/api.js";
+import { mountVideo } from "../core/media.js";
 import { esc, isTypingTarget } from "../core/util.js";
 import { ringSvg } from "../core/ring.js";
 import { attachSwipe } from "../core/swipe.js";
@@ -216,6 +217,7 @@ export function mountRound(root) {
   let cardEl = null;
   let comboEl = null;
   let leaving = false;
+  let clip = null;
 
   const pending = new Map();
 
@@ -248,9 +250,29 @@ export function mountRound(root) {
     } catch {}
   };
 
+  const stopClip = () => {
+    if (!clip) return;
+
+    if (clip.video) clip.video.pause();
+
+    if (clip.destroy) clip.destroy();
+    clip = null;
+  };
+
+  const playClip = (figure) => {
+    stopClip();
+    figure.classList.remove("is-missing");
+    figure.classList.add("is-playing");
+    figure.removeAttribute("data-open");
+    clip = mountVideo(figure, figure.dataset.play, figure.querySelector(".media-img")?.src, {
+      autoplay: true,
+    });
+  };
+
   function go(url) {
     if (leaving) return;
     leaving = true;
+    stopClip();
     const wait = new Promise((resolve) => setTimeout(resolve, LEAVE_WAIT_MS));
 
     Promise.race([Promise.allSettled(pending.values()), wait]).then(() => {
@@ -374,6 +396,7 @@ export function mountRound(root) {
   }
 
   function showCard(back = "") {
+    stopClip();
     const item = round.items[round.idx];
     const peekEl = stage.querySelector(":scope > .card.is-next");
     let el;
@@ -732,6 +755,8 @@ export function mountRound(root) {
 
     const ghost = cardEl;
 
+    stopClip();
+
     if (ghost) {
       ghost.classList.add("is-leaving", "leave-" + act);
 
@@ -823,6 +848,19 @@ export function mountRound(root) {
       e.preventDefault();
       e.stopPropagation();
       veiled.classList.remove("is-nsfw");
+
+      return;
+    }
+
+    const playing = e.target.closest(".card-media.is-playing");
+
+    if (playing && cardEl && cardEl.contains(playing)) return;
+
+    const playable = e.target.closest(".card-media[data-play]");
+
+    if (playable && cardEl && cardEl.contains(playable)) {
+      e.preventDefault();
+      playClip(playable);
 
       return;
     }

@@ -7,6 +7,7 @@ export type CardMedia = {
   src: string;
   fallback?: string;
   badge?: string;
+  play?: string;
 };
 
 const ExtraMetaSchema = z.object({
@@ -149,6 +150,25 @@ function durationOf(item: Item): number {
   return duration !== undefined && Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
 
+const VREDDIT_ID = /^https?:\/\/v\.redd\.it\/([A-Za-z0-9]+)/i;
+
+export function clipSrc(item: Item): string {
+  if (mediaEvidence(item) !== "video") return "";
+  const extra = extraMeta(item);
+
+  const src =
+    extra.media_url || (extra.media_urls ?? []).find((url) => VIDEO_EXT.test(url)) || item.url;
+
+  const local = extra.archived_media?.[src] ? `/media/${extra.archived_media[src]}` : "";
+
+  if (local) return local;
+  const vreddit = VREDDIT_ID.exec(src);
+
+  if (vreddit) return `https://v.redd.it/${vreddit[1]}/HLSPlaylist.m3u8`;
+
+  return VIDEO_EXT.test(src) ? safeUrl(src) : "";
+}
+
 function withFallback(item: Item, media: CardMedia): CardMedia {
   if (media.fallback) return media;
   const fallback = archivedUrl(item, media.src);
@@ -190,11 +210,17 @@ export function cardMedia(item: Item): CardMedia | null {
 
     if (!poster) return null;
 
-    return withFallback(item, {
+    const media: CardMedia = {
       kind: "video",
       src: poster,
       badge: duration ? `▶ ${clock(duration)}` : "▶ clip",
-    });
+    };
+
+    const play = clipSrc(item);
+
+    if (play) media.play = play;
+
+    return withFallback(item, media);
   }
 
   if (evidence === "gallery") {

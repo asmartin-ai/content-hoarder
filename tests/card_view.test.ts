@@ -258,3 +258,28 @@ test("Reddit's &#x200B; paragraph padding never prints as text", () => {
   expect(out).not.toContain("x200B");
   expect(out).toContain("Second paragraph.");
 });
+
+test("a clip plays its own video, never the archived poster", () => {
+  const clip = (archived: Record<string, string>) =>
+    cardMedia(
+      makeItem({
+        source: "reddit",
+        source_id: "t3_clip",
+        kind: "post",
+        title: "Clip",
+        url: "https://v.redd.it/abc123",
+        metadata: {
+          subreddit: "test",
+          thumbnail: "https://b.thumbs.redditmedia.com/poster.jpg",
+          media_url: "https://v.redd.it/abc123",
+          archived_media: archived,
+        },
+      }),
+    );
+
+  expect(clip({})?.play).toBe("https://v.redd.it/abc123/HLSPlaylist.m3u8");
+  expect(clip({ "https://b.thumbs.redditmedia.com/poster.jpg": "poster.jpg" })?.play).toBe(
+    "https://v.redd.it/abc123/HLSPlaylist.m3u8",
+  );
+  expect(clip({ "https://v.redd.it/abc123": "clip.mp4" })?.play).toBe("/media/clip.mp4");
+});

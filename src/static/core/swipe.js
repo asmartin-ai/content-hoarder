@@ -80,7 +80,7 @@ export function attachSwipe(el, opts) {
 
     if (e.pointerType === "mouse" && e.button !== 0) return;
 
-    if (e.target.closest("input, select, textarea")) return;
+    if (e.target.closest("input, select, textarea, video")) return;
 
     if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return;
 
