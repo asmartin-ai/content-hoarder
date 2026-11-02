@@ -4,6 +4,19 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security:** imported items never keep a `javascript:`/`data:`/`vbscript:` URL, and the
+  Library, reader, relay, lightbox and share refuse one already stored. In hosted mode one tester's
+  import could otherwise run script in every tester's session.
+- **Security:** the sign-in, privacy and invite pages send `frame-ancestors 'none'` and
+  `X-Frame-Options: DENY` like every other page.
+- Home's rhythm strip put today's decisions on yesterday's dot whenever the process time zone
+  differed from the system one (every evening under `bun test`).
+- Home's "Worth seeing again" no longer offers an item you snoozed.
+- Holding a decision key in Clear no longer decides one card per key repeat.
+- `scripts/demo.sh` is executable again.
+
 ### Changed
 
 - **Clips play inside the round card.** Tapping a Reddit clip (v.redd.it via HLS, a direct
