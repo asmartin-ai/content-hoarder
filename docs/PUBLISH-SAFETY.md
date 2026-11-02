@@ -59,6 +59,7 @@ boundary: audit every new docs, fixture and script path.
 | `scripts/mirror-media.bat` | media mirror job hard-coded to this workstation |
 | `scripts/verify-media-mirror.bat`, `scripts/verify-mirror-media.bat` | mirror verifiers for those drive paths |
 | `scripts/wp1_p4_backup_strategy.py` | one-off Windows disk-topology measurement |
+| `bakeoff/` | one-off model-bakeoff plans, routing notes and run artifacts (moved to private in `495498c`); they name personal machine paths |
 
 Kept because they are generic and tested: `scripts/verify_mirror_media.ts` (pair it with your own
 mirror command) and `scripts/demo.sh`. `docs/ai-suggestions.md`, `docs/DEMO.md` and
@@ -131,8 +132,9 @@ git filter-repo --force \
   --path scripts/bakeoff_arm.py --path scripts/bakeoff_batch.py \
   --path scripts/mirror-media.bat --path scripts/verify-media-mirror.bat \
   --path scripts/verify-mirror-media.bat --path scripts/wp1_p4_backup_strategy.py \
-  --name-callback 'return name if name in (b"asmartin-ai", b"Claude", b"GitHub") else b"asmartin-ai"' \
-  --email-callback 'return email if email.endswith(b"noreply.github.com") or email == b"noreply@anthropic.com" else b"291404369+asmartin-ai@users.noreply.github.com"'
+  --path bakeoff/ \
+  --name-callback 'return name if name in (b"asmartin-ai", b"Claude", b"GitHub", b"Zed") else b"asmartin-ai"' \
+  --email-callback 'return email if email.endswith(b"noreply.github.com") or email in (b"noreply@anthropic.com", b"hi@zed.dev") else b"291404369+asmartin-ai@users.noreply.github.com"'
 git filter-repo --force --replace-text ~/.config/content-hoarder/public-replace.txt
 git filter-repo --force --message-callback '
 import os
@@ -148,9 +150,10 @@ bun run scripts/publish_safety_check.ts --history
 ```
 
 `public-replace.txt` and `public-message-replace.txt` (git filter-repo `Old==>New` rules, one per
-line, no comments) live outside the repo because their rules name what they hide: the owner
-handle in both cases, the personal contact address, the real name variants, and real
-workstation paths longest-first. Keep both files at mode `0600`.
+line, no comments, longest `Old` first) live outside the repo because their rules name what they
+hide: the owner handle in both cases, the personal contact address, the real name variants, real
+workstation paths, and the Tailscale address a historical test used as a `Host` header (rewritten
+to TEST-NET-1, RFC 5737). Keep both files at mode `0600`.
 
 A `git push --force` of `main` does not clean the rest of GitHub: side branches, archive tags,
 `refs/pull/*` and issue/PR text keep the old material until they are deleted, rewritten or edited.
