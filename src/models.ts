@@ -254,6 +254,8 @@ export interface NewItemInput {
   now?: number | null;
 }
 
+const SCRIPT_URL = /^\s*(javascript|data|vbscript):/i;
+
 export function newItem(input: NewItemInput): RawItem {
   const ts = input.now ?? Math.floor(Date.now() / 1000);
 
@@ -270,7 +272,7 @@ export function newItem(input: NewItemInput): RawItem {
     kind: input.kind || "item",
     title: (input.title || "").trim(),
     body: input.body || "",
-    url: (input.url || "").trim(),
+    url: SCRIPT_URL.test(input.url || "") ? "" : (input.url || "").trim(),
     author: (input.author || "").trim(),
     created_utc: Math.trunc(input.created_utc || 0),
     saved_utc: Math.trunc(input.saved_utc || 0),

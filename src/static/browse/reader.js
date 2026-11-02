@@ -1595,7 +1595,7 @@ export function initReader({
     if (ledEl) ledEl.style.setProperty("--reader-led", sm.led);
 
     if (ooEl) ooEl.setAttribute("aria-label", "Open the original on " + sm.label);
-    ooHref = sm.originalHref(it);
+    ooHref = safeUrl(sm.originalHref(it));
 
     if (ooEl) {
       ooEl.href = ooHref || "#";

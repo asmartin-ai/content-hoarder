@@ -33,16 +33,24 @@ export const hnUserUrl = (author) => {
   return a ? "https://news.ycombinator.com/user?id=" + encodeURIComponent(a) : "";
 };
 
-export const itemUrl = (item) =>
+const SCRIPT_URL = /^\s*(javascript|data|vbscript):/i;
+
+const rawItemUrl = (item) =>
   item.source === "hackernews"
     ? hnThreadUrl(item) || item.url || ""
     : item.source === "reddit"
       ? redditUrl((item.metadata || {}).permalink) || item.url || ""
       : item.url || "";
 
+export const itemUrl = (item) => {
+  const url = rawItemUrl(item);
+
+  return SCRIPT_URL.test(url) ? "" : url;
+};
+
 export function shareItem(item) {
   if (!item) return;
-  const url = itemUrl(item) || item.url || "";
+  const url = itemUrl(item);
 
   if (!url) {
     toast("No link to share");

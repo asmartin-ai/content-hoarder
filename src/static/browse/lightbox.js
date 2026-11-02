@@ -1,4 +1,4 @@
-import { esc } from "../core/util.js";
+import { esc, safeUrl } from "../core/util.js";
 import * as api from "../core/api.js";
 import { toast } from "../core/toast.js";
 import {
@@ -262,7 +262,7 @@ export function openMediaFor(item, opts) {
   if (m.permalink && item.source === "reddit") return readerUI.open(item);
 
   if (m.permalink) return lightbox.openMedia(m.permalink, opts);
-  const url = item.url;
+  const url = safeUrl(item.url);
 
   if (url) window.open(url, "_blank", "noopener");
 }

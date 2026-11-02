@@ -50,3 +50,18 @@ test("database rows keep metadata JSON on the wire and parse it for API consumer
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("an imported item never keeps a script URL", () => {
+  for (const url of [
+    "javascript:alert(1)",
+    " JavaScript:alert(1)",
+    "data:text/html,x",
+    "vbscript:x",
+  ]) {
+    expect(newItem({ source: "reddit", source_id: "t3_x", url }).url).toBe("");
+  }
+
+  expect(newItem({ source: "reddit", source_id: "t3_y", url: " https://example.com/a " }).url).toBe(
+    "https://example.com/a",
+  );
+});

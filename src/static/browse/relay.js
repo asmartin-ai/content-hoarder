@@ -29,7 +29,7 @@ function relaySourceHref(it) {
 
   if (it.source === "hackernews")
     return "https://news.ycombinator.com/item?id=" + encodeURIComponent(it.source_id || "");
-  const u = itemUrl(it) || it.url || "";
+  const u = itemUrl(it);
 
   return u;
 }
