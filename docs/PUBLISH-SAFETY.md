@@ -84,9 +84,18 @@ git filter-repo --force \
   --invert-paths --path docs/FRIEND-PILOT.md \
   --name-callback 'return name if name in (b"asmartin-ai", b"Claude", b"GitHub") else b"asmartin-ai"' \
   --email-callback 'return email if email.endswith(b"noreply.github.com") or email == b"noreply@anthropic.com" else b"291404369+asmartin-ai@users.noreply.github.com"'
+git filter-repo --force --replace-text ~/.config/content-hoarder/public-replace.txt
 git log --format='%an|%ae|%cn|%ce' | sort -u   # only no-reply identities
-bun run <repo>/scripts/publish_safety_check.ts --history   # from /tmp/ch-public
-git bundle create ../content-hoarder-public-pre-refresh.bundle --all   # in the real repo, of origin/main
+bun run scripts/publish_safety_check.ts --history   # needs node_modules linked in
+```
+
+`public-replace.txt` (git filter-repo `Old==>New` rules) lives outside the repo because its rules
+name what they hide: the real name and personal identifiers in old blobs. Before pushing, back up
+the current public `main` from the real repo
+(`git bundle create ../content-hoarder-public-pre-refresh.bundle origin/main`), then from
+`/tmp/ch-public`:
+
+```sh
 git push --force https://github.com/asmartin-ai/content-hoarder.git main
 ```
 
