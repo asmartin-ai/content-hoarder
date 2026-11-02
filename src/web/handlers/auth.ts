@@ -166,7 +166,7 @@ export function privacyPage(): Response {
   return page(
     "Privacy",
     html`<h1 class="auth-title">Privacy</h1>
-      <p class="auth-line">Khaos is a small pilot run by the owner.</p>
+      <p class="auth-line">Khaos is a small pilot run by asmartin-ai.</p>
       <h2>What it reads</h2>
       <ul>
         <li>

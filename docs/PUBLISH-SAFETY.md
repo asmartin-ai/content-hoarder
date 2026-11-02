@@ -6,13 +6,13 @@ defines the boundary and the repeatable check to run before publication.
 
 ## Boundary
 
-content-hoarder is **single-repo public-canonical** (not private-canonical +
-public-mirror). The sensitive material it touches — live DBs, Takeout dumps,
-NSFW rule lists, exports, and saved-content text — is **gitignored at the
-path level**, never scrubbed from history. The last recorded
-`publish_safety_check.py --history` scan (2026-07-03) found no secrets or
-sensitive data in tracked history. This historical result is not current;
-re-run the Bun checker before publication.
+content-hoarder is **private-canonical with a rebuilt public copy**. Canonical history lives in
+`asmartin-ai/content-hoarder-private` (remote `private`). The public repo
+(`asmartin-ai/content-hoarder`, remote `origin`) is rebuilt from private `main` with every author
+identity mapped to the GitHub no-reply address and private-only paths removed, then force-pushed.
+The sensitive material it touches (live DBs, Takeout dumps, NSFW rule lists, exports and
+saved-content text) is also **gitignored at the path level**. Run the Bun checker before every
+publication.
 
 ### Public-safe (tracked, mirrors fine)
 
@@ -72,19 +72,26 @@ credential value; an unrelated example comment cannot hide a real secret.
 Test source files are excluded because they contain deliberate credential-shaped
 fixtures. Serialized files under `tests/fixtures/` are still scanned.
 
-## Workflow interaction with the existing public repo
+## Refreshing the public repo
 
-The existing public repo **stays canonical**. There is no private-canonical
-upstream and no sanitized-mirror generation step — the path-level gitignore +
-this check IS the safety boundary. If a future need introduces genuinely
-private-only code/docs (e.g. NSFW-aware classifiers, personal integration
-notes), THEN the Life-OS pattern (`decisions/0012`: private canonical + sanitized
-public mirror generated from an allowlist) becomes the right model:
-- move canonical to a private repo,
-- generate the public mirror from an **allowlist** of public-safe paths,
-- run this check on every mirror build.
+Private-only paths: `docs/FRIEND-PILOT.md` (hosted pilot operations). Add new ones to the
+`--invert-paths` list below.
 
-Until then: one repo, path-level ignore, this check before every push.
+```sh
+rm -rf /tmp/ch-public && git clone -q --single-branch --branch main . /tmp/ch-public
+cd /tmp/ch-public
+git filter-repo --force \
+  --invert-paths --path docs/FRIEND-PILOT.md \
+  --name-callback 'return name if name in (b"asmartin-ai", b"Claude", b"GitHub") else b"asmartin-ai"' \
+  --email-callback 'return email if email.endswith(b"noreply.github.com") or email == b"noreply@anthropic.com" else b"291404369+asmartin-ai@users.noreply.github.com"'
+git log --format='%an|%ae|%cn|%ce' | sort -u   # only no-reply identities
+bun run <repo>/scripts/publish_safety_check.ts --history   # from /tmp/ch-public
+git bundle create ../content-hoarder-public-pre-refresh.bundle --all   # in the real repo, of origin/main
+git push --force https://github.com/asmartin-ai/content-hoarder.git main
+```
+
+A force-push doesn't remove what was public before: GitHub keeps old commits reachable by SHA,
+and forks keep their history.
 
 ## Open decisions (deferred to user)
 
