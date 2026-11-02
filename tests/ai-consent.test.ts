@@ -101,6 +101,7 @@ test("a configured provider prompts once and the opt-out is remembered", async (
     expect(today).toContain("data-ai-consent");
     expect(today).toContain("Turn on AI suggestions?");
     expect(today).toContain("Z.ai (GLM)");
+    expect(today).toContain("first 500 characters of its text");
 
     const declined = await setConsent(base, false);
 
@@ -162,6 +163,7 @@ test("privacy claims follow the provider host", async () => {
   const otherPrivacy = await privacyPage().text();
 
   expect(otherPrivacy).toContain("OpenRouter");
+  expect(otherPrivacy).toContain("first 500 characters of its text");
   expect(otherPrivacy).toContain("The provider&#39;s own terms apply.");
   expect(otherPrivacy).not.toContain("Singapore");
   expect(otherPrivacy).not.toContain("docs.z.ai");

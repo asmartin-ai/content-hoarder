@@ -21,7 +21,7 @@ import {
   userExists,
 } from "../../hosted.ts";
 import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
-import { aiProviderIsZai, aiProviderLabel } from "../../assist/consent.ts";
+import { AI_FIELDS_SENT, aiProviderIsZai, aiProviderLabel } from "../../assist/consent.ts";
 import { demoAnalyticsOn } from "../../demo_analytics.ts";
 import { html, type SafeHtml } from "../views/html.ts";
 import { libraryConnection, mainConnection, notePull, startPull } from "../state.ts";
@@ -185,8 +185,8 @@ export function privacyPage(): Response {
         </li>
         <li>
           Your items are in a library of their own on one server for this pilot. Other testers can't
-          see them. Nothing is sold. AI suggestions are off by default. If you turn them on, the
-          fields above for cards being dealt are sent to ${aiProviderLabel()} to get a suggestion.
+          see them. Nothing is sold. AI suggestions are off by default. If you turn them on,
+          ${AI_FIELDS_SENT} are sent to ${aiProviderLabel()} to get a suggestion.
           ${
             aiProviderIsZai()
               ? html`The provider says it does not use API content to train unless the developer

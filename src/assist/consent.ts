@@ -4,6 +4,9 @@ import { getSetting, setSetting } from "../db.ts";
 
 export const AI_CONSENT_KEY = "ai_suggestions";
 
+export const AI_FIELDS_SENT =
+  "each dealt card's source, title, author, subreddit or channel, URL and the first 500 characters of its text";
+
 export type AiConsent = "on" | "off" | "unset";
 
 export function aiConfigured(): boolean {

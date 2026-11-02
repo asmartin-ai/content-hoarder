@@ -1,4 +1,4 @@
-import { aiConfigured, aiConsent, aiProviderLabel } from "../../assist/consent.ts";
+import { AI_FIELDS_SENT, aiConfigured, aiConsent, aiProviderLabel } from "../../assist/consent.ts";
 import { demoAnalyticsOn } from "../../demo_analytics.ts";
 import { connection } from "../state.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
@@ -163,8 +163,7 @@ function aiConsentPrompt(): SafeHtml | string {
       every card.
     </p>
     <p class="ai-consent-line">
-      To write a hint, Khaos sends each dealt card's source, title, author, subreddit or channel,
-      URL and the first 500 characters of its text to <b>${provider}</b>.
+      To write a hint, Khaos sends ${AI_FIELDS_SENT} to <b>${provider}</b>.
     </p>
     <p class="ai-consent-line">
       It's off until you say yes, and you can turn it off again on <a href="/add">Add</a>.
