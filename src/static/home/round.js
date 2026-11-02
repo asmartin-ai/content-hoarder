@@ -871,6 +871,8 @@ export function mountRound(root) {
 
     if (!act || state !== "playing") return;
     e.preventDefault();
+
+    if (e.repeat && act !== "open") return;
     run(act);
   }
 
