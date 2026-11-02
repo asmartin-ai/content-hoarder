@@ -16,7 +16,7 @@ import * as hnThread from "../hn_thread.ts";
 import * as exportModule from "../export.ts";
 import * as mediaStore from "../media_store.ts";
 import { isAutosyncEnabled } from "../sync/scheduler.ts";
-import { gate, hostedOrigin } from "../hosted.ts";
+import { gate, hostedOrigin, sessionSub } from "../hosted.ts";
 import { guard } from "./guard.ts";
 import { serviceWorkerResponse, staticResponse, templateResponse } from "./static.ts";
 import {
@@ -29,7 +29,7 @@ import {
   redditView,
   requestItem,
 } from "./http.ts";
-import { connection } from "./state.ts";
+import { connection, libraryConnection, mainConnection, withLibrary } from "./state.ts";
 import { handleItemAction } from "./handlers/items.ts";
 import {
   commitImport,
@@ -87,7 +87,7 @@ async function hostedRoute(
   method: string,
   path: string,
 ): Promise<Response | null> {
-  const blocked = gate(connection(), request);
+  const blocked = gate(mainConnection(), request);
 
   if (blocked) return blocked;
 
@@ -115,15 +115,22 @@ export async function handle(request: Request): Promise<Response> {
   const forbidden = guard(request);
 
   if (forbidden) return forbidden;
+
+  if (!hostedOrigin()) return appRoute(request);
+
+  const hosted = await hostedRoute(request, request.method, new URL(request.url).pathname);
+
+  if (hosted) return hosted;
+
+  const sub = sessionSub(mainConnection(), request);
+
+  return sub ? withLibrary(libraryConnection(sub), () => appRoute(request)) : appRoute(request);
+}
+
+async function appRoute(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
-
-  if (hostedOrigin()) {
-    const hosted = await hostedRoute(request, method, path);
-
-    if (hosted) return hosted;
-  }
 
   if (method === "GET" && path === "/triage") return Response.redirect("/clear", 302);
 

@@ -4,6 +4,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Hosted mode: a library per account.** Each Google account signed in to a hosted instance
+  reads and writes its own SQLite file (`data/users/<hash>.db`); `app.db` keeps only accounts,
+  sessions and invites. Testers no longer see each other's items, and the privacy page says so.
+
 ### Fixed
 
 - A browser bookmarks export that contained a Hacker News or Reddit link imported only those

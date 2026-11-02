@@ -23,7 +23,7 @@ import {
 } from "../../hosted.ts";
 import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
 import { html, type SafeHtml } from "../views/html.ts";
-import { connection } from "../state.ts";
+import { libraryConnection, mainConnection } from "../state.ts";
 import { htmlResponse } from "../static.ts";
 
 type Provider = "google" | "twitch";
@@ -142,7 +142,7 @@ async function exchange(endpoint: string, fields: Record<string, string>): Promi
 }
 
 export function invitePage(token: string): Response {
-  if (!inviteOpen(connection(), token))
+  if (!inviteOpen(mainConnection(), token))
     return notice(
       "This invite doesn't work",
       "It was already used or the link is wrong. Ask the owner for a new one.",
@@ -183,7 +183,8 @@ export function privacyPage(): Response {
           stored.
         </li>
         <li>
-          Your items live on one server for this pilot. Nothing is sold, shared or used to train AI.
+          Your items are in a library of their own on one server for this pilot. Other testers can't
+          see them. Nothing is sold, shared or used to train AI.
         </li>
         <li>Letting something go in Khaos never changes your YouTube, Twitch or Reddit account.</li>
         <li>Ask and your data is deleted, all of it.</li>
@@ -193,7 +194,7 @@ export function privacyPage(): Response {
 }
 
 export function logout(request: Request): Response {
-  endSession(connection(), request);
+  endSession(mainConnection(), request);
 
   return redirect("/auth/login", [clearedCookie(SESSION_COOKIE)]);
 }
@@ -240,10 +241,11 @@ export async function googleCallback(request: Request): Promise<Response> {
 
   if (!token) return notice("Google didn't sign you in", "Try again in a minute.", 502);
 
-  const database = connection();
+  const database = mainConnection();
   const setCookies = [clearedCookie(OAUTH_COOKIE)];
+  let sub = sessionSub(database, request);
 
-  if (!sessionSub(database, request)) {
+  if (!sub) {
     const userResponse = await hostedFetch()("https://openidconnect.googleapis.com/v1/userinfo", {
       headers: { authorization: `Bearer ${token}` },
     });
@@ -264,12 +266,13 @@ export async function googleCallback(request: Request): Promise<Response> {
       sessionCookie(createSession(database, user.data.sub)),
       clearedCookie(INVITE_COOKIE),
     );
+    sub = user.data.sub;
   }
 
   let pulled: string;
 
   try {
-    pulled = `youtube:${await pullYoutube(database, token)}`;
+    pulled = `youtube:${await pullYoutube(libraryConnection(sub), token)}`;
   } catch (error) {
     console.error(`youtube pull failed: ${error instanceof Error ? error.message : String(error)}`);
     pulled = "youtube:error";
@@ -315,10 +318,12 @@ export async function twitchCallback(request: Request): Promise<Response> {
     grant_type: "authorization_code",
   });
 
-  if (!token) return done("twitch:error");
+  const sub = sessionSub(mainConnection(), request);
+
+  if (!token || !sub) return done("twitch:error");
 
   try {
-    return done(`twitch:${await pullTwitch(connection(), token)}`);
+    return done(`twitch:${await pullTwitch(libraryConnection(sub), token)}`);
   } catch (error) {
     console.error(`twitch pull failed: ${error instanceof Error ? error.message : String(error)}`);
 

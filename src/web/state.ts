@@ -1,5 +1,7 @@
-import { randomBytes } from "node:crypto";
-import { unlinkSync } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdirSync, unlinkSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
 import * as config from "../config.ts";
 import * as db from "../db.ts";
@@ -23,6 +25,10 @@ let activeDatabase: Database | undefined;
 
 let unsaveTrickle: TrickleDrainer | null = null;
 
+const libraries = new Map<string, Database>();
+
+const currentLibrary = new AsyncLocalStorage<Database>();
+
 export function setDatabasePath(path: string | undefined): void {
   selectedDbPath = path;
 }
@@ -31,11 +37,11 @@ export function databasePath(): string {
   return selectedDbPath ?? config.dbPath();
 }
 
-export function connection(): Database {
+export function mainConnection(): Database {
   const path = databasePath();
 
   if (!activeDatabase || activeDatabasePath !== path) {
-    activeDatabase?.close();
+    closeConnection();
     activeDatabase = db.connect(path);
     activeDatabasePath = path;
   }
@@ -43,10 +49,41 @@ export function connection(): Database {
   return activeDatabase;
 }
 
+export function connection(): Database {
+  return currentLibrary.getStore() ?? mainConnection();
+}
+
+export function libraryPath(sub: string): string {
+  const name = createHash("sha256").update(sub).digest("hex").slice(0, 32);
+
+  return join(dirname(databasePath()), "users", `${name}.db`);
+}
+
+export function libraryConnection(sub: string): Database {
+  const path = libraryPath(sub);
+  const open = libraries.get(path);
+
+  if (open) return open;
+
+  mkdirSync(dirname(path), { recursive: true });
+  const opened = db.connect(path);
+
+  libraries.set(path, opened);
+
+  return opened;
+}
+
+export function withLibrary<T>(library: Database, fn: () => T): T {
+  return currentLibrary.run(library, fn);
+}
+
 export function closeConnection(): void {
   activeDatabase?.close();
   activeDatabase = undefined;
   activeDatabasePath = undefined;
+
+  for (const library of libraries.values()) library.close();
+  libraries.clear();
 }
 
 export function setUnsaveTrickle(drainer: TrickleDrainer | null): void {

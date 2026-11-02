@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { z } from "zod";
 import { createInvite, setHostedFetch } from "../src/hosted.ts";
 import { handle } from "../src/web/routes.ts";
-import { closeConnection, connection, setDatabasePath } from "../src/web/state.ts";
+import {
+  closeConnection,
+  connection,
+  libraryConnection,
+  setDatabasePath,
+} from "../src/web/state.ts";
 
 const ORIGIN = "https://demo.khaos.test";
 
@@ -131,9 +136,11 @@ async function googleSignIn(
 
 const SourceCount = z.object({ count: z.number() });
 
-function countSource(source: string): number {
+function countSource(sub: string, source: string): number {
   return SourceCount.parse(
-    connection().query("SELECT COUNT(*) AS count FROM items WHERE source = ?").get(source),
+    libraryConnection(sub)
+      .query("SELECT COUNT(*) AS count FROM items WHERE source = ?")
+      .get(source),
   ).count;
 }
 
@@ -180,7 +187,7 @@ test("an invite lets one Google account in once and pulls its YouTube", async ()
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe("/add?pulled=youtube%3A2");
   expect(cookies.ch_session).toBeTruthy();
-  expect(countSource("youtube")).toBe(2);
+  expect(countSource("friend", "youtube")).toBe(2);
 
   const signedIn = await handle(request("/", { ch_session: cookies.ch_session ?? "" }));
 
@@ -272,5 +279,52 @@ test("Twitch needs a session and imports followed channels", async () => {
   );
 
   expect(done.headers.get("location")).toBe("/add?pulled=twitch%3A1");
-  expect(countSource("twitch")).toBe(1);
+  expect(countSource("friend", "twitch")).toBe(1);
+});
+
+test("each account has its own library", async () => {
+  const sessions: string[] = [];
+
+  for (const sub of ["friend-a", "friend-b"]) {
+    const opened = await handle(request(`/invite/${createInvite(connection())}`));
+    const { cookies } = await googleSignIn(sub, setCookies(opened));
+
+    sessions.push(cookies.ch_session ?? "");
+  }
+
+  const [first = "", second = ""] = sessions;
+
+  const kept = await handle(
+    new Request(`${ORIGIN}/items/${encodeURIComponent("youtube:vid_liked01")}/status`, {
+      method: "POST",
+      headers: {
+        host: HOST,
+        origin: ORIGIN,
+        "content-type": "application/json",
+        cookie: `ch_session=${first}`,
+      },
+      body: JSON.stringify({ status: "keep" }),
+    }),
+  );
+
+  expect(kept.status).toBe(200);
+
+  const listings: string[] = [];
+
+  for (const session of sessions) {
+    const listed = await handle(
+      new Request(`${ORIGIN}/items`, {
+        headers: { host: HOST, accept: "application/json", cookie: `ch_session=${session}` },
+      }),
+    );
+
+    listings.push(await listed.text());
+  }
+
+  expect(second).not.toBe(first);
+  expect(countSource("friend-a", "youtube")).toBe(2);
+  expect(countSource("friend-b", "youtube")).toBe(2);
+  expect(listings[0]).toContain('"status":"keep"');
+  expect(listings[1]).not.toContain('"status":"keep"');
+  expect(connection().query("SELECT COUNT(*) AS n FROM items").get()).toEqual({ n: 0 });
 });
