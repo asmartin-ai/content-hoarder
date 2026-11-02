@@ -24,6 +24,7 @@ import {
 import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
 import { html, type SafeHtml } from "../views/html.ts";
 import { connection } from "../state.ts";
+import { htmlResponse } from "../static.ts";
 
 type Provider = "google" | "twitch";
 
@@ -70,10 +71,7 @@ function page(title: string, body: SafeHtml, status = 200): Response {
       </body>
     </html>`;
 
-  return new Response(document.value, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  return htmlResponse(document.value, { status });
 }
 
 function redirect(location: string, setCookies: string[] = []): Response {

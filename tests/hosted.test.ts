@@ -160,6 +160,15 @@ test("hosted mode sends strangers to sign-in and rejects other hosts", async () 
   expect(api.status).toBe(401);
 });
 
+test("public sign-in pages refuse to be framed", async () => {
+  for (const path of ["/auth/login", "/privacy", "/invite/not-a-real-token"]) {
+    const response = await handle(request(path));
+
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+  }
+});
+
 test("an invite lets one Google account in once and pulls its YouTube", async () => {
   const invite = createInvite(connection());
   const opened = await handle(request(`/invite/${invite}`));
