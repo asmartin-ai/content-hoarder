@@ -1,4 +1,4 @@
-const CACHE = "ch-shell-v148";
+const CACHE = "ch-shell-v149";
 
 const SHELL = [
   "/",

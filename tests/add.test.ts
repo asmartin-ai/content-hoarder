@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { dispatch, get } from "../src/connectors/registry.ts";
 import * as db from "../src/db.ts";
-import { parseMetadata } from "../src/models.ts";
+import { newItem, parseMetadata } from "../src/models.ts";
 import { serveApp } from "../src/web.ts";
 
 const roots: string[] = [];
@@ -205,6 +205,63 @@ test("a reddit-saved.json from the bookmarklet imports as Reddit, not Twitter", 
     expect(connector.id).toBe("reddit");
     expect(connector.importFile(path).map((item) => item.source)).toEqual(["reddit"]);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Reddit's data-request CSV titles comments and never thins a richer saved row", () => {
+  const root = mkdtempSync(join(tmpdir(), "content-hoarder-reddit-csv-"));
+  const path = join(root, "saved_comments.csv");
+  const connection = db.connect(join(root, "app.db"));
+
+  try {
+    writeFileSync(
+      path,
+      "id,permalink\n" +
+        "abc123,https://www.reddit.com/r/cooking/comments/abc123/crispy_roast_potatoes/\n" +
+        "xyz789,https://www.reddit.com/r/test/comments/def456/why_cast_iron/xyz789/\n",
+    );
+    db.mergeUpsert(
+      connection,
+      newItem({
+        source: "reddit",
+        source_id: "t3_abc123",
+        kind: "post",
+        title: "Crispy roast potatoes every time",
+        url: "https://i.redd.it/potatoes.jpg",
+        metadata: { subreddit: "cooking", permalink: "/r/cooking/comments/abc123/crispy/" },
+      }),
+    );
+
+    const items = get("reddit").importFile(path);
+
+    for (const item of items) db.mergeUpsert(connection, item);
+
+    const rows = new Map(
+      connection
+        .query("SELECT fullname, title, url, metadata FROM items")
+        .all()
+        .map((row) => {
+          const parsed = z
+            .object({
+              fullname: z.string(),
+              title: z.string(),
+              url: z.string(),
+              metadata: z.string(),
+            })
+            .parse(row);
+
+          return [parsed.fullname, { ...parsed, metadata: parseMetadata(parsed.metadata) }];
+        }),
+    );
+
+    expect(rows.get("reddit:t3_abc123")?.title).toBe("Crispy roast potatoes every time");
+    expect(rows.get("reddit:t3_abc123")?.url).toBe("https://i.redd.it/potatoes.jpg");
+    expect(rows.get("reddit:t3_abc123")?.metadata.reddit_export_thin).toBeUndefined();
+    expect(rows.get("reddit:t1_xyz789")?.title).toBe("Why cast iron");
+    expect(rows.get("reddit:t1_xyz789")?.metadata.reddit_export_thin).toBe(1);
+  } finally {
+    connection.close();
     rmSync(root, { recursive: true, force: true });
   }
 });

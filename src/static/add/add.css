@@ -192,3 +192,8 @@
   color: var(--accent);
   font-weight: 600;
 }
+
+.add-more a {
+  color: var(--accent);
+  font-weight: 600;
+}

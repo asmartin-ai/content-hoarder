@@ -247,6 +247,8 @@ const tableItems = (rows: JsonRecord[], seenAt = Math.floor(Date.now() / 1000)):
 
     if (normalized.domain) metadata.domain = normalized.domain;
     metadata.saved_seen_utc = seenAt;
+
+    if (normalized.title === undefined) metadata.reddit_export_thin = 1;
     const body = String(normalized.body ?? normalized.selftext ?? "");
     const url = classifyMedia(metadata, String(normalized.url ?? ""), permalink, body, kind);
 
@@ -255,7 +257,7 @@ const tableItems = (rows: JsonRecord[], seenAt = Math.floor(Date.now() / 1000)):
         source: "reddit",
         source_id: id,
         kind,
-        title: String(normalized.title ?? (kind === "post" ? titleFrom(permalink) : "")),
+        title: String(normalized.title ?? titleFrom(permalink)),
         body,
         url,
         author: String(normalized.author ?? ""),

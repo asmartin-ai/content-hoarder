@@ -145,6 +145,7 @@ export const MetadataSchema = z
     decay_label: _optionalString,
     karakeep_id: _optionalString,
     saved_seen_utc: _optionalNumber,
+    reddit_export_thin: _optionalNumber,
     body_edited_at: _optionalNumber,
     triage_score: _optionalNumber,
     triage_why: _optionalStrings,

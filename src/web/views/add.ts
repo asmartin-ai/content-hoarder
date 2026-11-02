@@ -127,6 +127,14 @@ export function renderAdd(url: URL): SafeHtml {
         <li>Open reddit.com, logged in, and click it. It only reads; a file downloads.</li>
         <li>Drop <code>reddit-saved.json</code> in the box above.</li>
       </ol>
+      <p class="add-sub add-more">
+        More than 1,000 saves? The button stops at 1,000. For all of them,
+        <a href="https://www.reddit.com/settings/data-request" target="_blank" rel="noopener"
+          >request your Reddit data</a
+        >
+        (Reddit says up to 30 days), then drop the ZIP in the box above. Cards from it show the
+        title from the link only.
+      </p>
     </section>
     <section id="add-preview" class="add-preview" hidden aria-live="polite">
       <p id="add-preview-line" class="add-preview-line"></p>

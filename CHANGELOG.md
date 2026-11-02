@@ -9,9 +9,17 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 - **Hosted mode: a library per account.** Each Google account signed in to a hosted instance
   reads and writes its own SQLite file (`data/users/<hash>.db`); `app.db` keeps only accounts,
   sessions and invites. Testers no longer see each other's items, and the privacy page says so.
+- **Add page: more than 1,000 Reddit saves.** Under the bookmarklet, a line points to Reddit's
+  data request, whose ZIP (`saved_posts.csv`, `saved_comments.csv`) the Reddit connector already
+  imports. SW cache `ch-shell-v149`.
 
 ### Fixed
 
+- Rows from Reddit's data-request CSVs only fill gaps: they no longer replace a saved item's real
+  title, link or metadata with the slug-derived ones, and they're marked `reddit_export_thin`
+  until a richer import arrives. Saved comments from the CSV get a title from the post's link
+  instead of none. A `reddit-saved.json` from the bookmarklet no longer imports as about 500
+  dead Twitter links.
 - A browser bookmarks export that contained a Hacker News or Reddit link imported only those
   links and dropped every other bookmark. Bookmarks exports are now recognised first.
 - **Security:** imported items never keep a `javascript:`/`data:`/`vbscript:` URL, and the

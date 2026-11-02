@@ -906,9 +906,12 @@ function mergeOnto(
 ): void {
   const merged: RawItem = { ...existing };
   const emd = parseMetadata(existing.metadata);
+  const thin = Boolean(incomingMd.reddit_export_thin);
 
   for (const field of _OVERLAY_FIELDS) {
     if (field === "body" && emd.body_edited_at) continue;
+
+    if (thin && existing[field]) continue;
 
     if (item[field]) merged[field] = item[field];
   }
@@ -923,6 +926,8 @@ function mergeOnto(
 
   for (const [key, value] of Object.entries(incomingMd)) {
     if (_USER_STATE_METADATA_KEYS.has(key) && key in emd) continue;
+
+    if (thin && (key in emd || key === "reddit_export_thin")) continue;
 
     if (key === "tags" && incomingCategory) {
       const tags = tagList(emd.tags);
@@ -946,6 +951,8 @@ function mergeOnto(
 
     emd[key] = value;
   }
+
+  if (!thin) delete emd.reddit_export_thin;
 
   let finalMd = emd;
 
