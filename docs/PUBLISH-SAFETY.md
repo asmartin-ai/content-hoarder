@@ -9,7 +9,10 @@ defines the boundary and the repeatable check to run before publication.
 content-hoarder is **private-canonical with a rebuilt public copy**. Canonical history lives in
 `asmartin-ai/content-hoarder-private` (remote `private`). The public repo
 (`asmartin-ai/content-hoarder`, remote `origin`) is rebuilt from private `main` with every author
-identity mapped to the GitHub no-reply address and private-only paths removed, then force-pushed.
+identity mapped to the GitHub no-reply address and private-only paths removed, then pushed
+fast-forward. There is exactly one publish path: build the candidate in `/tmp`, scan its full
+history, then push it with an explicit URL. The canonical checkout's `origin` push URL is
+disabled (`DISABLED-use-publish-mirror`), so a push by habit fails instead of publishing.
 The sensitive material it touches (live DBs, Takeout dumps, NSFW rule lists, exports and
 saved-content text) is also **gitignored at the path level**. Run the Bun checker on the rebuilt
 tree, not on this one, before every publication.
@@ -83,8 +86,7 @@ public tree (a `/tmp` clone), because the private tree still contains the exclud
 # Working tree only (fast; always run before push)
 bun run scripts/publish_safety_check.ts
 
-# Include git blob history (slower; run before any force-push / history rewrite
-# or the first publish of a fresh public mirror)
+# Include git blob history (slower; required before every publish)
 bun run scripts/publish_safety_check.ts --history
 ```
 
@@ -115,10 +117,16 @@ Test source files are excluded from the credential scan because they contain del
 credential-shaped fixtures — but **not** from the identifier scan. Serialized files under
 `tests/fixtures/` are scanned by both.
 
-## Refreshing the public repo
+## Publishing the public repo
 
-Back up the current public mirror first, then rebuild from private `main` in `/tmp`. Commit
-messages are rewritten by `--message-callback`, because `--replace-text` only touches blobs.
+Build the candidate in `/tmp`, scan it, then push it. Commit messages are rewritten by
+`--message-callback`, because `--replace-text` only touches blobs. The filter passes are
+deterministic: rebuilding from private `main` reproduces every published commit verbatim and
+appends the new ones on top, so the candidate stays a fast-forward of public `main`.
+
+**Never push from the canonical checkout** — its `origin` push URL is disabled on purpose. A
+push that is not a fast-forward means the build lost commits: stop and investigate instead of
+forcing.
 
 ```sh
 git -C <public-clone> bundle create /tmp/content-hoarder-public-before.bundle --all
@@ -147,7 +155,22 @@ return message'
 git log --format='%an|%ae|%cn|%ce' | sort -u   # only no-reply identities
 bun install --frozen-lockfile && bun run check
 bun run scripts/publish_safety_check.ts --history
+gitleaks git --redact --no-banner .
+git fetch origin main
+git merge-base --is-ancestor origin/main HEAD || { echo "not a fast-forward"; exit 1; }
+git push https://x-access-token:"$(GH_TOKEN= gh auth token -u asmartin-ai)"@github.com/asmartin-ai/content-hoarder.git HEAD:main
 ```
+
+The scans that must be clean before the push line runs:
+
+1. `bun run check` — tests and the Bun publish checker on the rebuilt tree.
+2. `scripts/publish_safety_check.ts --history` — private denylist terms, personal paths, and
+   credential patterns over every blob. Terms come from
+   `~/.config/content-hoarder/publish-denylist.txt`; identity and path rewrites come from
+   `public-replace.txt` / `public-message-replace.txt`. The shared private denylist
+   `~/.config/git/publish-denylist.txt` is the same list for every repo.
+3. `gitleaks git` — config auto-detected from `.gitleaks.toml`: default rules plus the repo
+   allowlist for documented fixtures. Expect `no leaks found`; never publish with findings.
 
 `public-replace.txt` and `public-message-replace.txt` (git filter-repo `Old==>New` rules, one per
 line, no comments, longest `Old` first) live outside the repo because their rules name what they
@@ -155,10 +178,20 @@ hide: the owner handle in both cases, the personal contact address, the real nam
 workstation paths, and the Tailscale address a historical test used as a `Host` header (rewritten
 to TEST-NET-1, RFC 5737). Keep both files at mode `0600`.
 
-A `git push --force` of `main` does not clean the rest of GitHub: side branches, archive tags,
-`refs/pull/*` and issue/PR text keep the old material until they are deleted, rewritten or edited.
-A force-push also doesn't remove what was public before — GitHub keeps old commits reachable by SHA,
-and forks keep their history.
+The push URL names the `asmartin-ai` account explicitly because `gh` is authenticated as that
+account, while the git credential helper resolves to a different one. Pass the token through the
+URL, never on the command line as a separate argument, and redact it from any captured output.
+
+What the push does **not** clean: side branches, archive tags, `refs/pull/*` and issue/PR text keep
+the old material until they are deleted, rewritten or edited, and GitHub keeps old commits
+reachable by SHA after any rewrite. Deleting the branch tip is not a removal.
+
+## CI gate
+
+`.github/workflows/leak-scan.yml` runs on every push and PR in the public repo: the gitleaks action
+for the pushed commits, then a `gitleaks git` pass over every commit (`fetch-depth: 0`), with
+`.gitleaks.toml` as the allowlist for documented fixtures, plus a tracked-file scan for personal
+machine paths and Tailscale addresses. The allowlist holds fixture paths only — no denylist terms.
 
 ## Open decisions (deferred to user)
 
@@ -166,13 +199,3 @@ and forks keep their history.
    posture is GitHub-only. Escalate only if the user wants redundancy.
 2. **Sign tags / releases** — not currently done. Add if the user wants
    verifiable provenance.
-
-## Concrete next action
-
-Add `bun run scripts/publish_safety_check.ts` to whatever runs before `git push`
-of the public mirror (pre-push hook or the user's manual checklist). A pre-push hook:
-
-```bash
-# .git/hooks/pre-push (chmod +x)
-exec bun run scripts/publish_safety_check.ts || exit 1
-```

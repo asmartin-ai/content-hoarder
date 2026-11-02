@@ -1,0 +1,16 @@
+title = "public leak scan"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "deliberate credential fixtures in detector tests"
+paths = [
+  '''^tests/publish_safety\.test\.ts$''',
+  '''^tests/test_publish_safety\.py$''',
+]
+
+[[allowlists]]
+description = "backlog epic keys that trip generic-api-key entropy"
+regexTarget = "line"
+regexes = ['''"key": "epic-[a-z0-9-]+"''']
