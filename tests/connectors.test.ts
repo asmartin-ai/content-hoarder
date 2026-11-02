@@ -252,6 +252,7 @@ test("all offline import connectors shape normalized source items", () => {
     firefox_captured_at: 1700000000,
   });
   expect(allConnectors().map((connector) => connector.id)).toEqual([
+    "bookmarks",
     "twitter",
     "reddit",
     "youtube",
@@ -260,7 +261,6 @@ test("all offline import connectors shape normalized source items", () => {
     "keep",
     "firefox",
     "twitch",
-    "bookmarks",
     "links",
   ]);
 });

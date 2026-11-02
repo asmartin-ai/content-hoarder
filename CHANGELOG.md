@@ -6,6 +6,8 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- A browser bookmarks export that contained a Hacker News or Reddit link imported only those
+  links and dropped every other bookmark. Bookmarks exports are now recognised first.
 - **Security:** imported items never keep a `javascript:`/`data:`/`vbscript:` URL, and the
   Library, reader, relay, lightbox and share refuse one already stored. In hosted mode one tester's
   import could otherwise run script in every tester's session.

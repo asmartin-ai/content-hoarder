@@ -14,6 +14,7 @@ import { YouTubeConnector } from "./youtube.ts";
 export type { BaseConnector, ImportResult } from "./base.ts";
 
 const CONNECTORS: BaseConnector[] = [
+  new BookmarksConnector(),
   new TwitterConnector(),
   new RedditConnector(),
   new YouTubeConnector(),
@@ -22,7 +23,6 @@ const CONNECTORS: BaseConnector[] = [
   new KeepConnector(),
   new FirefoxConnector(),
   new TwitchConnector(),
-  new BookmarksConnector(),
   new LinksConnector(),
 ];
 

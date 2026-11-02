@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { get } from "../src/connectors/registry.ts";
+import { dispatch, get } from "../src/connectors/registry.ts";
 import * as db from "../src/db.ts";
 import { parseMetadata } from "../src/models.ts";
 import { serveApp } from "../src/web.ts";
@@ -144,4 +144,28 @@ test("pasted links preview and then land in an empty library", async () => {
     expect(committed.imported).toBe(2);
     expect(await (await fetch(`${base}/hx/today/upnext?n=10`)).text()).toContain("Clear 10");
   });
+});
+
+test("a bookmarks export with Hacker News and Reddit links still imports every bookmark", () => {
+  const root = mkdtempSync(join(tmpdir(), "content-hoarder-bookmarks-"));
+  const path = join(root, "bookmarks.html");
+
+  try {
+    writeFileSync(
+      path,
+      readFileSync(join(import.meta.dir, "fixtures", "bookmarks-chrome.html"), "utf8").replace(
+        '<DT><A HREF="javascript:alert(1)"',
+        '<DT><A HREF="https://news.ycombinator.com/item?id=1" ADD_DATE="1">HN</A>\n' +
+          '<DT><A HREF="https://www.reddit.com/r/test/comments/abc/x/" ADD_DATE="1">R</A>\n' +
+          '<DT><A HREF="javascript:alert(1)"',
+      ),
+    );
+
+    const connector = dispatch(path);
+
+    expect(connector.id).toBe("bookmarks");
+    expect(connector.importFile(path).length).toBe(5);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
