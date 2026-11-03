@@ -7,36 +7,53 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: leak-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gitleaks:
     name: gitleaks full history
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: "false"
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
           GITLEAKS_ENABLE_SUMMARY: "false"
-      - name: Scan every commit
+      - name: Scan complete history with redaction
         run: gitleaks git --redact --no-banner .
 
   personal-paths:
     name: personal path patterns
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       PERSONAL_PATH_RE: '(^|[^A-Za-z0-9_./-])/home/[a-z]|C:\\Users\\|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.'
-      PERSONAL_PATH_EXCLUDE: :(exclude).github/workflows/leak-scan.yml :(exclude)docs/PUBLISH-SAFETY.md :(exclude)scripts/publish_safety_check.ts :(exclude)tests/publish_safety.test.ts :(exclude)src/_http.ts :(exclude)tests/http.test.ts
     steps:
-      - uses: actions/checkout@v6
-      - name: Scan tracked files
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Scan tracked files without printing matches
+        shell: bash
         run: |
-          matches=$(git grep -nIE "$PERSONAL_PATH_RE" -- . $PERSONAL_PATH_EXCLUDE || true)
-          if [ -n "$matches" ]; then
-            printf '%s\n' "$matches"
-            echo "::error::personal path pattern found in tracked files; scrub it or add a documented exclusion"
-            exit 1
-          fi
+          set +e
+          git grep -lIE "$PERSONAL_PATH_RE" -- . \
+            ':(exclude).github/workflows/leak-scan.yml' \
+            ':(exclude)docs/PUBLISH-SAFETY.md' \
+            ':(exclude)scripts/publish_safety_check.ts' \
+            ':(exclude)tests/publish_safety.test.ts' \
+            ':(exclude)src/_http.ts' \
+            ':(exclude)tests/http.test.ts'
+          status=$?
+          set -e
+          if [ "$status" -eq 1 ]; then exit 0; fi
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          echo '::error::personal path pattern found in tracked files; scrub it or add a documented exclusion'
+          exit 1
