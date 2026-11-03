@@ -121,7 +121,7 @@ Opening items, the inline reader, triaging from inside it.
 
 ## Story 6 — "I open the app and clear a round" (`/` Today → `/clear`)
 
-The front door and the one-card-at-a-time round (spec: `docs/design/clear-overhaul.md`).
+The front door and the one-card-at-a-time round.
 
 - [ ] **Today** shows the day title, the fanned hand of the next round's cards over the "Clear 10"
       hero (tapping the hand also starts it), the 5/10/25 picker, today's count in the pebble ring +

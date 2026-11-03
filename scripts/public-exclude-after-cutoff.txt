@@ -1,0 +1,17 @@
+.agents/
+.claude/
+.impeccable/
+docs/design/clear-overhaul.md
+docs/design/clear-v2.md
+docs/design/deck-pass.md
+docs/design/hooks.md
+docs/design/inline-reddit-reader/
+docs/reddit-derisking.md
+docs/search-operators-spec.md
+docs/taxonomy.md
+docs/reddit-management.md
+scripts/wp1_p13_defense_review.py
+scripts/gen_sandbox_fixtures.py
+scripts/flag_dead_gfycat.py
+requirements.txt
+uv.lock

@@ -14,7 +14,7 @@ Offline PWA (service worker + manifest) ships.
 
 - Bun + TypeScript 7, SQLite via `bun:sqlite`, Zod validation, HTML/CSS and static ES modules. Local-first; no Node backend or web framework.
 - Media archival, scans, YouTube recovery use native TypeScript/HTTP/ffmpeg integrations; do not add a Python sidecar or yt-dlp dependency.
-- Run: `bun run src/cli.ts <cmd>` (or `bun run start -- <cmd>`). Full command set + flags: see the README CLI table. Web default `127.0.0.1:8788`.
+- Run: `bun run src/cli.ts <cmd>` (or `bun run start -- <cmd>`). Full command set + flags: see `docs/cli.md`. Web default `127.0.0.1:8788`.
 - Install: `bun install --frozen-lockfile`. Checks: `bun run check` (typecheck, lint, format check, offline Bun tests).
 - Tests use synthetic data, temporary/in-memory SQLite, and loopback fixtures; keep them offline and deterministic. Never contact live sync/unsave/archive/publish services or write to the user's database. `bunfig.toml` preloads `tests/preload.ts`, which sets `CONTENT_HOARDER_OFFLINE=1`; a test that needs the URL guard to pass a public host wraps that part in `withOnline` from `tests/network.ts` and injects its transport.
 - Browser/PWA acceptance uses a synthetic database and local server: start it with `scripts/demo.sh`, which sets `CONTENT_HOARDER_OFFLINE=1`. With that set, `safeFetchUrl` refuses every non-loopback host and Reddit hydration returns `offline` before any request. Never point browser smoke tests at the user's database, run them without offline mode, or enable autosync.
@@ -111,9 +111,7 @@ live in **`docs/IMPORTING.md`**. One gotcha worth keeping here: Materialistic `M
 via `adb backup`, **not** `adb pull`.
 
 ## Triage UI / mobile
-- **Three rooms** (v2 spec: `docs/design/clear-v2.md`; visuals: `docs/design/deck-pass.md` — card
-  `--hue` paper, Bricolage `--font-display` on Today/Clear only; motion is transform/opacity only and
-  input never waits on animation — §3 there; v1 background: `clear-overhaul.md`). Today `/`
+- **Three rooms**: card `--hue` paper, Bricolage `--font-display` on Today/Clear only; motion is transform/opacity only and input never waits on animation. Today `/`
   and Clear `/clear` are **server-rendered** TS views (`src/web/views/*`, `handlers/today.ts`,
   `handlers/clear.ts`) using vendored htmx (`static/vendor/htmx.min.js`) for Today's partials
   (`/hx/today/*`, `/hx/sweeps/*`, `/hx/whisper/*`). Cards are rendered once, on the server, by
@@ -162,13 +160,11 @@ unsaving an already-unsaved item is a Reddit no-op). `merge_upsert` preserves `i
 re-imports (gotcha #2). Run `reddit-unsave --drain` against a **COPY** of `data/app.db` first (it
 mutates real Reddit state).
 
-## Reddit management view (`/reddit`)
-The RSM view folds over the generic `items` table (no schema change — Reddit fields live in
-`metadata`, flattened by `web._reddit_view`). **Full notes: `docs/reddit-management.md`.** Two
-invariants worth keeping in-reach: (1) thread trees live in the `reddit_threads` side table, *not*
-`metadata` (blobs are large, parsed every row read); (2) `migrate-rsm-threads` and `firefox_youtube`
-write via db helpers → exempt from "connectors never touch the DB" (they are NOT connectors).
-See `docs/reddit-management.md` + `docs/reddit-derisking.md` before resuming Reddit work.
+## Reddit in the Library
+`/reddit` redirects to the Reddit-filtered Library. Reddit fields live in item `metadata`.
+Thread trees live in the `reddit_threads` side table, *not* `metadata` (blobs are large and parsed
+on every row read). `migrate-rsm-threads` and `firefox_youtube` write via DB helpers and are exempt
+from "connectors never touch the DB" because they are not connectors.
 
 ## Hard rules
 - Never commit `*.db`, exports, Takeout dumps, or `.env`. Only synthetic fixtures.
