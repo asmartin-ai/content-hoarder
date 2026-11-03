@@ -190,7 +190,9 @@ reachable by SHA after any rewrite. Deleting the branch tip is not a removal.
 
 `.github/workflows/leak-scan.yml` runs on every push and PR in the public repo: the gitleaks action
 for the pushed commits, then a `gitleaks git` pass over every commit (`fetch-depth: 0`), plus a
-tracked-file scan for personal machine paths and Tailscale addresses.
+tracked-file scan for personal machine paths and Tailscale addresses. The path scan skips
+`src/_http.ts` and `tests/http.test.ts`: they hold the SSRF blocklist, which must name the
+`100.64.0.0/10` range and test addresses inside it.
 
 `.gitleaks.toml` allowlists two things only: the two publication-safety test files (they commit
 deliberate synthetic credentials) and the `"key": "epic-…"` backlog id that trips

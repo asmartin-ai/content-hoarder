@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
+import { isIP } from "node:net";
 import {
   closeSync,
   mkdirSync,
@@ -17,7 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import * as config from "./config.ts";
-import { safeFetchUrl } from "./_http.ts";
+import { isPublicAddress, safeFetchUrl } from "./_http.ts";
 import {
   DEFAULT_MAX_VIDEO_BYTES,
   DEFAULT_VIDEO_TIMEOUT,
@@ -96,49 +96,6 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const dnsLookup: HostResolver = async (hostname) =>
   (await lookup(hostname, { all: true })).map((entry) => entry.address);
-
-const privateAddresses = new BlockList();
-
-for (const [network, prefix] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 11],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["198.51.100.0", 24],
-  ["203.0.113.0", 24],
-  ["224.0.0.0", 4],
-  ["240.0.0.0", 4],
-] as const)
-  privateAddresses.addSubnet(network, prefix, "ipv4");
-
-for (const [network, prefix] of [
-  ["fe80::", 10],
-  ["fc00::", 7],
-  ["ff00::", 8],
-  ["2001:db8::", 32],
-] as const)
-  privateAddresses.addSubnet(network, prefix, "ipv6");
-
-function isPublicAddress(address: string): boolean {
-  const kind = isIP(address);
-
-  if (kind === 0) return false;
-
-  if (kind === 6) {
-    const mapped = /^::ffff:(.+)$/i.exec(address);
-
-    if (mapped && isIP(mapped[1] ?? "") === 4) return isPublicAddress(mapped[1] ?? "");
-
-    if (address === "::" || address === "::1") return false;
-  }
-
-  return !privateAddresses.check(address, kind === 4 ? "ipv4" : "ipv6");
-}
 
 class VideoExportError extends Error {
   code: string;

@@ -13,6 +13,7 @@ const _LOCALHOST_NAMES = {
 const _IPV4_BLOCKED: ReadonlyArray<readonly [string, number]> = [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
   ["127.0.0.0", 8],
   ["169.254.0.0", 16],
   ["172.16.0.0", 12],
@@ -27,6 +28,8 @@ const _IPV4_BLOCKED: ReadonlyArray<readonly [string, number]> = [
 
 const _blockedIps = new BlockList();
 
+const _blockedIpv6 = new BlockList();
+
 const _mappedIpv4 = new BlockList();
 
 _mappedIpv4.addSubnet("::ffff:0:0", 96, "ipv6");
@@ -40,7 +43,19 @@ for (const [network, prefix] of [
   ["ff00::", 8],
   ["2001:db8::", 32],
 ] as const)
-  _blockedIps.addSubnet(network, prefix, "ipv6");
+  _blockedIpv6.addSubnet(network, prefix, "ipv6");
+
+export function isPublicAddress(address: string): boolean {
+  const kind = isIP(address);
+
+  if (kind === 0) return false;
+
+  if (kind === 4) return !_blockedIps.check(address, "ipv4");
+
+  if (address === "::" || address === "::1" || _mappedIpv4.check(address, "ipv6")) return false;
+
+  return !_blockedIpv6.check(address, "ipv6");
+}
 
 export function safeFetchUrl(
   url: string,
@@ -95,11 +110,7 @@ export function safeFetchUrl(
 
   if (kind === 4 && rawHost !== hostClean) return [false, "blocked_host"];
 
-  if (kind === 6 && _mappedIpv4.check(host, "ipv6")) return [false, "blocked_host"];
-
-  return _blockedIps.check(host, kind === 4 ? "ipv4" : "ipv6")
-    ? [false, "blocked_host"]
-    : [true, "ok"];
+  return isPublicAddress(host) ? [true, "ok"] : [false, "blocked_host"];
 }
 
 export class HttpError extends Error {

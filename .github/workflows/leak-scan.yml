@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PERSONAL_PATH_RE: '(^|[^A-Za-z0-9_./-])/home/[a-z]|C:\\Users\\|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.'
-      PERSONAL_PATH_EXCLUDE: :(exclude).github/workflows/leak-scan.yml :(exclude)docs/PUBLISH-SAFETY.md :(exclude)scripts/publish_safety_check.ts :(exclude)tests/publish_safety.test.ts
+      PERSONAL_PATH_EXCLUDE: :(exclude).github/workflows/leak-scan.yml :(exclude)docs/PUBLISH-SAFETY.md :(exclude)scripts/publish_safety_check.ts :(exclude)tests/publish_safety.test.ts :(exclude)src/_http.ts :(exclude)tests/http.test.ts
     steps:
       - uses: actions/checkout@v6
       - name: Scan tracked files

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { request, safeFetchUrl } from "../src/_http.ts";
+import { isPublicAddress, request, safeFetchUrl } from "../src/_http.ts";
 import { withOnline } from "./network.ts";
 
 test("local LLM transport opt-in permits only exact HTTP loopback origins", () => {
@@ -55,4 +55,22 @@ test("HTTP requests to IPv6 loopback need explicit opt-in", async () => {
   } finally {
     server.stop(true);
   }
+});
+
+test("the URL guard refuses literal CGNAT addresses", () =>
+  withOnline(() => {
+    expect(safeFetchUrl("http://100.100.1.2/")).toEqual([false, "blocked_host"]);
+    expect(safeFetchUrl("http://100.64.0.1/")).toEqual([false, "blocked_host"]);
+    expect(safeFetchUrl("http://100.127.255.255/")).toEqual([false, "blocked_host"]);
+  }));
+
+test("isPublicAddress rejects CGNAT, mapped CGNAT and loopback, accepts the next range", () => {
+  expect(isPublicAddress("100.64.0.1")).toBe(false);
+  expect(isPublicAddress("100.127.255.255")).toBe(false);
+  expect(isPublicAddress("100.128.0.1")).toBe(true);
+  expect(isPublicAddress("::ffff:100.64.0.1")).toBe(false);
+  expect(isPublicAddress("::")).toBe(false);
+  expect(isPublicAddress("::1")).toBe(false);
+  expect(isPublicAddress("8.8.8.8")).toBe(true);
+  expect(isPublicAddress("not-an-ip")).toBe(false);
 });
