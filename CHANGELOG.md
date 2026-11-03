@@ -59,6 +59,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- **Spoiler images imported blurry.** Reddit's saved JSON can carry a blurred spoiler preview
+  (`?blur=40`) where the direct `i.redd.it` image is sharp. Imports now prefer the sharp image,
+  remember `metadata.spoiler`, and every preview surface (Library thumbnail and cards, reader
+  media, Clear cards) veils a spoiler behind the same tap-to-reveal used for NSFW, with NSFW
+  taking precedence when both apply. Existing libraries are backfilled from their stored Reddit
+  JSON on open; a blurred thumbnail reveals the item's sharp source when one is known.
 - **The Library stopped at 50 items.** Infinite scroll never loaded a second page, so a library
   of 1,000 saves looked like 50. Pages are also deduped, and triaging an item no longer shifts
   the next page by one.

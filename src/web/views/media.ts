@@ -1,6 +1,7 @@
 import * as z from "zod";
 import type { Item } from "../../models.ts";
 import { isRemovedText } from "../../static/core/util.js";
+import { sharpImage } from "../../static/core/veil.js";
 
 export type CardMedia = {
   kind: "image" | "gallery" | "video" | "youtube" | "link";
@@ -46,19 +47,19 @@ function directImg(url: string | undefined): boolean {
   return IMG_EXT.test(url ?? "") || /i\.redd\.it\//i.test(url ?? "");
 }
 
-function usableThumb(url: string | undefined): string {
-  const value = (url ?? "").trim();
+function usableThumb(item: Item, url: string | undefined): string {
+  const value = sharpImage(item, (url ?? "").trim());
 
   return value && !THUMB_SENTINEL.test(value) ? safeUrl(value) : "";
 }
 
 function galleryThumb(item: Item): string {
   const md = item.metadata;
-  const preview = safeUrl(md.gallery_preview?.[0]);
+  const preview = safeUrl(sharpImage(item, md.gallery_preview?.[0] ?? ""));
 
   if (preview) return preview;
 
-  return safeUrl(md.gallery?.[0]);
+  return safeUrl(sharpImage(item, md.gallery?.[0] ?? ""));
 }
 
 function archivedUrl(item: Item, url: string): string {
@@ -77,14 +78,14 @@ function imageUrl(item: Item): string {
   const md = item.metadata;
   const extra = extraMeta(item);
 
-  if (directImg(item.url)) return safeUrl(item.url);
+  if (directImg(item.url)) return safeUrl(sharpImage(item, item.url));
 
-  if (directImg(extra.media_url)) return safeUrl(extra.media_url);
+  if (directImg(extra.media_url)) return safeUrl(sharpImage(item, extra.media_url));
   const first = (extra.media_urls ?? []).find((url) => directImg(url));
 
-  if (first) return safeUrl(first);
+  if (first) return safeUrl(sharpImage(item, first));
 
-  return md.media_type === "image" ? safeUrl(extra.media_url) : "";
+  return md.media_type === "image" ? safeUrl(sharpImage(item, extra.media_url ?? "")) : "";
 }
 
 function youtubeId(item: Item): string {
@@ -185,7 +186,7 @@ export function cardMedia(item: Item): CardMedia | null {
 
   if (evidence === "youtube") {
     const id = youtubeId(item);
-    const thumb = usableThumb(md.thumbnail);
+    const thumb = usableThumb(item, md.thumbnail);
 
     const src = thumb
       ? YT_IMAGE.test(thumb)
@@ -212,7 +213,7 @@ export function cardMedia(item: Item): CardMedia | null {
   }
 
   if (evidence === "video") {
-    const poster = usableThumb(md.thumbnail) || galleryThumb(item);
+    const poster = usableThumb(item, md.thumbnail) || galleryThumb(item);
 
     if (!poster) return null;
 
@@ -230,7 +231,7 @@ export function cardMedia(item: Item): CardMedia | null {
   }
 
   if (evidence === "gallery") {
-    const src = galleryThumb(item) || usableThumb(md.thumbnail);
+    const src = galleryThumb(item) || usableThumb(item, md.thumbnail);
 
     if (!src) return null;
     const count = md.gallery?.length || md.gallery_preview?.length || 0;
@@ -243,14 +244,14 @@ export function cardMedia(item: Item): CardMedia | null {
   }
 
   if (evidence === "image") {
-    const src = imageUrl(item) || usableThumb(md.thumbnail);
+    const src = imageUrl(item) || usableThumb(item, md.thumbnail);
 
     return src ? withFallback(item, { kind: "image", src }) : null;
   }
 
   if (evidence === "link") {
     const src =
-      usableThumb(md.thumbnail) ||
+      usableThumb(item, md.thumbnail) ||
       (item.source === "hackernews" ? safeUrl(extraMeta(item).og_image) : "");
 
     if (!src) return null;
@@ -263,14 +264,14 @@ export function cardMedia(item: Item): CardMedia | null {
     return withFallback(item, media);
   }
 
-  const thumb = usableThumb(md.thumbnail);
+  const thumb = usableThumb(item, md.thumbnail);
 
   return thumb ? withFallback(item, { kind: "image", src: thumb }) : null;
 }
 
 export function thumbFor(item: Item): string {
   const md = item.metadata;
-  let thumb = usableThumb(md.thumbnail);
+  let thumb = usableThumb(item, md.thumbnail);
 
   if (!thumb && item.source === "hackernews") thumb = safeUrl(extraMeta(item).og_image);
 

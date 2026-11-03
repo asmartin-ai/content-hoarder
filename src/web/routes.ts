@@ -55,6 +55,8 @@ import {
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import { clearHints, clearPage, deal } from "./handlers/clear.ts";
 import { addPage, pullStatus } from "./handlers/add.ts";
+import { youtubeRoute } from "./handlers/youtube.ts";
+import { handleVideoExport, handleVideoPrepare } from "./handlers/video.ts";
 import { homePage } from "./handlers/home.ts";
 import {
   googleCallback,
@@ -142,11 +144,19 @@ async function route(request: Request): Promise<Response> {
 
   if (!hostedOrigin()) return appRoute(request);
 
-  const hosted = await hostedRoute(request, request.method, new URL(request.url).pathname);
+  const path = new URL(request.url).pathname;
+
+  const hosted = await hostedRoute(request, request.method, path);
 
   if (hosted) return hosted;
 
   const sub = sessionSub(mainConnection(), request);
+
+  if (sub) {
+    const youtube = await youtubeRoute(request, sub, request.method, path);
+
+    if (youtube) return youtube;
+  }
 
   return sub ? withLibrary(libraryConnection(sub), () => appRoute(request)) : appRoute(request);
 }
@@ -226,7 +236,7 @@ async function appRoute(request: Request): Promise<Response> {
 
   if (method === "GET" && path === "/clear") return clearPage();
 
-  if (method === "GET" && path === "/add") return addPage();
+  if (method === "GET" && path === "/add") return addPage(request, url);
 
   if (method === "GET" && path === "/settings") return settingsPage();
 
@@ -270,6 +280,34 @@ async function appRoute(request: Request): Promise<Response> {
       );
 
       return json({ items: rows.slice(0, count - 1), has_more: rows.length >= count });
+    }
+
+    const videoMatch = /^\/(?:api\/)?(?:reddit\/)?items\/(.+?)\/video\.mp4$/.exec(path);
+
+    if ((method === "GET" || method === "HEAD") && videoMatch) {
+      let fullname: string;
+
+      try {
+        fullname = decodeURIComponent(videoMatch[1] ?? "");
+      } catch {
+        return json({ error: "not_found" }, 404);
+      }
+
+      return handleVideoExport(request, fullname);
+    }
+
+    const videoPrepareMatch = /^\/(?:api\/)?(?:reddit\/)?items\/(.+?)\/video\/prepare$/.exec(path);
+
+    if (method === "POST" && videoPrepareMatch) {
+      let fullname: string;
+
+      try {
+        fullname = decodeURIComponent(videoPrepareMatch[1] ?? "");
+      } catch {
+        return json({ error: "not_found" }, 404);
+      }
+
+      return handleVideoPrepare(fullname);
     }
 
     const itemRoute = requestItem(path);

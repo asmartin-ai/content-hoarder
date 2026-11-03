@@ -182,7 +182,7 @@ function urlsFor(metadata: Metadata, scope: MediaScope): string[] {
   return [...new Set(urls)];
 }
 
-function videoCandidate(
+export function redditVideoCandidate(
   fullname: string,
   itemUrl: string,
   metadata: Metadata,
@@ -308,6 +308,13 @@ async function probeAudio(path: string, timeoutMs: number): Promise<boolean> {
   return code === 0 && output.trim().length > 0;
 }
 
+export function redditVideoPlaylists(candidate: VideoCandidate) {
+  return {
+    hls: `${candidate.canonical_url}/HLSPlaylist.m3u8`,
+    dash: `${candidate.canonical_url}/DASHPlaylist.mpd`,
+  };
+}
+
 export async function defaultVideoDownloader(
   candidate: VideoCandidate,
   tempDir: string,
@@ -318,8 +325,7 @@ export async function defaultVideoDownloader(
   if (!ffmpeg) return [null, "missing_ffmpeg"];
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_VIDEO_BYTES;
   const timeout = (opts.timeout ?? DEFAULT_VIDEO_TIMEOUT) * 1000;
-  const playlist = `${candidate.canonical_url}/HLSPlaylist.m3u8`;
-  const dash = `${candidate.canonical_url}/DASHPlaylist.mpd`;
+  const { hls: playlist, dash } = redditVideoPlaylists(candidate);
 
   const inputUrls = [
     ...new Set(
@@ -456,7 +462,7 @@ export async function archiveMedia(
       const archive: Record<string, JsonValue> = parsedArchive.success ? parsedArchive.data : {};
 
       if (scope === "videos") {
-        const candidate = videoCandidate(row.fullname, row.url, metadata);
+        const candidate = redditVideoCandidate(row.fullname, row.url, metadata);
 
         if (!candidate) continue;
 

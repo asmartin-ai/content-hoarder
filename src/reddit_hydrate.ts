@@ -358,6 +358,19 @@ function postFromBlob(threadJson: string): Record<string, JsonValue> | null {
   }
 }
 
+function syncSpoilerFlag(
+  database: Database,
+  post: Record<string, JsonValue> | null | undefined,
+  fullname: string,
+  permalink: string | null | undefined,
+): void {
+  if (!post || post.spoiler === undefined || post.spoiler === null) return;
+
+  db.patchItemMetadata(database, submissionFullname(permalink) || fullname, {
+    spoiler: post.spoiler ? 1 : 0,
+  });
+}
+
 function galleryPayload(post: Record<string, JsonValue>): Metadata | null {
   const item = childToItem({ kind: "t3", data: post });
 
@@ -417,6 +430,7 @@ export async function hydrateGallery(
     if (!post) return { status: hydrateStatus, fullname };
   }
 
+  syncSpoilerFlag(database, post, fullname, metadata.permalink);
   const payload = galleryPayload(post);
 
   if (!payload?.gallery) return { status: "no_gallery", fullname };
@@ -500,6 +514,8 @@ export async function hydrateOne(
   const thumbnail = post ? previewThumb(post) : "";
 
   if (thumbnail) db.patchItemMetadata(database, fullname, { thumbnail }, { onlyIfMissing: true });
+
+  syncSpoilerFlag(database, post, fullname, metadata.permalink);
 
   return { status: "hydrated", fullname, comments };
 }
@@ -629,7 +645,15 @@ export async function hydrateIfMissing(
     ttl?: number;
   } = {},
 ): Promise<HydrateResult> {
-  if (db.getRedditThread(database, fullname)?.thread_json) return { status: "cached", fullname };
+  const cached = db.getRedditThread(database, fullname);
+
+  if (cached?.thread_json) {
+    const cachedMeta = parseMetadata(db.getItem(database, fullname)?.metadata);
+
+    syncSpoilerFlag(database, postFromBlob(cached.thread_json), fullname, cachedMeta.permalink);
+
+    return { status: "cached", fullname };
+  }
 
   if (config.offline()) return { status: "offline", fullname };
   const item = db.getItem(database, fullname);
@@ -641,6 +665,8 @@ export async function hydrateIfMissing(
 
     if (postThread?.thread_json) {
       db.setRedditThread(database, fullname, postThread.thread_json);
+
+      syncSpoilerFlag(database, postFromBlob(postThread.thread_json), fullname, metadata.permalink);
 
       return { status: "cached", fullname, via: "submission" };
     }

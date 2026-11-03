@@ -26,6 +26,18 @@ const PlaylistSnippet = z.object({
   snippet: z.object({ title: z.string().default("Playlist") }),
 });
 
+const PlaylistSummary = z.object({
+  id: z.string(),
+  snippet: z.object({ title: z.string().default("Playlist") }),
+  contentDetails: z.object({ itemCount: z.number().optional() }).optional(),
+});
+
+export interface YoutubePlaylistListing {
+  id: string;
+  title: string;
+  count: number | null;
+}
+
 const PlaylistItem = z.object({
   snippet: z.object({
     title: z.string().default(""),
@@ -61,7 +73,7 @@ export interface PulledPlaylist {
 
 const HIDDEN_TITLES = new Set(["Private video", "Deleted video"]);
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -70,21 +82,33 @@ class ApiError extends Error {
   }
 }
 
+interface Budget {
+  left: number;
+  deadline?: number;
+}
+
+function missedDeadline(deadline: number | undefined): boolean {
+  return deadline !== undefined && Date.now() >= deadline;
+}
+
+function deadlineSignal(deadline: number | undefined): AbortSignal | undefined {
+  if (deadline === undefined) return undefined;
+
+  const remaining = deadline - Date.now();
+
+  return remaining > 0 ? AbortSignal.timeout(remaining) : AbortSignal.abort();
+}
+
 async function getJson<T extends z.ZodType>(
   url: string,
   headers: Record<string, string>,
   schema: T,
+  signal?: AbortSignal,
 ): Promise<z.infer<T>> {
-  const response = await hostedFetch()(url, { headers });
+  const response = await hostedFetch()(url, { headers, signal });
 
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
-
-    throw new ApiError(
-      `${new URL(url).pathname} answered ${response.status}: ${detail}`,
-      response.status,
-    );
-  }
+  if (!response.ok)
+    throw new ApiError(`${new URL(url).pathname} answered ${response.status}`, response.status);
 
   return schema.parse(await response.json());
 }
@@ -93,12 +117,12 @@ async function youtubePages(
   token: string,
   path: string,
   params: Record<string, string>,
-  budget: { left: number },
+  budget: Budget,
 ): Promise<JsonRecord[]> {
   const out: JsonRecord[] = [];
   let pageToken = "";
 
-  while (budget.left > 0) {
+  while (budget.left > 0 && !missedDeadline(budget.deadline)) {
     const query = new URLSearchParams({ ...params, maxResults: "50" });
 
     if (pageToken) query.set("pageToken", pageToken);
@@ -110,6 +134,7 @@ async function youtubePages(
         `${YOUTUBE_API}/${path}?${query}`,
         { authorization: `Bearer ${token}` },
         YoutubePage,
+        deadlineSignal(budget.deadline),
       );
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) break;
@@ -126,21 +151,64 @@ async function youtubePages(
   return out;
 }
 
-export async function fetchYoutube(token: string): Promise<PulledPlaylist[]> {
-  const budget = { left: ITEM_CAP };
+function deadlineError(): Error {
+  return new Error("youtube deadline reached");
+}
+
+export async function listYoutubePlaylists(
+  token: string,
+  deadline?: number,
+): Promise<YoutubePlaylistListing[]> {
+  const raw = await youtubePages(
+    token,
+    "playlists",
+    { part: "snippet,contentDetails", mine: "true" },
+    { left: 500, deadline },
+  );
+
+  if (missedDeadline(deadline)) throw deadlineError();
+
+  const playlists: YoutubePlaylistListing[] = [];
+
+  for (const value of raw) {
+    const playlist = PlaylistSummary.safeParse(value);
+
+    if (!playlist.success) continue;
+
+    playlists.push({
+      id: playlist.data.id,
+      title: playlist.data.snippet.title,
+      count: playlist.data.contentDetails?.itemCount ?? null,
+    });
+  }
+
+  playlists.push({ id: "LL", title: "Liked videos", count: null });
+
+  return playlists;
+}
+
+export async function fetchYoutube(
+  token: string,
+  ids: string[],
+  deadline?: number,
+): Promise<PulledPlaylist[]> {
+  const wanted = new Set(ids);
+  const budget = { left: ITEM_CAP, deadline };
   const lists: PulledPlaylist[] = [];
 
   const playlists = await youtubePages(
     token,
     "playlists",
     { part: "snippet", mine: "true" },
-    { left: 500 },
+    { left: 500, deadline },
   );
+
+  if (missedDeadline(deadline)) throw deadlineError();
 
   for (const raw of playlists) {
     const playlist = PlaylistSnippet.safeParse(raw);
 
-    if (!playlist.success || budget.left <= 0) continue;
+    if (!playlist.success || budget.left <= 0 || !wanted.has(playlist.data.id)) continue;
 
     const items = await youtubePages(
       token,
@@ -172,7 +240,9 @@ export async function fetchYoutube(token: string): Promise<PulledPlaylist[]> {
     lists.push({ id: playlist.data.id, title: playlist.data.snippet.title, entries });
   }
 
-  if (budget.left > 0) {
+  if (missedDeadline(deadline)) throw deadlineError();
+
+  if (budget.left > 0 && wanted.has("LL")) {
     const liked = await youtubePages(
       token,
       "videos",
@@ -198,7 +268,9 @@ export async function fetchYoutube(token: string): Promise<PulledPlaylist[]> {
     lists.push({ id: "LL", title: "Liked videos", entries });
   }
 
-  return lists.filter((list) => list.entries.length);
+  if (missedDeadline(deadline)) throw deadlineError();
+
+  return lists;
 }
 
 type TwitchFollow = z.infer<typeof TwitchFollows>["data"][number];
@@ -221,16 +293,26 @@ async function importJson(db: Database, source: string, payload: PullFile): Prom
   }
 }
 
-export async function pullYoutube(db: Database, token: string): Promise<number> {
+export async function pullYoutube(
+  db: Database,
+  token: string,
+  ids: string[],
+  deadline: number,
+  onPlaylistImported: (id: string) => void = () => {},
+): Promise<number> {
+  const lists = await fetchYoutube(token, ids, deadline);
   let imported = 0;
 
-  for (const list of await fetchYoutube(token)) {
-    imported += await importJson(db, "youtube", {
-      _type: "playlist",
-      id: list.id,
-      title: list.title,
-      entries: list.entries,
-    });
+  for (const list of lists) {
+    if (list.entries.length)
+      imported += await importJson(db, "youtube", {
+        _type: "playlist",
+        id: list.id,
+        title: list.title,
+        entries: list.entries,
+      });
+
+    onPlaylistImported(list.id);
   }
 
   return imported;

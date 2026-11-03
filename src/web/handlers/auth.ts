@@ -20,11 +20,20 @@ import {
   sessionSub,
   userExists,
 } from "../../hosted.ts";
-import { pullTwitch, pullYoutube } from "../../hosted_pull.ts";
+import { ApiError, listYoutubePlaylists, pullTwitch } from "../../hosted_pull.ts";
 import { AI_FIELDS_SENT, aiProviderIsZai, aiProviderLabel } from "../../assist/consent.ts";
 import { demoAnalyticsOn } from "../../demo_analytics.ts";
 import { html, type SafeHtml } from "../views/html.ts";
-import { libraryConnection, mainConnection, notePull, startPull } from "../state.ts";
+import {
+  YOUTUBE_CHOICE_SECONDS,
+  beginYoutubeAuth,
+  failYoutubeAuth,
+  libraryConnection,
+  mainConnection,
+  notePull,
+  setYoutubeChoice,
+  startPull,
+} from "../state.ts";
 import { htmlResponse } from "../static.ts";
 
 type Provider = "google" | "twitch";
@@ -34,9 +43,13 @@ interface PendingAuth {
   verifier: string;
   returnPath: string;
   expires: number;
+  sub: string | null;
+  sequence: number;
 }
 
 const PENDING = new Map<string, PendingAuth>();
+
+let authSequence = 0;
 
 const PENDING_SECONDS = 600;
 
@@ -95,19 +108,28 @@ function notice(title: string, line: string, status: number): Response {
 interface StartedAuth {
   state: string;
   verifier: string;
+  sequence: number;
 }
 
-function begin(provider: Provider, returnPath: string): StartedAuth {
+function begin(provider: Provider, returnPath: string, sub: string | null = null): StartedAuth {
   const time = now();
 
   for (const [key, pending] of PENDING) if (pending.expires <= time) PENDING.delete(key);
 
   const state = randomBytes(24).toString("base64url");
   const verifier = randomBytes(32).toString("base64url");
+  const sequence = (authSequence += 1);
 
-  PENDING.set(state, { provider, verifier, returnPath, expires: time + PENDING_SECONDS });
+  PENDING.set(state, {
+    provider,
+    verifier,
+    returnPath,
+    expires: time + PENDING_SECONDS,
+    sub,
+    sequence,
+  });
 
-  return { state, verifier };
+  return { state, verifier, sequence };
 }
 
 function finish(request: Request, provider: Provider): PendingAuth | null {
@@ -180,8 +202,9 @@ export function privacyPage(): Response {
       <h2>What it does with it</h2>
       <ul>
         <li>
-          Each sign-in reads your lists once. The access token is used for that one pull and is not
-          stored.
+          Each sign-in reads the list of your playlists. The access token is kept in server memory
+          for up to 10 minutes while you choose playlists, is used for that one import, and is never
+          written to disk.
         </li>
         <li>
           Your items are in a library of their own on one server for this pilot. Other testers can't
@@ -232,7 +255,10 @@ export function logout(request: Request): Response {
 
 export function googleStart(request: Request): Response {
   const returnPath = safeReturn(new URL(request.url).searchParams.get("return"));
-  const { state, verifier } = begin("google", returnPath);
+  const sub = sessionSub(mainConnection(), request);
+  const { state, verifier, sequence } = begin("google", returnPath, sub);
+
+  if (sub) beginYoutubeAuth(sub, sequence);
 
   const params = new URLSearchParams({
     client_id: config.get("GOOGLE_OAUTH_CLIENT_ID").trim(),
@@ -257,9 +283,15 @@ export async function googleCallback(request: Request): Promise<Response> {
 
   if (!pending) return notice("Sign-in expired", "Start again from the link.", 400);
 
-  const code = new URL(request.url).searchParams.get("code") ?? "";
+  const url = new URL(request.url);
+  const attempt = pending.sequence;
+  const code = url.searchParams.get("code") ?? "";
 
-  if (!code) return redirect("/auth/login", [clearedCookie(OAUTH_COOKIE)]);
+  if (!code) {
+    if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+
+    return redirect("/auth/login", [clearedCookie(OAUTH_COOKIE)]);
+  }
 
   const token = await exchange("https://oauth2.googleapis.com/token", {
     code,
@@ -270,8 +302,13 @@ export async function googleCallback(request: Request): Promise<Response> {
     code_verifier: pending.verifier,
   });
 
-  if (!token) return notice("Google didn't sign you in", "Try again in a minute.", 502);
+  if (!token) {
+    if (pending.sub) failYoutubeAuth(pending.sub, attempt);
 
+    return notice("Google didn't sign you in", "Try again in a minute.", 502);
+  }
+
+  const deadline = Date.now() + YOUTUBE_CHOICE_SECONDS * 1000;
   const database = mainConnection();
   const setCookies = [clearedCookie(OAUTH_COOKIE)];
   let sub = sessionSub(database, request);
@@ -283,14 +320,20 @@ export async function googleCallback(request: Request): Promise<Response> {
 
     const user = GoogleUser.safeParse(await userResponse.json().catch(() => null));
 
-    if (!userResponse.ok || !user.success)
+    if (!userResponse.ok || !user.success) {
+      if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+
       return notice("Google didn't sign you in", "Try again in a minute.", 502);
+    }
 
     const invite = cookieValue(request, INVITE_COOKIE);
 
     if (!userExists(database, user.data.sub)) {
-      if (!invite || !claimInvite(database, invite, user.data.sub, user.data.email))
+      if (!invite || !claimInvite(database, invite, user.data.sub, user.data.email)) {
+        if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+
         return notice("Khaos is invite-only", "Ask the project owner for an invite link.", 403);
+      }
     }
 
     setCookies.push(
@@ -300,11 +343,21 @@ export async function googleCallback(request: Request): Promise<Response> {
     sub = user.data.sub;
   }
 
-  const library = libraryConnection(sub);
+  try {
+    const playlists = await listYoutubePlaylists(token, deadline);
 
-  startPull(library, "youtube", () => pullYoutube(library, token));
+    setYoutubeChoice(sub, { token, playlists, expiresAt: deadline }, attempt);
+  } catch (error) {
+    console.error(
+      `youtube playlist listing failed: ${
+        error instanceof ApiError ? `status ${error.status}` : "request failed"
+      }`,
+    );
 
-  return redirect(pending.returnPath, setCookies);
+    if (failYoutubeAuth(sub, attempt)) notePull(libraryConnection(sub), "youtube", "error");
+  }
+
+  return redirect("/add?youtube=choose", setCookies);
 }
 
 export function twitchStart(request: Request): Response {

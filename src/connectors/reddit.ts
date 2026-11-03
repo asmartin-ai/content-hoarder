@@ -41,20 +41,40 @@ const redditFieldsSchema = z.object({
   score: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
 });
 
+const BLURRED_URL = /[?&]blur=\d/i;
+
+const REDDIT_DIRECT_IMAGE = /^https?:\/\/i\.redd\.it\/[^?#]+/i;
+
+const decodedUrl = (value: JsonValue | undefined): string =>
+  looseText(value).replaceAll("&amp;", "&");
+
+const sharpDirectImage = (value: JsonValue | undefined): string => {
+  const url = decodedUrl(value);
+
+  return REDDIT_DIRECT_IMAGE.test(url) && !BLURRED_URL.test(url) ? url : "";
+};
+
 export function previewThumb(value: JsonValue): string {
   const record = looseRecord(value);
 
   if (!record) return "";
+
+  const direct = sharpDirectImage(record.url_overridden_by_dest) || sharpDirectImage(record.url);
+
+  if (direct) return direct;
   const preview = looseRecord(record.preview);
   const images = z.array(z.json()).safeParse(preview?.images);
   const first = looseRecord(images.success ? images.data.at(0) : undefined);
   const source = looseRecord(first?.source);
-  const imageUrl = z.string().safeParse(source?.url);
+  const imageUrl = decodedUrl(source?.url);
 
-  if (imageUrl.success) return imageUrl.data.replaceAll("&amp;", "&");
-  const thumbnail = looseText(record.thumbnail);
+  if (imageUrl && !BLURRED_URL.test(imageUrl)) return imageUrl;
+  const thumbnail = decodedUrl(record.thumbnail);
+  const thumbnailUrl = thumbnail.startsWith("http") ? thumbnail : "";
 
-  return thumbnail.startsWith("http") ? thumbnail : "";
+  if (thumbnailUrl && !BLURRED_URL.test(thumbnailUrl)) return thumbnailUrl;
+
+  return imageUrl || thumbnailUrl;
 }
 
 const finiteNumber = (value: string | number | null | undefined): number | null => {
@@ -184,6 +204,8 @@ export const childToItem = (
   if (permalink) metadata.permalink = permalink;
 
   if (data.over_18 !== undefined && data.over_18 !== null) metadata.over_18 = data.over_18 ? 1 : 0;
+
+  if (data.spoiler !== undefined && data.spoiler !== null) metadata.spoiler = data.spoiler ? 1 : 0;
   const thumbnail = previewThumb(data);
 
   if (thumbnail) metadata.thumbnail = thumbnail;

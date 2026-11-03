@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { NSFW_TAGS as VEIL_NSFW_TAGS } from "./static/core/veil.js";
 
 export const ITEM_FIELDS = [
   "fullname",
@@ -27,7 +28,7 @@ export const VALID_STATUSES = ["inbox", "keep", "archived", "done"] as const;
 
 export type ItemStatus = (typeof VALID_STATUSES)[number];
 
-export const NSFW_TAGS = ["nsfw_erotic", "nsfw_other", "nsfw_talk"] as const;
+export const NSFW_TAGS = VEIL_NSFW_TAGS;
 
 const _META_SEARCH_KEYS = [
   "subreddit",
@@ -140,6 +141,7 @@ export const MetadataSchema = z
     ocr_text: _optionalString,
     score: _optionalNumber,
     over_18: _optionalNumberOrBoolean,
+    spoiler: _optionalNumberOrBoolean,
     duration: _optionalNumber,
     position: _optionalNumber,
     permalink: _optionalString,

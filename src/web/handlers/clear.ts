@@ -12,7 +12,7 @@ import { html, type SafeHtml } from "../views/html.ts";
 import { icon, type IconName } from "../views/icons.ts";
 import { renderPage } from "../views/page.ts";
 import { topComment } from "../views/thread.ts";
-import { isNsfw } from "../views/today.ts";
+import { isNsfw } from "../../static/core/veil.js";
 
 const MAX_DEAL = 50;
 

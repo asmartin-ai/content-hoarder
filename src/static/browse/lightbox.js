@@ -8,12 +8,14 @@ import {
   itemCaptionHtml,
   redditUrl,
   playableVideoSrc,
+  isRedditVideoItem,
   localUrl,
   canRecoverArchiveToday,
   archiveTodayConfirmText,
   setArchivePref,
   thumb,
 } from "../core/media.js";
+import { sharpImage } from "../core/veil.js";
 import { $, state, itemsEl } from "./shared.js";
 import { reblur } from "./feed.js";
 import { readerUI } from "./instances.js";
@@ -188,7 +190,12 @@ export function openMediaFor(item, opts) {
   if (imgs.length > 1) return lightbox.openGallery(imgs, imgs, withCap(opts));
   const vsrc = playableVideoSrc(item);
 
-  if (vsrc) return lightbox.openVideo(vsrc, m.thumbnail, opts);
+  if (vsrc)
+    return lightbox.openVideo(
+      vsrc,
+      sharpImage(item, m.thumbnail),
+      Object.assign({}, opts, { videoShareItem: isRedditVideoItem(item) ? item : null }),
+    );
   const img = imageUrl(item);
 
   if (img && !(item.source === "reddit" && m.permalink))

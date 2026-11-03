@@ -1,6 +1,7 @@
 import { $, $$, state, itemsEl, nsfwRevealed, selected } from "./shared.js";
 import { attachSwipe } from "../core/swipe.js";
-import { listHtml, emptyHtml, isNsfw } from "./render.js";
+import { listHtml, emptyHtml } from "./render.js";
+import { isVeiled } from "../core/veil.js";
 import { isFastScrollScrubbing } from "./fastscroll.js";
 import { loadItems } from "./data.js";
 import { act, snooze, paintBulk, syncSelectionToVisibleItems } from "./actions.js";
@@ -93,7 +94,7 @@ export function reblur(fn) {
   nsfwRevealed.delete(fn);
   const item = state.items.find((it) => it.fullname === fn);
 
-  if (!item || !isNsfw(item)) return;
+  if (!item || !isVeiled(item)) return;
   const row = rowEl(fn);
 
   if (row) row.querySelectorAll(".monitor, .screen").forEach((el) => el.classList.add("nsfw"));

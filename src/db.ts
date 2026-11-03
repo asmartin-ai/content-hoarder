@@ -457,6 +457,7 @@ export function initDb(db: Database): void {
       "ON items(CAST(json_extract(metadata, '$.duration') AS INTEGER))",
   );
   _ensureFtsBuilt(db);
+  _ensureSpoilerFlags(db);
 }
 
 function _ensureUpdateTrigger(db: Database): void {
@@ -468,6 +469,24 @@ function _ensureUpdateTrigger(db: Database): void {
   if (existing?.sql?.includes(_AU_TRIGGER_GUARD)) return;
   db.exec("DROP TRIGGER IF EXISTS items_au");
   db.exec(_AU_TRIGGER_SQL);
+}
+
+const _SPOILER_FLAGS_VERSION = 1;
+
+function _ensureSpoilerFlags(db: Database): void {
+  const marker =
+    Number.parseInt(String(getSetting(db, "spoiler_flags_built", "0") ?? "0"), 10) || 0;
+
+  if (marker >= _SPOILER_FLAGS_VERSION) return;
+
+  db.exec(`UPDATE items
+    SET metadata = json_set(metadata, '$.spoiler', 1)
+    WHERE source = 'reddit'
+      AND json_valid(metadata)
+      AND json_valid(raw_json)
+      AND json_extract(raw_json, '$.spoiler') = 1
+      AND COALESCE(json_extract(metadata, '$.spoiler'), 0) = 0`);
+  setSetting(db, "spoiler_flags_built", String(_SPOILER_FLAGS_VERSION));
 }
 
 const _FTS_VERSION = 2;

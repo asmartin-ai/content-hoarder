@@ -116,6 +116,11 @@ export const EvaluateFoldersBody = z.object({
 
 export const EnabledBody = z.object({ enabled: z.boolean() });
 
+export const YoutubeImportBody = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(501),
+  generation: z.string().min(1),
+});
+
 export const CookieBody = z.object({ cookie: z.string() });
 
 export const RedditSyncBody = z.object({

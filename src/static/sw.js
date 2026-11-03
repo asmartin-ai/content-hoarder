@@ -1,4 +1,4 @@
-const CACHE = "ch-shell-v154";
+const CACHE = "ch-shell-v156";
 
 const SHELL = [
   "/",
@@ -28,6 +28,7 @@ const SHELL = [
   "/static/core/toast.js",
   "/static/core/track.js",
   "/static/core/media.js",
+  "/static/core/veil.js",
   "/static/core/swipe.js",
   "/static/core/render.js",
   "/static/core/icons.js",

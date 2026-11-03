@@ -11,8 +11,7 @@ import {
   articleChip,
 } from "../core/render.js";
 import { thumb, ytFallback, mediaType, itemPreviewBlurb } from "../core/media.js";
-
-export const isNsfw = (item) => !!(item.metadata || {}).over_18;
+import { isNsfw, isSpoiler, isVeiled, veilLabel } from "../core/veil.js";
 
 const glyph = (item) => {
   const m = CH_SOURCES[item.source];
@@ -56,6 +55,8 @@ const metaHtml = (item) => {
   const bits = [];
 
   if (isNsfw(item)) bits.push('<span class="nsfw-tag">NSFW</span>');
+
+  if (isSpoiler(item)) bits.push('<span class="spoiler-tag">Spoiler</span>');
 
   if (m.subreddit)
     bits.push(
@@ -142,7 +143,7 @@ const monitorHtml = (item, nsfwRevealed) => {
 
   if (isRedditTextPost(item, mt)) return '<div class="monitor empty" aria-hidden="true"></div>';
   const m = item.metadata || {};
-  const blur = isNsfw(item) && !nsfwRevealed;
+  const blur = isVeiled(item) && !nsfwRevealed;
 
   const dur =
     item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
@@ -167,7 +168,7 @@ const monitorHtml = (item, nsfwRevealed) => {
     ">" +
     dur +
     badge +
-    (blur ? '<span class="veil">NSFW</span>' : "") +
+    (blur ? '<span class="veil">' + veilLabel(item) + "</span>" : "") +
     "</button>"
   );
 };
@@ -281,7 +282,7 @@ export const pinCard = (item, opts) => {
   const t = thumb(item, "card");
   const m = item.metadata || {};
   const mt = mediaType(item);
-  const blur = isNsfw(item) && !o.nsfwRevealed;
+  const blur = isVeiled(item) && !o.nsfwRevealed;
   const domainHtml = urlDomainHtml(item);
 
   const screen = isRedditTextPost(item, mt)
@@ -304,7 +305,7 @@ export const pinCard = (item, opts) => {
         (item.source === "youtube" && Number.isFinite(m.duration) && m.duration > 0
           ? '<span class="badge dur">' + fmtDur(m.duration) + "</span>"
           : "") +
-        (blur ? '<span class="veil">NSFW · REVEAL</span>' : "") +
+        (blur ? '<span class="veil">' + veilLabel(item, true) + "</span>" : "") +
         "</button>"
       : mt.cls === "video" || mt.cls === "gallery"
         ? '<button type="button" class="screen noimg" data-media="1" aria-label="' +

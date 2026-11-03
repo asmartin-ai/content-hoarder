@@ -5,12 +5,16 @@ import * as api from "../core/api.js";
 import {
   imageUrl,
   imageUrls,
+  isRedditVideoItem,
+  mediaTileKind,
   mediaType,
   mountVideo,
   playableVideoSrc,
+  resetVideoShare,
+  shareVideoFile,
   videoUrls,
 } from "../core/media.js";
-import { isNsfw } from "./render.js";
+import { isVeiled, sharpImage, veilLabel } from "../core/veil.js";
 import { COMP_LABEL, companionHref, hnUserUrl, itemUrl, shareItem } from "../core/render.js";
 import { toast } from "../core/toast.js";
 import { pushOverlay, settleTop } from "../core/overlaynav.js";
@@ -830,6 +834,30 @@ export function initReader({
   const ooEl = $("#reader-open-original");
   const ledEl = reader.querySelector(".led");
   const scrollEl = reader.querySelector(".rd-scroll");
+  const shareBtn = $("#reader-share");
+
+  function syncVideoShare(it) {
+    const existing = document.getElementById("reader-share-video");
+
+    if (!isRedditVideoItem(it)) {
+      resetVideoShare(existing);
+      existing?.remove();
+
+      return;
+    }
+
+    const button = existing || document.createElement("button");
+
+    if (!existing) {
+      button.type = "button";
+      button.id = "reader-share-video";
+      button.className = "rd-oo rd-share";
+      button.setAttribute("aria-label", "Share video");
+      shareBtn?.parentNode?.insertBefore(button, shareBtn);
+    }
+
+    resetVideoShare(button);
+  }
 
   let item = null,
     fullname = null,
@@ -1218,41 +1246,45 @@ export function initReader({
 
     if (noteIds.length > 1) return noteVideoMultiHtml(noteIds);
     const mt = mediaType(item);
-
-    if (!(mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return "";
     const m = item.metadata || {};
 
     const gal = Array.isArray(m.gallery) && m.gallery.length ? m.gallery[0] : "";
 
-    const img = imageUrl(item) || gal || m.thumbnail;
+    const img = imageUrl(item) || gal || sharpImage(item, m.thumbnail);
+    const tile = mediaTileKind(item, mt, img);
+
+    if (!tile) return "";
+    const imageOnly = tile === mt ? "" : ' data-img-only="1"';
 
     if (!img) {
-      if (mt.cls === "image") return "";
+      if (tile.cls === "image") return "";
 
       return (
         '<button type="button" class="rd-media noimg" data-media="1" aria-label="' +
-        esc(mt.label || "media") +
+        esc(tile.label || "media") +
         '"><span class="rd-mglyph" aria-hidden="true">' +
-        mt.icon +
+        tile.icon +
         "</span></button>"
       );
     }
 
-    const blur = isNsfw(item) && !revealed;
+    const blur = isVeiled(item) && !revealed;
 
     return (
       '<button type="button" class="rd-media' +
       (blur ? " nsfw" : "") +
-      '" data-media="1" aria-label="' +
-      esc(mt.label || "media") +
+      '" data-media="1"' +
+      imageOnly +
+      ' aria-label="' +
+      esc(tile.label || "media") +
       '">' +
       '<img src="' +
       esc(img) +
       '" alt="" loading="lazy">' +
-      (mt.cls !== "image"
-        ? '<span class="rd-mglyph" aria-hidden="true">' + mt.icon + "</span>"
+      (tile.cls !== "image"
+        ? '<span class="rd-mglyph" aria-hidden="true">' + tile.icon + "</span>"
         : "") +
-      (blur ? '<span class="rd-veil">NSFW · tap to reveal</span>' : "") +
+      (blur ? '<span class="rd-veil">' + veilLabel(item, true) + "</span>" : "") +
       "</button>"
     );
   }
@@ -1603,6 +1635,7 @@ export function initReader({
     }
 
     reader.classList.toggle("no-original", !ooHref);
+    syncVideoShare(it);
     renderPost(null);
     reader.style.transition = "";
     reader.style.transform = "";
@@ -1656,6 +1689,7 @@ export function initReader({
     returnTo = "";
     saveReaderScroll();
     stopInlineVideo();
+    resetVideoShare(document.getElementById("reader-share-video"));
     const wasTriageEnter = reader.classList.contains("triage-enter");
     reader.classList.remove("show", "from-triage");
 
@@ -1811,8 +1845,16 @@ export function initReader({
   });
 
   reader.addEventListener("click", (e) => {
+    const med = e.target.closest(".rd-media");
+
     if (e.target.closest("#reader-close")) {
       closeReader(false);
+
+      return;
+    }
+
+    if (e.target.closest("#reader-share-video")) {
+      shareVideoFile(item, e.target.closest("#reader-share-video"));
 
       return;
     }
@@ -1915,7 +1957,7 @@ export function initReader({
     }
 
     if (med) {
-      if (isNsfw(item) && !revealed) {
+      if (isVeiled(item) && !revealed) {
         revealed = true;
         med.classList.remove("nsfw");
         const v = med.querySelector(".rd-veil");
@@ -1925,11 +1967,20 @@ export function initReader({
         return;
       }
 
+      if (med.dataset.imgOnly === "1") {
+        const im = med.querySelector("img");
+        const src = im && im.getAttribute("src");
+
+        if (src) onImage?.(src);
+
+        return;
+      }
+
       const vsrc = playableVideoSrc(item);
 
       if (vsrc) {
         const m = item.metadata || {};
-        const posterUrl = imageUrl(item) || m.thumbnail;
+        const posterUrl = imageUrl(item) || sharpImage(item, m.thumbnail);
         const wrap = document.createElement("div");
         wrap.className = "rd-video-wrap";
         med.replaceWith(wrap);

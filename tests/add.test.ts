@@ -6,6 +6,7 @@ import { z } from "zod";
 import { dispatch, get } from "../src/connectors/registry.ts";
 import * as db from "../src/db.ts";
 import { newItem, parseMetadata } from "../src/models.ts";
+import { renderAdd } from "../src/web/views/add.ts";
 import { serveApp } from "../src/web.ts";
 
 const roots: string[] = [];
@@ -114,6 +115,8 @@ test("pasted links preview and then land in an empty library", async () => {
     expect(page).toContain('id="add-drop"');
     expect(page).toContain("Get my Reddit saves");
     expect(page).not.toContain("/oauth/google/start");
+    expect(page).not.toContain("Choose YouTube playlists");
+    expect(page).not.toContain("data-youtube-choice");
 
     const empty = await (await fetch(`${base}/hx/today/upnext?n=10`)).text();
 
@@ -266,5 +269,79 @@ test("Reddit's data-request CSV titles comments and never thins a richer saved r
   } finally {
     connection.close();
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the YouTube chooser lists playlists unticked and holds Import until one is picked", () => {
+  const page = renderAdd(undefined, undefined, {
+    state: "choose",
+    expiresIn: 600,
+    generation: "gen-1",
+    playlists: [
+      { id: "PL1", title: "Deep dives", count: 12, imported: false },
+      { id: "LL", title: "Liked videos", count: null, imported: true },
+    ],
+  }).value;
+
+  expect(page).toContain("data-youtube-choice");
+  expect(page).toContain('data-generation="gen-1"');
+  expect(page).toContain("Deep dives");
+  expect(page).toContain("12 items");
+  expect(page).toContain("Already imported");
+  expect(page).toContain("This list stays open for 10 minutes.");
+  expect(page).toMatch(/id="add-youtube-import"[^>]*disabled/);
+  expect(page).toMatch(/id="add-youtube-all"[^>]*>[\s\S]*?Select all/);
+
+  for (const box of page.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [])
+    expect(box).not.toContain("checked");
+});
+
+test("a hostile playlist title stays text in the chooser", () => {
+  const title = '<img src=x onerror="alert(1)"> & "quoted"';
+
+  const page = renderAdd(undefined, undefined, {
+    state: "choose",
+    expiresIn: 600,
+    generation: "gen-2",
+    playlists: [{ id: "PL9", title, count: null, imported: false }],
+  }).value;
+
+  expect(page).not.toContain(title);
+  expect(page).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &quot;quoted&quot;");
+});
+
+test("an expired YouTube sign-in offers the chooser again", () => {
+  const page = renderAdd(undefined, undefined, { state: "expired" }).value;
+
+  expect(page).toContain("Your YouTube sign-in timed out.");
+  expect(page).toContain('href="/oauth/google/start?return=/add%3Fyoutube%3Dchoose"');
+  expect(page).not.toContain("data-youtube-choice");
+});
+
+test("hosted Add always offers the YouTube chooser link", () => {
+  const keys = [
+    "CONTENT_HOARDER_PUBLIC_ORIGIN",
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+  ] as const;
+
+  const saved = keys.map((key) => process.env[key]);
+
+  process.env.CONTENT_HOARDER_PUBLIC_ORIGIN = "https://demo.khaos.test";
+  process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+
+  try {
+    const page = renderAdd(undefined).value;
+
+    expect(page).toContain("Choose YouTube playlists");
+    expect(page).toContain('href="/oauth/google/start?return=/add%3Fyoutube%3Dchoose"');
+  } finally {
+    keys.forEach((key, index) => {
+      const value = saved[index];
+
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
   }
 });

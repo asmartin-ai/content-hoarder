@@ -1,5 +1,7 @@
 import { esc, safeUrl } from "./util.js";
 import { pushOverlay, settleTop } from "./overlaynav.js";
+import { toast } from "./toast.js";
+import { gallerySlides, isVeiled, sharpImage } from "./veil.js";
 
 let _archive = false;
 
@@ -42,19 +44,22 @@ export const archiveTodayConfirmText =
   "If bytes are found, content-hoarder will store them locally.\n\n" +
   "Continue?";
 
-const _galleryThumb = (m) => {
-  if (Array.isArray(m.gallery_preview) && m.gallery_preview.length && safeUrl(m.gallery_preview[0]))
-    return m.gallery_preview[0];
+const _galleryThumb = (item) => {
+  const m = item.metadata || {};
 
-  if (Array.isArray(m.gallery) && m.gallery.length && safeUrl(m.gallery[0])) return m.gallery[0];
+  if (Array.isArray(m.gallery_preview) && m.gallery_preview.length && safeUrl(m.gallery_preview[0]))
+    return sharpImage(item, m.gallery_preview[0]);
+
+  if (Array.isArray(m.gallery) && m.gallery.length && safeUrl(m.gallery[0]))
+    return sharpImage(item, m.gallery[0]);
 
   return "";
 };
 
 const _thumbSentinel = /^(self|default|nsfw|spoiler)$/i;
 
-const _usableThumb = (u) => {
-  const t = u?.trim?.() || "";
+const _usableThumb = (item, u) => {
+  const t = sharpImage(item, u?.trim?.() || "");
 
   return t && !_thumbSentinel.test(t) ? safeUrl(t) : "";
 };
@@ -63,17 +68,17 @@ export const thumb = (item, density) => {
   const m = item.metadata || {};
 
   if (density === "card" && Array.isArray(m.gallery) && m.gallery.length)
-    return localUrl(item, _galleryThumb(m));
-  let t = _usableThumb(m.thumbnail);
+    return localUrl(item, _galleryThumb(item));
+  let t = _usableThumb(item, m.thumbnail);
 
   if (!t && item.source === "hackernews") t = m.og_image || "";
 
-  if (!t) t = _galleryThumb(m);
+  if (!t) t = _galleryThumb(item);
 
   if (!t) {
     const url = item.url || "";
 
-    if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
+    if (/\.(png|jpe?g|gif|webp)$/i.test(url)) return sharpImage(item, url);
     const yt = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/);
     t = yt ? "https://i.ytimg.com/vi/" + yt[1] + "/hqdefault.jpg" : "";
   }
@@ -101,7 +106,7 @@ export const imageUrls = (item) => {
   const m = item.metadata || {};
 
   if (Array.isArray(m.media_urls))
-    return m.media_urls.filter(_directImg).map((u) => localUrl(item, u));
+    return m.media_urls.filter(_directImg).map((u) => localUrl(item, sharpImage(item, u)));
 
   return [];
 };
@@ -118,14 +123,22 @@ export const videoUrls = (item) => {
 export const imageUrl = (item) => {
   const m = item.metadata || {};
 
-  if (_directImg(item.url)) return localUrl(item, item.url);
+  if (_directImg(item.url)) return localUrl(item, sharpImage(item, item.url));
 
-  if (_directImg(m.media_url)) return localUrl(item, m.media_url);
+  if (_directImg(m.media_url)) return localUrl(item, sharpImage(item, m.media_url));
   const imgs = imageUrls(item);
 
   if (imgs.length) return imgs[0];
 
-  return m.media_type === "image" ? localUrl(item, m.media_url || "") : "";
+  return m.media_type === "image" ? localUrl(item, sharpImage(item, m.media_url || "")) : "";
+};
+
+export const mediaTileKind = (item, mt, img) => {
+  if (mt && (mt.cls === "image" || mt.cls === "gallery" || mt.cls === "video")) return mt;
+
+  if (!img || !isVeiled(item)) return null;
+
+  return { cls: "image", icon: "🖼️", label: "Image" };
 };
 
 export const mediaType = (item) => {
@@ -210,6 +223,306 @@ export const playableVideoSrc = (item) => {
 
   return hls || (VIDEO_EXT.test(src) ? src : "");
 };
+
+export const isRedditVideoItem = (item) => {
+  if (!item || item.source !== "reddit") return false;
+  const m = item.metadata || {};
+  const rv = m.reddit_video || {};
+  const urls = [m.media_url, rv.fallback_url, rv.hls_url, rv.dash_url, item.url];
+
+  return urls.some((url) => /^https?:\/\/v\.redd\.it\//i.test(String(url || "")));
+};
+
+export const videoExportUrl = (item) =>
+  item && item.fullname ? "/items/" + encodeURIComponent(item.fullname) + "/video.mp4" : "";
+
+export const videoPrepareUrl = (item) =>
+  item && item.fullname ? "/items/" + encodeURIComponent(item.fullname) + "/video/prepare" : "";
+
+export const formatVideoSize = (bytes) => {
+  const size = Number(bytes) || 0;
+
+  if (size >= 1024 * 1024 * 1024) return (size / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+
+  if (size >= 1024 * 1024) return Math.round(size / (1024 * 1024)) + " MB";
+
+  if (size >= 1024) return Math.round(size / 1024) + " KB";
+
+  return size + " B";
+};
+
+export const VIDEO_SHARE_FILE_LIMIT = 50 * 1024 * 1024;
+
+const responseMessage = async (response) => {
+  try {
+    const value = await response.json();
+    const message = value && (value.message || value.error);
+
+    if (message) return String(message);
+  } catch {}
+
+  return "HTTP " + response.status;
+};
+
+const probeFile = () => new File([new Uint8Array(0)], "probe.mp4", { type: "video/mp4" });
+
+const filesShareSupported = () => {
+  try {
+    return Boolean(
+      navigator.share && navigator.canShare && navigator.canShare({ files: [probeFile()] }),
+    );
+  } catch {
+    return false;
+  }
+};
+
+const canShareFile = (file) => {
+  try {
+    return Boolean(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+  } catch {
+    return false;
+  }
+};
+
+const shareFile = (file, title) => {
+  let pending;
+
+  try {
+    pending = navigator.share({ files: [file], title: title || "Video" });
+  } catch {
+    return Promise.resolve("blocked");
+  }
+
+  return Promise.resolve(pending)
+    .then(() => "shared")
+    .catch((error) => (error && error.name === "AbortError" ? "cancelled" : "blocked"));
+};
+
+const downloadDirect = (url, filename) => {
+  if (!url) return;
+  const link = document.createElement("a");
+
+  link.href = url;
+
+  if (filename) link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+const abortableDelay = (ms, signal) =>
+  new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+
+      return;
+    }
+
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+
+    const timer = setTimeout(done, ms);
+
+    signal.addEventListener("abort", done, { once: true });
+  });
+
+const restoreLabel = (button) => {
+  if (!button) return;
+  button.disabled = false;
+  button.dataset.chVideoReady = "0";
+  button.textContent = button.dataset.chVideoLabel || "Share video";
+};
+
+export const resetVideoShare = (button) => {
+  if (!button) return;
+  button._chShareGen = (button._chShareGen || 0) + 1;
+
+  if (button._chShare) {
+    button._chShare.controller.abort();
+    button._chShare = null;
+  }
+
+  button._chVideoFile = null;
+  button._chVideoItem = null;
+  button._chDownload = null;
+  delete button.dataset.chVideoLabel;
+  restoreLabel(button);
+  button.textContent = "Share video";
+};
+
+const prepareVideo = async (item, state) => {
+  for (;;) {
+    if (state.controller.signal.aborted) return null;
+
+    const response = await fetch(videoPrepareUrl(item), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      signal: state.controller.signal,
+    });
+
+    if (!response.ok) throw new Error(await responseMessage(response));
+    const data = await response.json();
+
+    if (data && data.ready) return data;
+
+    if (data && data.error) throw new Error(data.message || data.error);
+    await abortableDelay(1000, state.controller.signal);
+  }
+};
+
+const sharePrepared = async (item, button, generation) => {
+  const file = button._chVideoFile;
+
+  button.disabled = true;
+  const outcome = canShareFile(file) ? await shareFile(file, item.title) : "unsupported";
+
+  if (!button.isConnected || button._chShareGen !== generation) return;
+
+  if (outcome === "shared" || outcome === "cancelled") {
+    button._chVideoFile = null;
+    button._chVideoItem = null;
+    restoreLabel(button);
+
+    return;
+  }
+
+  if (outcome === "unsupported") {
+    button._chVideoFile = null;
+    button._chVideoItem = null;
+    downloadDirect(videoExportUrl(item), file.name);
+    toast("Video downloaded");
+    restoreLabel(button);
+
+    return;
+  }
+
+  button.disabled = false;
+};
+
+const startDownload = (button, generation) => {
+  const pending = button._chDownload;
+
+  button._chDownload = null;
+
+  if (!pending || button._chShareGen !== generation) return;
+
+  downloadDirect(pending.url, pending.filename);
+  toast("Downloading video");
+  restoreLabel(button);
+};
+
+export async function shareVideoFile(item, button) {
+  if (!button || !isRedditVideoItem(item)) return;
+  const generation = button._chShareGen || 0;
+
+  if (
+    button._chVideoFile &&
+    button._chVideoItem === item.fullname &&
+    button._chVideoGen === generation
+  ) {
+    await sharePrepared(item, button, generation);
+
+    return;
+  }
+
+  if (button._chDownload && button._chDownload.fullname === item.fullname) {
+    startDownload(button, generation);
+
+    return;
+  }
+
+  if (button._chShare) button._chShare.controller.abort();
+  const state = { controller: new AbortController() };
+
+  button._chShare = state;
+  button._chVideoFile = null;
+  button._chVideoItem = null;
+  button._chDownload = null;
+  button.disabled = true;
+  button.dataset.chVideoReady = "0";
+  button.textContent = "Preparing video…";
+
+  const active = () =>
+    button.isConnected && button._chShare === state && !state.controller.signal.aborted;
+
+  const restore = () => {
+    if (active()) restoreLabel(button);
+  };
+
+  try {
+    const prepared = await prepareVideo(item, state);
+
+    if (!prepared || !active()) return;
+
+    const size = Number(prepared.size_bytes) || 0;
+    const filename = prepared.filename || "reddit-video.mp4";
+
+    button.dataset.chVideoLabel = "Share video (" + formatVideoSize(size) + ")";
+
+    if (!filesShareSupported()) {
+      downloadDirect(videoExportUrl(item), filename);
+      toast("Downloading video");
+      restore();
+
+      return;
+    }
+
+    if (size > VIDEO_SHARE_FILE_LIMIT) {
+      button._chDownload = {
+        url: videoExportUrl(item),
+        filename,
+        fullname: item.fullname,
+      };
+      button.disabled = false;
+      button.dataset.chVideoReady = "1";
+      button.textContent = "Download (" + formatVideoSize(size) + ")";
+
+      return;
+    }
+
+    button.textContent = "Preparing video (" + formatVideoSize(size) + ")…";
+    const response = await fetch(videoExportUrl(item), { signal: state.controller.signal });
+
+    if (!response.ok) throw new Error(await responseMessage(response));
+    const blob = await response.blob();
+
+    if (!active()) return;
+    const file = new File([blob], filename, { type: "video/mp4" });
+    const outcome = canShareFile(file) ? await shareFile(file, item.title) : "unsupported";
+
+    if (!active()) return;
+
+    if (outcome === "shared" || outcome === "cancelled") {
+      restore();
+
+      return;
+    }
+
+    if (outcome === "blocked") {
+      button._chVideoFile = file;
+      button._chVideoItem = item.fullname;
+      button._chVideoGen = generation;
+      button.disabled = false;
+      button.dataset.chVideoReady = "1";
+      button.textContent = "Ready — tap to share";
+
+      return;
+    }
+
+    downloadDirect(videoExportUrl(item), filename);
+    toast("Video downloaded");
+    restore();
+  } catch (error) {
+    if (state.controller.signal.aborted || !active()) return;
+    toast(error instanceof Error ? error.message : "Couldn't prepare the video");
+    restore();
+  }
+}
 
 export const itemCaptionText = (item, maxChars) => {
   const max = maxChars == null ? 1200 : maxChars;
@@ -466,6 +779,7 @@ export function createLightbox(opts) {
   let bodyLock = null;
 
   let videoTeardown = null;
+  let videoShareButton = null;
   let peekMode = false;
 
   let zoomScale = 1;
@@ -767,6 +1081,8 @@ export function createLightbox(opts) {
       videoTeardown = null;
     }
 
+    resetVideoShare(videoShareButton);
+    videoShareButton = null;
     body.innerHTML = "";
     modal.hidden = true;
 
@@ -806,6 +1122,8 @@ export function createLightbox(opts) {
     const alreadyOpen = !modal.hidden;
     resetTransformState();
     peekMode = !!(opts_ && opts_.peek);
+    resetVideoShare(videoShareButton);
+    videoShareButton = null;
     body.classList.remove("is-gallery");
     body.innerHTML = html;
     modal.hidden = false;
@@ -869,7 +1187,7 @@ export function createLightbox(opts) {
 
       if (!full.length) return;
       const sized = (previews || []).filter(safeUrl);
-      const srcs = sized.length === full.length ? sized : full;
+      const srcs = gallerySlides(full, sized);
       const cap = (opts_ && opts_.captionHtml) || "";
       open(
         '<div class="media-gallery">' +
@@ -911,6 +1229,19 @@ export function createLightbox(opts) {
 
       if (!video) return;
       videoTeardown = destroy;
+
+      const shareTarget = opts_ && opts_.videoShareItem;
+
+      if (shareTarget && isRedditVideoItem(shareTarget)) {
+        const share = document.createElement("button");
+
+        share.type = "button";
+        share.className = "media-fallback media-share-video";
+        share.textContent = "Share video";
+        share.addEventListener("click", () => shareVideoFile(shareTarget, share));
+        body.appendChild(share);
+        videoShareButton = share;
+      }
 
       if (opts_ && opts_.peek) _attachPeekRelease();
     },

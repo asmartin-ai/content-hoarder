@@ -137,6 +137,34 @@ async function googleSignIn(
   return { response, cookies: setCookies(response) };
 }
 
+async function importYoutube(sub: string, session: string, ids: string[]): Promise<Response> {
+  const listing = await handle(
+    new Request(`${ORIGIN}/youtube/playlists`, {
+      headers: { host: HOST, accept: "application/json", cookie: `ch_session=${session}` },
+    }),
+  );
+
+  const { generation } = z.object({ generation: z.string() }).parse(await listing.json());
+
+  const response = await handle(
+    new Request(`${ORIGIN}/youtube/import`, {
+      method: "POST",
+      headers: {
+        host: HOST,
+        origin: ORIGIN,
+        accept: "application/json",
+        "content-type": "application/json",
+        cookie: `ch_session=${session}`,
+      },
+      body: JSON.stringify({ ids, generation }),
+    }),
+  );
+
+  await currentPull(libraryConnection(sub))?.settled;
+
+  return response;
+}
+
 const SourceCount = z.object({ count: z.number() });
 
 function countSource(sub: string, source: string): number {
@@ -194,7 +222,7 @@ test("public sign-in pages refuse to be framed", async () => {
   }
 });
 
-test("an invite lets one Google account in once and pulls its YouTube", async () => {
+test("an invite lets one Google account in once and chooses its YouTube", async () => {
   const invite = createInvite(connection());
   const opened = await handle(request(`/invite/${invite}`));
 
@@ -203,16 +231,21 @@ test("an invite lets one Google account in once and pulls its YouTube", async ()
   const { response, cookies } = await googleSignIn("friend", setCookies(opened));
 
   expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("/add");
+  expect(response.headers.get("location")).toBe("/add?youtube=choose");
   expect(cookies.ch_session).toBeTruthy();
-  expect(countSource("friend", "youtube")).toBe(2);
+  expect(countSource("friend", "youtube")).toBe(0);
 
-  const add = () => handle(request("/add", { ch_session: cookies.ch_session ?? "" }));
+  const session = cookies.ch_session ?? "";
 
-  expect(await (await add()).text()).toContain("YouTube: 2 items added");
+  expect((await importYoutube("friend", session, ["PL1"])).status).toBe(200);
+  expect(countSource("friend", "youtube")).toBe(1);
+
+  const add = () => handle(request("/add", { ch_session: session }));
+
+  expect(await (await add()).text()).toContain("YouTube: 1 item added");
   expect(await (await add()).text()).not.toContain("items added");
 
-  const signedIn = await handle(request("/", { ch_session: cookies.ch_session ?? "" }));
+  const signedIn = await handle(request("/", { ch_session: session }));
 
   expect(signedIn.status).toBe(200);
   expect((await handle(request(`/invite/${invite}`))).status).toBe(404);
@@ -228,16 +261,17 @@ test("an invite lets one Google account in once and pulls its YouTube", async ()
   expect(returning.cookies.ch_session).toBeTruthy();
 });
 
-test("Google sign-in lets you in before the YouTube pull finishes", async () => {
+test("Google sign-in reads only the playlist list and imports nothing", async () => {
   const opened = await handle(request(`/invite/${createInvite(connection())}`));
-  const { promise: gate, resolve: release } = Promise.withResolvers<void>();
-  const api = googleApi("slow");
+  const calls: string[] = [];
+  const api = googleApi("lister");
 
   setHostedFetch(async (input) => {
-    if (new URL(input).pathname.endsWith("/playlists")) await gate;
+    calls.push(new URL(input).pathname);
 
     return api(input);
   });
+
   const start = await handle(request("/oauth/google/start?return=/add", setCookies(opened)));
   const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
 
@@ -250,16 +284,21 @@ test("Google sign-in lets you in before the YouTube pull finishes", async () => 
 
   const session = { ch_session: setCookies(response).ch_session ?? "" };
 
-  expect(response.headers.get("location")).toBe("/add");
-  expect(await (await handle(request("/add", session))).text()).toContain('hx-get="/hx/add/pull"');
+  expect(response.headers.get("location")).toBe("/add?youtube=choose");
+  expect(calls.filter((path) => path.startsWith("/youtube/"))).toEqual(["/youtube/v3/playlists"]);
+  expect(countSource("lister", "youtube")).toBe(0);
 
-  release();
-  await currentPull(libraryConnection("slow"))?.settled;
+  const listed = await handle(
+    new Request(`${ORIGIN}/youtube/playlists`, {
+      headers: {
+        host: HOST,
+        accept: "application/json",
+        cookie: `ch_session=${session.ch_session}`,
+      },
+    }),
+  );
 
-  const status = await handle(request("/hx/add/pull", session));
-
-  expect(await status.text()).toContain("YouTube: 2 items added");
-  expect(countSource("slow", "youtube")).toBe(2);
+  expect(await listed.json()).toMatchObject({ state: "choose" });
 });
 
 test("a tampered state is refused", async () => {
@@ -273,7 +312,7 @@ test("a tampered state is refused", async () => {
   expect(response.status).toBe(400);
 });
 
-test("an account without a YouTube channel still signs in and brings its likes", async () => {
+test("an account without a YouTube channel still signs in and can choose its likes", async () => {
   const invite = createInvite(connection());
   const opened = await handle(request(`/invite/${invite}`));
 
@@ -288,10 +327,14 @@ test("an account without a YouTube channel still signs in and brings its likes",
     }),
   );
 
-  expect(response.headers.get("location")).toBe("/add");
-  await currentPull(libraryConnection("viewer"))?.settled;
+  const session = setCookies(response).ch_session ?? "";
+
+  expect(response.headers.get("location")).toBe("/add?youtube=choose");
+  expect(session).toBeTruthy();
+  expect(countSource("viewer", "youtube")).toBe(0);
+
+  expect((await importYoutube("viewer", session, ["LL"])).status).toBe(200);
   expect(countSource("viewer", "youtube")).toBe(1);
-  expect(setCookies(response).ch_session).toBeTruthy();
 });
 
 test("Twitch needs a session and imports followed channels", async () => {
@@ -348,8 +391,10 @@ test("each account has its own library", async () => {
   for (const sub of ["friend-a", "friend-b"]) {
     const opened = await handle(request(`/invite/${createInvite(connection())}`));
     const { cookies } = await googleSignIn(sub, setCookies(opened));
+    const session = cookies.ch_session ?? "";
 
-    sessions.push(cookies.ch_session ?? "");
+    await importYoutube(sub, session, ["LL"]);
+    sessions.push(session);
   }
 
   const [first = "", second = ""] = sessions;
@@ -382,8 +427,8 @@ test("each account has its own library", async () => {
   }
 
   expect(second).not.toBe(first);
-  expect(countSource("friend-a", "youtube")).toBe(2);
-  expect(countSource("friend-b", "youtube")).toBe(2);
+  expect(countSource("friend-a", "youtube")).toBe(1);
+  expect(countSource("friend-b", "youtube")).toBe(1);
   expect(listings[0]).toContain('"status":"keep"');
   expect(listings[1]).not.toContain('"status":"keep"');
   expect(connection().query("SELECT COUNT(*) AS n FROM items").get()).toEqual({ n: 0 });

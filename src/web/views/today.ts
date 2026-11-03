@@ -1,4 +1,5 @@
-import { NSFW_TAGS, type Item } from "../../models.ts";
+import type { Item } from "../../models.ts";
+import { isVeiled } from "../../static/core/veil.js";
 import type { ResurfaceCard } from "../../resurface.ts";
 import { wallClock } from "../../zone.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
@@ -197,14 +198,6 @@ function caption(item: Item): string {
   return item.source;
 }
 
-export function isNsfw(item: Item): boolean {
-  const flagged = item.metadata.over_18 === true || item.metadata.over_18 === 1;
-
-  return (
-    flagged || (item.metadata.tags ?? []).some((tag) => NSFW_TAGS.some((nsfw) => nsfw === tag))
-  );
-}
-
 function fanSlot(index: number): number {
   const side = Math.ceil(index / 2);
 
@@ -216,7 +209,7 @@ function deckCard(item: Item, index: number): SafeHtml {
   const slot = fanSlot(index);
 
   return html`<li
-    class="deck-card${isNsfw(item) ? " is-nsfw" : ""}${thumb ? "" : " is-text"}"
+    class="deck-card${isVeiled(item) ? " is-nsfw" : ""}${thumb ? "" : " is-text"}"
     style="${sourceAccent(item.source)}; --hue: ${hueOf(communityOf(item))}; --slot: ${slot}; --far: ${Math.abs(slot)}"
   >
     ${thumb ? html`<img src="${thumb}" alt="" loading="lazy" decoding="async" />` : ""}<span

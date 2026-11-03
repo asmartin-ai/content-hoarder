@@ -28,6 +28,88 @@ const PULLED_LABELS = new Map([
   ["twitch", "Twitch"],
 ]);
 
+const YOUTUBE_CHOOSE_HREF = "/oauth/google/start?return=/add%3Fyoutube%3Dchoose";
+
+export interface YoutubePlaylistView {
+  id: string;
+  title: string;
+  count: number | null;
+  imported: boolean;
+}
+
+export type YoutubeChoiceView =
+  | {
+      state: "choose";
+      playlists: YoutubePlaylistView[];
+      expiresIn: number;
+      generation: string;
+    }
+  | { state: "expired" }
+  | { state: "none" };
+
+function playlistRow(playlist: YoutubePlaylistView): SafeHtml {
+  return html`<label class="add-yt-row">
+    <input class="add-yt-check" type="checkbox" name="ids" value="${playlist.id}" />
+    <span class="add-yt-main">
+      <span class="add-yt-name">${playlist.title}</span>
+      ${
+        playlist.count === null
+          ? ""
+          : html`<span class="add-yt-count"
+              >${playlist.count} ${playlist.count === 1 ? "item" : "items"}</span
+            >`
+      }
+    </span>
+    ${playlist.imported ? html`<span class="add-yt-tag">Already imported</span>` : ""}
+  </label>`;
+}
+
+function youtubeStopped(state: "expired" | "none"): SafeHtml {
+  const line = state === "expired" ? "Your YouTube sign-in timed out." : "Nothing to choose yet.";
+
+  return html`<section class="add-section add-yt" aria-labelledby="add-youtube-title">
+    <h2 id="add-youtube-title" tabindex="-1">Choose YouTube playlists</h2>
+    <p class="add-note" role="status">${line}</p>
+    <a class="add-btn" href="${YOUTUBE_CHOOSE_HREF}">Choose YouTube playlists</a>
+  </section>`;
+}
+
+function youtubeChooser(playlists: YoutubePlaylistView[], generation: string): SafeHtml {
+  return html`<section
+    class="add-section add-yt"
+    id="add-youtube"
+    aria-labelledby="add-youtube-title"
+    data-youtube-choice
+  >
+    <h2 id="add-youtube-title" tabindex="-1">Choose YouTube playlists</h2>
+    <p class="add-help">Pick what to bring over. Nothing is ticked yet.</p>
+    <form id="add-youtube-form" data-generation="${generation}">
+      <fieldset class="add-yt-list">
+        <legend class="add-label">Playlists</legend>
+        ${playlists.map(playlistRow)}
+      </fieldset>
+      <p class="add-help">This list stays open for 10 minutes.</p>
+      <div class="add-preview-actions">
+        <button id="add-youtube-all" class="add-yt-all" type="button" aria-pressed="false">
+          Select all
+        </button>
+        <button id="add-youtube-import" class="add-btn is-primary" type="submit" disabled>
+          Import playlists
+        </button>
+      </div>
+    </form>
+    <p id="add-youtube-status" class="add-note" hidden role="status"></p>
+  </section>`;
+}
+
+function youtubeSection(choice: YoutubeChoiceView | undefined): SafeHtml | string {
+  if (!choice) return "";
+
+  if (choice.state === "choose") return youtubeChooser(choice.playlists, choice.generation);
+
+  return youtubeStopped(choice.state);
+}
+
 export function renderPull(pull: LibraryPull | undefined): SafeHtml | string {
   const label = pull ? PULLED_LABELS.get(pull.source) : undefined;
 
@@ -80,7 +162,7 @@ function connectSection(): SafeHtml | string {
     <div class="add-connect">
       ${
         google
-          ? html`<a class="add-btn" href="/oauth/google/start?return=/add">YouTube playlists</a>`
+          ? html`<a class="add-btn" href="${YOUTUBE_CHOOSE_HREF}">Choose YouTube playlists</a>`
           : ""
       }
       ${
@@ -111,13 +193,18 @@ function aiSection(ai: AiSettingsView | undefined): SafeHtml | string {
   </section>`;
 }
 
-export function renderAdd(pull: LibraryPull | undefined, ai?: AiSettingsView): SafeHtml {
+export function renderAdd(
+  pull: LibraryPull | undefined,
+  ai?: AiSettingsView,
+  youtube?: YoutubeChoiceView,
+): SafeHtml {
   return html`<section class="add-page">
     <header class="add-head">
       <h1 class="add-title">Add your stuff</h1>
       <p class="add-sub">Bring in what you saved. Nothing changes in your accounts.</p>
     </header>
-    ${renderPull(pull)} ${connectSection()} ${aiSection(ai)}
+    <div id="add-pull">${renderPull(pull)}</div>
+    ${youtubeSection(youtube)} ${connectSection()} ${aiSection(ai)}
     <section class="add-section">
       <h2>Tabs on your computer</h2>
       <ol class="add-steps">

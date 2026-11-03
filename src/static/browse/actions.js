@@ -1,7 +1,7 @@
 import * as api from "../core/api.js";
 import { toast, snackbar } from "../core/toast.js";
 import { imageUrl } from "../core/media.js";
-import { isNsfw } from "./render.js";
+import { isVeiled } from "../core/veil.js";
 import { canOpenInReader } from "./reader.js";
 import { $, $$, state, itemsEl, selected, nsfwRevealed, COPY } from "./shared.js";
 import { clearItemFirstPageCache } from "./data.js";
@@ -158,7 +158,7 @@ itemsEl.addEventListener("click", (e) => {
 
     if (!item) return;
 
-    if (isNsfw(item) && !nsfwRevealed.has(fn)) {
+    if (isVeiled(item) && !nsfwRevealed.has(fn)) {
       nsfwRevealed.add(fn);
       media.classList.remove("nsfw");
 

@@ -2,6 +2,7 @@ import type { Item } from "../../models.ts";
 import { chIcon } from "../../static/core/icons.js";
 import { renderMarkdown } from "../../static/core/markdown.js";
 import { ago, isRemovedText } from "../../static/core/util.js";
+import { isNsfw, isSpoiler, veilLabel } from "../../static/core/veil.js";
 import { html, raw, type SafeHtml } from "./html.ts";
 import { icon } from "./icons.ts";
 import {
@@ -98,7 +99,7 @@ function age(item: Item): SafeHtml {
 
 const MISSING_LABEL = { gallery: "A gallery", image: "An image", video: "A clip" } as const;
 
-function missingFigure(item: Item): SafeHtml {
+function missingFigure(item: Item, veil: string): SafeHtml {
   const evidence = mediaEvidence(item);
 
   if (evidence !== "gallery" && evidence !== "image" && evidence !== "video") return html``;
@@ -106,7 +107,8 @@ function missingFigure(item: Item): SafeHtml {
   const play = evidence === "video" ? clipSrc(item) : "";
 
   return html`<figure
-    class="card-media is-missing"
+    class="card-media is-missing${veil ? " is-nsfw" : ""}"
+    ${veil ? html`data-veil="${veil}"` : ""}
     data-media="${evidence}"
     data-open=""
     ${play ? html`data-play="${play}"` : ""}
@@ -118,15 +120,16 @@ function missingFigure(item: Item): SafeHtml {
   </figure>`;
 }
 
-function mediaFigure(item: Item, nsfw: boolean): SafeHtml {
+function mediaFigure(item: Item, veil: string): SafeHtml {
   const media = cardMedia(item);
 
-  if (!media) return missingFigure(item);
+  if (!media) return missingFigure(item, veil);
 
   const opens = media.kind === "video" || media.kind === "youtube" || media.kind === "link";
 
   return html`<figure
-    class="card-media${nsfw ? " is-nsfw" : ""}"
+    class="card-media${veil ? " is-nsfw" : ""}"
+    ${veil ? html`data-veil="${veil}"` : ""}
     data-media="${media.kind}"
     ${opens ? html`data-open=""` : ""}
     ${media.play ? html`data-play="${media.play}"` : ""}
@@ -176,7 +179,7 @@ function externalDomain(item: Item): string {
   return domain;
 }
 
-function stats(item: Item, nsfw: boolean): SafeHtml {
+function stats(item: Item, nsfw: boolean, spoiler: boolean): SafeHtml {
   const md = item.metadata;
   const parts: SafeHtml[] = [];
 
@@ -198,6 +201,8 @@ function stats(item: Item, nsfw: boolean): SafeHtml {
   if (domain) parts.push(html`<span class="stat stat-domain">${domain}</span>`);
 
   if (nsfw) parts.push(html`<span class="tag tag-nsfw">NSFW</span>`);
+
+  if (spoiler) parts.push(html`<span class="tag tag-spoiler">Spoiler</span>`);
 
   return parts.length ? html`<footer class="card-stats">${parts}</footer>` : html``;
 }
@@ -224,11 +229,13 @@ export function renderCard(
 ): SafeHtml {
   const kind = cardKind(item);
   const hint = opts?.hint ?? null;
-  const nsfw = Boolean(item.metadata.over_18);
+  const nsfw = isNsfw(item);
+  const spoiler = isSpoiler(item);
+  const veil = veilLabel(item, true);
   const isComment = kind === "comment";
   const title = item.title.trim();
   const body = bodyText(item);
-  const figure = mediaFigure(item, nsfw);
+  const figure = mediaFigure(item, veil);
   const layout = figure.toString() ? "media" : "text";
 
   const len =
@@ -260,7 +267,7 @@ export function renderCard(
         </p>`
       : html``;
 
-  const thumb = nsfw ? "" : thumbFor(item);
+  const thumb = veil ? "" : thumbFor(item);
 
   return html`<article
     class="card"
@@ -294,7 +301,8 @@ export function renderCard(
             ${icon("open", 18)}
           </button>
         </header>
-        ${context}${heading}${removed} ${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw)}
+        ${context}${heading}${removed}
+        ${bodyHtml}${reply(opts?.topComment)}${stats(item, nsfw, spoiler)}
       </div>
       <span class="card-wash" aria-hidden="true"></span
       ><span class="card-stamp" aria-hidden="true"></span>
