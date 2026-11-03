@@ -1,0 +1,16 @@
+{
+  "color": "DEFAULT",
+  "isTrashed": false,
+  "isPinned": true,
+  "isArchived": false,
+  "title": "Desk reset",
+  "listContent": [
+    { "text": "Clear the paper tray", "isChecked": true },
+    { "text": "Wipe the keyboard", "isChecked": false },
+    { "text": "Sharpen three pencils", "isChecked": false },
+    { "text": "Put the small tools back in the drawer", "isChecked": false }
+  ],
+  "labels": [{ "name": "home" }],
+  "createdTimestampUsec": 1789800000000000,
+  "userEditedTimestampUsec": 1790500000000000
+}

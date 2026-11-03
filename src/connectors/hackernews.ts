@@ -111,6 +111,79 @@ const storyItem = (
 const idsFromHtml = (text: string): string[] =>
   [...text.matchAll(/item\?id=(\d+)/g)].flatMap((match) => (match[1] ? [match[1]] : []));
 
+const decodeEntity = (entity: string): string => {
+  switch (entity.toLowerCase()) {
+    case "amp":
+      return "&";
+    case "lt":
+      return "<";
+    case "gt":
+      return ">";
+    case "quot":
+      return '"';
+    case "apos":
+      return "'";
+    default:
+      return "";
+  }
+};
+
+const decodeHtml = (text: string): string =>
+  text
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, entity: string) => {
+      const named = decodeEntity(entity);
+
+      if (named) return named;
+
+      if (!entity.startsWith("#")) return whole;
+
+      const code =
+        entity[1]?.toLowerCase() === "x"
+          ? Number.parseInt(entity.slice(2), 16)
+          : Number.parseInt(entity.slice(1), 10);
+
+      return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
+    })
+    .trim();
+
+const rowTag = /<tr\b([^>]*)>/gi;
+
+const titleLink =
+  /<span\b[^>]*\bclass=["'][^"']*\btitleline\b[^"']*["'][^>]*>[\s\S]*?<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
+
+const attributeOf = (attributes: string, name: string): string => {
+  const match = attributes.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, "i"));
+
+  return decodeHtml(match?.[2] ?? match?.[3] ?? "");
+};
+
+const storiesFromHtml = (text: string): Map<string, { title: string; url: string }> => {
+  const found = new Map<string, { title: string; url: string }>();
+
+  for (const row of text.matchAll(rowTag)) {
+    const attributes = row[1] ?? "";
+    const id = attributeOf(attributes, "id");
+
+    if (!attributeOf(attributes, "class").split(/\s+/).includes("athing")) continue;
+
+    if (!/^\d+$/.test(id)) continue;
+    const start = (row.index ?? 0) + row[0].length;
+    const end = text.indexOf("</tr>", start);
+
+    if (end < 0) continue;
+    const link = titleLink.exec(text.slice(start, end));
+
+    if (!link) continue;
+    const href = decodeHtml(link[1] ?? "");
+    const title = decodeHtml(link[2] ?? "");
+
+    if (title) found.set(id, { title, url: /^https?:\/\//i.test(href) ? href : "" });
+  }
+
+  return found;
+};
+
 export class HackerNewsConnector implements BaseConnector {
   readonly id = "hackernews";
   readonly label = "Hacker News";
@@ -150,9 +223,14 @@ export class HackerNewsConnector implements BaseConnector {
     try {
       if (/\.(db|sqlite|sqlite3)$/i.test(path)) return this.fromDatabase(path);
       let ids: string[] = [];
+      let stories = new Map<string, { title: string; url: string }>();
 
-      if (/\.html?$/i.test(path)) ids = idsFromHtml(readFileSync(path, "utf8"));
-      else if (path.toLowerCase().endsWith(".json")) {
+      if (/\.html?$/i.test(path)) {
+        const source = readFileSync(path, "utf8");
+
+        stories = storiesFromHtml(source);
+        ids = idsFromHtml(source);
+      } else if (path.toLowerCase().endsWith(".json")) {
         const value: unknown = JSON.parse(readFileSync(path, "utf8"));
 
         if (Array.isArray(value)) {
@@ -165,7 +243,11 @@ export class HackerNewsConnector implements BaseConnector {
           match[1] ? [match[1]] : [],
         );
 
-      return [...new Set(ids.map((id) => id.trim()).filter(Boolean))].map((id) => storyItem(id));
+      return [...new Set(ids.map((id) => id.trim()).filter(Boolean))].map((id) => {
+        const story = stories.get(id);
+
+        return story ? storyItem(id, story) : storyItem(id);
+      });
     } catch {
       return [];
     }

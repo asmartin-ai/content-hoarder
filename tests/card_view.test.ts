@@ -6,7 +6,7 @@ import * as db from "../src/db.ts";
 import { newItem, parseMetadata, type Item, type NewItemInput } from "../src/models.ts";
 import { renderCard } from "../src/web/views/card.ts";
 import { html, raw } from "../src/web/views/html.ts";
-import { cardMedia, compact, costLabel, domainOf } from "../src/web/views/media.ts";
+import { cardMedia, compact, costLabel, domainOf, thumbFor } from "../src/web/views/media.ts";
 import { topComment } from "../src/web/views/thread.ts";
 
 const NOW = 1_760_000_000;
@@ -140,6 +140,54 @@ test("a YouTube item shows the duration badge and video cost", () => {
   expect(out).toContain('<span class="cost">12 min video</span>');
   expect(out).toContain("1.2M views");
   expect(out).toContain("<b>Some Channel</b>");
+});
+
+test("a YouTube item keeps its own thumbnail ahead of the derived ytimg URL", () => {
+  const thumbnail = "http://127.0.0.1:8790/youtube-01.jpg";
+
+  const item = makeItem({
+    source: "youtube",
+    source_id: "demoVid0001",
+    kind: "video",
+    title: "A demo clip",
+    url: "https://www.youtube.com/watch?v=demoVid0001",
+    metadata: { channel: "Demo Channel", duration: 4, thumbnail },
+  });
+
+  const media = cardMedia(item);
+
+  expect(media?.src).toBe(thumbnail);
+  expect(media?.fallback).toBeUndefined();
+  expect(thumbFor(item)).toBe(thumbnail);
+  expect(flat(renderCard(item).value)).toContain(`src="${thumbnail}"`);
+});
+
+test("a YouTube thumbnail is only upgraded on i.ytimg.com and keeps its query", () => {
+  const supplied = makeItem({
+    source: "youtube",
+    source_id: "demoVid0001",
+    kind: "video",
+    title: "A demo clip",
+    url: "https://www.youtube.com/watch?v=demoVid0001",
+    metadata: { thumbnail: "https://cdn.example.test/thumbs/hqdefault.jpg?token=demo" },
+  });
+
+  expect(cardMedia(supplied)?.src).toBe("https://cdn.example.test/thumbs/hqdefault.jpg?token=demo");
+
+  const recognised = makeItem({
+    source: "youtube",
+    source_id: "demoVid0001",
+    kind: "video",
+    title: "A demo clip",
+    url: "https://www.youtube.com/watch?v=demoVid0001",
+    metadata: { thumbnail: "https://i.ytimg.com/vi/demoVid0001/hqdefault.jpg?sqp=demo" },
+  });
+
+  expect(cardMedia(recognised)).toEqual({
+    kind: "youtube",
+    src: "https://i.ytimg.com/vi/demoVid0001/maxresdefault.jpg?sqp=demo",
+    fallback: "https://i.ytimg.com/vi/demoVid0001/hqdefault.jpg?sqp=demo",
+  });
 });
 
 test("archived media becomes the data-fallback", () => {

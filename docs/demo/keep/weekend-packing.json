@@ -1,0 +1,17 @@
+{
+  "color": "DEFAULT",
+  "isTrashed": false,
+  "isPinned": false,
+  "isArchived": false,
+  "title": "Weekend packing",
+  "listContent": [
+    { "text": "Rain jacket", "isChecked": true },
+    { "text": "Notebook and two pens", "isChecked": true },
+    { "text": "Camera battery", "isChecked": false },
+    { "text": "Thermos", "isChecked": false },
+    { "text": "Bus tickets", "isChecked": false }
+  ],
+  "labels": [{ "name": "travel" }],
+  "createdTimestampUsec": 1789200000000000,
+  "userEditedTimestampUsec": 1790200000000000
+}

@@ -1,0 +1,16 @@
+{
+  "color": "DEFAULT",
+  "isTrashed": false,
+  "isPinned": false,
+  "isArchived": false,
+  "title": "Garden jobs",
+  "listContent": [
+    { "text": "Move the mint off the sunny sill", "isChecked": true },
+    { "text": "Repot the rosemary into the clay pot", "isChecked": false },
+    { "text": "Order more seed labels", "isChecked": false },
+    { "text": "Water the balcony boxes on Thursday", "isChecked": false }
+  ],
+  "labels": [{ "name": "home" }],
+  "createdTimestampUsec": 1789000000000000,
+  "userEditedTimestampUsec": 1790100000000000
+}

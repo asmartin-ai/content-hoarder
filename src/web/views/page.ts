@@ -1,4 +1,5 @@
 import { AI_FIELDS_SENT, aiConfigured, aiConsent, aiProviderLabel } from "../../assist/consent.ts";
+import { hostedOrigin } from "../../hosted.ts";
 import { demoAnalyticsOn } from "../../demo_analytics.ts";
 import { connection } from "../state.ts";
 import { html, raw, type SafeHtml } from "./html.ts";
@@ -170,21 +171,16 @@ function aiConsentPrompt(): SafeHtml | string {
   if (!aiConfigured() || aiConsent(connection()) !== "unset") return "";
 
   const provider = aiProviderLabel();
+  const privacy = hostedOrigin() ? html` <a href="/privacy">Privacy</a>` : "";
 
   return html`<dialog class="ai-consent" data-ai-consent aria-labelledby="ai-consent-title">
     <h2 id="ai-consent-title" class="ai-consent-title">Turn on AI suggestions?</h2>
-    <p class="ai-consent-line">
-      On Clear, the button the AI would pick (Keep or Archive) is gently highlighted. You still
-      decide every card.
-    </p>
-    <p class="ai-consent-line">Archive keeps things searchable; nothing is deleted.</p>
-    <p class="ai-consent-line">
-      To write a hint, Khaos sends ${AI_FIELDS_SENT} to <b>${provider}</b>.
-    </p>
-    <p class="ai-consent-line">
-      It's off until you say yes, and you can turn it off again in
-      <a href="/settings">Settings</a>.
-    </p>
+    <p class="ai-consent-line">Khaos highlights the button the AI would pick. You still decide.</p>
+    <p class="ai-consent-line">Card details go to <b>${provider}</b>.</p>
+    <details class="ai-consent-details">
+      <summary>What's sent</summary>
+      <p class="ai-consent-line">${AI_FIELDS_SENT}.${privacy}</p>
+    </details>
     <p class="ai-consent-error" data-ai-consent-error hidden role="alert"></p>
     <div class="ai-consent-acts">
       <button class="ai-consent-btn is-primary" type="button" data-ai-consent-enable autofocus>

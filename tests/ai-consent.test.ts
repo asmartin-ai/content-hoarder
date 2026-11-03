@@ -100,9 +100,14 @@ test("a configured provider prompts once and the opt-out is remembered", async (
 
     expect(today).toContain("data-ai-consent");
     expect(today).toContain("Turn on AI suggestions?");
-    expect(today).toContain("Z.ai (GLM)");
-    expect(today).toContain("the button the AI would pick (Keep or Archive) is gently highlighted");
+    expect(today).toContain("Khaos highlights the button the AI would pick. You still decide.");
+    expect(today).toContain("Card details go to <b>Z.ai (GLM)</b>");
+    expect(today).toContain('<details class="ai-consent-details">');
+    expect(today).toContain("<summary>What's sent</summary>");
     expect(today).toContain("first 500 characters of its text");
+    expect(today).not.toContain('<details class="ai-consent-details" open');
+    expect(today).not.toContain('<a href="/settings">Privacy</a>');
+    expect(today).not.toContain('href="/privacy"');
 
     const declined = await setConsent(base, false);
 

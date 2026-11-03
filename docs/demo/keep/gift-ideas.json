@@ -1,0 +1,11 @@
+{
+  "color": "DEFAULT",
+  "isTrashed": false,
+  "isPinned": false,
+  "isArchived": false,
+  "title": "Gift ideas",
+  "textContent": "Small things people actually use: a good pencil sharpener, a clothbound notebook, a jar of good salt.",
+  "labels": [{ "name": "people" }],
+  "createdTimestampUsec": 1789400000000000,
+  "userEditedTimestampUsec": 1790300000000000
+}

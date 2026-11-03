@@ -1,6 +1,63 @@
 import { expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { request } from "../src/_http.ts";
 import { fetchOgImage } from "../src/connectors/hackernews.ts";
+import { get } from "../src/connectors/registry.ts";
+
+const FAVORITES_HTML = `<html><head><title>favorites</title></head><body><table>
+<tr class="athing submission" id="44510201">
+<td class="title"><span class="titleline"><a href="https://example.test/story-a">Story A</a></span></td>
+</tr>
+<tr><td class="subtext"><a href="item?id=44510201">1 hour ago</a></td></tr>
+<tr id='44510202' class='athing submission'>
+<td class='title'><span class='titleline'><a class='storylink' href='https://example.test/story-b'>Story &amp; B</a></span></td>
+</tr>
+<tr><td class="subtext"><a href="item?id=44510202">2 hours ago</a></td></tr>
+<tr id="44510203" class="athing comtr">
+<td><span class="comhead"><a href="user?id=sample_reader">sample_reader</a></span></td>
+<td class="comment"><div class="commtext">A saved comment</div></td>
+</tr>
+<tr><td class="subtext"><a href="item?id=44510203">3 hours ago</a></td></tr>
+<tr><td><a href="https://news.ycombinator.com/item?id=44510204">Legacy anchor row</a></td></tr>
+</table></body></html>`;
+
+test("HN favorites HTML keeps every id and titles only real story rows", () => {
+  const directory = mkdtempSync(join(tmpdir(), "content-hoarder-hn-html-"));
+  const path = join(directory, "favorites.html");
+  writeFileSync(path, FAVORITES_HTML);
+
+  try {
+    const items = get("hackernews").importFile(path);
+    const byId = Object.fromEntries(items.map((item) => [item.source_id, item]));
+
+    expect(items.map((item) => item.source_id)).toEqual([
+      "44510201",
+      "44510202",
+      "44510203",
+      "44510204",
+    ]);
+    expect(byId["44510201"]).toMatchObject({
+      title: "Story A",
+      url: "https://example.test/story-a",
+    });
+    expect(byId["44510202"]).toMatchObject({
+      title: "Story & B",
+      url: "https://example.test/story-b",
+    });
+    expect(byId["44510203"]).toMatchObject({
+      title: "",
+      url: "https://news.ycombinator.com/item?id=44510203",
+    });
+    expect(byId["44510204"]).toMatchObject({
+      title: "",
+      url: "https://news.ycombinator.com/item?id=44510204",
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("the HN og:image fetch refuses loopback and reserved article targets", async () => {
   let hits = 0;

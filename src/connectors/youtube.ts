@@ -12,6 +12,24 @@ const idFrom = (entry: JsonRecord): string =>
 
 const metadataObject = (raw: RawItem): Metadata => parseMetadata(raw.metadata);
 
+const thumbnailOf = (entry: JsonRecord): string => {
+  const direct = looseText(entry.thumbnail);
+
+  if (direct) return direct;
+
+  const list = z.array(jsonRecord).safeParse(entry.thumbnails);
+
+  const ranked = list.success
+    ? list.data.flatMap((thumb) => {
+        const url = looseText(thumb.url);
+
+        return url ? [{ url, width: Number(thumb.width) || 0 }] : [];
+      })
+    : [];
+
+  return ranked.toSorted((a, b) => b.width - a.width).at(0)?.url ?? "";
+};
+
 export class YouTubeConnector implements BaseConnector {
   readonly id = "youtube";
   readonly label = "YouTube";
@@ -83,7 +101,7 @@ export class YouTubeConnector implements BaseConnector {
         playlist_id: isPlaylist ? listId : "",
         position,
         availability: looseText(entry.availability),
-        thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        thumbnail: thumbnailOf(entry) || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
       };
 
       const duration = z.number().safeParse(entry.duration);

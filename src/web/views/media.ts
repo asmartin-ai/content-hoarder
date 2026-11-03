@@ -34,6 +34,8 @@ const THUMB_SENTINEL = /^(self|default|nsfw|spoiler|image)$/i;
 
 const YT_ID = /(?:v=|youtu\.be\/|\/shorts\/)([\w-]{6,})/;
 
+const YT_IMAGE = /^https?:\/\/i\.ytimg\.com\/vi\/[\w-]+\/[a-z0-9]+default\.jpg(\?.*)?$/i;
+
 function safeUrl(url: string | undefined): string {
   const value = (url ?? "").trim();
 
@@ -185,9 +187,13 @@ export function cardMedia(item: Item): CardMedia | null {
     const id = youtubeId(item);
     const thumb = usableThumb(md.thumbnail);
 
-    const src = id
-      ? `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
-      : thumb.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/maxresdefault.jpg");
+    const src = thumb
+      ? YT_IMAGE.test(thumb)
+        ? thumb.replace(/\/[a-z0-9]+default\.jpg(\?.*)?$/i, "/maxresdefault.jpg$1")
+        : thumb
+      : id
+        ? `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
+        : "";
 
     if (!src) return null;
     const archived = archivedUrl(item, src);

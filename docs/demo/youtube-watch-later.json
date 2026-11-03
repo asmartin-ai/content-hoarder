@@ -1,0 +1,144 @@
+{
+  "_type": "playlist",
+  "id": "PLdemoHoarder01",
+  "title": "Watch Later (demo)",
+  "webpage_url": "https://www.youtube.com/playlist?list=PLdemoHoarder01",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0001",
+      "url": "https://www.youtube.com/watch?v=demoVid0001",
+      "title": "Building a paper lantern from one sheet",
+      "channel": "Paper Lantern Studio",
+      "channel_id": "UCdemoLantern0000000001",
+      "duration": 642,
+      "view_count": 48120,
+      "timestamp": 1775030400,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-01.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-01.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0002",
+      "url": "https://www.youtube.com/watch?v=demoVid0002",
+      "title": "A quiet tour of a moss terrarium",
+      "channel": "Moss & Stone",
+      "channel_id": "UCdemoMoss000000000002",
+      "duration": 512,
+      "view_count": 21440,
+      "timestamp": 1777622400,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-02.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-02.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0003",
+      "url": "https://www.youtube.com/watch?v=demoVid0003",
+      "title": "Three chord shapes for a rainy afternoon",
+      "channel": "Harbourlight Music",
+      "channel_id": "UCdemoHarbour0000000003",
+      "duration": 388,
+      "view_count": 90310,
+      "timestamp": 1780291200,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-03.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-03.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0004",
+      "url": "https://www.youtube.com/watch?v=demoVid0004",
+      "title": "Repairing a wooden hand plane",
+      "channel": "Bench Notes Workshop",
+      "channel_id": "UCdemoBench00000000004",
+      "duration": 1180,
+      "view_count": 156720,
+      "timestamp": 1782710400,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-04.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-04.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0005",
+      "url": "https://www.youtube.com/watch?v=demoVid0005",
+      "title": "How a fountain pen nib is shaped",
+      "channel": "Nibsmith Field Notes",
+      "channel_id": "UCdemoNib000000000005",
+      "duration": 726,
+      "view_count": 63805,
+      "timestamp": 1785388800,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-05.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-05.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0006",
+      "url": "https://www.youtube.com/watch?v=demoVid0006",
+      "title": "A short history of map folds",
+      "channel": "Folded Atlas",
+      "channel_id": "UCdemoAtlas00000000006",
+      "duration": 934,
+      "view_count": 38290,
+      "timestamp": 1788067200,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-06.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-06.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0007",
+      "url": "https://www.youtube.com/watch?v=demoVid0007",
+      "title": "Weeknight noodles, one pan",
+      "channel": "Copper Pot Kitchen",
+      "channel_id": "UCdemoCopper0000000007",
+      "duration": 455,
+      "view_count": 302110,
+      "timestamp": 1790121600,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-07.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-07.jpg", "width": 640, "height": 360 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "demoVid0008",
+      "url": "https://www.youtube.com/watch?v=demoVid0008",
+      "title": "Field recording: a harbour at dawn",
+      "channel": "Low Tide Recordings",
+      "channel_id": "UCdemoLowTide000000008",
+      "duration": 1500,
+      "view_count": 18770,
+      "timestamp": 1792454400,
+      "availability": "public",
+      "thumbnail": "http://127.0.0.1:8790/youtube-08.jpg",
+      "thumbnails": [
+        { "url": "http://127.0.0.1:8790/youtube-08.jpg", "width": 640, "height": 360 }
+      ]
+    }
+  ]
+}

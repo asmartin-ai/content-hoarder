@@ -256,16 +256,20 @@ test("a purge confirmed after the retention window widened is rejected", async (
   );
 });
 
-test("the consent dialog uses Archive and names the decision-count line", async () => {
+test("the consent dialog keeps two short lines and tucks the field list into details", async () => {
   configureAi();
 
   await withServer(async (base) => {
     const today = await (await fetch(`${base}/`)).text();
 
-    expect(today).toContain("the button the AI would pick (Keep or Archive) is gently highlighted");
-    expect(today).toContain("Archive keeps things searchable; nothing is deleted.");
-    expect(today).not.toContain("Keep or Let go");
-    expect(today).toContain("You archived 9 of 10 from r/pics");
-    expect(today).toContain("never other items&#39; titles");
+    expect(today).toContain("Turn on AI suggestions?");
+    expect(today).toContain("Khaos highlights the button the AI would pick. You still decide.");
+    expect(today).toContain("Card details go to <b>Z.ai (GLM)</b>.");
+    expect(today).toContain('<details class="ai-consent-details">');
+    expect(today).toContain("<summary>What's sent</summary>");
+    expect(today).not.toContain('<details class="ai-consent-details" open');
+    expect(today).toContain("first 500 characters of its text");
+    expect(today).toContain("Not now");
+    expect(today).not.toContain('href="/privacy"');
   });
 });

@@ -811,6 +811,243 @@
      "selftext": "The stream starts at 10am PT. Discuss the announcements here.",
      "url": "https://example.com/technology/demo45"
     }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demoimg1",
+     "id": "demoimg1",
+     "title": "Block-print study: three crows over a winter field",
+     "subreddit": "printmaking",
+     "permalink": "/r/printmaking/comments/demoimg1/block_print_study_three_crows/",
+     "author": "sample_author_46",
+     "created_utc": 1790865600,
+     "score": 214,
+     "num_comments": 12,
+     "over_18": false,
+     "is_self": false,
+     "post_hint": "image",
+     "url": "https://www.reddit.com/r/printmaking/comments/demoimg1/block_print_study_three_crows/",
+     "thumbnail": "http://127.0.0.1:8790/reddit-image-01.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-image-01.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demoimg2",
+     "id": "demoimg2",
+     "title": "Balcony herb boxes, one month in",
+     "subreddit": "gardening",
+     "permalink": "/r/gardening/comments/demoimg2/balcony_herb_boxes_one_month_in/",
+     "author": "sample_author_47",
+     "created_utc": 1790869200,
+     "score": 96,
+     "num_comments": 7,
+     "over_18": false,
+     "is_self": false,
+     "post_hint": "image",
+     "url": "https://www.reddit.com/r/gardening/comments/demoimg2/balcony_herb_boxes_one_month_in/",
+     "thumbnail": "http://127.0.0.1:8790/reddit-image-02.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-image-02.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demoimg3",
+     "id": "demoimg3",
+     "title": "Walnut desk, first dovetails",
+     "subreddit": "woodworking",
+     "permalink": "/r/woodworking/comments/demoimg3/walnut_desk_first_dovetails/",
+     "author": "sample_author_48",
+     "created_utc": 1790872800,
+     "score": 318,
+     "num_comments": 24,
+     "over_18": false,
+     "is_self": false,
+     "post_hint": "image",
+     "url": "https://www.reddit.com/r/woodworking/comments/demoimg3/walnut_desk_first_dovetails/",
+     "thumbnail": "http://127.0.0.1:8790/reddit-image-03.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-image-03.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demoimg4",
+     "id": "demoimg4",
+     "title": "Test scheme for a ruin warband",
+     "subreddit": "minipainting",
+     "permalink": "/r/minipainting/comments/demoimg4/test_scheme_for_a_ruin_warband/",
+     "author": "sample_author_49",
+     "created_utc": 1790876400,
+     "score": 143,
+     "num_comments": 15,
+     "over_18": false,
+     "is_self": false,
+     "post_hint": "image",
+     "url": "https://www.reddit.com/r/minipainting/comments/demoimg4/test_scheme_for_a_ruin_warband/",
+     "thumbnail": "http://127.0.0.1:8790/reddit-image-04.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-image-04.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demoimg5",
+     "id": "demoimg5",
+     "title": "Practice sheet: uncial lowercase",
+     "subreddit": "calligraphy",
+     "permalink": "/r/calligraphy/comments/demoimg5/practice_sheet_uncial_lowercase/",
+     "author": "sample_author_50",
+     "created_utc": 1790880000,
+     "score": 77,
+     "num_comments": 4,
+     "over_18": false,
+     "is_self": false,
+     "post_hint": "image",
+     "url": "https://www.reddit.com/r/calligraphy/comments/demoimg5/practice_sheet_uncial_lowercase/",
+     "thumbnail": "http://127.0.0.1:8790/reddit-image-05.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-image-05.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demovid1",
+     "id": "demovid1",
+     "title": "Ink swirling in a glass of water (4-second loop)",
+     "subreddit": "oddlysatisfying",
+     "permalink": "/r/oddlysatisfying/comments/demovid1/ink_swirling_in_a_glass_of_water/",
+     "author": "sample_author_51",
+     "created_utc": 1790883600,
+     "score": 431,
+     "num_comments": 18,
+     "over_18": false,
+     "is_self": false,
+     "is_video": true,
+     "post_hint": "hosted:video",
+     "url": "http://127.0.0.1:8790/reddit-video-01.mp4",
+     "thumbnail": "http://127.0.0.1:8790/reddit-video-01-poster.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-video-01-poster.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     },
+     "media": {
+      "reddit_video": {
+       "fallback_url": "http://127.0.0.1:8790/reddit-video-01.mp4",
+       "duration": 4,
+       "width": 640,
+       "height": 360,
+       "is_gif": false
+      }
+     }
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "name": "t3_demovid2",
+     "id": "demovid2",
+     "title": "Planing a board in slow motion (3-second loop)",
+     "subreddit": "woodworking",
+     "permalink": "/r/woodworking/comments/demovid2/planing_a_board_in_slow_motion/",
+     "author": "sample_author_52",
+     "created_utc": 1790887200,
+     "score": 205,
+     "num_comments": 11,
+     "over_18": false,
+     "is_self": false,
+     "is_video": true,
+     "post_hint": "hosted:video",
+     "url": "http://127.0.0.1:8790/reddit-video-02.mp4",
+     "thumbnail": "http://127.0.0.1:8790/reddit-video-02-poster.jpg",
+     "preview": {
+      "enabled": true,
+      "images": [
+       {
+        "source": {
+         "url": "http://127.0.0.1:8790/reddit-video-02-poster.jpg",
+         "width": 640,
+         "height": 360
+        }
+       }
+      ]
+     },
+     "media": {
+      "reddit_video": {
+       "fallback_url": "http://127.0.0.1:8790/reddit-video-02.mp4",
+       "duration": 3,
+       "width": 640,
+       "height": 360,
+       "is_gif": false
+      }
+     }
+    }
    }
   ]
  }
