@@ -63,19 +63,34 @@ boundary: audit every new docs, fixture and script path.
 | `scripts/verify-media-mirror.bat`, `scripts/verify-mirror-media.bat` | mirror verifiers for those drive paths |
 | `scripts/wp1_p4_backup_strategy.py` | one-off Windows disk-topology measurement |
 | `bakeoff/` | one-off model-bakeoff plans, routing notes and run artifacts (moved to private in `495498c`); they name personal machine paths |
+| `docs/internal/` | private recording and other internal notes; never previously published |
 
-Kept because they are generic and tested: `scripts/verify_mirror_media.ts` (pair it with your own
-mirror command) and `scripts/demo.sh`. `docs/ai-suggestions.md`, `docs/DEMO.md` and
-`docs/design/hooks.md` stay public but must not name the handle, the owner email, a sibling
-repository path or a private runbook.
+### Tracked, private-only after the public cutoff
+
+The already-published paths in [`scripts/public-exclude-after-cutoff.txt`](../scripts/public-exclude-after-cutoff.txt)
+are removed only from commits after public main's cutoff
+`ff570f629a4881b50c3753360050de04cfe6b2ff`. Earlier public history remains unchanged and
+accessible: this is a normal removal from the current tree, not a history cleanup.
+
+| Paths | Reason |
+|---|---|
+| `.agents/`, `.claude/`, `.impeccable/` | private contributor tooling |
+| `docs/design/clear-overhaul.md`, `clear-v2.md`, `deck-pass.md`, `hooks.md`, `inline-reddit-reader/` | historical internal designs |
+| `docs/reddit-derisking.md`, `docs/search-operators-spec.md`, `docs/taxonomy.md`, `docs/reddit-management.md` | historical internal plans and notes |
+| `scripts/wp1_p13_defense_review.py`, `scripts/gen_sandbox_fixtures.py`, `scripts/flag_dead_gfycat.py` | local one-off analysis or data mutation |
+| `requirements.txt`, `uv.lock` | obsolete Python application dependencies |
+
+Kept because they support public workflows: `scripts/verify_mirror_media.ts` (pair it with your
+own mirror command), `scripts/demo.sh`, and `scripts/serve_mobile.ps1`. The optional
+`scripts/gen_splash_screens.py` regenerates iOS splash images and requires Python and Pillow;
+neither is required to run the app. `docs/ai-suggestions.md` and `docs/DEMO.md` stay public
+and must not name the handle, owner email, a sibling repository path or a private runbook.
 
 ### Needs-scrub (regenerate, don't commit output)
 
-- `tests/fixtures/sandbox/` output from `scripts/gen_sandbox_fixtures.py` —
-  the script's own docstring warns: "output contains REAL personal data
-  (usernames, titles, URLs, comment text). Do NOT commit." The committed
-  fixtures under that path are hand-written synthetic examples; the script
-  regenerates LOCAL-only copies for testing.
+- Generated `tests/fixtures/sandbox/` data can contain real usernames, titles, URLs and comment
+  text. Never commit regenerated personal data. The committed fixtures are hand-written synthetic
+  examples.
 
 ## The repeatable check
 
@@ -140,7 +155,7 @@ git filter-repo --force \
   --path scripts/bakeoff_arm.py --path scripts/bakeoff_batch.py \
   --path scripts/mirror-media.bat --path scripts/verify-media-mirror.bat \
   --path scripts/verify-mirror-media.bat --path scripts/wp1_p4_backup_strategy.py \
-  --path bakeoff/ \
+  --path bakeoff/ --path docs/internal/ \
   --name-callback 'return name if name in (b"asmartin-ai", b"Claude", b"GitHub", b"Zed") else b"asmartin-ai"' \
   --email-callback 'return email if email.endswith(b"noreply.github.com") or email in (b"noreply@anthropic.com", b"hi@zed.dev") else b"291404369+asmartin-ai@users.noreply.github.com"'
 git filter-repo --force --replace-text ~/.config/content-hoarder/public-replace.txt
@@ -152,6 +167,18 @@ for line in open(path, "rb").read().splitlines():
         old, new = line.split(b"==>", 1)
         message = message.replace(old, new)
 return message'
+CUT=ff570f629a4881b50c3753360050de04cfe6b2ff
+git ls-tree -r --name-only "$CUT" -- $(cat scripts/public-exclude-after-cutoff.txt) > /tmp/ch-public-delete.txt
+CUT=$CUT git filter-repo --force \
+  --invert-paths --paths-from-file scripts/public-exclude-after-cutoff.txt \
+  --refs "$CUT..main" \
+  --commit-callback '
+import os
+cut = os.environ["CUT"].encode()
+if cut in commit.parents:
+    for name in open("/tmp/ch-public-delete.txt", "rb").read().splitlines():
+        commit.file_changes.append(FileChange(b"D", name))'
+rm /tmp/ch-public-delete.txt
 git log --format='%an|%ae|%cn|%ce' | sort -u   # only no-reply identities
 bun install --frozen-lockfile && bun run check
 bun run scripts/publish_safety_check.ts --history
