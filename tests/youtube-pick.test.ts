@@ -138,11 +138,16 @@ function setCookies(response: Response) {
   );
 }
 
-function googleApi(sub: string, ids: string[] = ["PL1", "PL2"]): Fetcher {
+function googleApi(
+  sub: string,
+  ids: string[] = ["PL1", "PL2"],
+  scope = "openid email https://www.googleapis.com/auth/youtube.readonly",
+): Fetcher {
   return async (input) => {
     const url = new URL(input);
 
-    if (url.host === "oauth2.googleapis.com") return Response.json({ access_token: "g-token" });
+    if (url.host === "oauth2.googleapis.com")
+      return Response.json({ access_token: "g-token", scope });
 
     if (url.pathname === "/v1/userinfo")
       return Response.json({ sub, email: `${sub}@example.com`, email_verified: true });
@@ -207,13 +212,43 @@ async function callbackWith(
   return { response, session: setCookies(response).ch_session ?? "" };
 }
 
+async function connect(
+  sub: string,
+  session: string,
+  ids: string[] = ["PL1", "PL2"],
+  scope?: string,
+): Promise<{ response: Response; session: string }> {
+  setHostedFetch(googleApi(sub, ids, scope));
+
+  const cookies = { ch_session: session };
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", cookies),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ...cookies,
+      ...setCookies(start),
+    }),
+  );
+
+  return { response, session: setCookies(response).ch_session ?? session };
+}
+
 async function signIn(
   sub: string,
   ids: string[] = ["PL1", "PL2"],
 ): Promise<{ response: Response; session: string }> {
   setHostedFetch(googleApi(sub, ids));
 
-  return callbackWith(await inviteCookies());
+  const { response, session } = await callbackWith(await inviteCookies());
+
+  if (!session) return { response, session };
+
+  return connect(sub, session, ids);
 }
 
 function countYoutube(sub: string): number {
@@ -351,9 +386,11 @@ test("starting a new authorization invalidates the prior generation", async () =
   const view = await chosen(session);
 
   expect(
-    (await handle(request("/oauth/google/start?return=/add", { ch_session: session }))).headers.get(
-      "location",
-    ),
+    (
+      await handle(
+        request("/oauth/google/start?connect=youtube&return=/add", { ch_session: session }),
+      )
+    ).headers.get("location"),
   ).toContain("accounts.google.com");
   expect(await listed(session)).toEqual({ state: "none" });
   expect((await startImport(session, ["PL1"], view.generation)).status).toBe(409);
@@ -550,7 +587,17 @@ test("a stalled import is aborted at its deadline and writes nothing", async () 
 });
 
 test("a failed listing never logs the provider body or the token", async () => {
-  const opened = await inviteCookies();
+  setHostedFetch(googleApi("sentinel-listing"));
+
+  const { session } = await callbackWith(await inviteCookies());
+
+  expect(session).toBeTruthy();
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=/add", { ch_session: session }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
   const errors: string[] = [];
 
   const spy = spyOn(console, "error").mockImplementation((...args: unknown[]) => {
@@ -561,17 +608,23 @@ test("a failed listing never logs the provider body or the token", async () => {
     setHostedFetch(async (input) => {
       const url = new URL(input);
 
-      if (url.host === "oauth2.googleapis.com") return Response.json({ access_token: "g-token" });
-
-      if (url.pathname === "/v1/userinfo")
-        return Response.json({ sub: "sentinel-listing", email: "s@example.com" });
+      if (url.host === "oauth2.googleapis.com")
+        return Response.json({
+          access_token: "g-token",
+          scope: "openid email https://www.googleapis.com/auth/youtube.readonly",
+        });
 
       return new Response("echo SENTINEL-TOKEN", { status: 500 });
     });
 
-    const { session } = await callbackWith(opened);
+    const response = await handle(
+      request(`/oauth/google/callback?state=${state}&code=abc`, {
+        ch_session: session,
+        ...setCookies(start),
+      }),
+    );
 
-    expect(session).toBeTruthy();
+    expect(response.headers.get("location")).toBe("/add?youtube=choose");
     expect(errors.join(" ")).not.toContain("SENTINEL-TOKEN");
     expect(errors.join(" ")).toContain("youtube playlist listing failed: status 500");
   } finally {
@@ -611,23 +664,38 @@ test("a failed import never logs the provider body or the token", async () => {
 });
 
 test("a failed playlist listing lands on Add with an error and no choice", async () => {
-  const opened = await inviteCookies();
+  setHostedFetch(googleApi("broken"));
+
+  const { session } = await callbackWith(await inviteCookies());
+
+  expect(session).toBeTruthy();
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=/add", { ch_session: session }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
 
   setHostedFetch(async (input) => {
     const url = new URL(input);
 
-    if (url.host === "oauth2.googleapis.com") return Response.json({ access_token: "g-token" });
-
-    if (url.pathname === "/v1/userinfo")
-      return Response.json({ sub: "broken", email: "broken@example.com" });
+    if (url.host === "oauth2.googleapis.com")
+      return Response.json({
+        access_token: "g-token",
+        scope: "openid email https://www.googleapis.com/auth/youtube.readonly",
+      });
 
     return new Response("boom", { status: 500 });
   });
 
-  const { response, session } = await callbackWith(opened);
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ch_session: session,
+      ...setCookies(start),
+    }),
+  );
 
   expect(response.headers.get("location")).toBe("/add?youtube=choose");
-  expect(session).toBeTruthy();
 
   const add = await handle(request("/add?youtube=choose", { ch_session: session }));
 
@@ -641,7 +709,7 @@ test("a failed reauthorization clears the old choice", async () => {
   const view = await chosen(first.session);
 
   const start = await handle(
-    request("/oauth/google/start?return=/add", { ch_session: first.session }),
+    request("/oauth/google/start?connect=youtube&return=/add", { ch_session: first.session }),
   );
 
   const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
@@ -667,9 +735,17 @@ test("a failed reauthorization clears the old choice", async () => {
 
 test("an older callback failing does not erase a newer successful choice", async () => {
   const { session } = await signIn("order");
-  const older = await handle(request("/oauth/google/start?return=/add", { ch_session: session }));
+
+  const older = await handle(
+    request("/oauth/google/start?connect=youtube&return=/add", { ch_session: session }),
+  );
+
   const olderState = new URL(older.headers.get("location") ?? "").searchParams.get("state") ?? "";
-  const newer = await handle(request("/oauth/google/start?return=/add", { ch_session: session }));
+
+  const newer = await handle(
+    request("/oauth/google/start?connect=youtube&return=/add", { ch_session: session }),
+  );
+
   const newerState = new URL(newer.headers.get("location") ?? "").searchParams.get("state") ?? "";
 
   setHostedFetch(googleApi("order"));
@@ -701,42 +777,27 @@ test("an older callback failing does not erase a newer successful choice", async
   expect(after.generation).toBe(fresh.generation);
 });
 
-test("a signed-out older callback failing does not erase the newer choice", async () => {
-  const opened = await inviteCookies();
-  const older = await handle(request("/oauth/google/start?return=/add", opened));
-  const olderState = new URL(older.headers.get("location") ?? "").searchParams.get("state") ?? "";
-  const newer = await handle(request("/oauth/google/start?return=/add", opened));
-  const newerState = new URL(newer.headers.get("location") ?? "").searchParams.get("state") ?? "";
+test("a signed-out connect behaves as plain sign-in and leaves the choice alone", async () => {
+  const { session } = await signIn("unsigned-order");
+  const fresh = await chosen(session);
 
   setHostedFetch(googleApi("unsigned-order"));
 
-  const success = await handle(
-    request(`/oauth/google/callback?state=${newerState}&code=abc`, {
+  const opened = await inviteCookies();
+  const start = await handle(request("/oauth/google/start?connect=youtube&return=/add", opened));
+  const params = new URL(start.headers.get("location") ?? "").searchParams;
+
+  expect(params.get("scope")).toBe("openid email");
+  expect(params.get("include_granted_scopes")).toBeNull();
+  expect(params.get("login_hint")).toBeNull();
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${params.get("state") ?? ""}&code=abc`, {
       ...opened,
-      ...setCookies(newer),
+      ...setCookies(start),
     }),
   );
 
-  const session = setCookies(success).ch_session ?? "";
-  const fresh = await chosen(session);
-
-  setHostedFetch(async (input) => {
-    const url = new URL(input);
-
-    if (url.host === "oauth2.googleapis.com") return Response.json({ access_token: "g-token" });
-
-    if (url.pathname === "/v1/userinfo")
-      return Response.json({ sub: "unsigned-order", email: "u@example.com" });
-
-    return new Response("boom", { status: 500 });
-  });
-
-  await handle(
-    request(`/oauth/google/callback?state=${olderState}&code=abc`, {
-      ...opened,
-      ...setCookies(older),
-    }),
-  );
-
+  expect(response.headers.get("location")).toBe("/add");
   expect((await chosen(session)).generation).toBe(fresh.generation);
 });

@@ -39,6 +39,10 @@ function recordImported(library: Database, id: string): void {
   db.setSetting(library, IMPORTED_SETTING, JSON.stringify([...stored].sort()));
 }
 
+export function youtubeImported(sub: string): boolean {
+  return importedPlaylists(libraryConnection(sub)).size > 0;
+}
+
 export function youtubeChoiceView(sub: string): YoutubeChoiceView {
   const choice = youtubeChoice(sub);
 

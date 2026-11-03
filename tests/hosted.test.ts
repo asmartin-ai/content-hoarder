@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import * as db from "../src/db.ts";
 import { createInvite, setHostedFetch } from "../src/hosted.ts";
 import { handle } from "../src/web/routes.ts";
 import {
@@ -79,11 +80,51 @@ function setCookies(response: Response) {
   );
 }
 
-function googleApi(sub: string, hasChannel = true): (input: string) => Promise<Response> {
+function postRequest(path: string, cookies: Record<string, string> = {}): Request {
+  const headers = new Headers({ host: HOST, origin: ORIGIN, accept: "text/html" });
+
+  const cookie = Object.entries(cookies)
+    .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
+    .join("; ");
+
+  if (cookie) headers.set("cookie", cookie);
+
+  return new Request(`${ORIGIN}${path}`, { method: "POST", headers });
+}
+
+function seedItem(
+  sub: string,
+  id: string,
+  opts: { status?: string; metadata?: Record<string, number> } = {},
+): void {
+  const now = Math.floor(Date.now() / 1000);
+
+  libraryConnection(sub)
+    .query(
+      "INSERT INTO items(fullname, source, source_id, first_seen_utc, last_seen_utc, status, " +
+        "processed_utc, metadata) VALUES (?, 'youtube', ?, ?, ?, ?, ?, ?)",
+    )
+    .run(
+      `youtube:${id}`,
+      id,
+      now,
+      now,
+      opts.status ?? "inbox",
+      opts.status && opts.status !== "inbox" ? now : null,
+      JSON.stringify(opts.metadata ?? {}),
+    );
+}
+
+function googleApi(
+  sub: string,
+  hasChannel = true,
+  scope = "openid email https://www.googleapis.com/auth/youtube.readonly",
+): (input: string) => Promise<Response> {
   return async (input) => {
     const url = new URL(input);
 
-    if (url.host === "oauth2.googleapis.com") return Response.json({ access_token: "g-token" });
+    if (url.host === "oauth2.googleapis.com")
+      return Response.json({ access_token: "g-token", scope });
 
     if (url.pathname === "/v1/userinfo")
       return Response.json({ sub, email: `${sub}@example.com`, email_verified: true });
@@ -128,6 +169,33 @@ async function googleSignIn(
   const response = await handle(
     request(`/oauth/google/callback?state=${state}&code=abc`, {
       ...extra,
+      ...setCookies(start),
+    }),
+  );
+
+  await currentPull(libraryConnection(sub))?.settled;
+
+  return { response, cookies: setCookies(response) };
+}
+
+async function connectYoutube(
+  sub: string,
+  session: string,
+  opts: { hasChannel?: boolean; scope?: string } = {},
+): Promise<{ response: Response; cookies: Record<string, string> }> {
+  setHostedFetch(googleApi(sub, opts.hasChannel ?? true, opts.scope));
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", {
+      ch_session: session,
+    }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ch_session: session,
       ...setCookies(start),
     }),
   );
@@ -231,11 +299,15 @@ test("an invite lets one Google account in once and chooses its YouTube", async 
   const { response, cookies } = await googleSignIn("friend", setCookies(opened));
 
   expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("/add?youtube=choose");
+  expect(response.headers.get("location")).toBe("/add");
   expect(cookies.ch_session).toBeTruthy();
   expect(countSource("friend", "youtube")).toBe(0);
 
   const session = cookies.ch_session ?? "";
+  const connected = await connectYoutube("friend", session);
+
+  expect(connected.response.headers.get("location")).toBe("/add?youtube=choose");
+  expect(countSource("friend", "youtube")).toBe(0);
 
   expect((await importYoutube("friend", session, ["PL1"])).status).toBe(200);
   expect(countSource("friend", "youtube")).toBe(1);
@@ -261,7 +333,7 @@ test("an invite lets one Google account in once and chooses its YouTube", async 
   expect(returning.cookies.ch_session).toBeTruthy();
 });
 
-test("Google sign-in reads only the playlist list and imports nothing", async () => {
+test("Google sign-in asks only for the account and email and touches no YouTube data", async () => {
   const opened = await handle(request(`/invite/${createInvite(connection())}`));
   const calls: string[] = [];
   const api = googleApi("lister");
@@ -273,7 +345,12 @@ test("Google sign-in reads only the playlist list and imports nothing", async ()
   });
 
   const start = await handle(request("/oauth/google/start?return=/add", setCookies(opened)));
-  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+  const authorize = new URL(start.headers.get("location") ?? "");
+  const state = authorize.searchParams.get("state") ?? "";
+
+  expect(authorize.searchParams.get("scope")).toBe("openid email");
+  expect(authorize.searchParams.get("include_granted_scopes")).toBeNull();
+  expect(authorize.searchParams.get("login_hint")).toBeNull();
 
   const response = await handle(
     request(`/oauth/google/callback?state=${state}&code=abc`, {
@@ -282,11 +359,40 @@ test("Google sign-in reads only the playlist list and imports nothing", async ()
     }),
   );
 
-  const session = { ch_session: setCookies(response).ch_session ?? "" };
+  expect(response.headers.get("location")).toBe("/add");
+  expect(calls.filter((path) => path.startsWith("/youtube/"))).toEqual([]);
+  expect(countSource("lister", "youtube")).toBe(0);
+});
+
+test("connecting YouTube asks for the YouTube scope and offers the playlist choice", async () => {
+  const invite = createInvite(connection());
+  const opened = await handle(request(`/invite/${invite}`));
+  const { cookies } = await googleSignIn("connector", setCookies(opened));
+  const session = { ch_session: cookies.ch_session ?? "" };
+
+  setHostedFetch(googleApi("connector"));
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", session),
+  );
+
+  const authorize = new URL(start.headers.get("location") ?? "");
+  const state = authorize.searchParams.get("state") ?? "";
+
+  expect(authorize.searchParams.get("scope")).toBe(
+    "openid email https://www.googleapis.com/auth/youtube.readonly",
+  );
+  expect(authorize.searchParams.get("include_granted_scopes")).toBe("true");
+  expect(authorize.searchParams.get("login_hint")).toBe("connector@example.com");
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ...session,
+      ...setCookies(start),
+    }),
+  );
 
   expect(response.headers.get("location")).toBe("/add?youtube=choose");
-  expect(calls.filter((path) => path.startsWith("/youtube/"))).toEqual(["/youtube/v3/playlists"]);
-  expect(countSource("lister", "youtube")).toBe(0);
 
   const listed = await handle(
     new Request(`${ORIGIN}/youtube/playlists`, {
@@ -299,6 +405,206 @@ test("Google sign-in reads only the playlist list and imports nothing", async ()
   );
 
   expect(await listed.json()).toMatchObject({ state: "choose" });
+  expect(countSource("connector", "youtube")).toBe(0);
+});
+
+test("un-ticking the YouTube box lands on Add without a choice", async () => {
+  const invite = createInvite(connection());
+  const opened = await handle(request(`/invite/${invite}`));
+  const { cookies } = await googleSignIn("decliner", setCookies(opened));
+  const session = { ch_session: cookies.ch_session ?? "" };
+  const calls: string[] = [];
+
+  setHostedFetch(async (input) => {
+    const path = new URL(input).pathname;
+
+    calls.push(path);
+
+    if (path === "/token") return Response.json({ access_token: "g-token", scope: "openid email" });
+
+    return new Response("unexpected", { status: 500 });
+  });
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", session),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ...session,
+      ...setCookies(start),
+    }),
+  );
+
+  expect(response.headers.get("location")).toBe("/add?youtube=denied");
+  expect(calls.filter((path) => path.startsWith("/youtube/"))).toEqual([]);
+
+  const add = await handle(request("/add?youtube=denied", session));
+
+  expect(await add.text()).toContain("YouTube stays off");
+});
+
+test("Add walks a new friend from bring-in to done, then collapses", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const { cookies } = await googleSignIn("walker", setCookies(opened));
+  const session = cookies.ch_session ?? "";
+  const addPage = async () => (await handle(request("/add", { ch_session: session }))).text();
+
+  expect(await addPage()).toContain('data-onboarding-step="1"');
+  expect(db.getSetting(libraryConnection("walker"), "onboarding_done_seen")).toBeNull();
+
+  await connectYoutube("walker", session);
+  expect((await importYoutube("walker", session, ["PL1"])).status).toBe(200);
+  expect(await addPage()).toContain('data-onboarding-step="2"');
+
+  libraryConnection("walker")
+    .query("UPDATE items SET status = 'archived', processed_utc = ? WHERE status = 'inbox'")
+    .run(Math.floor(Date.now() / 1000));
+
+  const done = await addPage();
+
+  expect(done).toContain('data-onboarding-step="3"');
+  expect(done).not.toContain("is-collapsed");
+  expect(await addPage()).not.toContain("is-collapsed");
+  expect(db.getSetting(libraryConnection("walker"), "onboarding_done_seen")).toBeNull();
+
+  expect((await handle(postRequest("/onboarding/seen", { ch_session: session }))).status).toBe(204);
+  expect(db.getSetting(libraryConnection("walker"), "onboarding_done_seen")).toBe("1");
+  expect(await addPage()).toContain("is-collapsed");
+});
+
+test("a swept day fills the welcome's Clear 10 even while the inbox still has items", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const { cookies } = await googleSignIn("sweeper", setCookies(opened));
+  const session = cookies.ch_session ?? "";
+  const now = Math.floor(Date.now() / 1000);
+
+  seedItem("sweeper", "waiting");
+
+  for (let index = 0; index < 10; index += 1)
+    seedItem("sweeper", `swept${index}`, {
+      status: "archived",
+      metadata: { decayed_at: now },
+    });
+
+  const addPage = async () => (await handle(request("/add", { ch_session: session }))).text();
+
+  expect(await addPage()).toContain('data-onboarding-step="3"');
+  expect(await addPage()).not.toContain("is-collapsed");
+  expect(db.getSetting(libraryConnection("sweeper"), "onboarding_done_seen")).toBeNull();
+});
+
+test("cancelling YouTube consent returns to Add with the session intact", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const { cookies } = await googleSignIn("canceller", setCookies(opened));
+  const session = cookies.ch_session ?? "";
+
+  setHostedFetch(googleApi("canceller"));
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", {
+      ch_session: session,
+    }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&error=access_denied`, {
+      ch_session: session,
+      ...setCookies(start),
+    }),
+  );
+
+  expect(response.headers.get("location")).toBe("/add?youtube=denied");
+  expect(setCookies(response).ch_session).toBeUndefined();
+
+  const add = await handle(request("/add?youtube=denied", { ch_session: session }));
+
+  expect(add.status).toBe(200);
+  expect(await add.text()).toContain("YouTube stays off");
+});
+
+test("cancelling sign-in still returns to sign-in", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const start = await handle(request("/oauth/google/start?return=/add", setCookies(opened)));
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&error=access_denied`, {
+      ...setCookies(opened),
+      ...setCookies(start),
+    }),
+  );
+
+  expect(response.headers.get("location")).toBe("/auth/login");
+  expect(setCookies(response).ch_session).toBeUndefined();
+});
+
+test("a connect callback after logout does not sign the account back in", async () => {
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const { cookies } = await googleSignIn("logged-out", setCookies(opened));
+  const session = cookies.ch_session ?? "";
+
+  setHostedFetch(googleApi("logged-out"));
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", {
+      ch_session: session,
+    }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  expect((await handle(postRequest("/auth/logout", { ch_session: session }))).status).toBe(302);
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ch_session: session,
+      ...setCookies(start),
+    }),
+  );
+
+  expect(response.headers.get("location")).toBe("/auth/login");
+  expect(setCookies(response).ch_session).toBeUndefined();
+});
+
+test("a connect callback from another signed-in account is refused", async () => {
+  const first = await googleSignIn(
+    "first-account",
+    setCookies(await handle(request(`/invite/${createInvite(connection())}`))),
+  );
+
+  const second = await googleSignIn(
+    "second-account",
+    setCookies(await handle(request(`/invite/${createInvite(connection())}`))),
+  );
+
+  const firstSession = first.cookies.ch_session ?? "";
+  const secondSession = second.cookies.ch_session ?? "";
+
+  setHostedFetch(googleApi("first-account"));
+
+  const start = await handle(
+    request("/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose", {
+      ch_session: firstSession,
+    }),
+  );
+
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const response = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ch_session: secondSession,
+      ...setCookies(start),
+    }),
+  );
+
+  expect(response.headers.get("location")).toBe("/add?youtube=denied");
+  expect(setCookies(response).ch_session).toBeUndefined();
+  expect((await handle(request("/", { ch_session: secondSession }))).status).toBe(200);
 });
 
 test("a tampered state is refused", async () => {
@@ -316,23 +622,16 @@ test("an account without a YouTube channel still signs in and can choose its lik
   const invite = createInvite(connection());
   const opened = await handle(request(`/invite/${invite}`));
 
-  setHostedFetch(googleApi("viewer", false));
-  const start = await handle(request("/oauth/google/start?return=/add", setCookies(opened)));
-  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+  const { response, cookies } = await googleSignIn("viewer", setCookies(opened));
+  const session = cookies.ch_session ?? "";
 
-  const response = await handle(
-    request(`/oauth/google/callback?state=${state}&code=abc`, {
-      ...setCookies(opened),
-      ...setCookies(start),
-    }),
-  );
-
-  const session = setCookies(response).ch_session ?? "";
-
-  expect(response.headers.get("location")).toBe("/add?youtube=choose");
+  expect(response.headers.get("location")).toBe("/add");
   expect(session).toBeTruthy();
   expect(countSource("viewer", "youtube")).toBe(0);
 
+  const connected = await connectYoutube("viewer", session, { hasChannel: false });
+
+  expect(connected.response.headers.get("location")).toBe("/add?youtube=choose");
   expect((await importYoutube("viewer", session, ["LL"])).status).toBe(200);
   expect(countSource("viewer", "youtube")).toBe(1);
 });
@@ -393,6 +692,7 @@ test("each account has its own library", async () => {
     const { cookies } = await googleSignIn(sub, setCookies(opened));
     const session = cookies.ch_session ?? "";
 
+    await connectYoutube(sub, session);
     await importYoutube(sub, session, ["LL"]);
     sessions.push(session);
   }

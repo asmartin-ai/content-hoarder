@@ -3340,6 +3340,56 @@ export function redditSubredditCounts(
   ).map((r) => ({ subreddit: String(r.subreddit), count: Number(r.c) }));
 }
 
+export interface DailyProgress {
+  cleared: number;
+  swept: number;
+}
+
+export interface LibraryPresence {
+  empty: boolean;
+  inbox: boolean;
+}
+
+export function clearedTotal(db: Database): number {
+  return scalar(db, "SELECT COUNT(*) AS c FROM items WHERE status != 'inbox'");
+}
+
+export function dailyProgress(
+  db: Database,
+  opts: { now?: number | null; zone?: string } = {},
+): DailyProgress {
+  const now = Math.floor(
+    opts.now !== undefined && opts.now !== null ? opts.now : Date.now() / 1000,
+  );
+
+  const midnight = Math.floor(localMidnight(now * 1000, opts.zone ?? serverZone()) / 1000);
+
+  const cleared = scalar(
+    db,
+    "SELECT COUNT(*) AS c FROM items WHERE processed_utc >= ? AND status != 'inbox' " +
+      "AND json_extract(metadata, '$.decayed_at') IS NULL",
+    [midnight],
+  );
+
+  const swept = scalar(
+    db,
+    "SELECT COUNT(*) AS c FROM items WHERE json_extract(metadata, '$.decayed_at') >= ?",
+    [midnight],
+  );
+
+  return { cleared, swept };
+}
+
+export function libraryPresence(db: Database): LibraryPresence {
+  const facts = row<{ empty: number; inbox: number }>(
+    db,
+    "SELECT NOT EXISTS(SELECT 1 FROM items) AS empty, " +
+      "EXISTS(SELECT 1 FROM items WHERE status = 'inbox') AS inbox",
+  );
+
+  return { empty: Number(facts?.empty ?? 1) === 1, inbox: Number(facts?.inbox ?? 0) === 1 };
+}
+
 export function pulse(
   db: Database,
   opts: { now?: number | null; zone?: string } = {},
@@ -3354,12 +3404,7 @@ export function pulse(
     midnight,
   ]);
 
-  const clearedToday = scalar(
-    db,
-    "SELECT COUNT(*) AS c FROM items WHERE processed_utc >= ? AND status != 'inbox' " +
-      "AND json_extract(metadata, '$.decayed_at') IS NULL",
-    [midnight],
-  );
+  const progress = dailyProgress(db, { now, zone: opts.zone });
 
   const sweptRecent = scalar(
     db,
@@ -3367,20 +3412,12 @@ export function pulse(
     [now - 30 * 86400],
   );
 
-  const sweptToday = scalar(
-    db,
-    "SELECT COUNT(*) AS c FROM items WHERE json_extract(metadata, '$.decayed_at') >= ?",
-    [midnight],
-  );
-
-  const clearedTotal = scalar(db, "SELECT COUNT(*) AS c FROM items WHERE status != 'inbox'");
-
   return {
     new_today: newToday,
-    cleared_today: clearedToday,
+    cleared_today: progress.cleared,
     swept_recent: sweptRecent,
-    swept_today: sweptToday,
-    cleared_total: clearedTotal,
+    swept_today: progress.swept,
+    cleared_total: clearedTotal(db),
   };
 }
 

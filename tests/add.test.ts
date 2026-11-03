@@ -36,6 +36,35 @@ async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
   }
 }
 
+const HOSTED_KEYS = [
+  "CONTENT_HOARDER_PUBLIC_ORIGIN",
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+] as const;
+
+function squash(value: string): string {
+  return value.replace(/\s+/g, " ");
+}
+
+function withHosted<T>(fn: () => T): T {
+  const saved = HOSTED_KEYS.map((key) => process.env[key]);
+
+  process.env.CONTENT_HOARDER_PUBLIC_ORIGIN = "https://demo.khaos.test";
+  process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+
+  try {
+    return fn();
+  } finally {
+    HOSTED_KEYS.forEach((key, index) => {
+      const value = saved[index];
+
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+}
+
 test("a Chrome bookmarks export keeps folders, maps YouTube and skips scripts", () => {
   const items = get("bookmarks").importFile(
     join(import.meta.dir, "fixtures", "bookmarks-chrome.html"),
@@ -310,38 +339,125 @@ test("a hostile playlist title stays text in the chooser", () => {
   expect(page).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &quot;quoted&quot;");
 });
 
-test("an expired YouTube sign-in offers the chooser again", () => {
+test("an expired YouTube sign-in offers the connect button again", () => {
   const page = renderAdd(undefined, undefined, { state: "expired" }).value;
 
   expect(page).toContain("Your YouTube sign-in timed out.");
-  expect(page).toContain('href="/oauth/google/start?return=/add%3Fyoutube%3Dchoose"');
+  expect(page).toContain(
+    'href="/oauth/google/start?connect=youtube&amp;return=%2Fadd%3Fyoutube%3Dchoose"',
+  );
+  expect(page).toContain("Connect YouTube");
   expect(page).not.toContain("data-youtube-choice");
 });
 
-test("hosted Add always offers the YouTube chooser link", () => {
-  const keys = [
-    "CONTENT_HOARDER_PUBLIC_ORIGIN",
-    "GOOGLE_OAUTH_CLIENT_ID",
-    "GOOGLE_OAUTH_CLIENT_SECRET",
-  ] as const;
+test("hosted Add offers Connect YouTube until a playlist import happens", () => {
+  const connectHref =
+    'href="/oauth/google/start?connect=youtube&amp;return=%2Fadd%3Fyoutube%3Dchoose"';
 
-  const saved = keys.map((key) => process.env[key]);
+  withHosted(() => {
+    const fresh = renderAdd(undefined).value;
 
-  process.env.CONTENT_HOARDER_PUBLIC_ORIGIN = "https://demo.khaos.test";
-  process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
-  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    expect(fresh).toContain("Connect YouTube");
+    expect(fresh).toContain(connectHref);
+    expect(fresh).not.toContain("Choose more YouTube playlists");
 
-  try {
-    const page = renderAdd(undefined).value;
+    const returning = renderAdd(undefined, undefined, undefined, undefined, true).value;
 
-    expect(page).toContain("Choose YouTube playlists");
-    expect(page).toContain('href="/oauth/google/start?return=/add%3Fyoutube%3Dchoose"');
-  } finally {
-    keys.forEach((key, index) => {
-      const value = saved[index];
+    expect(returning).toContain("Choose more YouTube playlists");
+    expect(returning).toContain(connectHref);
+  });
+});
 
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    });
-  }
+test("an un-ticked YouTube box lands on a calm note", () => {
+  const page = renderAdd(undefined, undefined, { state: "denied" }).value;
+
+  expect(page).toContain("No problem — YouTube stays off. You can connect it any time.");
+  expect(page).not.toContain("data-youtube-choice");
+});
+
+test("the welcome starts at step one with the three source doors", () => {
+  const page = squash(
+    withHosted(
+      () => renderAdd(undefined, undefined, undefined, { step: 1, collapsed: false }).value,
+    ),
+  );
+
+  expect(page).toContain('data-onboarding-step="1"');
+  expect(page).toContain("Bring in your saves");
+  expect(page).toContain("Tabs/links");
+  expect(page).toContain('href="#add-tabs"');
+  expect(page).toContain('href="#add-reddit"');
+  expect(page).toContain('href="/clear"');
+  expect(page).toContain(
+    "Google will warn that it hasn't verified Khaos yet. Tap Advanced, then Go to khaosapp.tech, and tick the YouTube box.",
+  );
+  expect(page).toMatch(
+    /<li class="add-welcome-step is-current"\s*aria-current="step"\s*>(?:(?!<\/li>)[\s\S])*?aria-hidden="true"\s*>1</,
+  );
+  expect(page).toContain("Step 1 of 3, current.");
+  expect(page).not.toContain("✓");
+});
+
+test("the welcome highlights step two and ticks step one", () => {
+  const page = squash(
+    withHosted(
+      () => renderAdd(undefined, undefined, undefined, { step: 2, collapsed: false }).value,
+    ),
+  );
+
+  expect(page).toContain('data-onboarding-step="2"');
+  expect(page).toMatch(/<li class="add-welcome-step is-done"\s*>/);
+  expect(page).toContain("✓");
+  expect(page).toContain("Step 1 of 3, done.");
+  expect(page).toContain("Step 2 of 3, current.");
+  expect(page).toMatch(
+    /<li class="add-welcome-step is-current"\s*aria-current="step"\s*>(?:(?!<\/li>)[\s\S])*?<a class="add-welcome-link" href="\/clear"\s*>Clear 10<\/a>/,
+  );
+  expect(page).not.toMatch(
+    /<li class="add-welcome-step is-current"\s*aria-current="step"\s*>(?:(?!<\/li>)[\s\S])*?Done for today\. Nothing is owed\./,
+  );
+});
+
+test("step three says the day is done and offers Got it", () => {
+  const page = squash(
+    withHosted(
+      () => renderAdd(undefined, undefined, undefined, { step: 3, collapsed: false }).value,
+    ),
+  );
+
+  expect(page).toContain('data-onboarding-step="3"');
+  expect(page.match(/class="add-welcome-step is-done"/g)?.length).toBeGreaterThanOrEqual(2);
+  expect(page).toContain("Step 3 of 3, current.");
+  expect(page).toContain("Done for today. Nothing is owed.");
+  expect(page).toMatch(
+    /<li class="add-welcome-step is-current"\s*aria-current="step"\s*>(?:(?!<\/li>)[\s\S])*?Done for today\. Nothing is owed\./,
+  );
+  expect(page).toMatch(/<button class="add-welcome-gotit" type="button" data-onboarding-seen\s*>/);
+  expect(page).toMatch(/href="\/clear" data-onboarding-seen\s*>Clear 10<\/a>/);
+});
+
+test("a friend who has finished collapses the welcome to one line", () => {
+  const page = squash(
+    withHosted(
+      () => renderAdd(undefined, undefined, undefined, { step: 3, collapsed: true }).value,
+    ),
+  );
+
+  expect(page).toContain('class="add-welcome is-collapsed"');
+  expect(page).toContain('data-onboarding-step="3"');
+  expect(page).toContain("You're set up ·");
+  expect(page).toContain("<summary>Show steps</summary>");
+  expect(page).toMatch(/<div class="add-welcome-full"\s*hidden\s*>/);
+  expect(page).toMatch(/<div class="add-welcome-collapsed"\s*>/);
+  expect(page).toMatch(/href="\/clear" data-onboarding-seen\s*>Clear 10<\/a>/);
+  expect(page).toContain("Done for today. Nothing is owed.");
+  expect(page).toContain("Step 3 of 3, current.");
+});
+
+test("local Add shows no welcome", () => {
+  const page = renderAdd(undefined, undefined, undefined, { step: 1, collapsed: false }).value;
+
+  expect(page).not.toContain("Start here");
+  expect(page).not.toContain("add-welcome");
+  expect(page).not.toContain("Bring in your saves");
 });

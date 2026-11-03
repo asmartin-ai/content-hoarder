@@ -45,6 +45,7 @@ interface PendingAuth {
   expires: number;
   sub: string | null;
   sequence: number;
+  connectYoutube: boolean;
 }
 
 const PENDING = new Map<string, PendingAuth>();
@@ -53,9 +54,16 @@ let authSequence = 0;
 
 const PENDING_SECONDS = 600;
 
-const GOOGLE_SCOPES = "openid email https://www.googleapis.com/auth/youtube.readonly";
+const GOOGLE_SCOPES = "openid email";
 
-const TokenResponse = z.object({ access_token: z.string().min(1) });
+const YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
+
+const TokenResponse = z.object({
+  access_token: z.string().min(1),
+  scope: z.string().default(""),
+});
+
+const UserEmail = z.object({ email: z.string().default("") });
 
 const GoogleUser = z.object({
   sub: z.string().min(1),
@@ -111,7 +119,12 @@ interface StartedAuth {
   sequence: number;
 }
 
-function begin(provider: Provider, returnPath: string, sub: string | null = null): StartedAuth {
+function begin(
+  provider: Provider,
+  returnPath: string,
+  sub: string | null = null,
+  connectYoutube = false,
+): StartedAuth {
   const time = now();
 
   for (const [key, pending] of PENDING) if (pending.expires <= time) PENDING.delete(key);
@@ -127,6 +140,7 @@ function begin(provider: Provider, returnPath: string, sub: string | null = null
     expires: time + PENDING_SECONDS,
     sub,
     sequence,
+    connectYoutube,
   });
 
   return { state, verifier, sequence };
@@ -150,7 +164,15 @@ function challenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-async function exchange(endpoint: string, fields: Record<string, string>): Promise<string | null> {
+interface ExchangedToken {
+  token: string;
+  scope: string;
+}
+
+async function exchange(
+  endpoint: string,
+  fields: Record<string, string>,
+): Promise<ExchangedToken | null> {
   const response = await hostedFetch()(endpoint, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
@@ -161,7 +183,15 @@ async function exchange(endpoint: string, fields: Record<string, string>): Promi
 
   const token = TokenResponse.safeParse(await response.json().catch(() => null));
 
-  return token.success ? token.data.access_token : null;
+  return token.success ? { token: token.data.access_token, scope: token.data.scope } : null;
+}
+
+function sessionEmail(sub: string): string {
+  const row = UserEmail.safeParse(
+    mainConnection().query("SELECT email FROM hosted_users WHERE sub = ?").get(sub),
+  );
+
+  return row.success ? row.data.email : "";
 }
 
 export function invitePage(token: string): Response {
@@ -192,9 +222,9 @@ export function privacyPage(): Response {
       <p class="auth-line">Khaos is a small pilot run by asmartin-ai.</p>
       <h2>What it reads</h2>
       <ul>
+        <li>Google, when you sign in: your account ID and email, and nothing else.</li>
         <li>
-          Google: your account ID and email, to sign you in. Your YouTube playlists and liked
-          videos, read-only.
+          YouTube, only if you choose Connect YouTube: your playlists and liked videos, read-only.
         </li>
         <li>Twitch, if you connect it: the channels you follow, read-only.</li>
         <li>Files and links you add yourself.</li>
@@ -202,9 +232,9 @@ export function privacyPage(): Response {
       <h2>What it does with it</h2>
       <ul>
         <li>
-          Each sign-in reads the list of your playlists. The access token is kept in server memory
-          for up to 10 minutes while you choose playlists, is used for that one import, and is never
-          written to disk.
+          Signing in reads only your account ID and email. If you choose Connect YouTube, Khaos
+          reads your playlist list and keeps that access token in server memory for up to 10 minutes
+          while you choose playlists; it is used for that one import and never written to disk.
         </li>
         <li>
           Your items are in a library of their own on one server for this pilot. Other testers can't
@@ -254,24 +284,33 @@ export function logout(request: Request): Response {
 }
 
 export function googleStart(request: Request): Response {
-  const returnPath = safeReturn(new URL(request.url).searchParams.get("return"));
+  const url = new URL(request.url);
+  const returnPath = safeReturn(url.searchParams.get("return"));
   const sub = sessionSub(mainConnection(), request);
-  const { state, verifier, sequence } = begin("google", returnPath, sub);
+  const connectYoutube = Boolean(sub) && url.searchParams.get("connect") === "youtube";
+  const { state, verifier, sequence } = begin("google", returnPath, sub, connectYoutube);
 
-  if (sub) beginYoutubeAuth(sub, sequence);
+  if (connectYoutube && sub) beginYoutubeAuth(sub, sequence);
 
   const params = new URLSearchParams({
     client_id: config.get("GOOGLE_OAUTH_CLIENT_ID").trim(),
     redirect_uri: `${hostedOrigin()}/oauth/google/callback`,
     response_type: "code",
-    scope: GOOGLE_SCOPES,
+    scope: connectYoutube ? `${GOOGLE_SCOPES} ${YOUTUBE_SCOPE}` : GOOGLE_SCOPES,
     access_type: "online",
-    include_granted_scopes: "true",
     prompt: "select_account",
     state,
     code_challenge: challenge(verifier),
     code_challenge_method: "S256",
   });
+
+  if (connectYoutube && sub) {
+    params.set("include_granted_scopes", "true");
+
+    const email = sessionEmail(sub);
+
+    if (email) params.set("login_hint", email);
+  }
 
   return redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, [
     cookie(OAUTH_COOKIE, state, PENDING_SECONDS),
@@ -286,9 +325,29 @@ export async function googleCallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const attempt = pending.sequence;
   const code = url.searchParams.get("code") ?? "";
+  const database = mainConnection();
+  const session = sessionSub(database, request);
+
+  if (pending.connectYoutube) {
+    if (!session) {
+      if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+
+      return redirect("/auth/login", [clearedCookie(OAUTH_COOKIE)]);
+    }
+
+    if (session !== pending.sub) {
+      if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+
+      return redirect("/add?youtube=denied", [clearedCookie(OAUTH_COOKIE)]);
+    }
+  }
 
   if (!code) {
-    if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+    if (pending.connectYoutube) {
+      if (session) failYoutubeAuth(session, attempt);
+
+      return redirect("/add?youtube=denied", [clearedCookie(OAUTH_COOKIE)]);
+    }
 
     return redirect("/auth/login", [clearedCookie(OAUTH_COOKIE)]);
   }
@@ -303,25 +362,24 @@ export async function googleCallback(request: Request): Promise<Response> {
   });
 
   if (!token) {
-    if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+    if (pending.sub && pending.connectYoutube) failYoutubeAuth(pending.sub, attempt);
 
     return notice("Google didn't sign you in", "Try again in a minute.", 502);
   }
 
   const deadline = Date.now() + YOUTUBE_CHOICE_SECONDS * 1000;
-  const database = mainConnection();
   const setCookies = [clearedCookie(OAUTH_COOKIE)];
-  let sub = sessionSub(database, request);
+  let sub = session;
 
   if (!sub) {
     const userResponse = await hostedFetch()("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { authorization: `Bearer ${token.token}` },
     });
 
     const user = GoogleUser.safeParse(await userResponse.json().catch(() => null));
 
     if (!userResponse.ok || !user.success) {
-      if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+      if (pending.sub && pending.connectYoutube) failYoutubeAuth(pending.sub, attempt);
 
       return notice("Google didn't sign you in", "Try again in a minute.", 502);
     }
@@ -330,7 +388,7 @@ export async function googleCallback(request: Request): Promise<Response> {
 
     if (!userExists(database, user.data.sub)) {
       if (!invite || !claimInvite(database, invite, user.data.sub, user.data.email)) {
-        if (pending.sub) failYoutubeAuth(pending.sub, attempt);
+        if (pending.sub && pending.connectYoutube) failYoutubeAuth(pending.sub, attempt);
 
         return notice("Khaos is invite-only", "Ask the project owner for an invite link.", 403);
       }
@@ -343,10 +401,20 @@ export async function googleCallback(request: Request): Promise<Response> {
     sub = user.data.sub;
   }
 
-  try {
-    const playlists = await listYoutubePlaylists(token, deadline);
+  if (!pending.connectYoutube) return redirect("/add", setCookies);
 
-    setYoutubeChoice(sub, { token, playlists, expiresAt: deadline }, attempt);
+  const granted = new Set(token.scope.split(/\s+/).filter(Boolean));
+
+  if (!granted.has(YOUTUBE_SCOPE)) {
+    failYoutubeAuth(sub, attempt);
+
+    return redirect("/add?youtube=denied", setCookies);
+  }
+
+  try {
+    const playlists = await listYoutubePlaylists(token.token, deadline);
+
+    setYoutubeChoice(sub, { token: token.token, playlists, expiresAt: deadline }, attempt);
   } catch (error) {
     console.error(
       `youtube playlist listing failed: ${
@@ -404,7 +472,7 @@ export async function twitchCallback(request: Request): Promise<Response> {
 
   if (!library) return done();
 
-  if (token) startPull(library, "twitch", () => pullTwitch(library, token));
+  if (token) startPull(library, "twitch", () => pullTwitch(library, token.token));
   else notePull(library, "twitch", "error");
 
   return done();

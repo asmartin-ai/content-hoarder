@@ -104,13 +104,14 @@ export function upNext(request: Request, url: URL): Response {
 }
 
 export function wins(request: Request): Response {
-  const pulse = db.pulse(connection(), { zone: requestZone(request) });
+  const library = connection();
+  const progress = db.dailyProgress(library, { zone: requestZone(request) });
   const goal = Number.parseInt(cookieValue(request, "ch_goal"), 10);
 
   return fragment(
     renderWins({
-      today: pulse.cleared_today + pulse.swept_today,
-      total: pulse.cleared_total,
+      today: progress.cleared + progress.swept,
+      total: db.clearedTotal(library),
       goal: Number.isInteger(goal) && goal >= 0 ? Math.min(goal, 50) : DEFAULT_GOAL,
     }),
   );

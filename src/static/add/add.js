@@ -225,8 +225,8 @@ function showYoutubeStopped(state) {
   const link = document.createElement("a");
 
   link.className = "add-btn";
-  link.href = "/oauth/google/start?return=/add%3Fyoutube%3Dchoose";
-  link.textContent = "Choose YouTube playlists";
+  link.href = "/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose";
+  link.textContent = "Connect YouTube";
   panel.hidden = false;
   panel.removeAttribute("data-youtube-choice");
   panel.replaceChildren(title, line, link);
@@ -429,6 +429,34 @@ function youtubeBind() {
   if (form) form.addEventListener("submit", importYoutube);
 }
 
+function onboardingSeen(panel) {
+  panel.classList.add("is-collapsed");
+  panel.querySelector(".add-welcome-full").hidden = true;
+  panel.querySelector(".add-welcome-collapsed").hidden = false;
+
+  fetch("/onboarding/seen", { method: "POST", credentials: "same-origin", keepalive: true }).catch(
+    () => {},
+  );
+}
+
+function wireOnboarding() {
+  const panel = document.querySelector(".add-welcome");
+
+  if (!panel) return;
+
+  for (const control of panel.querySelectorAll("[data-onboarding-seen]"))
+    control.addEventListener("click", (event) => {
+      onboardingSeen(panel);
+
+      const href = control.getAttribute("href");
+
+      if (!href) return;
+
+      event.preventDefault();
+      location.assign(href);
+    });
+}
+
 function wireYoutube() {
   const panel = youtubePanel();
 
@@ -482,6 +510,7 @@ function wire() {
     say("Drag it to your bookmarks bar instead, then click it on reddit.com.");
   });
 
+  wireOnboarding();
   wireYoutube();
 }
 

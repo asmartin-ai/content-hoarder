@@ -28,7 +28,7 @@ const PULLED_LABELS = new Map([
   ["twitch", "Twitch"],
 ]);
 
-const YOUTUBE_CHOOSE_HREF = "/oauth/google/start?return=/add%3Fyoutube%3Dchoose";
+const CONNECT_YOUTUBE_HREF = "/oauth/google/start?connect=youtube&return=%2Fadd%3Fyoutube%3Dchoose";
 
 export interface YoutubePlaylistView {
   id: string;
@@ -45,7 +45,13 @@ export type YoutubeChoiceView =
       generation: string;
     }
   | { state: "expired" }
-  | { state: "none" };
+  | { state: "none" }
+  | { state: "denied" };
+
+export interface OnboardingView {
+  step: 1 | 2 | 3;
+  collapsed: boolean;
+}
 
 function playlistRow(playlist: YoutubePlaylistView): SafeHtml {
   return html`<label class="add-yt-row">
@@ -64,13 +70,15 @@ function playlistRow(playlist: YoutubePlaylistView): SafeHtml {
   </label>`;
 }
 
-function youtubeStopped(state: "expired" | "none"): SafeHtml {
+function youtubeStopped(state: "expired" | "none", imported: boolean): SafeHtml {
   const line = state === "expired" ? "Your YouTube sign-in timed out." : "Nothing to choose yet.";
 
   return html`<section class="add-section add-yt" aria-labelledby="add-youtube-title">
     <h2 id="add-youtube-title" tabindex="-1">Choose YouTube playlists</h2>
     <p class="add-note" role="status">${line}</p>
-    <a class="add-btn" href="${YOUTUBE_CHOOSE_HREF}">Choose YouTube playlists</a>
+    <a class="add-btn" href="${CONNECT_YOUTUBE_HREF}"
+      >${imported ? "Choose more YouTube playlists" : "Connect YouTube"}</a
+    >
   </section>`;
 }
 
@@ -102,12 +110,20 @@ function youtubeChooser(playlists: YoutubePlaylistView[], generation: string): S
   </section>`;
 }
 
-function youtubeSection(choice: YoutubeChoiceView | undefined): SafeHtml | string {
+function youtubeSection(
+  choice: YoutubeChoiceView | undefined,
+  imported: boolean,
+): SafeHtml | string {
   if (!choice) return "";
 
   if (choice.state === "choose") return youtubeChooser(choice.playlists, choice.generation);
 
-  return youtubeStopped(choice.state);
+  if (choice.state === "denied")
+    return html`<p class="add-note add-yt-denied" role="status">
+      No problem — YouTube stays off. You can connect it any time.
+    </p>`;
+
+  return youtubeStopped(choice.state, imported);
 }
 
 export function renderPull(pull: LibraryPull | undefined): SafeHtml | string {
@@ -150,7 +166,7 @@ export function renderPull(pull: LibraryPull | undefined): SafeHtml | string {
   </p>`;
 }
 
-function connectSection(): SafeHtml | string {
+function connectSection(imported: boolean): SafeHtml | string {
   const google = googleConfigured();
   const twitch = twitchConfigured();
 
@@ -162,7 +178,9 @@ function connectSection(): SafeHtml | string {
     <div class="add-connect">
       ${
         google
-          ? html`<a class="add-btn" href="${YOUTUBE_CHOOSE_HREF}">Choose YouTube playlists</a>`
+          ? html`<a class="add-btn" href="${CONNECT_YOUTUBE_HREF}"
+              >${imported ? "Choose more YouTube playlists" : "Connect YouTube"}</a
+            >`
           : ""
       }
       ${
@@ -175,6 +193,80 @@ function connectSection(): SafeHtml | string {
       YouTube's Watch Later list can't be read this way (Google blocks it). Liked videos and your
       own playlists come over.
     </p>
+  </section>`;
+}
+
+function onboardingSteps(step: 1 | 2 | 3): SafeHtml {
+  const bodies = new Map<1 | 2 | 3, SafeHtml>([
+    [
+      1,
+      html`<p class="add-welcome-line">Bring in your saves</p>
+        <div class="add-welcome-sources">
+          <a class="add-welcome-chip is-primary" href="${CONNECT_YOUTUBE_HREF}">Connect YouTube</a>
+          <a class="add-welcome-chip" href="#add-reddit">Reddit</a>
+          <a class="add-welcome-chip" href="#add-tabs">Tabs/links</a>
+        </div>
+        <p class="add-welcome-quiet">
+          Google will warn that it hasn't verified Khaos yet. Tap Advanced, then Go to
+          khaosapp.tech, and tick the YouTube box.
+        </p>`,
+    ],
+    [
+      2,
+      html`<p class="add-welcome-line"><a class="add-welcome-link" href="/clear">Clear 10</a></p>`,
+    ],
+    [3, html`<p class="add-welcome-line">Done for today. Nothing is owed.</p>`],
+  ]);
+
+  return html`<ol class="add-welcome-steps">
+    ${([1, 2, 3] as const).map((row) => {
+      const done = row < step;
+      const current = row === step;
+
+      const classes = ["add-welcome-step", current ? "is-current" : "", done ? "is-done" : ""]
+        .filter(Boolean)
+        .join(" ");
+
+      return html`<li class="${classes}" ${current ? html` aria-current="step"` : ""}>
+        <span class="add-sr">Step ${row} of 3${current ? ", current" : done ? ", done" : ""}.</span>
+        <span class="add-welcome-badge" aria-hidden="true">${done ? "✓" : row}</span>
+        <div class="add-welcome-body">${bodies.get(row)}</div>
+      </li>`;
+    })}
+  </ol>`;
+}
+
+function onboardingSection(onboarding: OnboardingView | undefined): SafeHtml | string {
+  if (!onboarding || !hostedOrigin()) return "";
+
+  const steps = onboardingSteps(onboarding.step);
+  const collapsed = onboarding.collapsed;
+
+  return html`<section
+    class="add-welcome${collapsed ? " is-collapsed" : ""}"
+    aria-label="Getting started"
+    data-onboarding-step="${onboarding.step}"
+  >
+    <div class="add-welcome-full" ${collapsed ? html`hidden` : ""}>
+      <h2 class="add-welcome-title">Start here</h2>
+      ${steps}
+      ${
+        onboarding.step === 3
+          ? html`<button class="add-welcome-gotit" type="button" data-onboarding-seen>
+              Got it
+            </button>`
+          : ""
+      }
+    </div>
+    <div class="add-welcome-collapsed" ${collapsed ? "" : html`hidden`}>
+      <p class="add-welcome-summary">
+        You're set up · <a class="add-welcome-link" href="/clear" data-onboarding-seen>Clear 10</a>
+      </p>
+      <details class="add-welcome-more">
+        <summary>Show steps</summary>
+        ${steps}
+      </details>
+    </div>
   </section>`;
 }
 
@@ -197,6 +289,8 @@ export function renderAdd(
   pull: LibraryPull | undefined,
   ai?: AiSettingsView,
   youtube?: YoutubeChoiceView,
+  onboarding?: OnboardingView,
+  youtubeImported = false,
 ): SafeHtml {
   return html`<section class="add-page">
     <header class="add-head">
@@ -204,8 +298,9 @@ export function renderAdd(
       <p class="add-sub">Bring in what you saved. Nothing changes in your accounts.</p>
     </header>
     <div id="add-pull">${renderPull(pull)}</div>
-    ${youtubeSection(youtube)} ${connectSection()} ${aiSection(ai)}
-    <section class="add-section">
+    ${onboardingSection(onboarding)} ${youtubeSection(youtube, youtubeImported)}
+    ${connectSection(youtubeImported)} ${aiSection(ai)}
+    <section class="add-section" id="add-tabs">
       <h2>Tabs on your computer</h2>
       <ol class="add-steps">
         <li>Chrome or Edge: press <b>Ctrl+Shift+D</b> to bookmark all tabs into one folder.</li>
@@ -233,7 +328,7 @@ export function renderAdd(
       </div>
     </section>
     <p id="add-status" class="add-note" hidden role="status"></p>
-    <section class="add-section">
+    <section class="add-section" id="add-reddit">
       <h2>Reddit saves</h2>
       <p class="add-help add-phone">
         On a phone, the button below can't run. Use Reddit's data request instead (last line), or do

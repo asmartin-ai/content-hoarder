@@ -54,7 +54,7 @@ import {
 } from "./handlers/settings.ts";
 import { applySweep, listSweeps, undoSweep } from "./handlers/sweeps.ts";
 import { clearHints, clearPage, deal } from "./handlers/clear.ts";
-import { addPage, pullStatus } from "./handlers/add.ts";
+import { addPage, onboardingSeen, pullStatus } from "./handlers/add.ts";
 import { youtubeRoute } from "./handlers/youtube.ts";
 import { handleVideoExport, handleVideoPrepare } from "./handlers/video.ts";
 import { homePage } from "./handlers/home.ts";
@@ -113,6 +113,12 @@ async function hostedRoute(
   if (method === "GET" && path === "/auth/login") return loginPage();
 
   if (method === "POST" && path === "/auth/logout") return logout(request);
+
+  if (method === "POST" && path === "/onboarding/seen") {
+    const sub = sessionSub(mainConnection(), request);
+
+    return sub ? onboardingSeen(libraryConnection(sub)) : json({ error: "sign in" }, 401);
+  }
 
   if (method === "GET" && path === "/privacy") return privacyPage();
 

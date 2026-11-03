@@ -39,6 +39,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **Optional YouTube connection.** Google sign-in requests only `openid email` and imports nothing.
+  Add welcomes users through bringing in saves, clearing 10 and being done for today. **Connect
+  YouTube** separately requests read-only access; until verification, Google shows its unverified
+  warning and YouTube checkbox. Cancelling or leaving it unticked returns to Add with **YouTube
+  stays off**. See [`src/web/handlers/auth.ts`](src/web/handlers/auth.ts).
+
 - Finishing with an empty inbox offers **Add more saves**.
 
 - Faster, smoother Library on long lists: the next page is appended instead of re-rendering every
@@ -47,11 +53,11 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 - The service worker no longer precaches HLS (543 KB) or the iOS splash images, fetches its shell
   fresh (`cache: "reload"`) so a deploy can't install stale files, and survives one failed file.
   Static files and pages send `Cache-Control: no-cache`. SW cache `ch-shell-v151`.
-- **Choose YouTube playlists.** Hosted Google sign-in lists playlists instead of importing them
-  all. Add starts with none selected, marks those already imported, and offers Select all. Import
-  is enabled after a selection; **Choose YouTube playlists** signs in again to pick more. The
-  access token stays in server memory for up to 10 minutes, is used for one import, and is never
-  written to disk. See [`src/hosted_pull.ts`](src/hosted_pull.ts).
+- **Choose YouTube playlists.** Connecting YouTube lists playlists instead of importing them all.
+  Add starts with none selected, marks those already imported, and offers Select all. Import is
+  enabled after a selection; **Choose YouTube playlists** connects again to pick more. The access
+  token stays in server memory for up to 10 minutes, is used for one import, and is never written
+  to disk. See [`src/hosted_pull.ts`](src/hosted_pull.ts).
 - **Times follow the reader's time zone.** The browser sends its zone (`ch_tz`); Today's greeting
   and date, "cleared today", and Home's week and rhythm use it instead of the server's.
 - **One tester's import no longer slows the others.** Parsing and writing an import runs in a
