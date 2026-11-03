@@ -35,6 +35,15 @@ takes a while — use `--limit` to do it in sessions. Network-only; offline just
 
 ## YouTube playlists (WL2 / WL3)
 
+In hosted mode, Google sign-in lists playlists on Add instead of importing them automatically.
+Tick the playlists to import, or use **Select all**; **Import** is disabled until something is
+selected. **Already imported** marks previous imports. To pick more later, choose **Choose YouTube
+playlists** and sign in again. The access token stays in server memory for up to 10 minutes from
+sign-in, is used for one import, and is never written to disk. See
+[`src/hosted_pull.ts`](../src/hosted_pull.ts).
+
+For the local file import below:
+
 **You need the *playlist* URL, not a video URL.** The link you sent
 (`https://youtu.be/7aWL2iEb6y4`) is a single video ("Why Crows Are as Smart as 7 Year Old
 Humans"). A playlist URL contains `list=PL…`.

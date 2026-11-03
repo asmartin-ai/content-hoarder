@@ -6,6 +6,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Share Reddit videos.** The reader and video lightbox offer **Share video (N MB)**. On
+  supported phones, this opens the system share sheet with an MP4 including sound; otherwise,
+  or above 50 MB, it downloads. The server joins Reddit's picture and sound tracks with ffmpeg
+  without re-encoding and caches the result per library. See [`src/video_export.ts`](src/video_export.ts)
+  and [`src/web/handlers/video.ts`](src/web/handlers/video.ts).
+
 - **Suggestions in Clear.** A gentle highlight marks the Keep or Archive button that AI, with
   per-library consent, or your triage history would pick. No reason text appears on the card;
   the model's reason remains in `metadata.llm` for analysis.
@@ -41,8 +47,11 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 - The service worker no longer precaches HLS (543 KB) or the iOS splash images, fetches its shell
   fresh (`cache: "reload"`) so a deploy can't install stale files, and survives one failed file.
   Static files and pages send `Cache-Control: no-cache`. SW cache `ch-shell-v151`.
-- **Sign-in no longer waits for YouTube.** Google (and Twitch) sign-in lets you in at once; the
-  pull runs in the background and Add shows "bringing your saves over", then the count.
+- **Choose YouTube playlists.** Hosted Google sign-in lists playlists instead of importing them
+  all. Add starts with none selected, marks those already imported, and offers Select all. Import
+  is enabled after a selection; **Choose YouTube playlists** signs in again to pick more. The
+  access token stays in server memory for up to 10 minutes, is used for one import, and is never
+  written to disk. See [`src/hosted_pull.ts`](src/hosted_pull.ts).
 - **Times follow the reader's time zone.** The browser sends its zone (`ch_tz`); Today's greeting
   and date, "cleared today", and Home's week and rhythm use it instead of the server's.
 - **One tester's import no longer slows the others.** Parsing and writing an import runs in a
