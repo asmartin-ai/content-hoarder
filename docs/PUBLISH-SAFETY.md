@@ -72,13 +72,10 @@ are removed only from commits after public main's cutoff
 `ff570f629a4881b50c3753360050de04cfe6b2ff`. Earlier public history remains unchanged and
 accessible: this is a normal removal from the current tree, not a history cleanup.
 
-| Paths | Reason |
-|---|---|
-| `.agents/`, `.claude/`, `.impeccable/` | private contributor tooling |
-| `docs/design/clear-overhaul.md`, `clear-v2.md`, `deck-pass.md`, `hooks.md`, `inline-reddit-reader/` | historical internal designs |
-| `docs/reddit-derisking.md`, `docs/search-operators-spec.md`, `docs/taxonomy.md`, `docs/reddit-management.md` | historical internal plans and notes |
-| `scripts/wp1_p13_defense_review.py`, `scripts/gen_sandbox_fixtures.py`, `scripts/flag_dead_gfycat.py` | local one-off analysis or data mutation |
-| `requirements.txt`, `uv.lock` | obsolete Python application dependencies |
+The exclusion file is frozen for this cutoff. Do not add or remove entries: changing it would
+rewrite post-cutoff commits that may already be public. To exclude another already-published path,
+create a new exclusion file and append a new cutoff pass after this one, with its own current
+public-main cutoff. Freeze that file for its cutoff too.
 
 Kept because they support public workflows: `scripts/verify_mirror_media.ts` (pair it with your
 own mirror command), `scripts/demo.sh`, and `scripts/serve_mobile.ps1`. The optional
@@ -143,7 +140,11 @@ appends the new ones on top, so the candidate stays a fast-forward of public `ma
 push that is not a fast-forward means the build lost commits: stop and investigate instead of
 forcing.
 
+Run the block as one script (`bash publish.sh`), not line by line in an interactive shell: any
+failed step must stop it before the push.
+
 ```sh
+set -euo pipefail
 git -C <public-clone> bundle create /tmp/content-hoarder-public-before.bundle --all
 rm -rf /tmp/ch-public && git clone -q --single-branch --branch main . /tmp/ch-public
 cd /tmp/ch-public
@@ -183,6 +184,7 @@ git log --format='%an|%ae|%cn|%ce' | sort -u   # only no-reply identities
 bun install --frozen-lockfile && bun run check
 bun run scripts/publish_safety_check.ts --history
 gitleaks git --redact --no-banner .
+git remote add origin https://github.com/asmartin-ai/content-hoarder.git
 git fetch origin main
 git merge-base --is-ancestor origin/main HEAD || { echo "not a fast-forward"; exit 1; }
 git push https://x-access-token:"$(GH_TOKEN= gh auth token -u asmartin-ai)"@github.com/asmartin-ai/content-hoarder.git HEAD:main

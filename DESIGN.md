@@ -103,7 +103,7 @@ components:
 
 **Creative North Star: "The Local Log Book"**
 
-content-hoarder should feel like a personal operations log for reducing a messy backlog: calm enough to keep the user from bouncing, fast enough that a decision costs one tap, and tactile enough that each decision feels confirmed. It has three rooms (see `docs/design/clear-overhaul.md`): **Today** (`/`, lamp mode — one lit object, "Clear 10"), **Clear** (`/clear`, focus mode — one card at a time in a finite round), and **Library** (`/library`, bench mode — search, filters, the reader). A dark “night ops” default with a daylight alternate, Lexend for human-readable scanning, JetBrains Mono for instrument readouts, fixed action colors, and source badges that identify content without turning the app into confetti.
+content-hoarder should feel like a personal operations log for reducing a messy backlog: calm enough to keep the user from bouncing, fast enough that a decision costs one tap, and tactile enough that each decision feels confirmed. It has three rooms: **Today** (`/`, lamp mode — one lit object, "Clear 10"), **Clear** (`/clear`, focus mode — one card at a time in a finite round), and **Library** (`/library`, bench mode — search, filters, the reader). A dark “night ops” default with a daylight alternate, Lexend for human-readable scanning, JetBrains Mono for instrument readouts, fixed action colors, and source badges that identify content without turning the app into confetti.
 
 The system rejects generic SaaS polish, decorative hero language, and any UI that celebrates hoarding more content. Visual decisions serve search, filtering, triage, media review, recovery, and error recovery. Empty states should feel like permission to stop; error states should be specific and non-blaming.
 
@@ -187,7 +187,7 @@ Depth is mostly tonal layering plus hairline borders. Shadows are reserved for o
 
 **The Shadow Has a Job Rule.** A shadow means overlay, focus, or separation. If a shadow is only decorative, remove it.
 
-**The Compositor Rule.** Anything that moves animates `transform` or `opacity` only — never a filter, shadow, size or position — so motion runs at the display's own refresh rate (120 Hz phones included). A glow that must change is a pseudo-element whose opacity animates. Per-frame feedback during a gesture is written inline on the few elements that move, never through an inherited custom property. Input never waits for an animation to finish (`docs/design/deck-pass.md` §3).
+**The Compositor Rule.** Anything that moves animates `transform` or `opacity` only — never a filter, shadow, size or position — so motion runs at the display's own refresh rate (120 Hz phones included). A glow that must change is a pseudo-element whose opacity animates. Per-frame feedback during a gesture is written inline on the few elements that move, never through an inherited custom property. Input never waits for an animation to finish.
 
 ## 5. Components
 

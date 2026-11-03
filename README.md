@@ -77,7 +77,8 @@ network; never expose this personal-data application to the public internet.
 - Per-item status: `inbox` → `keep` / `archived` / `done`, with one-step undo and a reversible
   "content bankruptcy" bulk-archive.
 - Responsive, installable **PWA** so you can triage on desktop or phone.
-- Runs locally on Bun + TypeScript, with SQLite and native media/network integrations. No Python runtime or yt-dlp dependency.
+- Runs locally on Bun + TypeScript, with SQLite and native media/network integrations. Python and
+  `yt-dlp` are not app runtime dependencies; `yt-dlp` is optional for preparing playlist exports.
 
 ## Privacy
 
@@ -91,7 +92,8 @@ network; never expose this personal-data application to the public internet.
   saved from. Opening a Reddit item in the reader fetches its comment thread (then public archives)
   unless it is cached. Sync, recovery, enrichment, hydration, unsave and promote are separate
   opt-in commands that talk to the services they name; nothing bulk-runs on startup.
-  `CONTENT_HOARDER_OFFLINE=1` turns all outbound requests off for demos and tests.
+  `CONTENT_HOARDER_OFFLINE=1` blocks the app's server-side outbound requests for demos and tests;
+  browser-loaded external media and embeds can still contact their providers.
 - **AI suggestions are off by default.** With per-library consent, the item's title, source and
   link go to the configured provider to get a hint.
 - **Reddit writes need explicit consent.** Unsave-on-done is off by default; the live lane requires
