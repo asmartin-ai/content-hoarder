@@ -662,8 +662,12 @@ a:focus-visible {
   flex-wrap: wrap;
 }
 .ambbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: var(--fw-bold) var(--fs-xs)/1 var(--font-mono);
   letter-spacing: 0.04em;
+  text-decoration: none;
   border: 1px solid var(--border-control);
   background: var(--surface-card);
   color: var(--text-muted);
