@@ -82,12 +82,24 @@
   border-radius: var(--r-sm);
 }
 
+.ch-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+.ch-signout {
+  display: flex;
+  margin: 0;
+}
+
 .ch-iconbtn {
   display: inline-grid;
   place-items: center;
   width: var(--touch-min);
   height: var(--touch-min);
-  margin-left: auto;
+  flex: none;
   padding: 0;
   border: 0;
   border-radius: var(--r-pill);
@@ -130,7 +142,8 @@
   }
 
   .ch-brand,
-  #theme-toggle {
+  #theme-toggle,
+  .ch-signout {
     display: none;
   }
 

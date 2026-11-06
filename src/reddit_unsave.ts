@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { appendFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
 import type { JsonValue } from "./models.ts";
 import * as config from "./config.ts";
@@ -398,9 +397,9 @@ export interface AuditRecord {
 
 export type AuditCallback = (record: AuditRecord) => void;
 
-export function auditAppender(databasePath: string): readonly [AuditCallback, string] {
-  const path = join(dirname(databasePath), "unsave-audit.jsonl");
+export const AUDIT_FILE = "unsave-audit.jsonl";
 
+export function auditAppender(path: string): readonly [AuditCallback, string] {
   return [(record) => appendFileSync(path, `${JSON.stringify(record)}\n`, "utf8"), path];
 }
 

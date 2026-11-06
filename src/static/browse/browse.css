@@ -4158,3 +4158,8 @@ a.rd-au:hover {
     inset: calc((var(--touch-min) - 100%) / -2);
   }
 }
+
+body[data-owner-tools="off"]
+  :is([data-relay="promote"], [data-relay="unsave"], [data-bulk="unsave"], #btn-sync-newest) {
+  display: none !important;
+}

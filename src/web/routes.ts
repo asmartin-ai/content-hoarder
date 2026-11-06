@@ -16,9 +16,9 @@ import * as hnThread from "../hn_thread.ts";
 import * as exportModule from "../export.ts";
 import * as mediaStore from "../media_store.ts";
 import { isAutosyncEnabled } from "../sync/scheduler.ts";
-import { gate, hostedOrigin, sessionSub } from "../hosted.ts";
+import { gate, hostedOrigin, ownerOnlyPath, sessionSub } from "../hosted.ts";
 import { guard } from "./guard.ts";
-import { serviceWorkerResponse, staticResponse, templateResponse } from "./static.ts";
+import { libraryPage, serviceWorkerResponse, staticResponse } from "./static.ts";
 import {
   clamp,
   json,
@@ -62,6 +62,7 @@ import {
   googleCallback,
   googleStart,
   invitePage,
+  landingPage,
   loginPage,
   logout,
   privacyPage,
@@ -103,6 +104,9 @@ async function hostedRoute(
   method: string,
   path: string,
 ): Promise<Response | null> {
+  if (method === "GET" && path === "/" && !sessionSub(mainConnection(), request))
+    return landingPage();
+
   const blocked = gate(mainConnection(), request);
 
   if (blocked) return blocked;
@@ -110,7 +114,7 @@ async function hostedRoute(
   if (method === "GET" && path.startsWith("/invite/"))
     return invitePage(decodeURIComponent(path.slice("/invite/".length)));
 
-  if (method === "GET" && path === "/auth/login") return loginPage();
+  if (method === "GET" && path === "/auth/login") return loginPage(request);
 
   if (method === "POST" && path === "/auth/logout") return logout(request);
 
@@ -155,6 +159,8 @@ async function route(request: Request): Promise<Response> {
   const hosted = await hostedRoute(request, request.method, path);
 
   if (hosted) return hosted;
+
+  if (ownerOnlyPath(path)) return json({ error: "not found" }, 404);
 
   const sub = sessionSub(mainConnection(), request);
 
@@ -244,9 +250,9 @@ async function appRoute(request: Request): Promise<Response> {
 
   if (method === "GET" && path === "/add") return addPage(request, url);
 
-  if (method === "GET" && path === "/settings") return settingsPage();
+  if (method === "GET" && path === "/settings") return settingsPage(request);
 
-  if (method === "GET" && (path === "/library" || path === "/browse")) return templateResponse();
+  if (method === "GET" && (path === "/library" || path === "/browse")) return libraryPage();
 
   try {
     if (method === "GET" && path === "/clear/deal") return deal(url);
@@ -571,7 +577,7 @@ async function appRoute(request: Request): Promise<Response> {
       return new Response(Bun.file(file), {
         headers: {
           "Content-Type": mediaStore.mimeFor(basename(file)),
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": "private, max-age=31536000, immutable",
         },
       });
     }

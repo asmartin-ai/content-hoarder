@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import * as db from "../src/db.ts";
-import { createInvite, setHostedFetch } from "../src/hosted.ts";
+import { createInvite, safeReturn, setHostedFetch } from "../src/hosted.ts";
 import { handle } from "../src/web/routes.ts";
 import {
   closeConnection,
@@ -24,6 +24,10 @@ const ENV_KEYS = [
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "TWITCH_OAUTH_CLIENT_ID",
   "TWITCH_OAUTH_CLIENT_SECRET",
+  "PKMS_CAPTURE_URL",
+  "PKMS_CAPTURE_TOKEN",
+  "LLM_BASE_URL",
+  "LLM_MODEL",
 ] as const;
 
 let root = "";
@@ -251,11 +255,19 @@ test("local mode keeps working without a session", async () => {
   expect((await handle(request("/", {}, "127.0.0.1:8788"))).status).toBe(200);
 });
 
-test("hosted mode sends strangers to sign-in and rejects other hosts", async () => {
-  const home = await handle(request("/"));
+test("hosted mode greets strangers, guards the app and rejects other hosts", async () => {
+  const landing = await handle(request("/"));
+
+  expect(landing.status).toBe(200);
+  expect(await landing.text()).toContain('href="/oauth/google/start?return=%2F"');
+
+  const home = await handle(request("/home"));
 
   expect(home.status).toBe(302);
-  expect(home.headers.get("location")).toBe("/auth/login");
+  const login = new URL(home.headers.get("location") ?? "", ORIGIN);
+
+  expect(login.pathname).toBe("/auth/login");
+  expect(login.searchParams.get("return")).toBe("/home");
   expect((await handle(request("/", {}, "evil.example"))).status).toBe(403);
   expect((await handle(request("/privacy"))).status).toBe(200);
 
@@ -273,6 +285,95 @@ test("a signed-out htmx fragment asks the page to go to sign-in", async () => {
 
   expect(fragment.status).toBe(401);
   expect(fragment.headers.get("hx-redirect")).toBe("/auth/login");
+});
+
+test("sign-in resumes the protected page with its query intact", async () => {
+  const destination = "/library?source=youtube&status=keep";
+  const opened = await handle(request(`/invite/${createInvite(connection())}`));
+  const inviteCookies = setCookies(opened);
+  const blocked = await handle(request(destination));
+  const login = await handle(request(blocked.headers.get("location") ?? "", inviteCookies));
+
+  const startPath = (await login.text())
+    .match(/href="(\/oauth\/google\/start[^"]*)"/)?.[1]
+    ?.replaceAll("&amp;", "&");
+
+  if (!startPath) throw new Error("Missing sign-in action");
+
+  setHostedFetch(googleApi("returning"));
+
+  const start = await handle(request(startPath, inviteCookies));
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+
+  const signedIn = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, {
+      ...inviteCookies,
+      ...setCookies(start),
+    }),
+  );
+
+  expect(signedIn.headers.get("location")).toBe(destination);
+  expect((await handle(request(destination, setCookies(signedIn)))).status).toBe(200);
+});
+
+test("return paths cannot escape the application after browser normalization", () => {
+  for (const value of [
+    "https://evil.example",
+    "//evil.example",
+    "/\\evil.example",
+    "/\n/evil.example",
+    "/\t/evil.example",
+    "/path/..//evil.example",
+    "/path\u0000",
+  ]) {
+    expect(safeReturn(value)).toBe("/");
+  }
+
+  expect(safeReturn("/library?source=youtube&status=keep#saved")).toBe(
+    "/library?source=youtube&status=keep#saved",
+  );
+});
+
+test("a signed-in visitor to sign-in goes straight to the requested page", async () => {
+  const inviteCookies = setCookies(await handle(request(`/invite/${createInvite(connection())}`)));
+  const { cookies } = await googleSignIn("already-in", inviteCookies);
+  const session = { ch_session: cookies.ch_session ?? "" };
+
+  const login = await handle(request("/auth/login?return=%2Flibrary%3Fsource%3Dyoutube", session));
+
+  expect(login.status).toBe(302);
+  expect(login.headers.get("location")).toBe("/library?source=youtube");
+
+  const signedOut = await handle(postRequest("/auth/logout", session));
+  const after = await handle(request(signedOut.headers.get("location") ?? "", session));
+
+  expect(after.status).toBe(200);
+  expect(await after.text()).toContain('role="status"');
+});
+
+test("sign-out revokes this session and cancels its pending sign-in", async () => {
+  const inviteCookies = setCookies(await handle(request(`/invite/${createInvite(connection())}`)));
+  const { cookies } = await googleSignIn("signing-out", inviteCookies);
+  const session = { ch_session: cookies.ch_session ?? "" };
+  const start = await handle(request("/oauth/google/start?return=%2Flibrary", session));
+  const state = new URL(start.headers.get("location") ?? "").searchParams.get("state") ?? "";
+  const staleCookies = { ...inviteCookies, ...session, ...setCookies(start) };
+  const signedOut = await handle(postRequest("/auth/logout", staleCookies));
+
+  expect(signedOut.status).toBe(302);
+  expect(setCookies(signedOut)).toMatchObject({
+    ch_session: "",
+    ch_oauth: "",
+    ch_invite: "",
+  });
+  expect((await handle(request("/library", session))).status).toBe(302);
+
+  const replay = await handle(
+    request(`/oauth/google/callback?state=${state}&code=abc`, staleCookies),
+  );
+
+  expect(replay.status).toBe(400);
+  expect(setCookies(replay).ch_session).toBeUndefined();
 });
 
 test("a malformed address is not found, not a crash", async () => {
@@ -317,7 +418,7 @@ test("an invite lets one Google account in once and chooses its YouTube", async 
   expect(await (await add()).text()).toContain("YouTube: 1 item added");
   expect(await (await add()).text()).not.toContain("items added");
 
-  const signedIn = await handle(request("/", { ch_session: session }));
+  const signedIn = await handle(request("/home", { ch_session: session }));
 
   expect(signedIn.status).toBe(200);
   expect((await handle(request(`/invite/${invite}`))).status).toBe(404);
@@ -604,7 +705,7 @@ test("a connect callback from another signed-in account is refused", async () =>
 
   expect(response.headers.get("location")).toBe("/add?youtube=denied");
   expect(setCookies(response).ch_session).toBeUndefined();
-  expect((await handle(request("/", { ch_session: secondSession }))).status).toBe(200);
+  expect((await handle(request("/home", { ch_session: secondSession }))).status).toBe(200);
 });
 
 test("a tampered state is refused", async () => {
@@ -637,9 +738,11 @@ test("an account without a YouTube channel still signs in and can choose its lik
 });
 
 test("Twitch needs a session and imports followed channels", async () => {
-  expect((await handle(request("/oauth/twitch/start"))).headers.get("location")).toBe(
-    "/auth/login",
-  );
+  const blocked = await handle(request("/oauth/twitch/start"));
+  const login = new URL(blocked.headers.get("location") ?? "", ORIGIN);
+
+  expect(login.pathname).toBe("/auth/login");
+  expect(login.searchParams.get("return")).toBe("/oauth/twitch/start");
 
   const invite = createInvite(connection());
   const opened = await handle(request(`/invite/${invite}`));
@@ -757,4 +860,62 @@ test("each account has its own library", async () => {
   expect((await commit(first)).status).toBe(200);
   expect(countSource("friend-a", "bookmarks")).toBe(1);
   expect(countSource("friend-b", "bookmarks")).toBe(0);
+});
+
+test("a tester's items never reach the owner's PKMS or an AI they haven't turned on", async () => {
+  const outbound: string[] = [];
+
+  const recorder = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(incoming) {
+      outbound.push(new URL(incoming.url).pathname);
+
+      return Response.json({ choices: [] });
+    },
+  });
+
+  process.env.PKMS_CAPTURE_URL = `http://127.0.0.1:${recorder.port}`;
+  process.env.PKMS_CAPTURE_TOKEN = "owner-vault-token";
+  process.env.LLM_BASE_URL = `http://127.0.0.1:${recorder.port}`;
+  process.env.LLM_MODEL = "synthetic-model";
+
+  try {
+    const opened = await handle(request(`/invite/${createInvite(connection())}`));
+    const { cookies } = await googleSignIn("tester", setCookies(opened));
+    const session = cookies.ch_session ?? "";
+
+    await connectYoutube("tester", session);
+    expect((await importYoutube("tester", session, ["LL"])).status).toBe(200);
+    expect(countSource("tester", "youtube")).toBe(1);
+
+    const act = (action: string) =>
+      handle(
+        new Request(`${ORIGIN}/items/${encodeURIComponent("youtube:vid_liked01")}/${action}`, {
+          method: "POST",
+          headers: { host: HOST, origin: ORIGIN, cookie: `ch_session=${session}` },
+        }),
+      );
+
+    expect((await act("promote")).status).toBe(404);
+    expect((await act("suggest")).status).toBe(403);
+
+    const cookie = await handle(
+      new Request(`${ORIGIN}/reddit/unsave/auth`, {
+        method: "POST",
+        headers: {
+          host: HOST,
+          origin: ORIGIN,
+          "content-type": "application/json",
+          cookie: `ch_session=${session}`,
+        },
+        body: JSON.stringify({ cookie: "tester-reddit-session" }),
+      }),
+    );
+
+    expect(cookie.status).toBe(404);
+    expect(outbound).toEqual([]);
+  } finally {
+    await recorder.stop(true);
+  }
 });

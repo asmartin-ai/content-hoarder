@@ -121,8 +121,8 @@ forwarding; keep it strictly behind a VPN/Tailscale or a trusted LAN.
 
 ### Phone quickstart (Tailscale)
 1. On the PC, find your Tailscale IP (`tailscale ip -4`, a `100.x.y.z` address) and start the app
-   bound to it: `bun run src/cli.ts serve --host 100.x.y.z` (the web guard already accepts
-   tailnet addresses; add real DNS names via `CONTENT_HOARDER_ALLOWED_HOSTS`).
+   bound to it: `bun run src/cli.ts serve --host 100.x.y.z` (the web guard accepts localhost,
+   private LAN and tailnet IP addresses, plus the hosted origin's host; other DNS names are refused).
 2. On the phone (Tailscale connected), open `http://100.x.y.z:8788/` in Chrome.
 3. Install it: Chrome menu (⋮) → **Install app** (a real WebAPK). The PWA opens fullscreen with the
    app icon; the service worker caches the shell, so cold opens are instant. *(Install needs a secure

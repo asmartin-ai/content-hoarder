@@ -247,6 +247,10 @@ kbd {
   margin: 0;
 }
 
+.settings-group-head .settings-btn {
+  margin-top: 0;
+}
+
 .settings-help {
   margin: var(--sp-2) 0 0;
   color: var(--text-muted);

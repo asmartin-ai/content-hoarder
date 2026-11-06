@@ -34,10 +34,26 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   imports. On a phone, where the bookmarklet can't run, the page says to use the data request.
 - **Clear explains its buttons.** A first-visit “? What the buttons mean” link opens a guide to
   Done, Archive, Keep, Not now and Skip; the `?` in the top bar also opens it.
-- **Sign out** button at the bottom of Add in hosted mode. Signing out clears the browser's cached
-  pages and storage (`Clear-Site-Data`), so the next person on that phone can't see them.
+- **Khaos front door (hosted mode).** Signed-out visitors to `/` see a landing page instead of
+  being sent straight to sign-in; signed-in visitors still get Today, and signing in from the
+  landing or a bare `/auth/login` lands on Today. `/auth/login` is a focused
+  sign-in card, skips straight to the requested page when already signed in, and confirms
+  "You're signed out." Invite and sign-in errors offer **Back to sign in**. The Google button
+  keeps AA contrast in the light theme. See [`src/web/handlers/auth.ts`](src/web/handlers/auth.ts)
+  and [`src/static/core/auth.css`](src/static/core/auth.css).
+- **Sign out** in the desktop nav and in **Settings → Account** (which shows the signed-in email)
+  in hosted mode, replacing the button at the bottom of Add. Signing out clears the browser's
+  cached pages and storage (`Clear-Site-Data`), so the next person on that phone can't see them.
+- **One nav everywhere.** The Library now renders the shared nav instead of its own copy, and the
+  brand reads **Khaos** in hosted mode. SW cache `ch-shell-v158`.
 
 ### Changed
+
+- **Hosted sign-in preserves the destination.** Opening a protected page carries its path and
+  query through Google sign-in. Return paths stay inside the application, including after browser
+  URL normalization. Sign-out also clears the authentication cookies and cancels the browser's
+  pending login attempt so that an old callback cannot sign it back in. See
+  [`src/web/handlers/auth.ts`](src/web/handlers/auth.ts).
 
 - **Optional YouTube connection.** Google sign-in requests only `openid email` and imports nothing.
   Add welcomes users through bringing in saves, clearing 10 and being done for today. **Connect
@@ -73,6 +89,22 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
   "already here" when nothing is new, and a plain message for a file type it can't read.
 
 ### Fixed
+
+- **Hosted testers can't reach owner-only tools.** In hosted mode, PKMS promote and every Reddit
+  route that stores or uses a `reddit_session` cookie (unsave auth, enable, drain, enqueue, item
+  unsave, manual sync) answer 404 (`ownerOnlyPath` in [`src/hosted.ts`](src/hosted.ts)). Settings
+  drops Reddit unsave, Reddit sync and Archived media, and the Library hides Promote, Unsave and
+  Sync. The purge response names its backup file instead of the server path.
+- **AI suggestions honour consent.** `POST /items/<id>/suggest` answers 403 unless the library has
+  AI suggestions turned on, matching the privacy page.
+- **Sign-out clears offline copies everywhere.** The signed-out page also deletes the service
+  worker's cached pages, unregisters it and clears storage, for browsers that ignore
+  `Clear-Site-Data`.
+- **Smaller hosted leaks closed.** `/media/` is sent `private`, not `public`; pending sign-ins are
+  capped at 10,000; CSV export prefixes text cells that start with `= + - @` so spreadsheets don't
+  run them; a hosted account's purge backup and delete/unsave audit logs carry its library name
+  instead of sharing the main database's files. `.env.example` and the README no longer mention
+  `CONTENT_HOARDER_ALLOWED_HOSTS`, which the host guard never read.
 
 - **Spoiler images imported blurry.** Reddit's saved JSON can carry a blurred spoiler preview
   (`?blur=40`) where the direct `i.redd.it` image is sharp. Imports now prefer the sharp image,

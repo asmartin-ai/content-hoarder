@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename } from "node:path";
 import * as db from "../../db.ts";
 import * as redditUnsave from "../../reddit_unsave.ts";
 import {
@@ -11,10 +11,12 @@ import {
 } from "../../assist/consent.ts";
 import { bool, clamp, json, numberValue, objectBody } from "../http.ts";
 import { track } from "../../demo_analytics.ts";
+import { hostedOrigin, sessionSub } from "../../hosted.ts";
 import { htmlResponse } from "../static.ts";
-import { connection, databasePath } from "../state.ts";
+import { connection, librarySidecar, mainConnection } from "../state.ts";
 import { renderPage } from "../views/page.ts";
 import { renderSettings } from "../views/settings.ts";
+import { sessionEmail } from "./auth.ts";
 import {
   DrainBody,
   EnabledBody,
@@ -66,8 +68,7 @@ export async function purgeDone(request: Request): Promise<Response> {
     .all(cutoff)
     .map((row) => PurgeVictimSchema.parse(row));
 
-  const backupPath = join(
-    dirname(databasePath()),
+  const backupPath = librarySidecar(
     `app.backup-pre-purge-done-${new Date().toISOString().replaceAll(":", "-")}.db`,
   );
 
@@ -90,9 +91,9 @@ export async function purgeDone(request: Request): Promise<Response> {
     })),
   };
 
-  appendFileSync(join(dirname(databasePath()), "delete-audit.jsonl"), `${JSON.stringify(audit)}\n`);
+  appendFileSync(librarySidecar("delete-audit.jsonl"), `${JSON.stringify(audit)}\n`);
 
-  return json({ purged: { ...purged, backup: backupPath }, preview });
+  return json({ purged: { ...purged, backup: basename(backupPath) }, preview });
 }
 
 export async function drainUnsave(request: Request): Promise<Response> {
@@ -121,7 +122,7 @@ export async function drainUnsave(request: Request): Promise<Response> {
     return json({ ...result, remaining, live_required: ["live", "confirm"] });
   }
 
-  const [audit] = redditUnsave.auditAppender(databasePath());
+  const [audit] = redditUnsave.auditAppender(librarySidecar(redditUnsave.AUDIT_FILE));
 
   return json(await redditUnsave.drain(database, { limit, dryRun: false, audit }));
 }
@@ -166,7 +167,7 @@ export function aiSettings(): Response {
   return json(aiState());
 }
 
-export function settingsPage(): Response {
+export function settingsPage(request: Request): Response {
   const database = connection();
   const now = Math.floor(Date.now() / 1000);
   const stored = Number(db.getSetting(database, "done_retention_days", "30") ?? "30");
@@ -176,16 +177,21 @@ export function settingsPage(): Response {
 
   const preview = db.purgeDone(database, { now });
   const auth = redditUnsave.getAuth(database);
+  const sub = hostedOrigin() ? sessionSub(mainConnection(), request) : null;
 
   const body = renderSettings({
+    hosted: Boolean(hostedOrigin()),
+    account: sub ? { email: sessionEmail(sub) } : null,
     ai: aiConfigured() ? { on: aiConsent(database) === "on", provider: aiProviderLabel() } : null,
     retention: { days: retentionDays, total: preview.total, cutoff: preview.cutoff },
-    unsave: {
-      enabled: db.unsaveEnabled(database),
-      username: auth?.username ?? null,
-      pending: redditUnsave.countPending(database),
-      failed: redditUnsave.countFailed(database),
-    },
+    unsave: hostedOrigin()
+      ? null
+      : {
+          enabled: db.unsaveEnabled(database),
+          username: auth?.username ?? null,
+          pending: redditUnsave.countPending(database),
+          failed: redditUnsave.countFailed(database),
+        },
   });
 
   return htmlResponse(renderPage({ title: "Settings", tab: "settings", body }));

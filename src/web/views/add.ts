@@ -351,13 +351,6 @@ export function renderAdd(
         cards from the ZIP show only the title from the link.
       </p>
     </section>
-    ${
-      hostedOrigin()
-        ? html`<form class="add-signout" method="post" action="/auth/logout">
-            <button class="add-btn" type="submit">Sign out</button>
-          </form>`
-        : ""
-    }
     <script type="module" src="/static/add/add.js"></script>
   </section>`;
 }

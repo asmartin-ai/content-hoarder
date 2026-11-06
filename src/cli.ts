@@ -1600,7 +1600,9 @@ async function runRedditUnsave(conn: Database, args: CliArgs): Promise<number> {
       return 0;
     }
 
-    const [audit, auditPath] = redditUnsave.auditAppender(config.dbPath());
+    const [audit, auditPath] = redditUnsave.auditAppender(
+      join(dirname(config.dbPath()), redditUnsave.AUDIT_FILE),
+    );
 
     const result = await redditTrickle.trickle(conn, {
       limit: number(args, "limit", redditTrickle.DEFAULT_CAP),
@@ -1630,7 +1632,9 @@ async function runRedditUnsave(conn: Database, args: CliArgs): Promise<number> {
       return 0;
     }
 
-    const [audit, auditPath] = redditUnsave.auditAppender(config.dbPath());
+    const [audit, auditPath] = redditUnsave.auditAppender(
+      join(dirname(config.dbPath()), redditUnsave.AUDIT_FILE),
+    );
 
     const result = await redditUnsave.drain(conn, {
       limit: number(args, "limit"),

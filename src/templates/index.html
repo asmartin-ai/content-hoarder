@@ -64,7 +64,7 @@
       href="/static/apple-touch-startup-image-1488x2266.png"
       media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2)"
     />
-    <title>content-hoarder</title>
+    <title>Library · {{brand}}</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/core/tokens.css" />
@@ -72,100 +72,8 @@
     <link rel="stylesheet" href="/static/browse/browse.css" />
     <script src="/static/theme.js"></script>
   </head>
-  <body data-page="browse" class="has-tabbar">
-    <nav class="ch-nav" aria-label="Main">
-      <a class="ch-brand" href="/"><span class="ch-led"></span><span>content-hoarder</span></a>
-      <div class="ch-tabs">
-        <a class="ch-tab" data-tab="home" href="/home"
-          ><svg
-            class="ch-ico"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1" />
-            <path d="M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1" />
-            <path
-              d="M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1"
-            />
-            <path
-              d="M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1"
-            /></svg
-          ><span>Home</span></a
-        >
-        <a class="ch-tab" data-tab="today" href="/"
-          ><svg
-            class="ch-ico"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
-            <path
-              d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"
-            /></svg
-          ><span>Today</span></a
-        >
-        <a class="ch-tab" data-tab="clear" href="/clear"
-          ><svg
-            class="ch-ico"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 4l-8 4l8 4l8 -4l-8 -4" />
-            <path d="M4 12l8 4l8 -4" />
-            <path d="M4 16l8 4l8 -4" /></svg
-          ><span>Clear</span></a
-        >
-        <a class="ch-tab" data-tab="library" href="/library" aria-current="page"
-          ><svg
-            class="ch-ico"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
-            <path d="M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />
-            <path d="M5 8h4" />
-            <path d="M9 16h4" />
-            <path
-              d="M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041z"
-            />
-            <path d="M14 9l4 -1" />
-            <path d="M16 16l3.923 -.98" /></svg
-          ><span>Library</span></a
-        >
-      </div>
-    </nav>
+  <body data-page="browse" class="has-tabbar" data-owner-tools="{{owner-tools}}">
+    {{nav}}
     <header class="console">
       <div class="con-row">
         <button

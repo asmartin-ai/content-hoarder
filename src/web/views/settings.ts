@@ -13,9 +13,11 @@ export interface SettingsUnsave {
 }
 
 export interface SettingsView {
+  hosted: boolean;
+  account: { email: string } | null;
   ai: SettingsAi | null;
   retention: { days: number; total: number; cutoff: number };
-  unsave: SettingsUnsave;
+  unsave: SettingsUnsave | null;
 }
 
 function toggle(name: string, on: boolean): SafeHtml {
@@ -87,13 +89,62 @@ function aiGroup(ai: SettingsAi | null): SafeHtml | string {
   </section>`;
 }
 
+function accountGroup(account: SettingsView["account"]): SafeHtml | string {
+  if (!account) return "";
+
+  return html`<section class="settings-group" data-settings-group="account">
+    <div class="settings-group-head">
+      <h2>Account</h2>
+      <form method="post" action="/auth/logout">
+        <button class="settings-btn" type="submit">Sign out</button>
+      </form>
+    </div>
+    <p class="settings-help">
+      ${account.email ? html`Signed in as <b>${account.email}</b>.` : "Signed in with Google."}
+      Signing out ends this session on this device.
+    </p>
+  </section>`;
+}
+
+function unsaveGroup(unsave: SettingsUnsave | null): SafeHtml | string {
+  if (!unsave) return "";
+
+  return html`<section class="settings-group" data-settings-group="reddit-unsave">
+    <h2>Reddit unsave</h2>
+    <div class="settings-group-head">
+      <p class="settings-help" id="settings-unsave-state">
+        ${unsave.username ? `Connected as u/${unsave.username}` : "No Reddit session saved yet"} ·
+        ${unsave.pending} queued · ${unsave.failed} failed
+      </p>
+      ${toggle("unsave", unsave.enabled)}
+    </div>
+    <p class="settings-help">
+      When on, marking a Reddit save Done queues it for removal from your Reddit Saved list. Nothing
+      leaves this machine until the drain runs.
+    </p>
+    <form class="settings-inline" id="settings-unsave-auth">
+      <label class="settings-label" for="settings-unsave-cookie">Reddit session cookie</label>
+      <input
+        class="settings-input"
+        id="settings-unsave-cookie"
+        name="cookie"
+        type="password"
+        autocomplete="off"
+        placeholder="reddit_session value"
+      />
+      <button class="settings-btn" type="submit">Save cookie</button>
+    </form>
+    <p class="settings-help" id="settings-unsave-feedback" role="status"></p>
+  </section>`;
+}
+
 export function renderSettings(view: SettingsView): SafeHtml {
   return html`<section class="settings-page">
     <header class="settings-head">
       <h1 class="settings-title">Settings</h1>
       <p class="settings-sub">How Khaos looks, remembers, and touches the outside world.</p>
     </header>
-    ${aiGroup(view.ai)}
+    ${accountGroup(view.account)} ${aiGroup(view.ai)}
 
     <section class="settings-group" data-settings-group="theme">
       <h2>Theme</h2>
@@ -153,22 +204,26 @@ export function renderSettings(view: SettingsView): SafeHtml {
       </p>
     </section>
 
-    <section class="settings-group" data-settings-group="archive-media">
-      <h2>Archived media</h2>
-      ${seg(
-        "archive",
-        [
-          ["off", "Off"],
-          ["on", "Prefer local"],
-        ],
-        "off",
-      )}
-      <p class="settings-help">
-        When on, images load from your locally-archived copies (the
-        <code>archive-media</code> pass) instead of Reddit — survives deletion, works offline. Off
-        by default.
-      </p>
-    </section>
+    ${
+      view.hosted
+        ? ""
+        : html`<section class="settings-group" data-settings-group="archive-media">
+            <h2>Archived media</h2>
+            ${seg(
+              "archive",
+              [
+                ["off", "Off"],
+                ["on", "Prefer local"],
+              ],
+              "off",
+            )}
+            <p class="settings-help">
+              When on, images load from your locally-archived copies (the
+              <code>archive-media</code> pass) instead of Reddit — survives deletion, works offline.
+              Off by default.
+            </p>
+          </section>`
+    }
 
     <section class="settings-group" data-settings-group="done-retention">
       <h2>Done retention</h2>
@@ -194,41 +249,16 @@ export function renderSettings(view: SettingsView): SafeHtml {
         Purge eligible Done items
       </button>
       <p class="settings-help" id="settings-retention-feedback">
-        The purge writes a timestamped DB backup and appends <code>delete-audit.jsonl</code>.
+        ${
+          view.hosted
+            ? "This can't be undone from the app."
+            : html`The purge writes a timestamped DB backup and appends
+                <code>delete-audit.jsonl</code>.`
+        }
       </p>
     </section>
 
-    <section class="settings-group" data-settings-group="reddit-unsave">
-      <h2>Reddit unsave</h2>
-      <div class="settings-group-head">
-        <p class="settings-help" id="settings-unsave-state">
-          ${
-            view.unsave.username
-              ? `Connected as u/${view.unsave.username}`
-              : "No Reddit session saved yet"
-          }
-          · ${view.unsave.pending} queued · ${view.unsave.failed} failed
-        </p>
-        ${toggle("unsave", view.unsave.enabled)}
-      </div>
-      <p class="settings-help">
-        When on, marking a Reddit save Done queues it for removal from your Reddit Saved list.
-        Nothing leaves this machine until the drain runs.
-      </p>
-      <form class="settings-inline" id="settings-unsave-auth">
-        <label class="settings-label" for="settings-unsave-cookie">Reddit session cookie</label>
-        <input
-          class="settings-input"
-          id="settings-unsave-cookie"
-          name="cookie"
-          type="password"
-          autocomplete="off"
-          placeholder="reddit_session value"
-        />
-        <button class="settings-btn" type="submit">Save cookie</button>
-      </form>
-      <p class="settings-help" id="settings-unsave-feedback" role="status"></p>
-    </section>
+    ${unsaveGroup(view.unsave)}
 
     <section class="settings-group" data-settings-group="collection">
       <h2>Library tools</h2>
@@ -236,8 +266,14 @@ export function renderSettings(view: SettingsView): SafeHtml {
         <a class="settings-link" href="/library?panel=stats">Stats — the shape of the collection</a>
         <a class="settings-link" href="/library?panel=dupes">Duplicates — review matching saves</a>
       </div>
-      <button type="button" class="settings-btn" id="settings-sync">Sync newest from Reddit</button>
-      <p class="settings-help" id="settings-status" role="status"></p>
+      ${
+        view.unsave
+          ? html`<button type="button" class="settings-btn" id="settings-sync">
+                Sync newest from Reddit
+              </button>
+              <p class="settings-help" id="settings-status" role="status"></p>`
+          : ""
+      }
     </section>
     <script type="module" src="/static/home/settings.js"></script>
   </section>`;

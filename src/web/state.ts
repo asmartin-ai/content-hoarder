@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, unlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
 import * as config from "../config.ts";
 import * as db from "../db.ts";
@@ -52,6 +52,14 @@ export function mainConnection(): Database {
 
 export function connection(): Database {
   return currentLibrary.getStore() ?? mainConnection();
+}
+
+export function librarySidecar(name: string): string {
+  const library = currentLibrary.getStore();
+
+  if (!library) return join(dirname(databasePath()), name);
+
+  return join(dirname(library.filename), `${basename(library.filename, ".db")}.${name}`);
 }
 
 export function libraryPath(sub: string): string {

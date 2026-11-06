@@ -1,5 +1,5 @@
 import { readFileSync, unlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { serve, type Server } from "bun";
 import { z } from "zod";
 import * as config from "../config.ts";
@@ -60,7 +60,10 @@ export async function serveApp(value: ServeOptions | string = {}): Promise<AppSe
     : null;
 
   const tricklePath = databasePath();
-  const [trickleAudit] = redditUnsave.auditAppender(tricklePath);
+
+  const [trickleAudit] = redditUnsave.auditAppender(
+    join(dirname(tricklePath), redditUnsave.AUDIT_FILE),
+  );
 
   setUnsaveTrickle(new TrickleDrainer(() => db.connect(tricklePath), { audit: trickleAudit }));
 

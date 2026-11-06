@@ -6,6 +6,7 @@ import * as redditHydrate from "../../reddit_hydrate.ts";
 import * as archival from "../../archival/service.ts";
 import { defaultMediaProviders } from "../../archival/providers.ts";
 import * as llm from "../../assist/llm.ts";
+import { aiActive } from "../../assist/consent.ts";
 import * as triageScore from "../../triage_score.ts";
 import * as pkms from "../../bridge/pkms.ts";
 import { track } from "../../demo_analytics.ts";
@@ -232,6 +233,9 @@ export async function handleItemAction(
 
   if (action === "suggest") {
     if (!llm.isAvailable()) return json({ error: "LLM not configured" }, 503);
+
+    if (!aiActive(database)) return json({ error: "AI suggestions are off" }, 403);
+
     const result = await llm.suggestAndStore(database, fullname);
 
     return result ? json(result) : json({ error: "no suggestion" }, 502);

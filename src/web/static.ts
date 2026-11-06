@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
+import { hostedOrigin } from "../hosted.ts";
+import { brandName, navHtml } from "./views/page.ts";
 
 const STATIC_DIR = join(import.meta.dir, "..", "static");
 
@@ -59,6 +61,14 @@ export function htmlResponse(
   return new Response(body, { ...init, headers });
 }
 
-export function templateResponse(): Response {
-  return htmlResponse(Bun.file(LIBRARY_TEMPLATE));
+export async function libraryPage(): Promise<Response> {
+  const template = await Bun.file(LIBRARY_TEMPLATE).text();
+  const nav = navHtml("library").value;
+
+  return htmlResponse(
+    template
+      .replace("{{brand}}", brandName())
+      .replace("{{owner-tools}}", hostedOrigin() ? "off" : "on")
+      .replace("{{nav}}", () => nav),
+  );
 }

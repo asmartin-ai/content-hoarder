@@ -22,6 +22,14 @@ const PUBLIC_PATHS = new Set([
   "/oauth/google/callback",
 ]);
 
+const OWNER_ONLY_PATHS = new Set([
+  "/reddit/sync",
+  "/reddit/unsave/auth",
+  "/reddit/unsave/drain",
+  "/reddit/unsave/enable",
+  "/reddit/unsave/enqueue-by-tag",
+]);
+
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
 let fetcher: Fetcher = (input, init) => fetch(input, init);
@@ -199,6 +207,14 @@ export function publicPath(path: string): boolean {
   return PUBLIC_PATHS.has(path) || path.startsWith("/static/") || path.startsWith("/invite/");
 }
 
+export function ownerOnlyPath(path: string): boolean {
+  return (
+    OWNER_ONLY_PATHS.has(path) ||
+    (path.startsWith("/reddit/items/") && path.endsWith("/unsave")) ||
+    (path.startsWith("/items/") && path.endsWith("/promote"))
+  );
+}
+
 export function gate(db: Database, request: Request): Response | null {
   if (!hostedOrigin()) return null;
 
@@ -209,7 +225,14 @@ export function gate(db: Database, request: Request): Response | null {
   const wantsPage =
     request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");
 
-  if (wantsPage) return new Response(null, { status: 302, headers: { location: "/auth/login" } });
+  if (wantsPage) {
+    const query = new URLSearchParams({ return: `${url.pathname}${url.search}` });
+
+    return new Response(null, {
+      status: 302,
+      headers: { location: `/auth/login?${query}` },
+    });
+  }
 
   if (request.headers.get("hx-request")) {
     return Response.json(
@@ -222,8 +245,17 @@ export function gate(db: Database, request: Request): Response | null {
 }
 
 export function safeReturn(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\"))
-    return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
 
-  return value;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+
+    if (code < 32 || code === 92 || code === 127) return "/";
+  }
+
+  const url = new URL(value, "https://khaos.invalid");
+
+  if (url.origin !== "https://khaos.invalid" || url.pathname.startsWith("//")) return "/";
+
+  return `${url.pathname}${url.search}${url.hash}`;
 }

@@ -40,9 +40,12 @@ export function exportRecords(rows: readonly Item[]): ExportRecord[] {
   });
 }
 
+const NUMERIC_FIELDS = new Set<(typeof EXPORT_FIELDS)[number]>(["score", "created_utc"]);
+
 export function toCsv(records: readonly ExportRecord[]): string {
-  const cell = (value: string | number | null): string => {
-    const text = value === null ? "" : String(value);
+  const cell = (value: string | number | null, numeric: boolean): string => {
+    const raw = value === null ? "" : String(value);
+    const text = !numeric && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
 
     return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   };
@@ -50,7 +53,9 @@ export function toCsv(records: readonly ExportRecord[]): string {
   return (
     [
       EXPORT_FIELDS.join(","),
-      ...records.map((r) => EXPORT_FIELDS.map((key) => cell(r[key])).join(",")),
+      ...records.map((r) =>
+        EXPORT_FIELDS.map((key) => cell(r[key], NUMERIC_FIELDS.has(key))).join(","),
+      ),
     ].join("\n") + "\n"
   );
 }
