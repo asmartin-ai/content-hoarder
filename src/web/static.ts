@@ -63,7 +63,10 @@ export function htmlResponse(
 
 export async function libraryPage(): Promise<Response> {
   const template = await Bun.file(LIBRARY_TEMPLATE).text();
-  const nav = navHtml("library").value;
+
+  const nav =
+    navHtml("library").value +
+    '<a href="/search" style="display:block;padding:12px 20px;text-align:center">Semantic search &amp; Ask with sources</a>';
 
   return htmlResponse(
     template

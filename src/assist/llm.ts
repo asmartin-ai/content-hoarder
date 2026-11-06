@@ -104,7 +104,7 @@ function itemText(item: Item, history?: string): string {
   return parts.join("\n");
 }
 
-async function chat(
+export async function chat(
   messages: Array<{ role: string; content: string }>,
   backend: "local" | "fireworks" = "local",
   timeout = llmTimeout(),

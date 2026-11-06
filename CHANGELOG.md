@@ -6,6 +6,12 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Local semantic search and grounded answers.** A dedicated `/search` surface linked from
+  Library offers explicit incremental indexing, hybrid retrieval, source passages and per-question
+  full-text AI consent. Added `semantic-index`, `semantic-search` and `ask` CLI commands.
+  Native SQLite vectors are per library; changed/deleted sources are excluded until refreshed.
+  Offline mode permits cached embeddings but blocks downloads and remote answers.
+
 - **Share Reddit videos.** The reader and video lightbox offer **Share video (N MB)**. On
   supported phones, this opens the system share sheet with an MP4 including sound; otherwise,
   or above 50 MB, it downloads. The server joins Reddit's picture and sound tracks with ffmpeg

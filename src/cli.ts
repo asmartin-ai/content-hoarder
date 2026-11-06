@@ -53,9 +53,13 @@ import {
 import * as llm from "./assist/llm.ts";
 import * as resurface from "./resurface.ts";
 import * as karakeep from "./bridge/karakeep.ts";
+import * as semantic from "./semantic.ts";
 
 const commandOptions = {
   "init-db": {},
+  "semantic-index": {},
+  "semantic-search": { query: "string", limit: "string" },
+  ask: { query: "string", limit: "string", consent: "boolean" },
   import: {
     positional: true,
     source: "string",
@@ -1700,6 +1704,29 @@ async function runExtended(command: string, args: CliArgs): Promise<number> {
 
   try {
     switch (command) {
+      case "semantic-index":
+        json(await semantic.semanticIndex(conn));
+
+        return 0;
+      case "semantic-search":
+        json(
+          await semantic.semanticSearch(conn, text(args, "query") ?? "", {
+            limit: number(args, "limit", 10),
+          }),
+        );
+
+        return 0;
+      case "ask":
+        if (!bool(args, "consent"))
+          throw new Error(
+            "Pass --consent to send this question and full retrieved passages to your configured AI endpoint (separate from AI hints).",
+          );
+        semantic.setRagConsent(conn, true);
+        json(
+          await semantic.ask(conn, text(args, "query") ?? "", { limit: number(args, "limit", 6) }),
+        );
+
+        return 0;
       case "categorize": {
         const source = text(args, "source", "youtube") ?? "youtube";
         const tag = text(args, "tag");

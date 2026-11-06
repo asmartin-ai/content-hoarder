@@ -16,6 +16,32 @@ Status: local release (source `VERSION` is `1.0.0`; unreleased work ships from `
 browse UI, offline PWA shell, Reddit OAuth/sync, inline reader, recovery tooling, media archiving,
 Obsidian export and optional local-LLM assist are in. Release notes: [`CHANGELOG.md`](CHANGELOG.md).
 
+## Semantic search and answers
+
+Library links to **Search**, a separate `/search` surface. Existing Library search remains lexical.
+Click **Index library** explicitly to derive local MiniLM vectors from titles, bodies and useful
+cached Reddit comments. The first index downloads the pinned model; no content is sent for
+embedding. Imports, recovery, edits, thread-cache changes and deletion mark affected evidence
+stale. Reindex to refresh it; stale vectors are excluded from retrieval.
+
+```bash
+bun run src/cli.ts semantic-index
+bun run src/cli.ts semantic-search --query 'reliable backups source:reddit' --limit 10
+bun run src/cli.ts ask --query 'What backup approaches did I save?' --consent
+```
+
+`KHAOS_MODEL_CACHE` optionally selects a shared, prewarmed model cache. Queries never download
+models. `CONTENT_HOARDER_OFFLINE=1` forbids model downloads and answer generation; cached local
+inference remains available. Missing models produce an explicit lexical-only warning. Retrieval
+combines lexical and native SQLite cosine rankings; Library query operators and eligibility filters
+apply before ranking. Cached comments retain their original permalinks.
+
+Answers use the configured OpenAI-compatible `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`.
+Each Ask action requires separate consent to send the question and full retrieved passages;
+AI hint consent does not authorize this. Answers cite bounded source passages and abstain without
+evidence. Citations identify retrieved sources, not a guarantee that generated claims are correct.
+Hosted requests only access the signed-in user's library; this surface does not query PKMS.
+
 ## Try it
 
 - **Hosted demo:** <https://demo.khaosapp.tech> — an invite-only pilot. It runs the same app with

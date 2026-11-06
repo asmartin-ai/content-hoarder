@@ -1126,7 +1126,7 @@ export function patchItem(db: Database, fullname: string, patch: ItemPatch): boo
   return true;
 }
 
-function ftsQuery(q: string, opts: { exact?: string[]; exclude?: string[] } = {}): string {
+export function ftsQuery(q: string, opts: { exact?: string[]; exclude?: string[] } = {}): string {
   const exact = opts.exact ?? [];
   const exclude = opts.exclude ?? [];
 
@@ -1220,231 +1220,239 @@ export interface SearchOpts {
   offset?: number;
 }
 
-export function searchItems(db: Database, q: string = "", opts: SearchOpts = {}): Item[] {
+export function searchFilters(opts: SearchOpts = {}, alias = "") {
   const filters: string[] = [];
   const params: SQLQueryBindings[] = [];
+  const a = alias ? `${alias}.` : "";
+
+  const {
+    source,
+    kind,
+    status,
+    category,
+    tags,
+    tagsAll,
+    subreddit,
+    author,
+    isSaved,
+    nsfw,
+    hideNsfw,
+    decayed,
+    swept,
+    snoozed,
+    hideSnoozed,
+    deleted,
+    hasMedia,
+    before,
+    after,
+    scoreMin,
+    scoreMax,
+    openInFirefox,
+    ocr,
+    includeConsolidated,
+  } = opts;
+
+  if (source) {
+    if (Array.isArray(source)) {
+      const ph = source.map(() => "?").join(",");
+      filters.push(`${a}source IN (${ph})`);
+      params.push(...source);
+    } else {
+      filters.push(`${a}source = ?`);
+      params.push(source);
+    }
+  }
+
+  if (kind) {
+    if (Array.isArray(kind)) {
+      const ph = kind.map(() => "?").join(",");
+      filters.push(`${a}kind IN (${ph})`);
+      params.push(...kind);
+    } else {
+      filters.push(`${a}kind = ?`);
+      params.push(kind);
+    }
+  }
+
+  if (status) {
+    if (Array.isArray(status)) {
+      const ph = status.map(() => "?").join(",");
+      filters.push(`${a}status IN (${ph})`);
+      params.push(...status);
+    } else {
+      filters.push(`${a}status = ?`);
+      params.push(status);
+    }
+  }
+
+  if (category) {
+    if (PROCESSING_TAGS.some((processingTag) => processingTag === category)) {
+      filters.push(
+        `(json_extract(${a}metadata, '$.category') = ? OR ` +
+          `EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value = ?))`,
+      );
+      params.push(category, category);
+    } else {
+      filters.push(`json_extract(${a}metadata, '$.category') = ?`);
+      params.push(category);
+    }
+  }
+
+  if (tags?.length) {
+    if (tagsAll) {
+      for (const t of tags) {
+        filters.push(`EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value = ?)`);
+        params.push(t);
+      }
+    } else {
+      const ph = tags.map(() => "?").join(",");
+      filters.push(
+        `EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value IN (${ph}))`,
+      );
+      params.push(...tags);
+    }
+  }
+
+  let nsfwPred = "";
+
+  if (nsfw || hideNsfw) {
+    const ph = NSFW_TAGS.map(() => "?").join(",");
+    nsfwPred =
+      `(EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value IN (${ph}))` +
+      ` OR COALESCE(json_extract(${a}metadata, '$.over_18'), 0) = 1)`;
+  }
+
+  if (nsfw) {
+    filters.push(nsfwPred);
+    params.push(...NSFW_TAGS);
+  }
+
+  if (hideNsfw) {
+    filters.push(`NOT ${nsfwPred}`);
+    params.push(...NSFW_TAGS);
+  }
+
+  if (hasMedia) {
+    if (Array.isArray(hasMedia)) {
+      const mapped = hasMedia.map((h) => (h === "video" ? "reddit_video" : h));
+      const ph = mapped.map(() => "?").join(",");
+      filters.push(`json_extract(${a}metadata, '$.media_type') IN (${ph})`);
+      params.push(...mapped);
+    } else {
+      const mt = hasMedia === "video" ? "reddit_video" : hasMedia;
+      filters.push(`json_extract(${a}metadata, '$.media_type') = ?`);
+      params.push(mt);
+    }
+  }
+
+  if (decayed) {
+    filters.push(`json_extract(${a}metadata, '$.decayed_at') IS NOT NULL`);
+  }
+
+  if (swept) {
+    filters.push(`json_extract(${a}metadata, '$.decay_label') = 'swept'`);
+  }
+
+  if (snoozed) {
+    filters.push(`json_extract(${a}metadata, '$.snoozed_until') > ?`);
+    params.push(Math.floor(Date.now() / 1000));
+  }
+
+  if (hideSnoozed && !snoozed) {
+    filters.push(
+      `(json_extract(${a}metadata, '$.snoozed_until') IS NULL ` +
+        `OR json_extract(${a}metadata, '$.snoozed_until') <= ?)`,
+    );
+    params.push(Math.floor(Date.now() / 1000));
+  }
+
+  if (deleted) {
+    filters.push(`json_extract(${a}metadata, '$.media_status') = 'gone'`);
+  }
+
+  if (ocr) {
+    filters.push(
+      `json_extract(${a}metadata, '$.ocr_text') IS NOT NULL ` +
+        `AND CAST(json_extract(${a}metadata, '$.ocr_text') AS TEXT) <> ''`,
+    );
+  }
+
+  if (subreddit) {
+    if (Array.isArray(subreddit)) {
+      const ph = subreddit.map(() => "?").join(",");
+      filters.push(`json_extract(${a}metadata, '$.subreddit') COLLATE NOCASE IN (${ph})`);
+      params.push(...subreddit);
+    } else {
+      filters.push(`json_extract(${a}metadata, '$.subreddit') = ? COLLATE NOCASE`);
+      params.push(subreddit);
+    }
+  }
+
+  if (author) {
+    if (Array.isArray(author)) {
+      const ph = author.map(() => "?").join(",");
+      filters.push(`${a}author COLLATE NOCASE IN (${ph})`);
+      params.push(...author);
+    } else {
+      filters.push(`${a}author = ? COLLATE NOCASE`);
+      params.push(author);
+    }
+  }
+
+  if ((before !== undefined && before !== null) || (after !== undefined && after !== null)) {
+    filters.push(`${a}created_utc > 0`);
+  }
+
+  if (before !== undefined && before !== null) {
+    filters.push(`${a}created_utc < ?`);
+    params.push(Number(before));
+  }
+
+  if (after !== undefined && after !== null) {
+    filters.push(`${a}created_utc >= ?`);
+    params.push(Number(after));
+  }
+
+  if (
+    (scoreMin !== undefined && scoreMin !== null) ||
+    (scoreMax !== undefined && scoreMax !== null)
+  ) {
+    filters.push(`json_extract(${a}metadata, '$.score') IS NOT NULL`);
+    const scoreExpr = `CAST(json_extract(${a}metadata, '$.score') AS INTEGER)`;
+
+    if (scoreMin !== undefined && scoreMin !== null) {
+      filters.push(`${scoreExpr} >= ?`);
+      params.push(Number(scoreMin));
+    }
+
+    if (scoreMax !== undefined && scoreMax !== null) {
+      filters.push(`${scoreExpr} <= ?`);
+      params.push(Number(scoreMax));
+    }
+  }
+
+  if (isSaved !== undefined && isSaved !== null) {
+    filters.push(`${a}is_saved = ?`);
+    params.push(Number(isSaved));
+  }
+
+  if (openInFirefox) {
+    filters.push(`json_extract(${a}metadata, '$.open_in_firefox') = 1`);
+  }
+
+  if (!includeConsolidated) {
+    filters.push(`json_extract(${a}metadata, '$.consolidated_into') IS NULL`);
+  }
+
+  return { filters, params };
+}
+
+export function searchItems(db: Database, q: string = "", opts: SearchOpts = {}): Item[] {
+  let filters: string[] = [];
+  let params: SQLQueryBindings[] = [];
 
   const addFilters = (alias: string): void => {
-    const a = alias ? `${alias}.` : "";
-
-    const {
-      source,
-      kind,
-      status,
-      category,
-      tags,
-      tagsAll,
-      subreddit,
-      author,
-      isSaved,
-      nsfw,
-      hideNsfw,
-      decayed,
-      swept,
-      snoozed,
-      hideSnoozed,
-      deleted,
-      hasMedia,
-      before,
-      after,
-      scoreMin,
-      scoreMax,
-      openInFirefox,
-      ocr,
-      includeConsolidated,
-    } = opts;
-
-    if (source) {
-      if (Array.isArray(source)) {
-        const ph = source.map(() => "?").join(",");
-        filters.push(`${a}source IN (${ph})`);
-        params.push(...source);
-      } else {
-        filters.push(`${a}source = ?`);
-        params.push(source);
-      }
-    }
-
-    if (kind) {
-      if (Array.isArray(kind)) {
-        const ph = kind.map(() => "?").join(",");
-        filters.push(`${a}kind IN (${ph})`);
-        params.push(...kind);
-      } else {
-        filters.push(`${a}kind = ?`);
-        params.push(kind);
-      }
-    }
-
-    if (status) {
-      if (Array.isArray(status)) {
-        const ph = status.map(() => "?").join(",");
-        filters.push(`${a}status IN (${ph})`);
-        params.push(...status);
-      } else {
-        filters.push(`${a}status = ?`);
-        params.push(status);
-      }
-    }
-
-    if (category) {
-      if (PROCESSING_TAGS.some((processingTag) => processingTag === category)) {
-        filters.push(
-          `(json_extract(${a}metadata, '$.category') = ? OR ` +
-            `EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value = ?))`,
-        );
-        params.push(category, category);
-      } else {
-        filters.push(`json_extract(${a}metadata, '$.category') = ?`);
-        params.push(category);
-      }
-    }
-
-    if (tags?.length) {
-      if (tagsAll) {
-        for (const t of tags) {
-          filters.push(`EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value = ?)`);
-          params.push(t);
-        }
-      } else {
-        const ph = tags.map(() => "?").join(",");
-        filters.push(
-          `EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value IN (${ph}))`,
-        );
-        params.push(...tags);
-      }
-    }
-
-    let nsfwPred = "";
-
-    if (nsfw || hideNsfw) {
-      const ph = NSFW_TAGS.map(() => "?").join(",");
-      nsfwPred =
-        `(EXISTS (SELECT 1 FROM json_each(${a}metadata, '$.tags') WHERE value IN (${ph}))` +
-        ` OR COALESCE(json_extract(${a}metadata, '$.over_18'), 0) = 1)`;
-    }
-
-    if (nsfw) {
-      filters.push(nsfwPred);
-      params.push(...NSFW_TAGS);
-    }
-
-    if (hideNsfw) {
-      filters.push(`NOT ${nsfwPred}`);
-      params.push(...NSFW_TAGS);
-    }
-
-    if (hasMedia) {
-      if (Array.isArray(hasMedia)) {
-        const mapped = hasMedia.map((h) => (h === "video" ? "reddit_video" : h));
-        const ph = mapped.map(() => "?").join(",");
-        filters.push(`json_extract(${a}metadata, '$.media_type') IN (${ph})`);
-        params.push(...mapped);
-      } else {
-        const mt = hasMedia === "video" ? "reddit_video" : hasMedia;
-        filters.push(`json_extract(${a}metadata, '$.media_type') = ?`);
-        params.push(mt);
-      }
-    }
-
-    if (decayed) {
-      filters.push(`json_extract(${a}metadata, '$.decayed_at') IS NOT NULL`);
-    }
-
-    if (swept) {
-      filters.push(`json_extract(${a}metadata, '$.decay_label') = 'swept'`);
-    }
-
-    if (snoozed) {
-      filters.push(`json_extract(${a}metadata, '$.snoozed_until') > ?`);
-      params.push(Math.floor(Date.now() / 1000));
-    }
-
-    if (hideSnoozed && !snoozed) {
-      filters.push(
-        `(json_extract(${a}metadata, '$.snoozed_until') IS NULL ` +
-          `OR json_extract(${a}metadata, '$.snoozed_until') <= ?)`,
-      );
-      params.push(Math.floor(Date.now() / 1000));
-    }
-
-    if (deleted) {
-      filters.push(`json_extract(${a}metadata, '$.media_status') = 'gone'`);
-    }
-
-    if (ocr) {
-      filters.push(
-        `json_extract(${a}metadata, '$.ocr_text') IS NOT NULL ` +
-          `AND CAST(json_extract(${a}metadata, '$.ocr_text') AS TEXT) <> ''`,
-      );
-    }
-
-    if (subreddit) {
-      if (Array.isArray(subreddit)) {
-        const ph = subreddit.map(() => "?").join(",");
-        filters.push(`json_extract(${a}metadata, '$.subreddit') COLLATE NOCASE IN (${ph})`);
-        params.push(...subreddit);
-      } else {
-        filters.push(`json_extract(${a}metadata, '$.subreddit') = ? COLLATE NOCASE`);
-        params.push(subreddit);
-      }
-    }
-
-    if (author) {
-      if (Array.isArray(author)) {
-        const ph = author.map(() => "?").join(",");
-        filters.push(`${a}author COLLATE NOCASE IN (${ph})`);
-        params.push(...author);
-      } else {
-        filters.push(`${a}author = ? COLLATE NOCASE`);
-        params.push(author);
-      }
-    }
-
-    if ((before !== undefined && before !== null) || (after !== undefined && after !== null)) {
-      filters.push(`${a}created_utc > 0`);
-    }
-
-    if (before !== undefined && before !== null) {
-      filters.push(`${a}created_utc < ?`);
-      params.push(Number(before));
-    }
-
-    if (after !== undefined && after !== null) {
-      filters.push(`${a}created_utc >= ?`);
-      params.push(Number(after));
-    }
-
-    if (
-      (scoreMin !== undefined && scoreMin !== null) ||
-      (scoreMax !== undefined && scoreMax !== null)
-    ) {
-      filters.push(`json_extract(${a}metadata, '$.score') IS NOT NULL`);
-      const scoreExpr = `CAST(json_extract(${a}metadata, '$.score') AS INTEGER)`;
-
-      if (scoreMin !== undefined && scoreMin !== null) {
-        filters.push(`${scoreExpr} >= ?`);
-        params.push(Number(scoreMin));
-      }
-
-      if (scoreMax !== undefined && scoreMax !== null) {
-        filters.push(`${scoreExpr} <= ?`);
-        params.push(Number(scoreMax));
-      }
-    }
-
-    if (isSaved !== undefined && isSaved !== null) {
-      filters.push(`${a}is_saved = ?`);
-      params.push(Number(isSaved));
-    }
-
-    if (openInFirefox) {
-      filters.push(`json_extract(${a}metadata, '$.open_in_firefox') = 1`);
-    }
-
-    if (!includeConsolidated) {
-      filters.push(`json_extract(${a}metadata, '$.consolidated_into') IS NULL`);
-    }
+    ({ filters, params } = searchFilters(opts, alias));
   };
 
   const query = (q || "").trim();

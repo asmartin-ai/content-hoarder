@@ -58,6 +58,7 @@ import { addPage, onboardingSeen, pullStatus } from "./handlers/add.ts";
 import { youtubeRoute } from "./handlers/youtube.ts";
 import { handleVideoExport, handleVideoPrepare } from "./handlers/video.ts";
 import { homePage } from "./handlers/home.ts";
+import { searchRoute } from "./handlers/search.ts";
 import {
   googleCallback,
   googleStart,
@@ -231,6 +232,9 @@ async function appRoute(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+  const semantic = await searchRoute(request);
+
+  if (semantic) return semantic;
 
   if (method === "GET" && path === "/triage") return Response.redirect("/clear", 302);
 

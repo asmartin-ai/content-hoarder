@@ -370,6 +370,21 @@ export function privacyPage(): Response {
               : "The provider's own terms apply."
           }
         </li>
+        <li>
+          Semantic search uses a local embedding model on this server and a derived index inside
+          your own library. Indexing is explicit, never automatic. The first index may download
+          model files; it does not send your saved text to an embedding provider. Titles, bodies and
+          useful cached Reddit comments are indexed, with source links preserved. Changed or deleted
+          sources are excluded from semantic retrieval until refreshed.
+        </li>
+        <li>
+          Ask requires separate consent for each question. Your question and the full retrieved
+          passages (not just the short AI-hint excerpt) are sent to ${aiProviderLabel()}, the
+          configured AI endpoint. AI hint consent does not authorize this. Provider terms apply.
+          Answers include source citations but can still be wrong. Offline mode blocks remote
+          answers and model downloads; a prewarmed model can still search locally. Search and Ask
+          cannot read another tester's library or a personal PKMS library.
+        </li>
         <li>Letting something go in Khaos never changes your YouTube, Twitch or Reddit account.</li>
         <li>Ask and your data is deleted, all of it.</li>
       </ul>
